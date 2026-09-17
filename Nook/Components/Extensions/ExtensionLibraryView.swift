@@ -3,6 +3,7 @@
 //  Nook
 //
 
+import NookSettings
 import SwiftUI
 import AppKit
 import WebKit

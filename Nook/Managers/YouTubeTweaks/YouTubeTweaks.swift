@@ -6,32 +6,14 @@
 //
 
 import Foundation
+import NookSettings
 import OSLog
 import WebKit
 
 private let ytLog = Logger(subsystem: "com.baingurley.nook", category: "YouTubeTweaks")
 
-/// Home feed shelves the user can hide. Shelf types are computed in YouTube's JS, not reflected
-/// as attributes, so each one is matched by what it contains.
-enum YouTubeHomeSection: String, CaseIterable, Identifiable {
-    case posts
-    case playables
-    case otherShelves
-    case surveys
-    case filterChips
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .posts: return "Posts"
-        case .playables: return "Playables"
-        case .otherShelves: return "News and topic shelves"
-        case .surveys: return "Surveys and banners"
-        case .filterChips: return "Topic filter bar"
-        }
-    }
-
+/// The selectors each hideable home shelf is matched by. The enum itself lives in NookSettings.
+extension YouTubeHomeSection {
     fileprivate static let shorts = "ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2"
     fileprivate static let postItems = "ytd-post-renderer, ytd-backstage-post-thread-renderer"
     fileprivate static let gameItems = "ytd-mini-game-card-view-model, ytd-game-card-renderer"

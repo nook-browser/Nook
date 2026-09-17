@@ -5,16 +5,16 @@
 //  Site search (Tab-to-Search) data model and matching logic
 //
 
-import SwiftUI
+import Foundation
 
 // MARK: - Custom Search Engine
 
-struct CustomSearchEngine: Codable, Identifiable, Equatable, Sendable {
-    var id: UUID
-    var name: String
-    var urlTemplate: String   // uses %@ placeholder like SearchProvider.queryTemplate
+public struct CustomSearchEngine: Codable, Identifiable, Equatable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var urlTemplate: String   // uses %@ placeholder like SearchProvider.queryTemplate
 
-    init(id: UUID = UUID(), name: String, urlTemplate: String) {
+    public init(id: UUID = UUID(), name: String, urlTemplate: String) {
         self.id = id
         self.name = name
         self.urlTemplate = urlTemplate
@@ -23,18 +23,14 @@ struct CustomSearchEngine: Codable, Identifiable, Equatable, Sendable {
 
 // MARK: - Site Search Entry
 
-struct SiteSearchEntry: Codable, Identifiable, Equatable {
-    var id: UUID
-    var name: String
-    var domain: String
-    var searchURLTemplate: String
-    var colorHex: String
+public struct SiteSearchEntry: Codable, Identifiable, Equatable {
+    public var id: UUID
+    public var name: String
+    public var domain: String
+    public var searchURLTemplate: String
+    public var colorHex: String
 
-    var color: Color {
-        Color(hex: colorHex)
-    }
-
-    init(id: UUID = UUID(), name: String, domain: String, searchURLTemplate: String, colorHex: String) {
+    public init(id: UUID = UUID(), name: String, domain: String, searchURLTemplate: String, colorHex: String) {
         self.id = id
         self.name = name
         self.domain = domain
@@ -42,7 +38,7 @@ struct SiteSearchEntry: Codable, Identifiable, Equatable {
         self.colorHex = colorHex
     }
 
-    func searchURL(for query: String) -> URL? {
+    public func searchURL(for query: String) -> URL? {
         guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             return nil
         }
@@ -54,14 +50,14 @@ struct SiteSearchEntry: Codable, Identifiable, Equatable {
         return URL(string: urlString)
     }
 
-    func matches(prefix: String) -> Bool {
+    public func matches(prefix: String) -> Bool {
         let lower = prefix.lowercased()
         return name.lowercased().hasPrefix(lower) || domain.lowercased().hasPrefix(lower)
     }
 
     // MARK: - Defaults
 
-    static let defaultSites: [SiteSearchEntry] = [
+    public static let defaultSites: [SiteSearchEntry] = [
         SiteSearchEntry(
             name: "YouTube", domain: "youtube.com",
             searchURLTemplate: "https://www.youtube.com/results?search_query={query}",
@@ -134,7 +130,7 @@ struct SiteSearchEntry: Codable, Identifiable, Equatable {
         ),
     ]
 
-    static func match(for text: String, in sites: [SiteSearchEntry]) -> SiteSearchEntry? {
+    public static func match(for text: String, in sites: [SiteSearchEntry]) -> SiteSearchEntry? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         return sites.first { $0.matches(prefix: trimmed) }

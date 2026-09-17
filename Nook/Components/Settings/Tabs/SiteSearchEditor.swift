@@ -5,6 +5,7 @@
 //  Created by Maciek Bagiński on 03/08/2025.
 //
 
+import NookSettings
 import SwiftUI
 
 struct SiteSearchEntryEditor: View {

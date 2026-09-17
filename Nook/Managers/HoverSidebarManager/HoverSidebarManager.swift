@@ -5,6 +5,7 @@
 //  Created by Jonathan Caudill on 2025-09-13.
 //
 
+import NookSettings
 import SwiftUI
 import AppKit
 

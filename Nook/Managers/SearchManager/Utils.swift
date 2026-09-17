@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 /// Returns true if the host portion of the input looks like an IP address (v4 or v6).
 private func isIPAddress(_ host: String) -> Bool {
@@ -73,69 +72,4 @@ public func isLikelyURL(_ text: String) -> Bool {
   return trimmed.contains(".com") || trimmed.contains(".org") ||
     trimmed.contains(".net") || trimmed.contains(".io") ||
     trimmed.contains(".co") || trimmed.contains(".dev")
-}
-
-public enum SearchProvider: String, CaseIterable, Identifiable, Codable, Sendable {
-  case google
-  case duckDuckGo
-  case bing
-  case brave
-  case yahoo
-  case perplexity
-  case unduck
-  case ecosia
-  case kagi
-
-  public var id: String { rawValue }
-
-  var displayName: String {
-    switch self {
-    case .google: return "Google"
-    case .duckDuckGo: return "DuckDuckGo"
-    case .bing: return "Bing"
-    case .brave: return "Brave"
-    case .yahoo: return "Yahoo"
-    case .perplexity: return "Perplexity"
-    case .unduck: return "Unduck"
-    case .ecosia: return "Ecosia"
-    case .kagi: return "Kagi"
-    }
-  }
-
-  var host: String {
-    switch self {
-    case .google: return "www.google.com"
-    case .duckDuckGo: return "duckduckgo.com"
-    case .bing: return "www.bing.com"
-    case .brave: return "search.brave.com"
-    case .yahoo: return "search.yahoo.com"
-    case .perplexity: return "www.perplexity.ai"
-    case .unduck: return "duckduckgo.com"
-    case .ecosia: return "www.ecosia.org"
-    case .kagi: return "kagi.com"
-    }
-  }
-
-  var queryTemplate: String {
-    switch self {
-    case .google:
-      return "https://www.google.com/search?q=%@"
-    case .duckDuckGo:
-      return "https://duckduckgo.com/?q=%@"
-    case .bing:
-      return "https://www.bing.com/search?q=%@"
-    case .brave:
-      return "https://search.brave.com/search?q=%@"
-    case .yahoo:
-      return "https://search.yahoo.com/search?p=%@"
-    case .perplexity:
-      return "https://www.perplexity.ai/search?q=%@"
-    case .unduck:
-      return "https://unduck.link?q=%@"
-    case .ecosia:
-      return "https://www.ecosia.org/search?q=%@"
-    case .kagi:
-      return "https://kagi.com/search?q=%@"
-    }
-  }
 }

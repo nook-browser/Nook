@@ -62,7 +62,7 @@ struct SpacesListItem: View {
                 space: space,
                 canDelete: tabs.switchableSpaces(for: windowState).count > 1,
                 onOpenSettings: {
-                    nookSettings.currentSettingsTab = .spaces
+                    SettingsNavigation.shared.currentSettingsTab = .spaces
                     openSettings()
                 },
                 onDeleteSpace: { tabs.deleteSpace(space.id) }

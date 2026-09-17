@@ -5,6 +5,7 @@
 //  Created by Maciek Bagiński on 07/12/2025.
 //
 
+import NookSettings
 import SwiftUI
 
 struct SettingsGeneralTab: View {

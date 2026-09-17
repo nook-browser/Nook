@@ -1,4 +1,5 @@
 import AppKit
+import NookSettings
 import NookTabsCore
 import WebKit
 

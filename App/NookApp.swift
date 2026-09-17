@@ -8,6 +8,7 @@
 
 import AppKit
 import Carbon
+import NookSettings
 import OSLog
 import Sparkle
 import SwiftUI

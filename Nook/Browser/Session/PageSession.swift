@@ -11,6 +11,7 @@ import AppKit
 import Combine
 import CoreAudio
 import FaviconFinder
+import NookSettings
 import SwiftUI
 import WebKit
 

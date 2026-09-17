@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import NookSettings
 import OSLog
 
 struct OllamaProvider: AIProviderProtocol {

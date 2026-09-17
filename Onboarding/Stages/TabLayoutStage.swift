@@ -5,6 +5,7 @@
 //  Created by Maciek Bagiński on 17/02/2026.
 //
 
+import NookSettings
 import SwiftUI
 
 struct TabLayoutStage: View {

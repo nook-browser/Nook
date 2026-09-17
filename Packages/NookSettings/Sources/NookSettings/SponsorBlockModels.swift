@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Category
 
-enum SponsorBlockCategory: String, Codable, CaseIterable, Identifiable {
+public enum SponsorBlockCategory: String, Codable, CaseIterable, Identifiable {
     case sponsor
     case selfpromo
     case exclusive_access
@@ -21,9 +21,9 @@ enum SponsorBlockCategory: String, Codable, CaseIterable, Identifiable {
     case music_offtopic
     case poi_highlight
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .sponsor: return "Sponsor"
         case .selfpromo: return "Self-Promotion"
@@ -38,7 +38,7 @@ enum SponsorBlockCategory: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .sponsor: return "Paid promotion, paid referral, or direct advertisement"
         case .selfpromo: return "Promoting a product or service that is directly related to the creator"
@@ -54,7 +54,7 @@ enum SponsorBlockCategory: String, Codable, CaseIterable, Identifiable {
     }
 
     /// Hex color matching SponsorBlock's official category colors
-    var color: String {
+    public var color: String {
         switch self {
         case .sponsor: return "#00D400"
         case .selfpromo: return "#FFFF00"
@@ -72,14 +72,14 @@ enum SponsorBlockCategory: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - Skip Option (per-category behavior)
 
-enum SponsorBlockSkipOption: String, Codable, CaseIterable, Identifiable {
+public enum SponsorBlockSkipOption: String, Codable, CaseIterable, Identifiable {
     case autoSkip = "auto"
     case manualSkip = "manual"
     case disabled = "disabled"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .autoSkip: return "Auto Skip"
         case .manualSkip: return "Show Skip Button"
@@ -90,7 +90,7 @@ enum SponsorBlockSkipOption: String, Codable, CaseIterable, Identifiable {
 
 extension SponsorBlockCategory {
     /// Default skip option per category, matching SponsorBlock's defaults.
-    var defaultSkipOption: SponsorBlockSkipOption {
+    public var defaultSkipOption: SponsorBlockSkipOption {
         switch self {
         case .sponsor: return .autoSkip
         case .poi_highlight: return .manualSkip
@@ -99,7 +99,7 @@ extension SponsorBlockCategory {
     }
 
     /// Builds the full default options dictionary.
-    static var defaultCategoryOptions: [String: String] {
+    public static var defaultCategoryOptions: [String: String] {
         var options: [String: String] = [:]
         for category in Self.allCases {
             options[category.rawValue] = category.defaultSkipOption.rawValue
@@ -110,7 +110,7 @@ extension SponsorBlockCategory {
 
 // MARK: - Action Type
 
-enum SponsorBlockActionType: String, Codable {
+public enum SponsorBlockActionType: String, Codable {
     case skip
     case mute
     case full
@@ -120,27 +120,27 @@ enum SponsorBlockActionType: String, Codable {
 
 // MARK: - Segment
 
-struct SponsorBlockSegment: Codable, Identifiable {
-    let UUID: String
-    let segment: [Double]
-    let category: String
-    let actionType: String
-    let votes: Int?
-    let locked: Int?
+public struct SponsorBlockSegment: Codable, Identifiable {
+    public let UUID: String
+    public let segment: [Double]
+    public let category: String
+    public let actionType: String
+    public let votes: Int?
+    public let locked: Int?
 
-    var id: String { UUID }
-    var startTime: Double { segment.count >= 2 ? segment[0] : 0 }
-    var endTime: Double { segment.count >= 2 ? segment[1] : 0 }
-    var categoryEnum: SponsorBlockCategory? { SponsorBlockCategory(rawValue: category) }
-    var actionEnum: SponsorBlockActionType? { SponsorBlockActionType(rawValue: actionType) }
+    public var id: String { UUID }
+    public var startTime: Double { segment.count >= 2 ? segment[0] : 0 }
+    public var endTime: Double { segment.count >= 2 ? segment[1] : 0 }
+    public var categoryEnum: SponsorBlockCategory? { SponsorBlockCategory(rawValue: category) }
+    public var actionEnum: SponsorBlockActionType? { SponsorBlockActionType(rawValue: actionType) }
 }
 
 // MARK: - Hash-Based API Response
 
 /// Response from the privacy-preserving hash-prefix endpoint.
 /// Each entry contains segments for a single video matching the hash prefix.
-struct SponsorBlockHashResponse: Codable {
-    let videoID: String
-    let hash: String
-    let segments: [SponsorBlockSegment]
+public struct SponsorBlockHashResponse: Codable {
+    public let videoID: String
+    public let hash: String
+    public let segments: [SponsorBlockSegment]
 }

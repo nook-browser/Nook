@@ -6,12 +6,13 @@
 //  Updated by Aether Aurelia on 15/11/2025.
 //
 
-import SwiftUI
+import Foundation
+import Observation
 
 
 @MainActor
 @Observable
-class NookSettingsService {
+public final class NookSettingsService {
     private let userDefaults = UserDefaults.standard
     private let searchEngineKey = "settings.searchEngine"
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
@@ -64,15 +65,13 @@ class NookSettingsService {
     private let facebookHideReelsKey = "settings.facebookHideReels"
     private let facebookHideSuggestedKey = "settings.facebookHideSuggested"
 
-    var currentSettingsTab: SettingsTabs = .general
-
-    var searchEngineId: String {
+    public var searchEngineId: String {
         didSet {
             userDefaults.set(searchEngineId, forKey: searchEngineKey)
         }
     }
 
-    var customSearchEngines: [CustomSearchEngine] {
+    public var customSearchEngines: [CustomSearchEngine] {
         didSet {
             if let data = try? JSONEncoder().encode(customSearchEngines) {
                 userDefaults.set(data, forKey: customSearchEnginesKey)
@@ -80,7 +79,7 @@ class NookSettingsService {
         }
     }
 
-    var siteRoutingRules: [SiteRoutingRule] = [] {
+    public var siteRoutingRules: [SiteRoutingRule] = [] {
         didSet {
             if let data = try? JSONEncoder().encode(siteRoutingRules) {
                 userDefaults.set(data, forKey: siteRoutingRulesKey)
@@ -90,7 +89,7 @@ class NookSettingsService {
 
     /// Resolves the current `searchEngineId` to a query template string.
     /// Checks built-in `SearchProvider` cases first, then custom engines.
-    var resolvedSearchEngineTemplate: String {
+    public var resolvedSearchEngineTemplate: String {
         if let provider = SearchProvider(rawValue: searchEngineId) {
             return provider.queryTemplate
         }
@@ -100,7 +99,7 @@ class NookSettingsService {
         return SearchProvider.google.queryTemplate
     }
     
-    var tabManagementMode: TabManagementMode {
+    public var tabManagementMode: TabManagementMode {
         didSet {
             userDefaults.set(tabManagementMode.rawValue, forKey: tabManagementModeKey)
             NotificationCenter.default.post(
@@ -111,31 +110,31 @@ class NookSettingsService {
         }
     }
 
-    var startupLoadMode: StartupLoadMode {
+    public var startupLoadMode: StartupLoadMode {
         didSet {
             userDefaults.set(startupLoadMode.rawValue, forKey: startupLoadModeKey)
         }
     }
 
-    var tabUnloadTimeout: TimeInterval {
+    public var tabUnloadTimeout: TimeInterval {
         tabManagementMode.unloadTimeout
     }
 
-    var blockCrossSiteTracking: Bool {
+    public var blockCrossSiteTracking: Bool {
         didSet {
             userDefaults.set(blockCrossSiteTracking, forKey: blockXSTKey)
             NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
         }
     }
 
-    var adBlockerEnabled: Bool {
+    public var adBlockerEnabled: Bool {
         didSet {
             userDefaults.set(adBlockerEnabled, forKey: adBlockerEnabledKey)
             NotificationCenter.default.post(name: .adBlockerEnabledChanged, object: nil, userInfo: ["enabled": adBlockerEnabled])
         }
     }
 
-    var adBlockerWhitelist: [String] {
+    public var adBlockerWhitelist: [String] {
         didSet {
             if let data = try? JSONEncoder().encode(adBlockerWhitelist) {
                 userDefaults.set(data, forKey: adBlockerWhitelistKey)
@@ -143,7 +142,7 @@ class NookSettingsService {
         }
     }
 
-    var pinnedExtensionIDs: [String] = [] {
+    public var pinnedExtensionIDs: [String] = [] {
         didSet {
             if let data = try? JSONEncoder().encode(pinnedExtensionIDs) {
                 userDefaults.set(data, forKey: pinnedExtensionIDsKey)
@@ -151,13 +150,13 @@ class NookSettingsService {
         }
     }
 
-    var adBlockerLastUpdate: Date? {
+    public var adBlockerLastUpdate: Date? {
         didSet {
             userDefaults.set(adBlockerLastUpdate, forKey: adBlockerLastUpdateKey)
         }
     }
 
-    var enabledOptionalFilterLists: [String] {
+    public var enabledOptionalFilterLists: [String] {
         didSet {
             if let data = try? JSONEncoder().encode(enabledOptionalFilterLists) {
                 userDefaults.set(data, forKey: "settings.enabledOptionalFilterLists")
@@ -165,47 +164,47 @@ class NookSettingsService {
         }
     }
     
-    var askBeforeQuit: Bool {
+    public var askBeforeQuit: Bool {
         didSet {
             userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
         }
     }
     
-    var sidebarPosition: SidebarPosition {
+    public var sidebarPosition: SidebarPosition {
         didSet {
             userDefaults.set(sidebarPosition.rawValue, forKey: sidebarPositionKey)
         }
     }
     
-    var topBarAddressView: Bool {
+    public var topBarAddressView: Bool {
         didSet {
             userDefaults.set(topBarAddressView, forKey: topBarAddressViewKey)
         }
     }
 
-    var appearanceMode: AppearanceMode {
+    public var appearanceMode: AppearanceMode {
         didSet {
             userDefaults.set(appearanceMode.rawValue, forKey: appearanceModeKey)
             NotificationCenter.default.post(name: .appearanceModeChanged, object: nil)
         }
     }
 
-    var debugToggleUpdateNotification: Bool {
+    public var debugToggleUpdateNotification: Bool {
         didSet {
             userDefaults.set(debugToggleUpdateNotification, forKey: debugToggleUpdateNotificationKey)
         }
     }
 
 
-    var geminiApiKey: String
+    public var geminiApiKey: String
 
-    var geminiModel: GeminiModel {
+    public var geminiModel: GeminiModel {
         didSet {
             userDefaults.set(geminiModel.rawValue, forKey: geminiModelKey)
         }
     }
 
-    var showAIAssistant: Bool {
+    public var showAIAssistant: Bool {
         didSet {
             userDefaults.set(showAIAssistant, forKey: showAIAssistantKey)
         }
@@ -214,70 +213,69 @@ class NookSettingsService {
     /// Local MCP server (127.0.0.1:47823) that lets a coding agent drive this browser.
     /// Off by default: anything that can read the token file gets full control of the
     /// browser, including pages the user is signed in to. See DevMCPServer.
-    var browserControlServerEnabled: Bool {
+    public var browserControlServerEnabled: Bool {
         didSet {
             userDefaults.set(browserControlServerEnabled, forKey: browserControlServerKey)
-            DevMCPServer.shared.applyEnabledSetting(browserControlServerEnabled)
         }
     }
 
-    var aiProvider: AIProvider {
+    public var aiProvider: AIProvider {
         didSet {
             userDefaults.set(aiProvider.rawValue, forKey: aiProviderKey)
         }
     }
 
-    var openRouterApiKey: String
+    public var openRouterApiKey: String
 
-    var openRouterModel: OpenRouterModel {
+    public var openRouterModel: OpenRouterModel {
         didSet {
             userDefaults.set(openRouterModel.rawValue, forKey: openRouterModelKey)
         }
     }
 
-    var ollamaEndpoint: String {
+    public var ollamaEndpoint: String {
         didSet {
             userDefaults.set(ollamaEndpoint, forKey: ollamaEndpointKey)
         }
     }
 
-    var ollamaModel: String {
+    public var ollamaModel: String {
         didSet {
             userDefaults.set(ollamaModel, forKey: ollamaModelKey)
         }
     }
 
-    var webSearchEnabled: Bool {
+    public var webSearchEnabled: Bool {
         didSet {
             userDefaults.set(webSearchEnabled, forKey: webSearchEnabledKey)
         }
     }
 
-    var webSearchEngine: String {
+    public var webSearchEngine: String {
         didSet {
             userDefaults.set(webSearchEngine, forKey: webSearchEngineKey)
         }
     }
 
-    var webSearchMaxResults: Int {
+    public var webSearchMaxResults: Int {
         didSet {
             userDefaults.set(webSearchMaxResults, forKey: webSearchMaxResultsKey)
         }
     }
 
-    var webSearchContextSize: String {
+    public var webSearchContextSize: String {
         didSet {
             userDefaults.set(webSearchContextSize, forKey: webSearchContextSizeKey)
         }
     }
     
-    var showLinkStatusBar: Bool {
+    public var showLinkStatusBar: Bool {
         didSet {
             userDefaults.set(showLinkStatusBar, forKey: showLinkStatusBarKey)
         }
     }
     
-    var siteSearchEntries: [SiteSearchEntry] {
+    public var siteSearchEntries: [SiteSearchEntry] {
         didSet {
             if let data = try? JSONEncoder().encode(siteSearchEntries) {
                 userDefaults.set(data, forKey: siteSearchEntriesKey)
@@ -285,7 +283,7 @@ class NookSettingsService {
         }
     }
     
-    var tabLayout: TabLayout {
+    public var tabLayout: TabLayout {
         didSet {
             userDefaults.set(tabLayout.rawValue, forKey: tabLayoutKey)
             // When tabs are on top, URL bar can't be in the sidebar
@@ -295,38 +293,38 @@ class NookSettingsService {
         }
     }
 
-    var didFinishOnboarding: Bool {
+    public var didFinishOnboarding: Bool {
         didSet {
             userDefaults.set(didFinishOnboarding, forKey: didFinishOnboardingKey)
         }
     }
 
-    var tabOrganizerEnabled: Bool {
+    public var tabOrganizerEnabled: Bool {
         didSet {
             userDefaults.set(tabOrganizerEnabled, forKey: tabOrganizerEnabledKey)
         }
     }
 
-    var tabOrganizerModelDownloaded: Bool {
+    public var tabOrganizerModelDownloaded: Bool {
         didSet {
             userDefaults.set(tabOrganizerModelDownloaded, forKey: tabOrganizerModelDownloadedKey)
         }
     }
 
-    var tabOrganizerIdleTimeout: TimeInterval {
+    public var tabOrganizerIdleTimeout: TimeInterval {
         didSet {
             userDefaults.set(tabOrganizerIdleTimeout, forKey: tabOrganizerIdleTimeoutKey)
         }
     }
 
-    var sponsorBlockEnabled: Bool {
+    public var sponsorBlockEnabled: Bool {
         didSet {
             userDefaults.set(sponsorBlockEnabled, forKey: sponsorBlockEnabledKey)
         }
     }
 
     /// Per-category skip options: category rawValue → skip option rawValue ("auto", "manual", "disabled")
-    var sponsorBlockCategoryOptions: [String: String] {
+    public var sponsorBlockCategoryOptions: [String: String] {
         didSet {
             if let data = try? JSONEncoder().encode(sponsorBlockCategoryOptions) {
                 userDefaults.set(data, forKey: sponsorBlockCategoryOptionsKey)
@@ -334,54 +332,54 @@ class NookSettingsService {
         }
     }
 
-    var youTubeHideShorts: Bool {
+    public var youTubeHideShorts: Bool {
         didSet { userDefaults.set(youTubeHideShorts, forKey: youTubeHideShortsKey) }
     }
 
     /// `YouTubeHomeSection` raw values.
-    var youTubeHiddenHomeSections: [String] {
+    public var youTubeHiddenHomeSections: [String] {
         didSet { userDefaults.set(youTubeHiddenHomeSections, forKey: youTubeHiddenHomeSectionsKey) }
     }
 
     /// 0 leaves YouTube's automatic layout; otherwise `YouTubeTweaks.videosPerRowRange`.
-    var youTubeVideosPerRow: Int {
+    public var youTubeVideosPerRow: Int {
         didSet { userDefaults.set(youTubeVideosPerRow, forKey: youTubeVideosPerRowKey) }
     }
 
     /// Replace video thumbnails with a frame from the video.
-    var youTubeFrameThumbnails: Bool {
+    public var youTubeFrameThumbnails: Bool {
         didSet { userDefaults.set(youTubeFrameThumbnails, forKey: youTubeFrameThumbnailsKey) }
     }
 
     /// Stop YouTube playing a video preview when the pointer rests on a card.
-    var youTubeNoHoverPreview: Bool {
+    public var youTubeNoHoverPreview: Bool {
         didSet { userDefaults.set(youTubeNoHoverPreview, forKey: youTubeNoHoverPreviewKey) }
     }
 
     /// Download button over photos and videos, per site.
-    var instagramDownload: Bool {
+    public var instagramDownload: Bool {
         didSet { userDefaults.set(instagramDownload, forKey: instagramDownloadKey) }
     }
 
-    var facebookDownload: Bool {
+    public var facebookDownload: Bool {
         didSet { userDefaults.set(facebookDownload, forKey: facebookDownloadKey) }
     }
 
-    var vscoDownload: Bool {
+    public var vscoDownload: Bool {
         didSet { userDefaults.set(vscoDownload, forKey: vscoDownloadKey) }
     }
 
     /// Remove the Reels carousel from Facebook's news feed.
-    var facebookHideReels: Bool {
+    public var facebookHideReels: Bool {
         didSet { userDefaults.set(facebookHideReels, forKey: facebookHideReelsKey) }
     }
 
     /// Remove posts and units from groups, pages, and people the viewer does not follow.
-    var facebookHideSuggested: Bool {
+    public var facebookHideSuggested: Bool {
         didSet { userDefaults.set(facebookHideSuggested, forKey: facebookHideSuggestedKey) }
     }
 
-    init() {
+    public init() {
         // Register default values
         userDefaults.register(defaults: [
             searchEngineKey: SearchProvider.google.rawValue,
@@ -532,7 +530,7 @@ class NookSettingsService {
     }
 
     /// Call once after ExtensionManager is ready on first launch to pin all existing extensions.
-    func migrateExtensionPinStateIfNeeded(installedExtensionIDs: [String]) {
+    public func migrateExtensionPinStateIfNeeded(installedExtensionIDs: [String]) {
         let migrationKey = "settings.pinnedExtensionIDsMigrated"
         guard !userDefaults.bool(forKey: migrationKey) else { return }
         userDefaults.set(true, forKey: migrationKey)
@@ -545,7 +543,7 @@ class NookSettingsService {
     }
 
     /// Remove plaintext API keys that may exist from before Keychain migration
-    func cleanupPlaintextApiKeys() {
+    public func cleanupPlaintextApiKeys() {
         userDefaults.removeObject(forKey: geminiApiKeyKey)
         userDefaults.removeObject(forKey: openRouterApiKeyKey)
     }
@@ -560,7 +558,7 @@ public enum AIProvider: String, CaseIterable, Identifiable {
     
     public var id: String { rawValue }
     
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .gemini: return "Google Gemini"
         case .openRouter: return "OpenRouter"
@@ -568,7 +566,7 @@ public enum AIProvider: String, CaseIterable, Identifiable {
         }
     }
     
-    var isRecommended: Bool {
+    public var isRecommended: Bool {
         return false
     }
 }
@@ -581,21 +579,21 @@ public enum GeminiModel: String, CaseIterable, Identifiable {
     
     public var id: String { rawValue }
     
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .flash: return "Gemini Flash"
         case .pro: return "Gemini 2.5 Pro"
         }
     }
     
-    var description: String {
+    public var description: String {
         switch self {
         case .flash: return "Fast responses, great for quick questions"
         case .pro: return "Most capable model, best for complex analysis"
         }
     }
     
-    var icon: String {
+    public var icon: String {
         switch self {
         case .flash: return "bolt.fill"
         case .pro: return "star.fill"
@@ -620,7 +618,7 @@ public enum OpenRouterModel: String, CaseIterable, Identifiable {
     
     public var id: String { rawValue }
     
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .deepseekChatV31: return "DeepSeek Chat V3.1 (Free)"
         case .glm45air: return "GLM 4.5 Air (Free)"
@@ -638,28 +636,11 @@ public enum OpenRouterModel: String, CaseIterable, Identifiable {
 
 // MARK: - Notification Names
 extension Notification.Name {
-    static let tabManagementModeChanged = Notification.Name("tabManagementModeChanged")
-    static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
-    static let appearanceModeChanged = Notification.Name("appearanceModeChanged")
-    static let adBlockerEnabledChanged = Notification.Name("adBlockerEnabledChanged")
-    static let adBlockerStateChanged = Notification.Name("adBlockerStateChanged")
-}
-
-// MARK: - Environment Key
-private struct NookSettingsServiceKey: EnvironmentKey {
-    @MainActor
-    static var defaultValue: NookSettingsService {
-        // This should never be called since we always inject from NookApp
-        // But EnvironmentKey protocol requires a default value
-        return NookSettingsService()
-    }
-}
-
-extension EnvironmentValues {
-    var nookSettings: NookSettingsService {
-        get { self[NookSettingsServiceKey.self] }
-        set { self[NookSettingsServiceKey.self] = newValue }
-    }
+    public static let tabManagementModeChanged = Notification.Name("tabManagementModeChanged")
+    public static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
+    public static let appearanceModeChanged = Notification.Name("appearanceModeChanged")
+    public static let adBlockerEnabledChanged = Notification.Name("adBlockerEnabledChanged")
+    public static let adBlockerStateChanged = Notification.Name("adBlockerStateChanged")
 }
 
 // MARK: - Tab Layout
@@ -671,19 +652,11 @@ public enum AppearanceMode: String, CaseIterable, Identifiable {
 
     public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .system: return "System"
         case .light: return "Light"
         case .dark: return "Dark"
-        }
-    }
-
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .system: return nil
-        case .light: return .light
-        case .dark: return .dark
         }
     }
 }
@@ -694,7 +667,7 @@ public enum TabLayout: String, CaseIterable, Identifiable {
 
     public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .sidebar: return "Sidebar"
         case .topOfWindow: return "Top of Window"
@@ -711,7 +684,7 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
 
     public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .powerSaving: return "Power Saving"
         case .standard: return "Standard"
@@ -719,7 +692,7 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .powerSaving: return "Aggressively unloads tabs to minimize memory and battery usage. Best for laptops on battery."
         case .standard: return "Balanced tab management for everyday browsing."
@@ -727,7 +700,7 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .powerSaving: return "leaf.fill"
         case .standard: return "speedometer"
@@ -735,7 +708,7 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var unloadTimeout: TimeInterval {
+    public var unloadTimeout: TimeInterval {
         switch self {
         case .powerSaving: return 300       // 5 minutes
         case .standard: return 1800         // 30 minutes
@@ -743,7 +716,7 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var maxLoadedTabs: Int? {
+    public var maxLoadedTabs: Int? {
         switch self {
         case .powerSaving: return 8
         case .standard: return nil
@@ -751,7 +724,7 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var unloadsOnBackground: Bool {
+    public var unloadsOnBackground: Bool {
         switch self {
         case .powerSaving: return true
         case .standard: return false
@@ -761,7 +734,7 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
 
     /// Number of tabs to keep loaded (in addition to current) under memory pressure.
     /// nil means use fraction-based approach instead.
-    var memoryPressureKeepCount: Int? {
+    public var memoryPressureKeepCount: Int? {
         switch self {
         case .powerSaving: return 2
         case .standard: return nil
@@ -770,7 +743,7 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
     }
 
     /// Fraction of loaded tabs to unload under memory pressure (used when keepCount is nil).
-    var memoryPressureUnloadFraction: Double {
+    public var memoryPressureUnloadFraction: Double {
         switch self {
         case .powerSaving: return 1.0  // Not used — keepCount takes precedence for powerSaving
         case .standard: return 0.5
@@ -788,7 +761,7 @@ public enum StartupLoadMode: String, CaseIterable, Identifiable {
 
     public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .nothing: return "Last Tab Only"
         case .favorites: return "Last Tab & Favorites"
@@ -796,7 +769,7 @@ public enum StartupLoadMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .nothing: return "Only your last open tab is loaded. Other tabs load when selected."
         case .favorites: return "Your last open tab and favorites are loaded on start. Space tabs load when selected."

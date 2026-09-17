@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import NookSettings
 import SwiftUI
 import Garnish
 

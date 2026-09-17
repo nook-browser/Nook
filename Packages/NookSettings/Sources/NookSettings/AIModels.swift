@@ -13,15 +13,15 @@ import Security
 
 // MARK: - Provider Configuration
 
-enum AIProviderType: String, Codable, CaseIterable, Identifiable {
+public enum AIProviderType: String, Codable, CaseIterable, Identifiable {
     case gemini = "gemini"
     case openRouter = "openrouter"
     case ollama = "ollama"
     case openAICompatible = "openai_compatible"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .gemini: return "Google Gemini"
         case .openRouter: return "OpenRouter"
@@ -30,14 +30,14 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var requiresAPIKey: Bool {
+    public var requiresAPIKey: Bool {
         switch self {
         case .gemini, .openRouter: return true
         case .ollama, .openAICompatible: return false
         }
     }
 
-    var defaultBaseURL: String? {
+    public var defaultBaseURL: String? {
         switch self {
         case .gemini: return "https://generativelanguage.googleapis.com/v1beta"
         case .openRouter: return "https://openrouter.ai/api/v1"
@@ -47,20 +47,20 @@ enum AIProviderType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct AIProviderConfig: Codable, Identifiable, Equatable {
-    let id: String
-    var displayName: String
-    var providerType: AIProviderType
-    var baseURL: String
-    var isEnabled: Bool
-    var customHeaders: [String: String]
+public struct AIProviderConfig: Codable, Identifiable, Equatable {
+    public let id: String
+    public var displayName: String
+    public var providerType: AIProviderType
+    public var baseURL: String
+    public var isEnabled: Bool
+    public var customHeaders: [String: String]
 
     // API key is stored in Keychain, not in JSON
-    var apiKey: String {
+    public var apiKey: String {
         AIKeychainStorage.shared.apiKey(for: id) ?? ""
     }
 
-    init(
+    public init(
         id: String = UUID().uuidString,
         displayName: String,
         providerType: AIProviderType,
@@ -91,7 +91,7 @@ struct AIProviderConfig: Codable, Identifiable, Equatable {
         case customHeaders
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(String.self, forKey: .id)
         self.displayName = try container.decode(String.self, forKey: .displayName)
@@ -102,7 +102,7 @@ struct AIProviderConfig: Codable, Identifiable, Equatable {
         // apiKey is loaded from Keychain via computed property
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(displayName, forKey: .displayName)
@@ -118,15 +118,15 @@ struct AIProviderConfig: Codable, Identifiable, Equatable {
 
 /// Non-isolated Keychain storage for AI provider API keys
 /// Uses internal synchronization for thread safety
-final class AIKeychainStorage: @unchecked Sendable {
-    static let shared = AIKeychainStorage()
+public final class AIKeychainStorage: @unchecked Sendable {
+    public static let shared = AIKeychainStorage()
 
     private let service = "com.nook.aiProvider"
     private let lock = NSLock()
 
     private init() {}
 
-    func apiKey(for providerId: String) -> String? {
+    public func apiKey(for providerId: String) -> String? {
         guard !providerId.isEmpty else { return nil }
 
         lock.lock()
@@ -154,7 +154,7 @@ final class AIKeychainStorage: @unchecked Sendable {
     }
 
     @discardableResult
-    func saveAPIKey(_ apiKey: String, for providerId: String) -> Bool {
+    public func saveAPIKey(_ apiKey: String, for providerId: String) -> Bool {
         guard !providerId.isEmpty else { return false }
 
         lock.lock()
@@ -191,7 +191,7 @@ final class AIKeychainStorage: @unchecked Sendable {
     }
 
     @discardableResult
-    func deleteAPIKey(for providerId: String) -> Bool {
+    public func deleteAPIKey(for providerId: String) -> Bool {
         guard !providerId.isEmpty else { return false }
 
         lock.lock()
@@ -213,14 +213,14 @@ final class AIKeychainStorage: @unchecked Sendable {
 
 // MARK: - Model Configuration
 
-struct AIModelCapabilities: Codable, Equatable {
-    var toolCalling: Bool
-    var streaming: Bool
-    var webSearch: Bool
-    var contextWindow: Int
-    var maxOutput: Int
+public struct AIModelCapabilities: Codable, Equatable {
+    public var toolCalling: Bool
+    public var streaming: Bool
+    public var webSearch: Bool
+    public var contextWindow: Int
+    public var maxOutput: Int
 
-    init(
+    public init(
         toolCalling: Bool = false,
         streaming: Bool = true,
         webSearch: Bool = false,
@@ -235,14 +235,14 @@ struct AIModelCapabilities: Codable, Equatable {
     }
 }
 
-struct AIModelConfig: Codable, Identifiable, Equatable {
-    let id: String
-    var displayName: String
-    var providerId: String
-    var isCustom: Bool
-    var capabilities: AIModelCapabilities
+public struct AIModelConfig: Codable, Identifiable, Equatable {
+    public let id: String
+    public var displayName: String
+    public var providerId: String
+    public var isCustom: Bool
+    public var capabilities: AIModelCapabilities
 
-    init(
+    public init(
         id: String,
         displayName: String,
         providerId: String,
@@ -259,17 +259,17 @@ struct AIModelConfig: Codable, Identifiable, Equatable {
 
 // MARK: - Generation Configuration
 
-struct AIGenerationConfig: Codable, Equatable {
-    var temperature: Double
-    var maxTokens: Int
-    var systemPrompt: String
-    var streamingEnabled: Bool
-    var webSearchEnabled: Bool
-    var webSearchEngine: String
-    var webSearchMaxResults: Int
-    var webSearchContextSize: String
+public struct AIGenerationConfig: Codable, Equatable {
+    public var temperature: Double
+    public var maxTokens: Int
+    public var systemPrompt: String
+    public var streamingEnabled: Bool
+    public var webSearchEnabled: Bool
+    public var webSearchEngine: String
+    public var webSearchMaxResults: Int
+    public var webSearchContextSize: String
 
-    static let defaultSystemPrompt = """
+    public static let defaultSystemPrompt = """
     You are a helpful AI assistant integrated into Nook, a modern web browser. Your role is to assist users in real time as they browse the web, helping them understand content, answer questions, and gain deeper insights into the pages they're viewing.
 
     Key Behaviors:
@@ -309,7 +309,7 @@ struct AIGenerationConfig: Codable, Equatable {
     To enhance the web browsing experience by providing intelligent, context-aware support exactly when it's needed — whether that means breaking down complex topics, summarizing articles, helping with research, or just answering quick questions.
     """
 
-    init(
+    public init(
         temperature: Double = 0.7,
         maxTokens: Int = 4096,
         systemPrompt: String = AIGenerationConfig.defaultSystemPrompt,
@@ -332,14 +332,14 @@ struct AIGenerationConfig: Codable, Equatable {
 
 // MARK: - Browser Tool Configuration
 
-enum BrowserToolExecutionMode: String, Codable, CaseIterable, Identifiable {
+public enum BrowserToolExecutionMode: String, Codable, CaseIterable, Identifiable {
     case auto = "auto"
     case askBeforeExecuting = "ask"
     case disabled = "disabled"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .auto: return "Auto"
         case .askBeforeExecuting: return "Ask Before Executing"
@@ -348,11 +348,11 @@ enum BrowserToolExecutionMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct BrowserToolsConfig: Codable, Equatable {
-    var executionMode: BrowserToolExecutionMode
-    var enabledTools: Set<String>
+public struct BrowserToolsConfig: Codable, Equatable {
+    public var executionMode: BrowserToolExecutionMode
+    public var enabledTools: Set<String>
 
-    static let allToolNames: Set<String> = [
+    public static let allToolNames: Set<String> = [
         "navigateToURL", "readPageContent", "clickElement",
         "getInteractiveElements",
         "extractStructuredData", "summarizePage", "searchInPage",
@@ -360,7 +360,7 @@ struct BrowserToolsConfig: Codable, Equatable {
         "executeJavaScript"
     ]
 
-    init(
+    public init(
         executionMode: BrowserToolExecutionMode = .askBeforeExecuting,
         enabledTools: Set<String> = BrowserToolsConfig.allToolNames
     ) {
@@ -371,16 +371,16 @@ struct BrowserToolsConfig: Codable, Equatable {
 
 // MARK: - Full AI Configuration
 
-struct AIConfiguration: Codable {
-    var providers: [AIProviderConfig]
-    var models: [AIModelConfig]
-    var activeProviderId: String?
-    var activeModelId: String?
-    var generationConfig: AIGenerationConfig
-    var mcpServers: [MCPServerConfig]
-    var browserToolsConfig: BrowserToolsConfig
+public struct AIConfiguration: Codable {
+    public var providers: [AIProviderConfig]
+    public var models: [AIModelConfig]
+    public var activeProviderId: String?
+    public var activeModelId: String?
+    public var generationConfig: AIGenerationConfig
+    public var mcpServers: [MCPServerConfig]
+    public var browserToolsConfig: BrowserToolsConfig
 
-    init(
+    public init(
         providers: [AIProviderConfig] = [],
         models: [AIModelConfig] = [],
         activeProviderId: String? = nil,

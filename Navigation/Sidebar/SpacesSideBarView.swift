@@ -7,6 +7,7 @@
 //
 
 import AppKit
+import NookSettings
 import NookTabsCore
 import SwiftUI
 import UniformTypeIdentifiers

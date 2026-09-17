@@ -356,7 +356,7 @@ struct NookCommands: Commands {
                 .modifier(dynamicShortcut(.installExtension))
 
                 Button("Manage Extensions...") {
-                    nookSettings.currentSettingsTab = .extensions
+                    SettingsNavigation.shared.currentSettingsTab = .extensions
                     openSettings()
                 }
 

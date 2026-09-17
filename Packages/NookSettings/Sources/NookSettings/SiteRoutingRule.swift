@@ -5,17 +5,17 @@
 
 import Foundation
 
-struct SiteRoutingRule: Codable, Identifiable, Equatable {
-    let id: UUID
-    var domain: String
-    var pathPrefix: String?
-    var targetSpaceId: UUID
-    var isEnabled: Bool
+public struct SiteRoutingRule: Codable, Identifiable, Equatable {
+    public let id: UUID
+    public var domain: String
+    public var pathPrefix: String?
+    public var targetSpaceId: UUID
+    public var isEnabled: Bool
     /// Only set on rules written before spaces owned their data, where the target was a space
     /// inside a profile. `SiteRoutingManager.dropMergedProfileTargets()` resolves and clears it.
-    var legacyProfileId: UUID?
+    public var legacyProfileId: UUID?
 
-    init(
+    public init(
         id: UUID = UUID(),
         domain: String,
         pathPrefix: String? = nil,
@@ -34,7 +34,7 @@ struct SiteRoutingRule: Codable, Identifiable, Equatable {
         case legacyProfileId = "targetProfileId"
     }
 
-    static func normalizeDomain(_ input: String) -> String {
+    public static func normalizeDomain(_ input: String) -> String {
         var d = input
             .lowercased()
             .trimmingCharacters(in: .whitespacesAndNewlines)

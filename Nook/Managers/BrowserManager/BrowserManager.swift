@@ -8,6 +8,7 @@
 import AppKit
 import Combine
 import CoreServices
+import NookSettings
 import OSLog
 import Sparkle
 import SwiftData
@@ -776,7 +777,7 @@ class BrowserManager: ObservableObject {
             }
             return
         }
-        nookSettings?.currentSettingsTab = .spaces
+        SettingsNavigation.shared.currentSettingsTab = .spaces
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
