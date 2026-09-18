@@ -56,9 +56,9 @@ summaries.
    what fails.
 2. **The target.** `NookiOS/` at the repo root (the spec's layout), one app
    target in the same `Nook.xcodeproj`, `SDKROOT = iphoneos`, deployment
-   target iOS 26, the seven package products, bundle id
-   `com.baingurley.nook.ios` or the same id if you want one App Store record
-   (decide with Bain). Entry point, one `WindowGroup`, a `BrowserModel` (the
+   target iOS 26, the seven package products, bundle id `com.gstudios.nook`
+   (decided 2026-09-18; the macOS app moves to the same id in the transition
+   track that runs first, see the spec's Phase 3 decisions). Entry point, one `WindowGroup`, a `BrowserModel` (the
    iOS stand-in for `BrowserManager`: owns settings, registry, blocker,
    sponsorBlock, siteRouting, history, tabs, and the nine conformances).
 3. **Milestone one:** the iOS target builds and loads one page with the
@@ -71,15 +71,14 @@ summaries.
    default list set on iOS or a staged background compile with progress.
    Decide before building the bottom bar.
 5. **Chrome.** iPhone: bottom bar with URL and actions, swipe to switch tabs,
-   space dots above it, tab grid as a sheet, long-press for the shared
+   space dots above it, the tab outline as a sheet, long-press for the shared
    context menu builders. iPad: `NavigationSplitView` with the sidebar rows
    from NookUI. Touch drag via `.draggable` / `.dropDestination` calling
    `TabsController.drop(...)`. `TabCompositorManager` tuned for jetsam.
    Downloads to the app container with `LSSupportsOpeningDocumentsInPlace`.
-6. **Open design questions to brainstorm first**, both from the spec: how a
-   five-deep folder tree and a favorites grid work at phone width; and the
-   settings visual pass (the macOS window should feel like System Settings,
-   iOS like Settings.app), done once in NookUI.
+6. **Open design questions**: answered 2026-09-18, see the spec's Phase 3
+   decisions (indented outline for folders, four-column tile grid for
+   favorites, settings visual pass out of Phase 3).
 7. **Entitlements.** Apply for `com.apple.developer.web-browser` now; the
    review takes time and it is the difference between a browser and a viewer.
    Team ZHB786H6YN needs an iOS provisioning profile.

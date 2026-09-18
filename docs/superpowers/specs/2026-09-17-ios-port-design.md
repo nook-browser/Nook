@@ -348,8 +348,8 @@ shared. The sidebar and window chrome are the irreducible half.
 
 Bottom bar carrying URL and actions, within thumb reach. Horizontal swipe on
 that bar switches tabs. Spaces sit above it as a row of accent dots, the same
-language as `SpacesList` on macOS. Tab grid opens as a sheet. Long-press opens
-the shared context menu builders.
+language as `SpacesList` on macOS. The tab outline (favorites tiles, pinned, tabs,
+folders) opens as a sheet. Long-press opens the shared context menu builders.
 
 ### iPad
 
@@ -384,6 +384,83 @@ Sparkle is macOS-only and does not come along.
 Apply for `com.apple.developer.web-browser` early. It is a request form to
 Apple with a review attached, and it is the difference between shipping a
 browser and shipping a viewer.
+
+### Decisions, 2026-09-18
+
+Settled in the Phase 3 brainstorm, before any code. Facts behind them are in
+the handoff (`docs/ios-port-phase3-handoff.md`) and the session that wrote this.
+
+**Bundle id: `com.gstudios.nook` on both platforms**, App ID registered under
+team ZHB786H6YN. Neither existing id carries over. The upstream install base
+(1.0.7, `io.browsewithnook.nook`, signed by team 9DLM793N9T, no Sparkle EdDSA
+key) can only take an installable update from the same team, so no id choice
+reaches them through Sparkle, and that id is in all likelihood registered as an
+App ID on the old team. `com.baingurley.nook` shipped to two downloads.
+
+**Canonical repo: `nook-browser/Nook`.** Bain is admin on the repo and the
+org. This fork's history is pushed to its `main`, `dev` is deleted, the fork
+is retired. `SUFeedURL` moves to `https://nook-browser.github.io/Nook/appcast.xml`
+and the org repo gets `SPARKLE_SIGNING_KEY` plus Bain's certificate secrets in
+place of the old ones. The 24 upstream-only commits (March 2026 sidebar
+animation work) are treated as superseded by the September remodel unless a
+diff read finds something the remodel lacks.
+
+**Bridge for 1.0.7 users: one informational appcast item.** Sparkle 2.4+
+supports `<sparkle:informationalUpdate>` with a `<sparkle:below>` child; 1.0.7
+runs Sparkle 2.8.1. One item scoped below build 130 shows those users a link
+and no download, so no code-signing check runs. Builds 130 and up see it as a
+normal signed update.
+
+**First-launch migration.** A build that finds no `com.gstudios.nook` data
+copies the Application Support folder, the WebKit website data directory and
+the defaults domain from `io.browsewithnook.nook`, else from
+`com.baingurley.nook`, then runs the existing first-launch path, which already
+seeds spaces from old profiles. The WebKit path for identifier stores on an
+unsandboxed app is verified on a machine with 1.0.7 installed before the
+migration is written.
+
+**Order.** The transition (repo move, feed URL, bridge item, migration, ship
+1.3.0) is its own small plan and runs before Phase 3. Phase 3 then begins with
+the license pointer commit, so every iOS file is born with it.
+
+**The tab sheet is the outline, not a thumbnail grid.** Thumbnails need a
+snapshot per tab, which means loading unloaded pages or a bitmap cache. The
+rows, folder headers, pinned section and favorites tiles in NookUI already run
+through `TabsController`, so the sheet is the macOS sidebar at phone width with
+the space dots as its header.
+
+**Folders on iPhone: the indented outline, unchanged.** `Spacing.folderIndent`
+becomes per-platform in the token file (16pt on iOS); `TabFolderView` renders
+as is. Depth 5 at 16pt leaves about 260pt of a 390pt phone for the row.
+
+**Favorites on iPhone: the same tile grid, four columns.** `PinnedGrid`'s
+column count from width already caps at four. The macOS drop-zone host does not
+port; iOS uses `.draggable` and `.dropDestination` onto
+`TabsController.dropOnFavorites`. Favorites do not appear on the empty page in
+v1.
+
+**Rule list compile: staged install; the device spike decides the list set.**
+Compile in list order and install each list as it finishes, so browsing starts
+once `nook-filters-default` and EasyList are in. This changes
+`ContentBlockerManager`'s install path for both platforms. The spike on Bain's
+iPhone answers whether the full set completes within memory; if not, urlhaus
+and ublock-badware drop first on iOS, before anything that blocks ads.
+
+**Settings visual pass: out of Phase 3.** The grouped `Form` bodies already
+read as Settings.app inside a `NavigationStack`. Only what fails to compile or
+render is touched: fixed `sheetSmallWidth` editors become detent sheets, inline
+pickers take the iOS navigation-link style.
+
+**Phone chrome, minimal set.** One `WKWebView` container filling the scene, a
+bottom bar with URL field, back and a tabs button, space dots above it, swipe on
+the bar to switch tabs within the space, long-press on a sheet row for
+`TabContextMenu`. iPad's `NavigationSplitView` waits until the phone works.
+Peek, PiP, sign-in window, cross-window navigation and shortcuts are no-op
+conformances in one file. `WebViewProvider` on iOS is a dictionary of one
+`WKWebView` per session.
+
+**Entitlement.** The `com.apple.developer.web-browser` request is filed as
+soon as the App ID exists.
 
 ## Phase 4: CloudKit sync
 
