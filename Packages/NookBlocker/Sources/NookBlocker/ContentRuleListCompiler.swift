@@ -46,7 +46,8 @@ final class ContentRuleListCompiler {
     private static var hashFile: URL { cacheDir.appendingPathComponent("rules.sha256") }
     private static var chunkCountFile: URL { cacheDir.appendingPathComponent("chunk-count.txt") }
     /// Written only by saveCache. Its absence means the cache predates the adblock-rust swap.
-    private static var converterStampFile: URL { cacheDir.appendingPathComponent("converter-adblock-rust") }
+    /// The hash is over the input rules, so bump this name when the converter's output changes.
+    private static var converterStampFile: URL { cacheDir.appendingPathComponent("converter-adblock-rust-v2") }
 
     // MARK: - Public API
 
