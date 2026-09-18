@@ -4,8 +4,8 @@
 //  NookiOS
 //
 //  The phone's tab surface: the macOS sidebar outline at phone width. It opens
-//  large because it is the deliberate surface (find, reorder, pin); quick
-//  switching is the swipe on the bar. It drops to medium on a drag.
+//  medium, so the page stays visible behind it and the rows sit in thumb reach,
+//  and pulls up to large for the whole outline.
 //
 
 import SwiftUI
@@ -20,7 +20,8 @@ struct TabSheet: View {
     @Environment(BrowserWindowState.self) private var window
     @Environment(\.dismiss) private var dismiss
 
-    @State private var detent: PresentationDetent = .large
+    @State private var detent: PresentationDetent = .medium
+    @State private var showSettings = false
 
     private var spaceID: UUID? { window.spaceID }
 
@@ -39,16 +40,35 @@ struct TabSheet: View {
         }
         .presentationDetents([.medium, .large], selection: $detent)
         .presentationDragIndicator(.visible)
+        // The default sheet material lets the page bleed through the rows at the
+        // medium detent, where there is something behind to read.
+        .presentationBackground(NookDesign.Surface.windowBackground)
+        // Settings comes up over the sheet rather than replacing it, so closing
+        // it puts you back in the outline.
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet().nookEnvironment(model)
+        }
     }
 
     private var header: some View {
         ZStack {
-            // Centred regardless of the close button's width.
+            // Centred regardless of the buttons flanking it.
             SpacesList()
                 .frame(height: NookDesign.Spacing.xl)
 
             HStack {
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .frame(width: NookDesign.Size.iconButton)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Settings")
+
                 Spacer()
+
                 Button {
                     dismiss()
                 } label: {
@@ -57,6 +77,7 @@ struct TabSheet: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+                .accessibilityLabel("Close")
             }
         }
         .padding(.horizontal, NookDesign.Spacing.rowPadding)

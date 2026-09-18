@@ -22,9 +22,26 @@ struct RegularRootView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                SpacesList()
-                    .frame(height: NookDesign.Spacing.xl)
-                    .padding(.vertical, NookDesign.Spacing.md)
+                ZStack {
+                    SpacesList()
+                        .frame(height: NookDesign.Spacing.xl)
+
+                    HStack {
+                        Button {
+                            model.present(.settings)
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .frame(width: NookDesign.Size.iconButton)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Settings")
+
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, NookDesign.Spacing.rowPadding)
+                .padding(.vertical, NookDesign.Spacing.md)
 
                 ScrollView {
                     if let spaceID = window.spaceID {
@@ -38,7 +55,7 @@ struct RegularRootView: View {
                     }
                 }
 
-                BottomBar(style: .sidebar)
+                BottomBar(style: .sidebar, condensed: .constant(false))
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
