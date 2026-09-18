@@ -35,6 +35,16 @@ struct CommandPaletteView: View {
         return SiteSearchEntry.match(for: text, in: nookSettings.siteSearchEntries)
     }
 
+    /// True while an input method is composing, i.e. the field editor holds marked text.
+    ///
+    /// SwiftUI delivers `onKeyPress` ahead of the text input context, so without this the
+    /// palette eats the keys a CJK input method needs: Return commits a candidate rather
+    /// than submitting, and the arrow keys pick candidates rather than moving through
+    /// suggestions. Handlers return `.ignored` while this is true so the IME gets them.
+    private var isComposing: Bool {
+        (NSApp.keyWindow?.firstResponder as? NSTextInputClient)?.hasMarkedText() ?? false
+    }
+
     private var visibleSuggestions: [SearchManager.SearchSuggestion] {
         if activeSiteSearch != nil {
             return searchManager.suggestions.filter {
@@ -135,6 +145,7 @@ struct CommandPaletteView: View {
                                     }
                                     .focused($isSearchFocused)
                                     .onKeyPress(.tab) {
+                                        if isComposing { return .ignored }
                                         if let match = siteSearchMatch, activeSiteSearch == nil {
                                             withAnimation(NookDesign.Motion.spring) {
                                                 activeSiteSearch = match
@@ -158,18 +169,22 @@ struct CommandPaletteView: View {
                                         return .ignored
                                     }
                                     .onKeyPress(.return) {
+                                        if isComposing { return .ignored }
                                         handleReturn()
                                         return .handled
                                     }
                                     .onKeyPress(.upArrow) {
+                                        if isComposing { return .ignored }
                                         navigateSuggestions(direction: -1)
                                         return .handled
                                     }
                                     .onKeyPress(.downArrow) {
+                                        if isComposing { return .ignored }
                                         navigateSuggestions(direction: 1)
                                         return .handled
                                     }
                                     .onKeyPress(.escape) {
+                                        if isComposing { return .ignored }
                                         if activeSiteSearch != nil {
                                             withAnimation(NookDesign.Motion.standard) {
                                                 activeSiteSearch = nil
@@ -180,6 +195,7 @@ struct CommandPaletteView: View {
                                         return .handled
                                     }
                                     .onKeyPress(.delete) {
+                                        if isComposing { return .ignored }
                                         if activeSiteSearch != nil && text.isEmpty {
                                             withAnimation(NookDesign.Motion.standard) {
                                                 activeSiteSearch = nil
@@ -189,6 +205,7 @@ struct CommandPaletteView: View {
                                         return .ignored
                                     }
                                     .onKeyPress(characters: CharacterSet(charactersIn: "\u{7F}")) { _ in
+                                        if isComposing { return .ignored }
                                         if activeSiteSearch != nil && text.isEmpty {
                                             withAnimation(NookDesign.Motion.standard) {
                                                 activeSiteSearch = nil
