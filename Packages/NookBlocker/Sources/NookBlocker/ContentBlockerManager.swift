@@ -40,6 +40,7 @@ public final class ContentBlockerManager: NSObject {
 
     /// In-flight activation; startup tab loading waits on it so the first page is protected.
     public private(set) var activationTask: Task<Void, Never>?
+    private var hasActivated = false
 
     private var compiledRuleLists: [WKContentRuleList] = []
     private var updateTimer: Timer?
@@ -147,7 +148,10 @@ public final class ContentBlockerManager: NSObject {
         isCompiling = false
         isEnabled = true
         applyToSharedConfiguration()
-        applyToExistingWebViews()
+        // Later activations are a Settings toggle: those pages were loaded unblocked on purpose.
+        let isFirstActivation = !hasActivated
+        hasActivated = true
+        applyToExistingWebViews(reloadingPagesLoadedWithoutBlocking: isFirstActivation)
         NotificationCenter.default.post(name: .adBlockerStateChanged, object: nil)
         scheduleAutoUpdate()
 
@@ -332,10 +336,14 @@ public final class ContentBlockerManager: NSObject {
         exemptedWebViews.add(webView)
     }
 
-    private func applyToExistingWebViews() {
+    /// A page that committed before blocking was ready can only be fixed by reloading it:
+    /// rule lists are evaluated at navigation time and document-start scripts have already run.
+    private func applyToExistingWebViews(reloadingPagesLoadedWithoutBlocking reloading: Bool = false) {
         for session in self.host?.blockablePages ?? [] {
             guard let wv = session.webView else { continue }
             if shouldApplyBlocking(to: session) { applyBlocking(to: wv) } else { removeBlocking(from: wv) }
+            guard reloading, let url = wv.url, url.scheme != "about" else { continue }
+            wv.reload()
         }
     }
 
