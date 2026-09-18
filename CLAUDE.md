@@ -57,8 +57,9 @@ xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath buil
 
 - **`develop`** is the development branch and the GitHub default branch. Commit and branch from here.
 - **`main`** holds the last release-ready state. Fast-forward it from `develop` when cutting a release.
+- **Gitflow naming.** Short-lived work goes on `feature/<name>` or `hotfix/<name>` branched from `develop` (hotfixes from `main`), merged back and deleted. The September 2026 cleanup deleted every stale upstream branch; only `main`, `develop`, `release` and `gh-pages` are long-lived and protected (deletion and force-push blocked, org admins bypass).
 - **`release`** is the ship branch. A push to `release` triggers the notarize workflow, which builds, signs, notarizes, uploads a DMG to a GitHub release named after the marketing version, and updates the Sparkle appcast. Ship by fast-forwarding `main` to `develop`, then `release` to `main`, and pushing.
-- `dev` and upstream-era branches were deleted in September 2026. `fix/download-memory` survives as an unfinished WIP branch (URLSession-streamed downloads, based on an old commit; rebase before finishing).
+- `feature/download-memory` (local only, formerly `fix/download-memory`) is an unfinished WIP branch: URLSession-streamed downloads, based on an old commit; rebase onto `develop` before finishing.
 - AI assistance must be disclosed per CONTRIBUTING.md.
 
 ## Architecture
