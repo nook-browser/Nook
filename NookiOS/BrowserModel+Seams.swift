@@ -83,7 +83,12 @@ extension BrowserModel: PageSessionDelegate {
     }
 
     func addDownload(_ download: WKDownload, originalURL: URL, suggestedFilename: String) {
-        download.cancel()   // ponytail: downloads arrive in the second plan
+        // WKDownload.delegate is weak, so the array is what keeps it alive.
+        let handler = IOSDownload { [weak self] finished in
+            self?.downloads.removeAll { $0 === finished }
+        }
+        downloads.append(handler)
+        download.delegate = handler
     }
 
     func toggleFullScreen(for webView: WKWebView) -> Bool { false }
