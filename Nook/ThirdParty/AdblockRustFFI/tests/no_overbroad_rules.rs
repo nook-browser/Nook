@@ -17,7 +17,7 @@ const BARE_ELEMENTS: &[&str] = &[
 
 fn bundled_filter_text() -> String {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../Managers/ContentBlockerManager/Resources")
+        .join("../../../Packages/NookBlocker/Sources/NookBlocker/Resources")
         .canonicalize()
         .expect("resources dir should exist");
     let mut text = String::new();
