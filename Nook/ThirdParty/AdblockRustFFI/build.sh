@@ -1,6 +1,7 @@
 #!/bin/sh
-# Builds libnook_adblock.a (release, stripped) for macOS arm64 and wraps it in
-# NookAdblock.xcframework so machines without a Rust toolchain can still build Nook.
+# Builds libnook_adblock.a (release, stripped) for macOS arm64, iOS arm64 and the iOS
+# simulator and wraps them in NookAdblock.xcframework so machines without a Rust
+# toolchain can still build Nook.
 set -eu
 cd "$(dirname "$0")"
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -10,10 +11,12 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$PWD/../../../build/AdblockRustFFI-
 
 cargo test --release
 cargo build --release --target aarch64-apple-darwin
-# iOS slices (phase 3): rustup target add aarch64-apple-ios aarch64-apple-ios-sim,
-# cargo build for each, and add two more -library/-headers pairs below.
+cargo build --release --target aarch64-apple-ios
+cargo build --release --target aarch64-apple-ios-sim
 rm -rf NookAdblock.xcframework
 xcodebuild -create-xcframework \
   -library "$CARGO_TARGET_DIR/aarch64-apple-darwin/release/libnook_adblock.a" -headers include \
+  -library "$CARGO_TARGET_DIR/aarch64-apple-ios/release/libnook_adblock.a" -headers include \
+  -library "$CARGO_TARGET_DIR/aarch64-apple-ios-sim/release/libnook_adblock.a" -headers include \
   -output NookAdblock.xcframework
 ls NookAdblock.xcframework
