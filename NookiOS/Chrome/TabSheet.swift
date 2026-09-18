@@ -24,16 +24,11 @@ struct TabSheet: View {
 
     private var spaceID: UUID? { window.spaceID }
 
-    private let columns = Array(
-        repeating: GridItem(.flexible(), spacing: NookDesign.Spacing.sm),
-        count: 4
-    )
-
     var body: some View {
         ScrollView {
             if let spaceID {
                 LazyVStack(alignment: .leading, spacing: NookDesign.Spacing.lg) {
-                    favorites(spaceID)
+                    FavoritesGrid(spaceID: spaceID) { dismiss() }
                     TabSheetRows(spaceID: spaceID) { dismiss() }
                 }
                 .padding(NookDesign.Spacing.rowPadding)
@@ -69,48 +64,5 @@ struct TabSheet: View {
         .padding(.top, NookDesign.Spacing.xxl)
         .padding(.bottom, NookDesign.Spacing.md)
         .background(.bar)
-    }
-
-    @ViewBuilder
-    private func favorites(_ spaceID: UUID) -> some View {
-        let items = tabs.favorites(of: spaceID)
-        if !items.isEmpty {
-            LazyVGrid(columns: columns, spacing: NookDesign.Spacing.sm) {
-                ForEach(items, id: \.id) { item in
-                    let session = tabs.session(for: item.id)
-                    PinnedTabView(
-                        tabName: tabs.title(for: item),
-                        tabURL: item.url?.absoluteString ?? "",
-                        tabIcon: ItemFavicon(item: item, session: session),
-                        isActive: tabs.selectedItemID(in: window) == item.id,
-                        isUnloaded: session?.isUnloaded ?? true,
-                        hasLeftPinnedURL: tabs.hasLeftHome(item.id),
-                        onResetToPinnedURL: { tabs.resetToHome(item.id) },
-                        action: {
-                            tabs.select(item.id, in: window)
-                            dismiss()
-                        }
-                    )
-                    .frame(maxWidth: .infinity)
-                    // PinnedTabView takes a generic icon and no item id, so the
-                    // menu is attached here rather than inside the shared view.
-                    .contextMenu {
-                        TabContextMenu(itemID: item.id, context: .favorite)
-                            .environment(window)
-                            .environment(tabs)
-                            .environment(\.tabActions, model)
-                    }
-                    .draggable(item.id.uuidString)
-                }
-            }
-            // The grid takes a drop anywhere in it; favorites append rather than
-            // land at an index, the way the Mac's pin intent does.
-            .dropDestination(for: String.self) { ids, _ in
-                guard let first = ids.first, let dragged = UUID(uuidString: first) else { return false }
-                tabs.pin(dragged, to: .favorites(spaceID: spaceID))
-                Haptics.alignment()
-                return true
-            }
-        }
     }
 }

@@ -14,7 +14,17 @@ import NookDesign
 import NookUI
 import NookWeb
 
+/// Where the bar is drawn. The phone floats it over the page; the iPad puts it
+/// at the foot of the sidebar, where glass over a sidebar material would be
+/// glass on glass and the tabs button would duplicate the visible outline.
+enum BottomBarStyle {
+    case floating
+    case sidebar
+}
+
 struct BottomBar: View {
+    var style: BottomBarStyle = .floating
+
     @EnvironmentObject private var model: BrowserModel
     @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var window
@@ -26,7 +36,7 @@ struct BottomBar: View {
 
     var body: some View {
         VStack(spacing: NookDesign.Spacing.md) {
-            if !isFocused {
+            if !isFocused, style == .floating {
                 SpacesList()
                     .frame(height: NookDesign.Spacing.xl)
             }
@@ -53,7 +63,7 @@ struct BottomBar: View {
                     Button("Cancel") { isFocused = false }
                         .buttonStyle(.plain)
                         .foregroundStyle(.primary)
-                } else {
+                } else if style == .floating {
                     Button {
                         model.present(.tabs)
                     } label: {
@@ -68,7 +78,7 @@ struct BottomBar: View {
         }
         .padding(.horizontal, NookDesign.Spacing.rowPadding)
         .padding(.vertical, NookDesign.Spacing.md)
-        .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
+        .modifier(BarBackground(style: style))
         .animation(NookDesign.Motion.standard, value: isFocused)
         .gesture(
             // The swipe covers the whole bar, field included: it is the biggest
@@ -86,5 +96,22 @@ struct BottomBar: View {
                     Haptics.alignment()
                 }
         )
+    }
+}
+
+
+/// Glass when the bar floats over a page; nothing when it sits in the sidebar,
+/// which already has a material behind it.
+private struct BarBackground: ViewModifier {
+    let style: BottomBarStyle
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch style {
+        case .floating:
+            content.nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
+        case .sidebar:
+            content
+        }
     }
 }

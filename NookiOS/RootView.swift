@@ -3,9 +3,10 @@
 //  RootView.swift
 //  NookiOS
 //
-//  The page fills the scene and the bar floats over it. SwiftUI raises the
-//  stack's bottom safe area when the keyboard appears, which is what lets the
-//  bar ride the keyboard with no keyboard-frame observer. The page keeps its
+//  Two layouts chosen by horizontal size class, and the modifiers they share.
+//  Compact: the page fills the scene and the bar floats over it. SwiftUI raises
+//  the stack's bottom safe area when the keyboard appears, which is what lets
+//  the bar ride the keyboard with no keyboard-frame observer. The page keeps its
 //  full height and gets a scroll inset instead, so content behind the glass is
 //  still reachable, the way Safari does it.
 //
@@ -17,21 +18,18 @@ import NookWeb
 
 struct RootView: View {
     @EnvironmentObject private var model: BrowserModel
-    @State private var barHeight: CGFloat = 0
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            if let session = model.selectedSession {
-                WebViewContainer(webView: session.activeWebView, bottomInset: barHeight)
-                    .ignoresSafeArea(.container, edges: .top)
+        Group {
+            if sizeClass == .compact {
+                CompactRootView()
             } else {
-                Color.clear
+                RegularRootView()
             }
-
-            BottomBar()
-                .padding(.horizontal, NookDesign.Spacing.md)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 }
         }
+        // Every shared modifier stays on this outer view, so the two layouts
+        // cannot drift apart.
         .sheet(item: $model.sheet) { sheet in
             // A sheet does not inherit the scene's environment values.
             Group {
@@ -49,6 +47,26 @@ struct RootView: View {
             model.openDebugSheetIfRequested()
         }
         .onOpenURL { model.navigate($0.absoluteString) }
+    }
+}
+
+struct CompactRootView: View {
+    @EnvironmentObject private var model: BrowserModel
+    @State private var barHeight: CGFloat = 0
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            if let session = model.selectedSession {
+                WebViewContainer(webView: session.activeWebView, bottomInset: barHeight)
+                    .ignoresSafeArea(.container, edges: .top)
+            } else {
+                Color.clear
+            }
+
+            BottomBar()
+                .padding(.horizontal, NookDesign.Spacing.md)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 }
+        }
     }
 }
 
