@@ -27,10 +27,18 @@
 		C0DE7AB50000000000000043 /* NookTweaks in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000042 /* NookTweaks */; };
 		C0DE7AB50000000000000053 /* NookWeb in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000052 /* NookWeb */; };
 		C0DE7AB50000000000000063 /* NookUI in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE7AB50000000000000062 /* NookUI */; };
+		105000000000000000000200 /* NookTabsCore in Frameworks */ = {isa = PBXBuildFile; productRef = 105000000000000000000100 /* NookTabsCore */; };
+		105000000000000000000201 /* NookSettings in Frameworks */ = {isa = PBXBuildFile; productRef = 105000000000000000000101 /* NookSettings */; };
+		105000000000000000000202 /* NookDesign in Frameworks */ = {isa = PBXBuildFile; productRef = 105000000000000000000102 /* NookDesign */; };
+		105000000000000000000203 /* NookBlocker in Frameworks */ = {isa = PBXBuildFile; productRef = 105000000000000000000103 /* NookBlocker */; };
+		105000000000000000000204 /* NookTweaks in Frameworks */ = {isa = PBXBuildFile; productRef = 105000000000000000000104 /* NookTweaks */; };
+		105000000000000000000205 /* NookWeb in Frameworks */ = {isa = PBXBuildFile; productRef = 105000000000000000000105 /* NookWeb */; };
+		105000000000000000000206 /* NookUI in Frameworks */ = {isa = PBXBuildFile; productRef = 105000000000000000000106 /* NookUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		7F8340FC2E37F39400674A5D /* Nook.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nook.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		105000000000000000000009 /* NookiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NookiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -73,6 +81,13 @@
 				Sidebar/SpacesSideBarView.swift,
 			);
 			target = 7F8340FB2E37F39400674A5D /* Nook */;
+		};
+		105000000000000000000010 /* Exceptions for "NookiOS" folder in "NookiOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 105000000000000000000001 /* NookiOS */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -121,6 +136,14 @@
 			path = Onboarding;
 			sourceTree = "<group>";
 		};
+		105000000000000000000002 /* NookiOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				105000000000000000000010 /* Exceptions for "NookiOS" folder in "NookiOS" target */,
+			);
+			path = NookiOS;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -151,12 +174,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		105000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				105000000000000000000200 /* NookTabsCore in Frameworks */,
+				105000000000000000000201 /* NookSettings in Frameworks */,
+				105000000000000000000202 /* NookDesign in Frameworks */,
+				105000000000000000000203 /* NookBlocker in Frameworks */,
+				105000000000000000000204 /* NookTweaks in Frameworks */,
+				105000000000000000000205 /* NookWeb in Frameworks */,
+				105000000000000000000206 /* NookUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		7F8340F32E37F39400674A5D = {
 			isa = PBXGroup;
 			children = (
+				105000000000000000000002 /* NookiOS */,
 				7F6409912F4729B600A02697 /* Onboarding */,
 				2D0834C72EC8D90400C302AC /* Settings */,
 				2D0834CF2EC8E0AD00C302AC /* Navigation */,
@@ -171,6 +209,7 @@
 		7F8340FD2E37F39400674A5D /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				105000000000000000000009 /* NookiOS.app */,
 				7F8340FC2E37F39400674A5D /* Nook.app */,
 			);
 			name = Products;
@@ -216,6 +255,35 @@
 			productReference = 7F8340FC2E37F39400674A5D /* Nook.app */;
 			productType = "com.apple.product-type.application";
 		};
+		105000000000000000000001 /* NookiOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 105000000000000000000006 /* Build configuration list for PBXNativeTarget "NookiOS" */;
+			buildPhases = (
+				105000000000000000000003 /* Sources */,
+				105000000000000000000004 /* Frameworks */,
+				105000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				105000000000000000000002 /* NookiOS */,
+			);
+			name = NookiOS;
+			packageProductDependencies = (
+				105000000000000000000100 /* NookTabsCore */,
+				105000000000000000000101 /* NookSettings */,
+				105000000000000000000102 /* NookDesign */,
+				105000000000000000000103 /* NookBlocker */,
+				105000000000000000000104 /* NookTweaks */,
+				105000000000000000000105 /* NookWeb */,
+				105000000000000000000106 /* NookUI */,
+			);
+			productName = NookiOS;
+			productReference = 105000000000000000000009 /* NookiOS.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -259,6 +327,7 @@
 			projectRoot = "";
 			targets = (
 				7F8340FB2E37F39400674A5D /* Nook */,
+				105000000000000000000001 /* NookiOS */,
 			);
 		};
 /* End PBXProject section */
@@ -271,10 +340,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		105000000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		7F8340F82E37F39400674A5D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		105000000000000000000003 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -495,6 +578,68 @@
 			};
 			name = Release;
 		};
+		105000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = NookiOS/NookiOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				DEVELOPMENT_TEAM = ZHB786H6YN;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NookiOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Nook;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gstudios.nook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		105000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = NookiOS/NookiOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				DEVELOPMENT_TEAM = ZHB786H6YN;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NookiOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Nook;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gstudios.nook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -512,6 +657,15 @@
 			buildConfigurations = (
 				7F8341092E37F39500674A5D /* Debug */,
 				7F83410A2E37F39500674A5D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		105000000000000000000006 /* Build configuration list for PBXNativeTarget "NookiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				105000000000000000000007 /* Debug */,
+				105000000000000000000008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -630,6 +784,34 @@
 			productName = NookWeb;
 		};
 		C0DE7AB50000000000000062 /* NookUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookUI;
+		};
+		105000000000000000000100 /* NookTabsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookTabsCore;
+		};
+		105000000000000000000101 /* NookSettings */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookSettings;
+		};
+		105000000000000000000102 /* NookDesign */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookDesign;
+		};
+		105000000000000000000103 /* NookBlocker */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookBlocker;
+		};
+		105000000000000000000104 /* NookTweaks */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookTweaks;
+		};
+		105000000000000000000105 /* NookWeb */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NookWeb;
+		};
+		105000000000000000000106 /* NookUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NookUI;
 		};
