@@ -34,8 +34,8 @@ final class BrowserModel: ObservableObject {
 
     @Published var sheet: ChromeSheet?
     @Published var dialog: ChromeDialog?
-    /// Where the settings sheet opens. Nil is its root list.
-    @Published var settingsRoute: SettingsRoute?
+    /// Where the settings sheet opens. Empty is its root list.
+    @Published var settingsPath: [SettingsRoute] = []
     private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "BrowserModel")
 
     init() {

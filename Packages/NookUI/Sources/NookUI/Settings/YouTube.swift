@@ -27,7 +27,10 @@ public struct SettingsYouTubeTab: View {
                     }
                 }
                 Toggle("Frame thumbnails", isOn: $settings.youTubeFrameThumbnails)
+                #if os(macOS)
+                // There is no hover on a touch screen.
                 Toggle("Disable hover previews", isOn: $settings.youTubeNoHoverPreview)
+                #endif
             } header: {
                 Text("Layout")
             } footer: {

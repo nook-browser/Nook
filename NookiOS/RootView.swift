@@ -37,7 +37,7 @@ struct RootView: View {
             Group {
                 switch sheet {
                 case .tabs: TabSheet()
-                case .settings: Text("Settings")
+                case .settings: SettingsSheet()
                 }
             }
             .nookEnvironment(model)

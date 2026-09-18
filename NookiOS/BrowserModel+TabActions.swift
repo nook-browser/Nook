@@ -38,7 +38,7 @@ extension BrowserModel: TabActions {
     }
 
     func openSpaceSettings() {
-        settingsRoute = .spaces
+        settingsPath = [.spaces]
         present(.settings)
     }
 
