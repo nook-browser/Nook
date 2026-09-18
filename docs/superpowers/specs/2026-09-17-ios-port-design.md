@@ -405,19 +405,22 @@ place of the old ones. The 24 upstream-only commits (March 2026 sidebar
 animation work) are treated as superseded by the September remodel unless a
 diff read finds something the remodel lacks.
 
-**Bridge for 1.0.7 users: one informational appcast item.** Sparkle 2.4+
-supports `<sparkle:informationalUpdate>` with a `<sparkle:below>` child; 1.0.7
-runs Sparkle 2.8.1. One item scoped below build 130 shows those users a link
-and no download, so no code-signing check runs. Builds 130 and up see it as a
-normal signed update.
+**Bridge for 1.0.7 users: every appcast item carries an informational scope.**
+Sparkle's `SUAppcast.m` parses `<sparkle:informationalUpdate>` with a
+`<sparkle:belowVersion>` child; 1.0.7 runs Sparkle 2.8.1. An item scoped below
+build 130 shows those users the `<link>` and no download, so no code-signing
+check runs. Builds 130 and up see the same item as a normal signed update. The
+scope stays on every future item, since a 1.0.7 app always evaluates the newest
+one.
 
 **First-launch migration.** A build that finds no `com.gstudios.nook` data
-copies the Application Support folder, the WebKit website data directory and
-the defaults domain from `io.browsewithnook.nook`, else from
-`com.baingurley.nook`, then runs the existing first-launch path, which already
-seeds spaces from old profiles. The WebKit path for identifier stores on an
-unsandboxed app is verified on a machine with 1.0.7 installed before the
-migration is written.
+copies the SwiftData store, the `Tabs/` JSON, WebKit's `WebsiteDataStore/`
+directory (one folder per space or profile id, verified on this Mac) and the
+defaults domain from `com.baingurley.nook`, else from `io.browsewithnook.nook`
+(newest first). A 1.0.x store has no `Tabs/` JSON, and the first-launch path
+that seeds one tab per profile would drop every tab, so the first launch
+imports the store's spaces, folders and tabs into the tree instead, mapping a
+profile's first space onto the profile's id the way `ProfileMerge` does.
 
 **Order.** The transition (repo move, feed URL, bridge item, migration, ship
 1.3.0) is its own small plan and runs before Phase 3. Phase 3 then begins with
