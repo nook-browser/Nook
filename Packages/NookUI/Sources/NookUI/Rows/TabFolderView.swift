@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  TabFolderView.swift
 //  Nook
@@ -67,7 +68,7 @@ public struct TabFolderView: View {
                             DispatchQueue.main.async { nameFieldFocused = true }
                         }
                         .onSubmit { commitRename() }
-                        .onExitCommand { cancelRename() }
+                        .onEscapeKey { cancelRename() }
                 } else {
                     Text(item.displayTitle)
                         .font(NookDesign.Font.label)

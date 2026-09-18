@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  TabActions.swift
 //  NookUI
@@ -30,6 +31,15 @@ import NookWeb
     var accentColor: Color { get }
     func copyToPasteboard(_ string: String)
     func share(_ url: URL)
+    /// False on iOS, where there is one scene and no split view. Menus hide the
+    /// items that would call into either.
+    var supportsMultipleWindows: Bool { get }
+}
+
+extension TabActions {
+    /// macOS keeps this default; iOS overrides it. A default rather than a
+    /// `#if os` so the shared protocol file stays platform-free.
+    public var supportsMultipleWindows: Bool { true }
 }
 
 // MARK: - Environment

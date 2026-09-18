@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  NookDesign.swift
 //  Nook
@@ -47,7 +48,12 @@ public enum NookDesign {
         public static let rowGap: CGFloat = 2
         public static let sectionGap: CGFloat = 10
         public static let rowPadding: CGFloat = 8
+        #if os(iOS)
+        // Depth 5 at 20 would eat 100 of a 390pt phone row.
+        public static let folderIndent: CGFloat = 16
+        #else
         public static let folderIndent: CGFloat = 20
+        #endif
         public static let sidebarTop: CGFloat = 34     // clears the traffic lights when the sidebar is on the left
         public static let trafficLights: CGFloat = 78  // leading space the traffic lights take in the title row
         public static let titleFade: CGFloat = 20      // trailing fade on long row titles
@@ -67,7 +73,13 @@ public enum NookDesign {
         public static let essentialsFavicon: CGFloat = 20
         public static let urlBar: CGFloat = 32
         public static let navRow: CGFloat = 28
+        #if os(iOS)
+        // The floating bar's control row. 50 clears the 44pt touch minimum with
+        // room for the field's own inset.
+        public static let bottomBar: CGFloat = 50
+        #else
         public static let bottomBar: CGFloat = 40
+        #endif
         public static let spaceIcon: CGFloat = 14      // switcher and header symbol
         public static let rowGlyph: CGFloat = 13       // inline glyphs in a row: audio, lock, chevron
         public static let rowButton: CGFloat = 20      // hover-only close/unload button in a row

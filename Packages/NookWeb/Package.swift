@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 // swift-tools-version: 6.0
 import PackageDescription
 
@@ -19,7 +20,8 @@ let package = Package(
         .target(
             name: "NookWeb",
             dependencies: [
-                "MuteableWKWebView",
+                // Page muting reaches a private WebKit call through NSTask and nm; macOS only.
+                .target(name: "MuteableWKWebView", condition: .when(platforms: [.macOS])),
                 .product(name: "NookTabsCore", package: "NookTabsCore"),
                 .product(name: "NookSettings", package: "NookSettings"),
                 .product(name: "NookBlocker", package: "NookBlocker"),

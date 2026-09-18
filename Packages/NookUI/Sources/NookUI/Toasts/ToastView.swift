@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  ToastView.swift
 //  Nook
@@ -21,7 +22,7 @@ struct ToastView<Content: View>: View {
         content
             .padding(12)
             .fixedSize(horizontal: true, vertical: false)
-            .background(Color(.windowBackgroundColor).opacity(0.35))
+            .background(NookDesign.Surface.windowBackground.opacity(0.35))
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
             .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
     }

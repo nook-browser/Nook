@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  NookSettingsService.swift
 //  Nook
@@ -62,6 +63,7 @@ public final class NookSettingsService {
     private let instagramDownloadKey = "settings.instagramDownload"
     private let facebookDownloadKey = "settings.facebookDownload"
     private let vscoDownloadKey = "settings.vscoDownload"
+    private let mediaDownloadSitesKey = "settings.mediaDownloadSites"
     private let facebookHideReelsKey = "settings.facebookHideReels"
     private let facebookHideSuggestedKey = "settings.facebookHideSuggested"
 
@@ -356,17 +358,10 @@ public final class NookSettingsService {
         didSet { userDefaults.set(youTubeNoHoverPreview, forKey: youTubeNoHoverPreviewKey) }
     }
 
-    /// Download button over photos and videos, per site.
-    public var instagramDownload: Bool {
-        didSet { userDefaults.set(instagramDownload, forKey: instagramDownloadKey) }
-    }
-
-    public var facebookDownload: Bool {
-        didSet { userDefaults.set(facebookDownload, forKey: facebookDownloadKey) }
-    }
-
-    public var vscoDownload: Bool {
-        didSet { userDefaults.set(vscoDownload, forKey: vscoDownloadKey) }
+    /// Domains that show the download button over photos and videos. Suffix match, so
+    /// "instagram.com" covers "www.instagram.com".
+    public var mediaDownloadSites: [String] {
+        didSet { userDefaults.set(mediaDownloadSites, forKey: mediaDownloadSitesKey) }
     }
 
     /// Remove the Reels carousel from Facebook's news feed.
@@ -510,11 +505,21 @@ public final class NookSettingsService {
         self.youTubeVideosPerRow = userDefaults.integer(forKey: youTubeVideosPerRowKey)
         self.youTubeFrameThumbnails = userDefaults.bool(forKey: youTubeFrameThumbnailsKey)
         self.youTubeNoHoverPreview = userDefaults.bool(forKey: youTubeNoHoverPreviewKey)
-        // One setting covered all three sites until September 2026; it seeds the per-site ones.
-        let legacyDownload = userDefaults.bool(forKey: legacySocialImageDownloadKey)
-        self.instagramDownload = userDefaults.object(forKey: instagramDownloadKey) as? Bool ?? legacyDownload
-        self.facebookDownload = userDefaults.object(forKey: facebookDownloadKey) as? Bool ?? legacyDownload
-        self.vscoDownload = userDefaults.object(forKey: vscoDownloadKey) as? Bool ?? legacyDownload
+        // One setting covered all three sites, then three per-site ones; both seed the site list.
+        if let sites = userDefaults.stringArray(forKey: mediaDownloadSitesKey) {
+            self.mediaDownloadSites = sites
+        } else {
+            let defaults = userDefaults
+            let legacyDownload = defaults.bool(forKey: legacySocialImageDownloadKey)
+            let legacy = [
+                (instagramDownloadKey, "instagram.com"),
+                (facebookDownloadKey, "facebook.com"),
+                (vscoDownloadKey, "vsco.co")
+            ]
+            self.mediaDownloadSites = legacy
+                .filter { defaults.object(forKey: $0.0) as? Bool ?? legacyDownload }
+                .map(\.1)
+        }
         self.facebookHideReels = userDefaults.bool(forKey: facebookHideReelsKey)
         self.facebookHideSuggested = userDefaults.bool(forKey: facebookHideSuggestedKey)
 

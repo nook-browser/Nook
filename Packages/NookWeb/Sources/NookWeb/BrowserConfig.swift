@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  BrowserConfig.swift
 //  Nook
@@ -29,21 +30,11 @@ public class BrowserConfiguration {
         // Core WebKit preferences for extensions
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
 
-        // Enable JavaScript clipboard access (navigator.clipboard API, document.execCommand('copy'))
-        // Required for third-party WKWebView apps — Safari enables this by default.
-        config.preferences.setValue(true, forKey: "javaScriptCanAccessClipboard")
-        config.preferences.setValue(true, forKey: "DOMPasteAllowed")
-
         // Media settings — use macOS default (no restrictions, matching Safari behavior).
         // [.audio] blocks programmatic play() for media with audio tracks, which breaks
         // YouTube autoplay since SPA navigations call play() outside user-gesture context.
         config.mediaTypesRequiringUserActionForPlayback = []
         
-        // Enable Picture-in-Picture for web media
-        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-
-        // Enable full-screen API support
-        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         // NOTE: "mediaDevicesEnabled" intentionally NOT set — it causes the WebContent
         // process to eagerly register with com.apple.audio.AudioComponentRegistrar,
         // which is sandbox-denied for third-party WKWebView apps and crashes the process.
@@ -58,10 +49,9 @@ public class BrowserConfiguration {
         // User agent for better compatibility with Client Hints support
         config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
 
-        // Web inspector will be enabled per-webview using isInspectable property
-        #if DEBUG
-        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
-        #endif
+        // Clipboard, picture-in-picture, inline playback and the inspector are spelled differently
+        // per platform; see BrowserConfig+macOS.swift and BrowserConfig+iOS.swift.
+        BrowserConfiguration.applyPlatformPreferences(to: config)
 
         // Note: webExtensionController will be set by ExtensionManager during initialization
 

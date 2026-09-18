@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  Haptics.swift
 //  NookUI
@@ -12,9 +13,9 @@ import AppKit
 import UIKit
 #endif
 
-enum Haptics {
+public enum Haptics {
     /// The small click the sidebar plays when a selection snaps into place.
-    @MainActor static func alignment() {
+    @MainActor public static func alignment() {
         #if os(macOS)
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         #else

@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 // History persistence stays on its own executor; UI consumers receive value records.
 import Foundation
 import SwiftData

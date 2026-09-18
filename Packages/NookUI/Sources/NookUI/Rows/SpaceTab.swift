@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  SpaceTab.swift
 //  Nook
@@ -79,7 +80,7 @@ public struct SpaceTab: View {
                         .foregroundStyle(isUnloaded ? .secondary : .primary)
                         .textFieldStyle(.plain)
                         .onSubmit { commitRename() }
-                        .onExitCommand { renameState.itemID = nil }
+                        .onEscapeKey { renameState.itemID = nil }
                         .focused($isTextFieldFocused)
                         .onAppear {
                             if draftName.isEmpty { draftName = title }

@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  Appearance.swift
 //  Nook
@@ -25,6 +26,9 @@ public struct SettingsAppearanceTab: View {
                 }
             }
 
+            // Every row here is about the Mac window: a sidebar side, the
+            // floating URL bar, and a hover preview. None has a touch meaning.
+            #if os(macOS)
             Section("Layout") {
                 Picker("Sidebar Position", selection: $settings.sidebarPosition) {
                     ForEach(SidebarPosition.allCases) { provider in
@@ -34,6 +38,7 @@ public struct SettingsAppearanceTab: View {
                 Toggle("Show URL bar in the web view", isOn: $settings.topBarAddressView)
                 Toggle("Preview link URL on hover", isOn: $settings.showLinkStatusBar)
             }
+            #endif
         }
         .formStyle(.grouped)
     }

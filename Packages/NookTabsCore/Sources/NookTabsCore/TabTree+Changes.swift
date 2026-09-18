@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 import Foundation
 
 /// Every edit to the tree. Each method validates first and leaves the tree untouched when it

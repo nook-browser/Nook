@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  PageSession.swift
 //  Nook
@@ -8,7 +9,6 @@
 //
 
 import Combine
-import CoreAudio
 import FaviconFinder
 import NookBlocker
 import NookSettings
@@ -152,7 +152,7 @@ public final class PageSession: NSObject, Identifiable {
     @ObservationIgnored var lastTopBarDomain: String? = nil
     @ObservationIgnored var pendingThemeColorUpdate: DispatchWorkItem? = nil
 
-    @ObservationIgnored var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
+    @ObservationIgnored var audioDeviceListenerProc: AudioDeviceListenerProc?
     @ObservationIgnored var audioListenerHelper: AudioListenerHelper?
     @ObservationIgnored var isMonitoringNativeAudio = false
     @ObservationIgnored var lastAudioDeviceCheckTime: Date = Date()
@@ -331,11 +331,10 @@ public final class PageSession: NSObject, Identifiable {
             controller.removeScriptMessageHandler(forName: name)
             controller.add(self, name: name)
         }
-        webView.customUserAgent =
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
+        webView.customUserAgent = PlatformUserAgent.custom
         // Let the web content control its own background so extension styles (like Dark
         // Reader) can paint dark backgrounds. The themed background shows only while loading.
-        webView.setValue(true, forKey: "drawsBackground")
+        webView.setDrawsPageBackground(true)
         webView.isInspectable = true
         webView.allowsLinkPreview = true
         webView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true

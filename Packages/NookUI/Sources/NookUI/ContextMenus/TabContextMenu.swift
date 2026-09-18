@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  TabContextMenu.swift
 //  Nook
@@ -186,7 +187,8 @@ public struct TabContextMenu: View {
             }
         }
 
-        if context != .split, let windowState, let selected = tabs.selectedItemID(in: windowState), selected != itemID {
+        if actions?.supportsMultipleWindows == true,
+           context != .split, let windowState, let selected = tabs.selectedItemID(in: windowState), selected != itemID {
             Menu {
                 Button {
                     actions?.enterSplit(with: itemID, placeOnRight: true, in: windowState)

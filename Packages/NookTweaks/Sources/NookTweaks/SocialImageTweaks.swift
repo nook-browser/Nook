@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  SocialImageTweaks.swift
 //  Nook
@@ -13,9 +14,9 @@ import WebKit
 
 private let socialLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "SocialImageTweaks")
 
-/// Download button over photos and videos on Instagram, Facebook, and VSCO, each with its own setting. The
-/// isolated script picks the largest srcset candidate, or asks a page-world script for the MP4 in React's
-/// data; the app saves it through the same WKDownload path as the image context menu.
+/// Download button over photos and videos on the domains the user lists in Settings. The isolated script
+/// picks the largest srcset candidate, or asks a page-world script for the MP4 in React's data (Facebook
+/// and Instagram); the app saves it through the same WKDownload path as the image context menu.
 @MainActor
 public enum SocialImageTweaks {
     /// Set by the app; saves through the same WKDownload path as the image context menu.
@@ -25,7 +26,6 @@ public enum SocialImageTweaks {
     private static let pageMarker = "// Nook Social Video Source"
     private static let world = WKContentWorld.world(name: "NookSocialImageTweaks")
     private static let handlerName = "nookSocialImageDownload"
-    private static let imageDomains = ["cdninstagram.com", "fbcdn.net", "vsco.co"]
 
     private static let script = source("social-image-download")
     /// Page world: reads video URLs from React props, which the isolated world cannot see.
@@ -42,11 +42,9 @@ public enum SocialImageTweaks {
     }
 
     private static func enabledDomains(_ settings: NookSettingsService) -> [String] {
-        var domains: [String] = []
-        if settings.instagramDownload { domains.append("instagram.com") }
-        if settings.facebookDownload { domains.append("facebook.com") }
-        if settings.vscoDownload { domains.append("vsco.co") }
-        return domains
+        settings.mediaDownloadSites
+            .map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 
     /// Main-frame navigation hook, next to YouTubeTweaks. Installed on the first visit to an enabled site and
@@ -61,8 +59,7 @@ public enum SocialImageTweaks {
 
         var wanted: String?
         if let script, !domains.isEmpty {
-            let pattern = "(^|\\.)(" + domains.map { $0.replacingOccurrences(of: ".", with: "\\.") }.joined(separator: "|") + ")$"
-            wanted = "\(marker)\nconst NOOK_DOWNLOAD_SITES = \(jsString(pattern));\n\(script)"
+            wanted = "\(marker)\nconst NOOK_DOWNLOAD_SITES = \(jsArray(domains));\n\(script)"
         }
         guard wanted != current else { return }
 
@@ -72,16 +69,16 @@ public enum SocialImageTweaks {
         ucc.removeScriptMessageHandler(forName: handlerName, contentWorld: world)
         guard let wanted else { return }
         ucc.add(Handler.shared, contentWorld: world, name: handlerName)
-        if let pageScript, domains.contains(where: { $0 != "vsco.co" }) {
+        if let pageScript {
             ucc.addUserScript(WKUserScript(source: "\(pageMarker)\n\(pageScript)", injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))
         }
         ucc.addUserScript(WKUserScript(source: wanted, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
     }
 
-    private static func jsString(_ value: String) -> String {
-        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
-              let json = String(data: data, encoding: .utf8) else { return "\"\"" }
-        return String(json.dropFirst().dropLast())
+    private static func jsArray(_ values: [String]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: values),
+              let json = String(data: data, encoding: .utf8) else { return "[]" }
+        return json
     }
 
     private static func matches(_ host: String?, _ domains: [String]) -> Bool {
@@ -98,7 +95,6 @@ public enum SocialImageTweaks {
                   let string = body["url"] as? String,
                   let url = URL(string: string),
                   url.scheme == "https",
-                  SocialImageTweaks.matches(url.host, SocialImageTweaks.imageDomains),
                   let webView = message.webView
             else { return }
             socialLog.debug("Downloading \(url.absoluteString, privacy: .public) (\(body["note"] as? String ?? "image", privacy: .public))")

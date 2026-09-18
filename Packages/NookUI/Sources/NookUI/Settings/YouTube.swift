@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  YouTube.swift
 //  Nook
@@ -26,7 +27,10 @@ public struct SettingsYouTubeTab: View {
                     }
                 }
                 Toggle("Frame thumbnails", isOn: $settings.youTubeFrameThumbnails)
+                #if os(macOS)
+                // There is no hover on a touch screen.
                 Toggle("Disable hover previews", isOn: $settings.youTubeNoHoverPreview)
+                #endif
             } header: {
                 Text("Layout")
             } footer: {
