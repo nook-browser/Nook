@@ -80,7 +80,7 @@ public struct SpaceTab: View {
                         .foregroundStyle(isUnloaded ? .secondary : .primary)
                         .textFieldStyle(.plain)
                         .onSubmit { commitRename() }
-                        .onExitCommand { renameState.itemID = nil }
+                        .onEscapeKey { renameState.itemID = nil }
                         .focused($isTextFieldFocused)
                         .onAppear {
                             if draftName.isEmpty { draftName = title }

@@ -22,7 +22,7 @@ struct ToastView<Content: View>: View {
         content
             .padding(12)
             .fixedSize(horizontal: true, vertical: false)
-            .background(Color(.windowBackgroundColor).opacity(0.35))
+            .background(NookDesign.Surface.windowBackground.opacity(0.35))
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
             .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
     }

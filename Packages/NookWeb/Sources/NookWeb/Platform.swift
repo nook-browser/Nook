@@ -1,10 +1,14 @@
 // Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
-@_exported import MuteableWKWebView
-
 import SwiftUI
+import WebKit
 
 #if canImport(AppKit)
+@_exported import MuteableWKWebView
 import AppKit
+import CoreAudio
+
+/// The default-output-device listener PageSession keeps; see PageSession+AudioDevice+macOS.swift.
+public typealias AudioDeviceListenerProc = AudioObjectPropertyListenerProc
 
 public typealias PlatformImage = NSImage
 public typealias PlatformColor = NSColor
@@ -35,6 +39,18 @@ extension PlatformImage {
 }
 #else
 import UIKit
+
+/// Never installed on iOS; the type exists so PageSession's stored property compiles.
+public typealias AudioDeviceListenerProc = @convention(c) () -> Void
+
+extension WKWebView {
+    /// Page muting is the macOS-only MuteableWKWebView target; a phone has one audible page.
+    public var isMuted: Bool { get { false } set {} }
+    /// Pinch zoom is built into UIKit's web view; the AppKit switch has no counterpart.
+    public var allowsMagnification: Bool { get { true } set {} }
+    /// UIKit's origin is top-left, which is what AppKit calls flipped.
+    public var isFlipped: Bool { true }
+}
 
 public typealias PlatformImage = UIImage
 public typealias PlatformColor = UIColor

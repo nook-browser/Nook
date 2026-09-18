@@ -68,7 +68,7 @@ public struct TabFolderView: View {
                             DispatchQueue.main.async { nameFieldFocused = true }
                         }
                         .onSubmit { commitRename() }
-                        .onExitCommand { cancelRename() }
+                        .onEscapeKey { cancelRename() }
                 } else {
                     Text(item.displayTitle)
                         .font(NookDesign.Font.label)

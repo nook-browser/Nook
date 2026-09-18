@@ -9,7 +9,6 @@
 //
 
 import Combine
-import CoreAudio
 import FaviconFinder
 import NookBlocker
 import NookSettings
@@ -153,7 +152,7 @@ public final class PageSession: NSObject, Identifiable {
     @ObservationIgnored var lastTopBarDomain: String? = nil
     @ObservationIgnored var pendingThemeColorUpdate: DispatchWorkItem? = nil
 
-    @ObservationIgnored var audioDeviceListenerProc: AudioObjectPropertyListenerProc?
+    @ObservationIgnored var audioDeviceListenerProc: AudioDeviceListenerProc?
     @ObservationIgnored var audioListenerHelper: AudioListenerHelper?
     @ObservationIgnored var isMonitoringNativeAudio = false
     @ObservationIgnored var lastAudioDeviceCheckTime: Date = Date()
