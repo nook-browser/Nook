@@ -32,11 +32,6 @@ begin with:
 // Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 ```
 
-## Who granted this
-
-Every copyright holder of Nook's own code has granted this permission. The
-maintainer keeps the records outside this repo.
-
 ### Third-party code
 
 The exception covers Nook's own source. It does not reach code Nook links that
