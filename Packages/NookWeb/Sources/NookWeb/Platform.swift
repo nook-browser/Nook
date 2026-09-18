@@ -7,6 +7,17 @@ import WebKit
 import AppKit
 import CoreAudio
 
+public enum PlatformUserAgent {
+    /// Desktop Safari, so sites serve what they serve Safari on a Mac.
+    public static let custom: String? =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
+}
+
+extension WKWebView {
+    /// AppKit's web view takes this through KVC only.
+    public func setDrawsPageBackground(_ draws: Bool) { setValue(draws, forKey: "drawsBackground") }
+}
+
 /// The default-output-device listener PageSession keeps; see PageSession+AudioDevice+macOS.swift.
 public typealias AudioDeviceListenerProc = AudioObjectPropertyListenerProc
 
@@ -40,6 +51,12 @@ extension PlatformImage {
 #else
 import UIKit
 
+public enum PlatformUserAgent {
+    /// nil keeps WebKit's own iPhone or iPad string, completed by applicationNameForUserAgent
+    /// in BrowserConfig+iOS.swift.
+    public static let custom: String? = nil
+}
+
 /// Never installed on iOS; the type exists so PageSession's stored property compiles.
 public typealias AudioDeviceListenerProc = @convention(c) () -> Void
 
@@ -50,6 +67,8 @@ extension WKWebView {
     public var allowsMagnification: Bool { get { true } set {} }
     /// UIKit's origin is top-left, which is what AppKit calls flipped.
     public var isFlipped: Bool { true }
+    /// UIKit has no drawsBackground key; opacity is the nearest control.
+    public func setDrawsPageBackground(_ draws: Bool) { isOpaque = draws }
 }
 
 public typealias PlatformImage = UIImage

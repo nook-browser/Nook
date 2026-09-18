@@ -4,7 +4,7 @@
 //  Nook
 //
 //  Downloads, caches, and updates uBlock Origin / EasyList filter lists.
-//  Stores raw text in ~/Library/Application Support/io.browsewithnook.nook/ContentBlocker/FilterLists/.
+//  Stores raw text in ~/Library/Application Support/<bundle id>/ContentBlocker/FilterLists/.
 //  Uses conditional HTTP GET (ETag/Last-Modified) for bandwidth-efficient updates.
 //
 
@@ -99,7 +99,7 @@ public final class FilterListManager {
 
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let base = appSupport.appendingPathComponent("io.browsewithnook.nook/ContentBlocker/FilterLists", isDirectory: true)
+        let base = appSupport.appendingPathComponent("\(Bundle.main.bundleIdentifier ?? "Nook")/ContentBlocker/FilterLists", isDirectory: true)
         self.cacheDir = base
         self.etagDir = base.appendingPathComponent(".etags", isDirectory: true)
 
