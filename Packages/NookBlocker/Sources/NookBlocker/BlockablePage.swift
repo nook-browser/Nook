@@ -3,8 +3,10 @@
 //  NookBlocker
 //
 //  The seam between the content blocker and whatever owns the pages it acts on.
-//  The app conforms `PageSession` to `BlockablePage` and `BrowserManager` to
-//  `ContentBlockerHost`; nothing in this package knows either type exists.
+//  `Packages/NookWeb/Sources/NookWeb/PageSession+Blockable.swift` conforms
+//  `PageSession` to `BlockablePage`, and the app conforms `BrowserManager` to
+//  `ContentBlockerHost` in `BrowserManager+Blocker.swift`; nothing in this
+//  package knows either type exists.
 //
 //  Foundation + WebKit only; nothing here is AppKit-specific.
 //

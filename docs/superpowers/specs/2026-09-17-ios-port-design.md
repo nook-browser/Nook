@@ -301,7 +301,9 @@ NSTrackingArea-based hover pattern this file already requires elsewhere.
 `fix/download-memory` rewrite. One behavior changed: the persisted ad-block
 allowlist now loads at launch, because the old code read a `settings`
 reference that was `nil` at attach time and silently skipped it; the package
-seam wiring fixed that as a side effect rather than by design.
+seam wiring fixed that as a side effect rather than by design. Find and zoom
+now fall back to the session's primary web view when the pool has no view
+for the active window; the old code reported the view as unavailable.
 
 ## Phase 3: the iOS app
 

@@ -10,7 +10,6 @@ let package = Package(
     dependencies: [
         .package(path: "../NookTabsCore"),
         .package(path: "../NookSettings"),
-        .package(path: "../NookDesign"),
         .package(path: "../NookBlocker"),
         .package(path: "../NookTweaks"),
         .package(url: "https://github.com/will-lumley/FaviconFinder.git", from: "5.1.5"),
@@ -23,7 +22,6 @@ let package = Package(
                 "MuteableWKWebView",
                 .product(name: "NookTabsCore", package: "NookTabsCore"),
                 .product(name: "NookSettings", package: "NookSettings"),
-                .product(name: "NookDesign", package: "NookDesign"),
                 .product(name: "NookBlocker", package: "NookBlocker"),
                 .product(name: "NookTweaks", package: "NookTweaks"),
                 .product(name: "FaviconFinder", package: "FaviconFinder"),

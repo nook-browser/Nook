@@ -10,10 +10,8 @@
 import SwiftUI
 #if canImport(AppKit)
 import AppKit
-typealias PlatformColor = NSColor
 #elseif canImport(UIKit)
 import UIKit
-typealias PlatformColor = UIColor
 #endif
 
 public enum NookDesign {

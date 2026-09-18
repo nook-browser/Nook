@@ -283,7 +283,10 @@ public final class PageSession: NSObject, Identifiable {
             primaryWebView = created
         }
 
-        guard let webView = primaryWebView else { return }
+        guard let webView = primaryWebView else {
+            Self.log.error("No web view created for item \(self.itemID.uuidString, privacy: .public)")
+            return
+        }
         (webView as? SessionWebView)?.owningSession = self
         webView.navigationDelegate = self
         webView.uiDelegate = self
