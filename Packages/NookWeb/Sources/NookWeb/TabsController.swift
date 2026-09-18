@@ -81,6 +81,8 @@ public final class TabsController {
         siteRouting: SiteRoutingManager,
         history: HistoryManager? = nil,
         legacyProfiles: [(id: UUID, name: String)] = [],
+        /// A tree built from a pre-1.1 store; asked for only on a first launch.
+        legacyTree: () -> TabTree? = { nil },
         directory: URL = TabsController.defaultDirectory
     ) {
         self.settings = settings
@@ -97,7 +99,12 @@ public final class TabsController {
         switch loaded.outcome {
         case .firstLaunch, .readOnly:
             // Read-only still needs a working sidebar; the store writes nothing this session.
-            tree = Self.seed(from: legacyProfiles)
+            if case .firstLaunch = loaded.outcome, let imported = legacyTree() {
+                tree = imported
+                log.info("Imported \(imported.orderedSpaces.count) spaces and \(imported.items.count) items from the legacy store")
+            } else {
+                tree = Self.seed(from: legacyProfiles)
+            }
             device = DeviceState()
             device.firstLaunchCompleted = true
         case .loaded, .restoredFromBackup:

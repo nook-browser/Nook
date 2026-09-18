@@ -438,7 +438,8 @@ class BrowserManager: ObservableObject {
         let tabs = TabsController(
             settings: settings, windowRegistry: windowRegistry, blocker: blocker,
             sponsorBlock: sponsorBlock, siteRouting: siteRouting,
-            legacyProfiles: Self.legacyProfileRecords(in: modelContext))
+            legacyProfiles: Self.legacyProfileRecords(in: modelContext),
+            legacyTree: { [modelContext] in LegacyTabImport.tree(from: modelContext) })
         self.tabs = tabs
         // The first space's data store is the one the app starts on.
         let initialProfile = tabs.orderedSpaces.first.flatMap { tabs.profile(forSpace: $0.id) }

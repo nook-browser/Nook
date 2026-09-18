@@ -77,7 +77,7 @@ final class FolderEntity {
     var spaceId: UUID
     var isOpen: Bool
     var index: Int
-    var isRegular: Bool
+    var isRegular: Bool = false // Added after 1.0.7; the default lets stores without the column migrate in place.
 
     init(
         id: UUID,
