@@ -23,7 +23,7 @@
   <a href="https://github.com/nook-browser/Nook/releases/latest"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
 </p>
 
-> **Status:** Development started back up in September 2026 under a new maintainer. The next release is 1.3.0; see [Releases](https://github.com/nook-browser/Nook/releases) for the current download.
+> **Status:** Development started back up in September 2026 under a new maintainer. The next release is 1.1.0; see [Releases](https://github.com/nook-browser/Nook/releases) for the current download.
 
 ## Features  
 

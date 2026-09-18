@@ -12,7 +12,7 @@ Nook is a fast, minimal macOS browser with sidebar-first design. Built with Swif
 - **Local toolchain**: Xcode 27.0 (27A266a, SDK 27.0) at `/Applications/Xcode.app`, installed September 2026; Xcode 16.4 stays at `/Applications/Xcode-16.4.0.app`. Xcode 27 ships without the Metal Toolchain (see Metal below). The deployment target is still 26.0, so macOS 27 APIs need the wrapper pattern in Key Patterns.
 - **Swift language mode**: 5 (`SWIFT_VERSION = 5.0`). Swift 6 strict concurrency is not enabled; see `ASSESSMENT.md` for the warning inventory that would become errors.
 - **Bundle ID**: `com.gstudios.nook`
-- **Current Version**: 1.3.0 (build 130), unreleased. Tags run to `v1.2.1`, which is also the last published GitHub release (2026-09-14, notarized DMG).
+- **Current Version**: 1.1.0 (build 110), unreleased. Tags run to `v1.2.1`, which is also the last published GitHub release (2026-09-14, notarized DMG).
 - **NOT sandboxed** — runs with hardened runtime but no App Sandbox.
 - **Passkeys are not supported.** Apple declined the `com.apple.developer.web-browser.public-key-credential` entitlement. It has been removed from the entitlements file. Do not add WebAuthn/passkey code paths that depend on it.
 

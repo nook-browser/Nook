@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship Nook 1.3.0 as `com.gstudios.nook` from the canonical `nook-browser/Nook` repo, with the 1.0.7 install base told about it through Sparkle and their data carried over on first launch.
+**Goal:** Ship Nook 1.1.0 as `com.gstudios.nook` from the canonical `nook-browser/Nook` repo, with the 1.0.7 install base told about it through Sparkle and their data carried over on first launch.
 
 **Architecture:** The bundle id changes in the project file and every path or logger that spelled it out now derives from `Bundle.main`. A new `@main` entry runs a one-time file and defaults copy from the previous bundle ids before SwiftUI constructs anything, and the first-launch path builds the tab tree from the old SwiftData spaces, folders and tabs instead of one tab per profile. The notarize workflow keeps emitting appcast items, each carrying an informational-update scope so Sparkle 2.8.1 in the 1.0.7 app shows a link instead of attempting an install it would reject (different Team ID).
 
@@ -14,7 +14,7 @@
 
 - Bundle id: `com.gstudios.nook`, App ID on team `ZHB786H6YN`.
 - Canonical repo: `nook-browser/Nook`. Sparkle feed: `https://nook-browser.github.io/Nook/appcast.xml`. `SUPublicEDKey` stays `oWrc3J4HWz5PEVE5fIMKj5fEnCUwqYl0bO1li3xOYM4=`.
-- Version stays 1.3.0, build 130. The informational scope is "below 130".
+- Version 1.1.0, build 110 (the first release after upstream's 1.0.7). The informational scope is "below 110".
 - Previous bundle ids, newest first: `com.baingurley.nook` (1.1.x to 1.2.1), `io.browsewithnook.nook` (1.0.x).
 - Zero behaviour change on macOS beyond the migration. Every task ends with a Debug build. No test target exists; verification is a build plus a hands-off run (`open -g`, `log show`, never take the screen).
 - Commit per task, disclose AI assistance (`Assisted by Claude Code.` as the last line of the message).
@@ -91,7 +91,7 @@ Assisted by Claude Code."
 - Modify: `README.md:16`, `:57`; `CONTRIBUTING.md:19`; `TRADEMARK.md:35`; `LICENSE-EXCEPTION.md:14`; `CLAUDE.md:9` (fork status paragraph), `CLAUDE.md` Info.plist line
 
 **Interfaces:**
-- Produces: every future appcast item has the shape Sparkle 2.8.1 reads as informational for hosts below build 130 (`SUAppcast.m` parses `sparkle:informationalUpdate` with `sparkle:belowVersion` children into a `<130` entry; `SPUAppcastItemStateResolver` compares the host's `CFBundleVersion` against it). The `<link>` element is the item's `infoURL`, which the "Learn More" button opens.
+- Produces: every future appcast item has the shape Sparkle 2.8.1 reads as informational for hosts below build 110 (`SUAppcast.m` parses `sparkle:informationalUpdate` with `sparkle:belowVersion` children into a `<110` entry; `SPUAppcastItemStateResolver` compares the host's `CFBundleVersion` against it). The `<link>` element is the item's `infoURL`, which the "Learn More" button opens.
 
 - [x] **Step 1: Feed URL and links**
 
@@ -120,7 +120,7 @@ In `.github/workflows/macos-notarize.yml`, change the `ENTRY` heredoc so the ite
               <link>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</link>
               <sparkle:releaseNotesLink>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</sparkle:releaseNotesLink>
               <sparkle:informationalUpdate>
-                <sparkle:belowVersion>130</sparkle:belowVersion>
+                <sparkle:belowVersion>110</sparkle:belowVersion>
               </sparkle:informationalUpdate>
               <pubDate>${DATE}</pubDate>
               <enclosure
@@ -136,7 +136,7 @@ In `.github/workflows/macos-notarize.yml`, change the `ENTRY` heredoc so the ite
 Add this comment above the heredoc:
 
 ```yaml
-          # Builds below 130 (the 1.0.x line, bundle id io.browsewithnook.nook, signed by another
+          # Builds below 110 (the 1.0.x line, bundle id io.browsewithnook.nook, signed by another
           # team) cannot install our updates: Sparkle binds an update to the running app's Team ID.
           # The informational scope shows them a link instead. Keep it on every item.
 ```
@@ -551,20 +551,20 @@ Expected: six secrets, all dated today.
 ```bash
 git push org main:release
 gh run watch -R nook-browser/Nook --exit-status
-curl -s https://nook-browser.github.io/Nook/appcast.xml | grep -A14 'Version 1.3.0'
-gh release view v1.3.0 -R nook-browser/Nook --json assets --jq '.assets[].name'
+curl -s https://nook-browser.github.io/Nook/appcast.xml | grep -A14 'Version 1.1.0'
+gh release view v1.1.0 -R nook-browser/Nook --json assets --jq '.assets[].name'
 ```
-Expected: the run succeeds; the appcast's first item is 1.3.0 with `<link>`, the `informationalUpdate` block, and an `edSignature`; the release lists `Nook-v1.3.0.dmg`.
+Expected: the run succeeds; the appcast's first item is 1.1.0 with `<link>`, the `informationalUpdate` block, and an `edSignature`; the release lists `Nook-v1.1.0.dmg`.
 
 - [ ] **Step 4: Release notes**
 
 ```bash
-gh release edit v1.3.0 -R nook-browser/Nook --notes-file - <<'EOF'
+gh release edit v1.1.0 -R nook-browser/Nook --notes-file - <<'EOF'
 Nook has a new maintainer and a new home: this repo. The app's bundle id changed to `com.gstudios.nook`, so:
 
 - If you are on 1.0.x, the updater cannot install this version for you. Download the DMG, replace Nook in Applications, and launch it. Your spaces, tabs, logins and settings carry over on the first launch.
 - macOS will ask you to choose Nook as your default browser again.
-- Updates from 1.3.0 onward install through the app as before.
+- Updates from 1.1.0 onward install through the app as before.
 
 Full change list since 1.0.7: ad blocking runs on adblock-rust with EasyList, EasyPrivacy and the uBlock lists; profiles are folded into spaces; a redesigned sidebar and settings; SponsorBlock, YouTube and social media tweaks; an on-device tab organizer; macOS 26 required.
 EOF
@@ -583,4 +583,4 @@ Expected: `origin` is the org repo; the fork reports `true`.
 
 - [ ] **Step 6 (Bain): install the released build**
 
-Download `Nook-v1.3.0.dmg` from the release, replace `/Applications/Nook.app`, launch. This Mac's home already migrated in Task 3, so the check is that tabs, logins and settings are there and that Sparkle reports "up to date". Native dialogs, context menus and drag remain on the handoff's manual list.
+Download `Nook-v1.1.0.dmg` from the release, replace `/Applications/Nook.app`, launch. This Mac's home already migrated in Task 3, so the check is that tabs, logins and settings are there and that Sparkle reports "up to date". Native dialogs, context menus and drag remain on the handoff's manual list.

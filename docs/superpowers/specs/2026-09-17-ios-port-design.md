@@ -408,8 +408,8 @@ diff read finds something the remodel lacks.
 **Bridge for 1.0.7 users: every appcast item carries an informational scope.**
 Sparkle's `SUAppcast.m` parses `<sparkle:informationalUpdate>` with a
 `<sparkle:belowVersion>` child; 1.0.7 runs Sparkle 2.8.1. An item scoped below
-build 130 shows those users the `<link>` and no download, so no code-signing
-check runs. Builds 130 and up see the same item as a normal signed update. The
+build 110 shows those users the `<link>` and no download, so no code-signing
+check runs. Builds 110 and up see the same item as a normal signed update. The
 scope stays on every future item, since a 1.0.7 app always evaluates the newest
 one.
 
@@ -423,7 +423,7 @@ imports the store's spaces, folders and tabs into the tree instead, mapping a
 profile's first space onto the profile's id the way `ProfileMerge` does.
 
 **Order.** The transition (repo move, feed URL, bridge item, migration, ship
-1.3.0) is its own small plan and runs before Phase 3. Phase 3 then begins with
+1.1.0) is its own small plan and runs before Phase 3. Phase 3 then begins with
 the license pointer commit, so every iOS file is born with it.
 
 **The tab sheet is the outline, not a thumbnail grid.** Thumbnails need a
