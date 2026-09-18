@@ -100,7 +100,16 @@ struct TabSheet: View {
                             .environment(tabs)
                             .environment(\.tabActions, model)
                     }
+                    .draggable(item.id.uuidString)
                 }
+            }
+            // The grid takes a drop anywhere in it; favorites append rather than
+            // land at an index, the way the Mac's pin intent does.
+            .dropDestination(for: String.self) { ids, _ in
+                guard let first = ids.first, let dragged = UUID(uuidString: first) else { return false }
+                tabs.pin(dragged, to: .favorites(spaceID: spaceID))
+                Haptics.alignment()
+                return true
             }
         }
     }
