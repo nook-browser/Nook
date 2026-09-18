@@ -9,7 +9,7 @@ import OSLog
 
 @MainActor
 public final class SiteRoutingManager {
-    private let logger = Logger(subsystem: "com.baingurley.nook", category: "SiteRouting")
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "SiteRouting")
 
     private let settings: NookSettingsService
     public weak var host: SiteRoutingHost?

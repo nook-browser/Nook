@@ -100,7 +100,7 @@ public final class HistoryManager {
 
 @ModelActor
 actor HistoryStore {
-    private static let logger = Logger(subsystem: "com.baingurley.nook", category: "History")
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "History")
 
     private func visible(to profile: UUID?) -> Predicate<HistoryEntity> {
         guard let profile else { return #Predicate { _ in true } }

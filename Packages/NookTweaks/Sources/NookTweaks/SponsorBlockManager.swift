@@ -12,7 +12,7 @@ import NookSettings
 import OSLog
 import WebKit
 
-private let sbLog = Logger(subsystem: "com.baingurley.nook", category: "SponsorBlock")
+private let sbLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "SponsorBlock")
 
 @MainActor
 public final class SponsorBlockManager {

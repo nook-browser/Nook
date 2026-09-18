@@ -23,7 +23,7 @@ public final class PageSession: NSObject, Identifiable {
 
     public let itemID: UUID
     public var id: UUID { itemID }
-    @ObservationIgnored static let log = Logger(subsystem: "com.baingurley.nook", category: "PageSession")
+    @ObservationIgnored static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "PageSession")
     /// A session in a private window: ephemeral profile, never saved, no extensions.
     public let isPrivate: Bool
 

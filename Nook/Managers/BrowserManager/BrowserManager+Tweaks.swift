@@ -15,7 +15,7 @@ import NookTabsCore
 import NookTweaks
 import NookWeb
 
-private let tweaksLog = Logger(subsystem: "com.baingurley.nook", category: "SiteRouting")
+private let tweaksLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "SiteRouting")
 
 extension BrowserManager: SiteRoutingHost {
     func route(url: URL, toSpace spaceID: UUID, from page: AnyObject?) -> Bool {

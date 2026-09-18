@@ -11,7 +11,7 @@ import NookSettings
 import OSLog
 import WebKit
 
-private let ytLog = Logger(subsystem: "com.baingurley.nook", category: "YouTubeTweaks")
+private let ytLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "YouTubeTweaks")
 
 /// The selectors each hideable home shelf is matched by. The enum itself lives in NookSettings.
 extension YouTubeHomeSection {
