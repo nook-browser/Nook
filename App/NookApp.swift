@@ -15,7 +15,6 @@ import NookSettings
 import NookUI
 import NookWeb
 
-@main
 struct NookApp: App {
     @State private var windowRegistry: WindowRegistry
     @State private var webViewCoordinator = WebViewCoordinator()
