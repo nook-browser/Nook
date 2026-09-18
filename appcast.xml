@@ -88,5 +88,21 @@
       sparkle:shortVersionString="1.0.1"
       type="application/octet-stream"/>
   </item>
+  <item>
+    <title>Version 1.1.0 beta 1</title>
+    <link>https://github.com/nook-browser/Nook/releases/tag/v1.1.0-beta.1</link>
+    <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.1.0-beta.1</sparkle:releaseNotesLink>
+    <sparkle:informationalUpdate>
+      <sparkle:belowVersion>110</sparkle:belowVersion>
+    </sparkle:informationalUpdate>
+    <pubDate>Fri, 18 Sep 2026 18:18:12 +0000</pubDate>
+    <enclosure
+      url="https://github.com/nook-browser/Nook/releases/download/v1.1.0-beta.1/Nook-v1.1.0-beta.1.dmg"
+      sparkle:version="111"
+      sparkle:shortVersionString="1.1.0-beta.1"
+      sparkle:edSignature="XHbFsz3H2WHgOoYifcT9D3MnlZKZQ3I6HnnCGt2/O3+49dQjFnZrbboybQeU1mtqzh3tI/5JWnAOmYwjCpyhDA=="
+      length="32254391"
+      type="application/octet-stream"/>
+  </item>
 </channel>
 </rss>
