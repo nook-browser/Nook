@@ -297,7 +297,10 @@ extension MiniBrowserWindowController: NSToolbarDelegate {
 }
 
 extension MiniBrowserWindowController: NSSharingServicePickerToolbarItemDelegate {
-    nonisolated func items(for pickerToolbarItem: NSSharingServicePickerToolbarItem) -> [Any] {
-        MainActor.assumeIsolated { [session.currentURL] }
+    /// The SDK declares this requirement `NS_SWIFT_UI_ACTOR`, so it is already main-actor
+    /// isolated. Marking it `nonisolated` forced a `MainActor.assumeIsolated` whose executor
+    /// check segfaults in the concurrency runtime on macOS 27 (26A428) during toolbar validation.
+    func items(for pickerToolbarItem: NSSharingServicePickerToolbarItem) -> [Any] {
+        [session.currentURL]
     }
 }
