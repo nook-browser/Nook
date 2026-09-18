@@ -8,8 +8,8 @@
 </div>
 
 <p align="center">
-  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-15.5+-blue" alt="macOS 15.5+"></a>
-  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-6-orange" alt="Swift"></a>
+  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-26.0+-blue" alt="macOS 26.0+"></a>
+  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-5-orange" alt="Swift"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-green" alt="GPL-3.0"></a>
   <a href="https://github.com/nook-browser/Nook/pulls"><img src="https://img.shields.io/github/issues-pr/nook-browser/Nook" alt="Open pull requests"></a>
   <a href="https://github.com/nook-browser/Nook/issues"><img src="https://img.shields.io/github/issues/nook-browser/Nook" alt="Open issues"></a>
@@ -20,7 +20,7 @@
 
 
 <p align="center">
-  <a href="https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+  <a href="https://github.com/nook-browser/Nook/releases/latest"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
 </p>
 
 > **Status:** Development started back up in September 2026 under a new maintainer. The next release is 1.3.0; see [Releases](https://github.com/nook-browser/Nook/releases) for the current download.
@@ -39,13 +39,13 @@
 ## Getting Started  
 
 ### Download
-[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg)
+[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/Nook/releases/latest)
 
 ### or, Build from Source
 
 #### Prerequisites  
-- macOS 15.5+
-- [Xcode](https://developer.apple.com/xcode/) (to build from source)
+- macOS 26.0 (Tahoe) or later, Apple Silicon
+- [Xcode](https://developer.apple.com/xcode/) 26 or later
 ```bash
 
 git clone https://github.com/nook-browser/Nook.git
@@ -53,66 +53,49 @@ cd Nook
 open Nook.xcodeproj
 ```
 
-Some obj-c libraries may not play nice with Intel Macs, though there should technically be full interoperability. You can use any number of resources to debug. You will also need to delete a couple lines of code for *older* versions of macOS than Tahoe (26.0).
+Nook builds for Apple Silicon only: the on-device tab organizer depends on MLX, which has no x86_64 slice. Xcode resolves the Swift packages on open.
 
 You’ll need to set your personal Development Team in Signing to build locally.
-
-Join our Discord to help with development: https://discord.gg/J3XfPvg7Fs
 
 ## Project Structure
 
 ```
 Nook/
+├── App/                       # Entry point, AppDelegate, window scene, menu commands
+├── Packages/                  # Local Swift packages shared with the planned iOS port
+│   ├── NookTabsCore/          # Tab tree model: spaces, items, ordering, on-disk store
+│   ├── NookSettings/          # Settings service and every persisted value type
+│   ├── NookDesign/            # Design tokens: radii, spacing, type, motion, surfaces
+│   ├── NookBlocker/           # Content blocker: filter lists, adblock-rust conversion, cosmetic engine
+│   ├── NookTweaks/            # Site tweaks: YouTube, Facebook, social downloads, SponsorBlock, routing
+│   ├── NookWeb/               # Tabs controller, page sessions, windows, history, favicons, search
+│   └── NookUI/                # Shared SwiftUI: rows, context menus, spaces list, toasts, settings tabs
 ├── Nook/
-│   ├── Managers/              # Core business logic and state management
-│   │   ├── BrowserManager/    # Central coordinator for browser state
-│   │   ├── TabManager/        # Tab lifecycle and organization
-│   │   ├── ProfileManager/    # User profile and data isolation
-│   │   ├── ExtensionManager/  # Browser extension support
-│   │   ├── HistoryManager/    # Browsing history tracking
-│   │   ├── DownloadManager/   # File download handling
-│   │   ├── CookieManager/     # Cookie storage and management
-│   │   ├── CacheManager/      # Web cache management
-│   │   ├── SettingsManager/   # User preferences
-│   │   ├── DialogManager/     # System dialogs and alerts
-│   │   ├── SearchManager/     # Search functionality
+│   ├── Managers/              # Feature managers (macOS side)
+│   │   ├── BrowserManager/    # Central coordinator; conforms to the package seams
+│   │   ├── ExtensionManager/  # WKWebExtension support
+│   │   ├── AIManager/         # AI chat providers, MCP client, browser tools
+│   │   ├── DevMCPServer/      # Local MCP server for driving the app from a coding agent
+│   │   ├── TabOrganizerManager/ # On-device LLM tab grouping (MLX)
+│   │   ├── WebViewCoordinator/  # Web view pool for multi-window display
+│   │   ├── DownloadManager/   # File downloads
+│   │   ├── DialogManager/     # Modal dialogs
+│   │   ├── PeekManager/       # Quick preview overlay
 │   │   ├── SplitViewManager/  # Split-screen tab viewing
-│   │   ├── PeekManager/       # Quick preview feature
-│   │   ├── DragManager/       # Drag-and-drop operations
 │   │   └── ...
-│   │
-│   ├── Models/                # Data models and business entities
-│   │   ├── Tab/              # Tab model and state
-│   │   ├── Space/            # Workspace organization
-│   │   ├── Profile/          # User profile data model
-│   │   ├── History/          # Browsing history entries
-│   │   ├── Extension/        # Extension metadata
-│   │   ├── Settings/         # Settings data structures
-│   │   └── BrowserConfig/    # Browser configuration
-│   │
-│   ├── Components/            # SwiftUI views and UI components
-│   │   ├── Browser/          # Main browser window UI
-│   │   ├── Sidebar/          # Sidebar navigation UI
-│   │   ├── CommandPalette/   # Quick action interface
-│   │   ├── Settings/         # Settings screens
-│   │   ├── Extensions/       # Extension management UI
-│   │   ├── Peek/             # Preview overlay UI
-│   │   ├── Dialog/           # Modal dialogs
-│   │   ├── FindBar/          # In-page search
-│   │   └── ...
-│   │
-│   ├── Utils/                # Utility functions and helpers
-│   │   ├── WebKit/           # WebKit extensions
-│   │   ├── Shaders/          # Metal shaders for UI effects
-│   │   └── Debug/            # Development tools
-│   │
-│   ├── Protocols/            # Swift protocols and interfaces
-│   ├── Adapters/             # External API adapters
-│   ├── ThirdParty/           # Third-party dependencies
-│   └── Supporting Files/     # App configuration and resources
-│
-├── Config/                   # Build and project configuration
-└── assets/                   # Static assets and resources
+│   ├── Models/                # macOS-only models and SwiftData entities
+│   ├── Components/            # SwiftUI views: sidebar, website view, settings, drag and drop, dialogs
+│   ├── Browser/               # macOS-only slice of the tab controller
+│   ├── Utils/                 # WebKit helpers and utilities
+│   └── ThirdParty/            # adblock-rust FFI crate and other embedded dependencies
+├── CommandPalette/            # Command palette UI
+├── Navigation/                # Sidebar structure: header, bottom bar, spaces list
+├── Onboarding/                # First-run flow
+├── Settings/                  # SwiftUI environment glue for the settings service
+├── UI/                        # Shared buttons and controls
+├── docs/                      # Architecture notes, design specs, implementation plans
+├── scripts/                   # Filter list refresh, used in CI
+└── assets/                    # Static assets
 ```
 
 ### Architecture Overview
@@ -122,6 +105,7 @@ Nook follows a manager-based architecture where:
 - **Models** represent data and state using Swift's `@Observable` macro
 - **Components** are SwiftUI views that reactively update based on model changes
 - **BrowserManager** acts as the central coordinator, connecting all managers together
+- **Packages** hold the model, blocker, tweak and shared view code that has no AppKit dependency, so it can be reused by an iOS app
 
 
 ---
@@ -143,5 +127,4 @@ Nook follows a manager-based architecture where:
 ---
 
 ### LICENSES
-With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses.
-
+With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses. A GPL-3.0 section 7 additional permission for App Store distribution is in [LICENSE-EXCEPTION.md](./LICENSE-EXCEPTION.md).
