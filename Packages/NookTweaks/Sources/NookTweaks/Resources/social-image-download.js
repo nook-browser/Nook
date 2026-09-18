@@ -1,12 +1,13 @@
 // Runs at document start in the main frame, in its own content world.
-// Shows a download button over the photo or video under the pointer on the sites in
-// NOOK_DOWNLOAD_SITES (a regex source set by SocialImageTweaks: Instagram, Facebook, VSCO).
-// Both sites obfuscate class names and cover media with transparent overlays, so media is
-// found by what is under the pointer and where it is served from, not by selector or event target.
+// Shows a download button over the photo or video under the pointer on the domains in
+// NOOK_DOWNLOAD_SITES (a list set by SocialImageTweaks from the user's Settings).
+// Sites obfuscate class names and cover media with transparent overlays, so media is
+// found by what is under the pointer, not by selector or event target. Any https media
+// counts: a whitelisted site may serve from any CDN.
 (function () {
-    if (!new RegExp(NOOK_DOWNLOAD_SITES).test(location.hostname)) return;
+    const HOST = location.hostname.toLowerCase();
+    if (!NOOK_DOWNLOAD_SITES.some(d => HOST === d || HOST.endsWith('.' + d))) return;
 
-    const CDN = /(^|\.)(cdninstagram\.com|fbcdn\.net|vsco\.co)$/;
     const MIN_SIZE = 120;       // skips avatars and icons
     const INSET = 8;
     const HANDLER = 'nookSocialImageDownload';
@@ -19,16 +20,16 @@
     // Videos with no saveable URL, by the source they were playing; a miss costs a React tree walk.
     const misses = new WeakMap();
 
-    function cdnURL(value) {
+    function mediaURL(value) {
         try {
             const url = new URL(value, location.href);
-            return url.protocol === 'https:' && CDN.test(url.hostname) ? url.href : null;
+            return url.protocol === 'https:' ? url.href : null;
         } catch { return null; }
     }
 
     // Largest candidate from srcset (w or x descriptors), falling back to what is showing.
     function imageURL(img) {
-        let best = cdnURL(img.currentSrc || img.src), bestScore = 0;
+        let best = mediaURL(img.currentSrc || img.src), bestScore = 0;
         const sets = [img.getAttribute('srcset')];
         if (img.parentElement?.tagName === 'PICTURE') {
             for (const source of img.parentElement.querySelectorAll('source[srcset]')) sets.push(source.getAttribute('srcset'));
@@ -37,12 +38,13 @@
             // Instagram omits the space after each comma; split only where a URL starts.
             for (const candidate of (set || '').split(/,\s*(?=https:|\/)/)) {
                 const [src, descriptor = '1x'] = candidate.trim().split(/\s+/);
-                const url = cdnURL(src);
+                const url = mediaURL(src);
                 const score = parseFloat(descriptor) * (descriptor.endsWith('x') ? img.naturalWidth || 1 : 1);
                 if (url && score > bestScore) { best = url; bestScore = score; }
             }
         }
         // VSCO resizes by query (?w=1600); without one im.vsco.co serves the original upload.
+        // ponytail: the one site-specific rule left; add a table if other sites need one.
         if (best && /(^|\.)vsco\.co$/.test(new URL(best).hostname)) {
             const original = new URL(best);
             original.search = '';
@@ -52,16 +54,16 @@
     }
 
     // Facebook and Instagram stream video as blob: URLs; social-video-source.js reads the MP4 from the
-    // page's React data and answers in an attribute during dispatchEvent. A direct CDN src also works.
+    // page's React data and answers in an attribute during dispatchEvent. Elsewhere the src is direct.
     function videoSource(video) {
         video.dispatchEvent(new CustomEvent('nook-social-video-url'));
         const answer = video.getAttribute('data-nook-video-url');
         video.removeAttribute('data-nook-video-url');
         try {
             const { url, note } = JSON.parse(answer);
-            if (cdnURL(url)) return { url, note };
+            if (mediaURL(url)) return { url, note };
         } catch {}
-        const direct = cdnURL(video.currentSrc || video.src);
+        const direct = mediaURL(video.currentSrc || video.src);
         return direct && { url: direct, note: 'src' };
     }
 
@@ -71,7 +73,7 @@
         return url && { url };
     }
 
-    const isMedia = element => element.tagName === 'VIDEO' || (element.tagName === 'IMG' && cdnURL(element.currentSrc || element.src));
+    const isMedia = element => element.tagName === 'VIDEO' || (element.tagName === 'IMG' && mediaURL(element.currentSrc || element.src));
     const contains = (rect, x, y) => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 
     function mediaAt(x, y) {
