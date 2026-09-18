@@ -36,6 +36,8 @@ final class BrowserModel: ObservableObject {
     @Published var dialog: ChromeDialog?
     /// Where the settings sheet opens. Empty is its root list.
     @Published var settingsPath: [SettingsRoute] = []
+    /// Live downloads, held only because WKDownload.delegate is weak.
+    var downloads: [IOSDownload] = []
     private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "BrowserModel")
 
     init() {
