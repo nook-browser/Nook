@@ -17,7 +17,7 @@
 - Version 1.1.0, build 110 (the first release after upstream's 1.0.7). The informational scope is "below 110".
 - Previous bundle ids, newest first: `com.baingurley.nook` (1.1.x to 1.2.1), `io.browsewithnook.nook` (1.0.x).
 - Zero behaviour change on macOS beyond the migration. Every task ends with a Debug build. No test target exists; verification is a build plus a hands-off run (`open -g`, `log show`, never take the screen).
-- Commit per task, disclose AI assistance (`Assisted by Claude Code.` as the last line of the message).
+- Commit per task with a plain message.
 - Never delete a directory without listing it first. Nothing in this plan removes user data; copies only.
 - Do not launch the app between Task 1 and Task 3's verification: a launch under the new id creates a fresh store and the migration guard would then skip the copy.
 
@@ -76,9 +76,7 @@ Expected: `** BUILD SUCCEEDED **` and `com.gstudios.nook`. Do not launch.
 
 ```bash
 git add Nook.xcodeproj/project.pbxproj Packages Nook CLAUDE.md
-git commit -m "chore: bundle id com.gstudios.nook, derive paths and loggers from the bundle
-
-Assisted by Claude Code."
+git commit -m "chore: bundle id com.gstudios.nook, derive paths and loggers from the bundle"
 ```
 
 ---
@@ -155,9 +153,7 @@ Expected: `yaml ok`, `** BUILD SUCCEEDED **`, the org feed URL.
 
 ```bash
 git add Nook/Info.plist .github/workflows/macos-notarize.yml README.md CONTRIBUTING.md TRADEMARK.md LICENSE-EXCEPTION.md CLAUDE.md
-git commit -m "chore: point Sparkle and docs at nook-browser/Nook, scope appcast items for 1.0.x hosts
-
-Assisted by Claude Code."
+git commit -m "chore: point Sparkle and docs at nook-browser/Nook, scope appcast items for 1.0.x hosts"
 ```
 
 ---
@@ -311,9 +307,7 @@ Expected: log lines `Migrating data from com.baingurley.nook to com.gstudios.noo
 
 ```bash
 git add App/LegacyDataMigration.swift App/Main.swift App/NookApp.swift
-git commit -m "feat: copy the previous bundle id's data on first launch
-
-Assisted by Claude Code."
+git commit -m "feat: copy the previous bundle id's data on first launch"
 ```
 
 ---
@@ -481,9 +475,7 @@ Expected: the sqlite line prints the counts (on this Mac: 5 spaces, 8 folders, 4
 
 ```bash
 git add Nook/Models/Legacy/LegacyTabImport.swift Packages/NookWeb/Sources/NookWeb/TabsController.swift Nook/Managers/BrowserManager/BrowserManager.swift
-git commit -m "feat: import 1.0.x spaces, folders and tabs on the first launch after the bundle id change
-
-Assisted by Claude Code."
+git commit -m "feat: import 1.0.x spaces, folders and tabs on the first launch after the bundle id change"
 ```
 
 ---
