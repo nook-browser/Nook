@@ -26,15 +26,17 @@ final class NookDragSourceCoordinator: NSObject, NSDraggingSource {
         return context == .withinApplication ? .move : .copy
     }
 
-    nonisolated func draggingSession(_ session: NSDraggingSession, movedTo screenPoint: NSPoint) {
+    // NSDraggingSource is declared NS_SWIFT_UI_ACTOR, so these run on the main actor
+    // statically. Marking them nonisolated and hopping back with assumeIsolated added a
+    // dynamic executor check that segfaults after any ObjC exception has unwound a
+    // main-actor task (see ExternalMiniWindowManager.items(for:) for the same fix).
+    func draggingSession(_ session: NSDraggingSession, movedTo screenPoint: NSPoint) {
         manager.updateCursorScreenPosition(screenPoint)
     }
 
-    nonisolated func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        MainActor.assumeIsolated {
-            if operation == [] {
-                manager.cancelDrag()
-            }
+    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+        if operation == [] {
+            manager.cancelDrag()
         }
     }
 }
