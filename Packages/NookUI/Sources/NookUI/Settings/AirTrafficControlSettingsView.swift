@@ -100,7 +100,7 @@ public struct AirTrafficControlSettingsView: View {
                         // accent dot, so this picker uses the same mark.
                         Circle()
                             .fill(space.accentColor)
-                            .frame(width: NookDesign.Spacing.sm, height: NookDesign.Spacing.sm)
+                            .frame(width: NookDesign.Spacing.md, height: NookDesign.Spacing.md)
                         Text(space.name)
                             .font(NookDesign.Font.caption)
                             .foregroundStyle(.secondary)

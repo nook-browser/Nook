@@ -178,24 +178,32 @@ final class DevMCPServer {
         // for as long as it took. These two tasks race and the loser is dropped.
         let latch = Latch()
         return await withCheckedContinuation { (cont: CheckedContinuation<T?, Never>) in
-            let work = Task { @MainActor in
-                let value = await operation()
-                guard !latch.done else { return }
-                latch.done = true
-                cont.resume(returning: value)
-            }
-            Task { @MainActor in
+            // The deadline task is made first so the work task can cancel it: a tool that
+            // answers in a millisecond otherwise leaves a sleeper on the main actor for the
+            // full timeout, one per request.
+            let deadline = Task { @MainActor in
                 try? await Task.sleep(for: .seconds(seconds))
                 guard !latch.done else { return }
                 latch.done = true
-                work.cancel()
+                latch.work?.cancel()
                 cont.resume(returning: nil)
+            }
+            latch.work = Task { @MainActor in
+                let value = await operation()
+                guard !latch.done else { return }
+                latch.done = true
+                deadline.cancel()
+                cont.resume(returning: value)
             }
         }
     }
 
-    /// Whether the race above has already been decided. Main actor only.
-    private final class Latch { var done = false }
+    /// Whether the race above has already been decided, and the work task the deadline
+    /// branch cancels (assigned after the deadline task is made, so it is passed this way).
+    @MainActor private final class Latch {
+        var done = false
+        var work: Task<Void, Never>?
+    }
 
     private func rpcError(id: Any, code: Int, message: String) -> Data? {
         try? JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": id, "error": ["code": code, "message": message]])
@@ -224,17 +232,17 @@ final class DevMCPServer {
         ),
         AIToolDefinition(
             name: "reload",
-            description: "Reload the selected tab and wait for the load to finish (timeout seconds, default 20).",
+            description: "Reload the selected tab and wait for the load to finish (timeout seconds, default 20, capped at 25 by the server's own deadline).",
             parameters: ["type": "object", "properties": ["timeout": ["type": "number"]]]
         ),
         AIToolDefinition(
             name: "wait_for_load",
-            description: "Wait until the selected tab stops loading (timeout seconds, default 20). Call after navigateToURL.",
+            description: "Wait until the selected tab stops loading (timeout seconds, default 20, capped at 25 by the server's own deadline). Call after navigateToURL.",
             parameters: ["type": "object", "properties": ["timeout": ["type": "number"]]]
         ),
         AIToolDefinition(
             name: "blocker_status",
-            description: "Content blocker state for the selected tab: enabled, whether this page is exempt, allowlisted host, blocked-request count, compiled rule lists.",
+            description: "Content blocker state for the selected tab: enabled, whether this page is exempt, allowlisted host, compiled rule lists.",
             parameters: ["type": "object", "properties": [:] as [String: Any]]
         ),
         AIToolDefinition(
@@ -258,7 +266,10 @@ final class DevMCPServer {
         )
     ]
 
-    private static let toolList: [[String: Any]] = (BrowserTools.allTools + devTools).map {
+    /// `executeJavaScript` is not advertised: over this server it is only an old name for
+    /// `evaluate` (see callTool), and the chat's description of it is wrong for that behaviour.
+    /// The alias stays so an agent registered against the old name keeps working.
+    private static let toolList: [[String: Any]] = (BrowserTools.allTools.filter { $0.name != "executeJavaScript" } + devTools).map {
         ["name": $0.name, "description": $0.description, "inputSchema": $0.parameters]
     }
 
@@ -300,7 +311,6 @@ final class DevMCPServer {
         do {
             if BrowserTools.toolsByName[name] != nil {
                 let executor = BrowserToolExecutor(browserManager: bm, windowState: window)
-                executor.confirmationHandler = { _, _ in true } // the bearer token is the approval
                 let r = try await executor.execute(AIToolCall(name: name, arguments: args))
                 return text(r.content, error: r.isError)
             }
@@ -347,7 +357,9 @@ final class DevMCPServer {
             case "reload", "wait_for_load":
                 guard let wv = webView else { return text("No active tab", error: true) }
                 if name == "reload" { wv.reload() }
-                let timeout = (args["timeout"] as? NSNumber)?.doubleValue ?? 20
+                // Clamped below the outer deadline: an uncapped timeout: 60 would be cut off
+                // by withTimeout at 30s as a confusing -32001 instead of this tool's own answer.
+                let timeout = min((args["timeout"] as? NSNumber)?.doubleValue ?? 20, Self.toolTimeout - 5)
                 let deadline = Date().addingTimeInterval(timeout)
                 // ponytail: 100 ms poll, debug-only and bounded by the timeout; use navigation delegate callbacks if this ever matters.
                 if name == "reload" { try await Task.sleep(for: .milliseconds(150)) }
