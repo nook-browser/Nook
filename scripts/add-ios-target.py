@@ -93,7 +93,7 @@ def config(oid_, name, extra):
     return f"""\t\t{oid_} /* {name} */ = {{
 \t\t\tisa = XCBuildConfiguration;
 \t\t\tbuildSettings = {{
-\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = logo;
 \t\t\t\tASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 \t\t\t\tCODE_SIGN_ENTITLEMENTS = NookiOS/NookiOS.entitlements;
 \t\t\t\tCODE_SIGN_STYLE = Automatic;
