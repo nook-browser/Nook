@@ -140,7 +140,17 @@ struct URLBarView: View {
     }
 
     private func isSecure(for session: PageSession?) -> Bool { session?.url.scheme == "https" }
-    private func displayHost(for session: PageSession?) -> String { session?.url.host ?? displayURL(for: session) }
+    /// The host, carrying the port when the URL names a non-default one. A development
+    /// server at `localhost:3000` is a different origin from one at `localhost:8080`, so
+    /// dropping the port left the bar showing the wrong thing. `URL.port` reports a port
+    /// that was written out even when it is the scheme's default, so `https://x.com:443`
+    /// still reads as `x.com`.
+    private func displayHost(for session: PageSession?) -> String {
+        guard let url = session?.url, let host = url.host else { return displayURL(for: session) }
+        let defaultPort = url.scheme == "https" ? 443 : (url.scheme == "http" ? 80 : nil)
+        guard let port = url.port, port != defaultPort else { return host }
+        return "\(host):\(port)"
+    }
     private func displayPath(for session: PageSession?) -> String {
         guard let url = session?.url, url.host != nil else { return "" }
         let path = url.path
