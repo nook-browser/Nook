@@ -5,6 +5,7 @@
 //
 
 import SwiftUI
+import NookUI
 
 @main
 struct NookiOSApp: App {
@@ -12,7 +13,25 @@ struct NookiOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView().environmentObject(model)
+            RootView()
+                .nookEnvironment(model)
         }
+    }
+}
+
+extension View {
+    /// Everything the shared rows, menus and settings bodies read. Sheets do not
+    /// inherit these, so the sheet contents apply the same modifier.
+    func nookEnvironment(_ model: BrowserModel) -> some View {
+        self
+            .environmentObject(model)
+            .environment(model.tabs)
+            .environment(model.window)
+            .environment(model.windowRegistry)
+            .environment(model.settings)
+            .environment(\.nookSettings, model.settings)
+            .environment(\.tabActions, model)
+            .environment(\.contentBlocker, model.blocker)
+            .environment(\.siteRouting, model.siteRouting)
     }
 }

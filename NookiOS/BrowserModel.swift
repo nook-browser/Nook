@@ -29,6 +29,13 @@ final class BrowserModel: ObservableObject {
 
     /// The active space's data store; PageSession waits on the publisher when this is nil.
     @Published var currentProfileValue: Profile?
+
+    // MARK: - Chrome
+
+    @Published var sheet: ChromeSheet?
+    @Published var dialog: ChromeDialog?
+    /// Where the settings sheet opens. Nil is its root list.
+    @Published var settingsRoute: SettingsRoute?
     private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "BrowserModel")
 
     init() {
