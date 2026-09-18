@@ -205,7 +205,7 @@ jobs:
             : > notes.md
           fi
           gh release create "$VERSION" \
-            --title "Nook $DISPLAY_VERSION" \
+            --title "$VERSION" \
             --notes-file notes.md \
             --generate-notes \
             $PRERELEASE \
