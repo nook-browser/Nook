@@ -32,4 +32,4 @@ Holding the name is what separates a fork from an impersonation.
 
 ## Asking
 
-Open an issue at <https://github.com/l984-451/Nook/issues>.
+Open an issue at <https://github.com/nook-browser/Nook/issues>.

@@ -197,10 +197,17 @@ jobs:
           git fetch origin gh-pages
           git checkout gh-pages
 
+          # Builds below 130 (the 1.0.x line, bundle id io.browsewithnook.nook, signed by another
+          # team) cannot install our updates: Sparkle binds an update to the running app's Team ID.
+          # The informational scope shows them a link instead. Keep it on every item.
           ENTRY=$(cat << XMLEOF
             <item>
               <title>Version ${SHORT_VERSION}</title>
+              <link>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</link>
               <sparkle:releaseNotesLink>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</sparkle:releaseNotesLink>
+              <sparkle:informationalUpdate>
+                <sparkle:belowVersion>130</sparkle:belowVersion>
+              </sparkle:informationalUpdate>
               <pubDate>${DATE}</pubDate>
               <enclosure
                 url="${DMG_URL}"

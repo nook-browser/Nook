@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/l984-451/Nook/releases/latest"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+  <a href="https://github.com/nook-browser/Nook/releases/latest"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
 </p>
 
 <p align="center">
@@ -54,7 +54,7 @@ Everything else is negotiable against those three.
 ## Building
 
 ```bash
-git clone https://github.com/l984-451/Nook.git
+git clone https://github.com/nook-browser/Nook.git
 cd Nook
 open Nook.xcodeproj
 ```

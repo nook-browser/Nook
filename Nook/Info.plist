@@ -53,7 +53,7 @@
 	<key>SUEnableDowngrade</key>
 	<false/>
 	<key>SUFeedURL</key>
-	<string>https://l984-451.github.io/Nook/appcast.xml</string>
+	<string>https://nook-browser.github.io/Nook/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>oWrc3J4HWz5PEVE5fIMKj5fEnCUwqYl0bO1li3xOYM4=</string>
 	<key>SUScheduledCheckInterval</key>

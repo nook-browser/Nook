@@ -16,7 +16,7 @@ Please be respectful to maintainers and disclose AI assistance.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/l984-451/Nook.git
+   git clone https://github.com/nook-browser/Nook.git
    cd Nook
    ```
 

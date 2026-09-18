@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 Nook is a fast, minimal macOS browser with sidebar-first design. Built with Swift 5, SwiftUI, and WKWebView. Licensed GPL-3.0.
 
-**Fork status**: This repo (`origin` = `l984-451/Nook`) started as a fork of `nook-browser/Nook`, which went dormant in March 2026. As of September 2026 it is a standalone solo project: the `upstream` remote is removed, upstream's PR-base workflow is deleted, and nothing is merged back. Treat this repo as the only source of truth.
+**Repo status**: `nook-browser/Nook` is the canonical repo and `origin`; Bain Gurley is the maintainer since September 2026. The project ran as the fork `l984-451/Nook` from March to September 2026 and that fork is archived. The 24 upstream commits from March 2026 that the fork never took (sidebar animation work) were superseded by the September remodel. Treat this repo as the only source of truth.
 
 - **Minimum macOS**: 26.0 (Tahoe), Apple Silicon. Raised from 15.5 in September 2026; every `@available` / `#available` guard below 26 was removed at the same time. Do not add guards for versions below the deployment target.
 - **Local toolchain**: Xcode 27.0 (27A266a, SDK 27.0) at `/Applications/Xcode.app`, installed September 2026; Xcode 16.4 stays at `/Applications/Xcode-16.4.0.app`. Xcode 27 ships without the Metal Toolchain (see Metal below). The deployment target is still 26.0, so macOS 27 APIs need the wrapper pattern in Key Patterns.
@@ -259,7 +259,7 @@ Located in `Packages/NookBlocker/Sources/NookBlocker/`. Full description in `doc
 
 The passkey entitlement (`web-browser.public-key-credential`) was requested and declined by Apple; it is not in the file and nothing in the code references WebAuthn.
 
-**Info.plist**: Registers as URL handler for `http`/`https` (LSHandlerRank: Owner) with `CFBundleDocumentTypes` so Nook appears in the default-browser picker. Allows arbitrary loads in web content and local networking. Sparkle: daily check, feed `https://l984-451.github.io/Nook/appcast.xml`, `SUPublicEDKey` must match the `SPARKLE_SIGNING_KEY` repo secret.
+**Info.plist**: Registers as URL handler for `http`/`https` (LSHandlerRank: Owner) with `CFBundleDocumentTypes` so Nook appears in the default-browser picker. Allows arbitrary loads in web content and local networking. Sparkle: daily check, feed `https://nook-browser.github.io/Nook/appcast.xml`, `SUPublicEDKey` must match the `SPARKLE_SIGNING_KEY` repo secret.
 
 ## Key Patterns
 

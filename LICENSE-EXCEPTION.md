@@ -11,7 +11,7 @@ Nook is licensed under GPL-3.0. See [LICENSE](./LICENSE).
 > channel without those restrictive terms and conditions.
 
 The proviso is the point. Nook's complete corresponding source stays public at
-<https://github.com/l984-451/Nook> under plain GPL-3.0, with no additional
+<https://github.com/nook-browser/Nook> under plain GPL-3.0, with no additional
 terms and no acceptance required. Anyone who receives Nook through Apple's App
 Store can obtain that source from a channel Apple does not govern.
 
