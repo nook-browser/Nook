@@ -11,6 +11,7 @@
 
   <item>
     <title>Version 1.1.0</title>
+    <sparkle:channel>beta</sparkle:channel>
     <link>https://github.com/nook-browser/Nook/releases/tag/v1.1.0</link>
     <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.1.0</sparkle:releaseNotesLink>
     <sparkle:informationalUpdate>
