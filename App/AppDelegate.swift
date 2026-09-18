@@ -144,7 +144,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                 case 2:  // Middle mouse button
                     if let hoveredId = manager.hoveredPinnedTabId, manager.tabs.item(hoveredId)?.url != nil {
                         manager.tabs.resetToHome(hoveredId)
-                    } else if let hoveredId = registry.activeWindow?.hoveredItemID {
+                    } else if let hoveredId = registry.windows.values
+                        .first(where: { $0.window === event.window })?.hoveredItemID {
                         // Middle click closes a sidebar tab, the same way Cmd+W does: a
                         // pinned tab or favorite keeps its place, a regular tab goes to
                         // the reopen history.

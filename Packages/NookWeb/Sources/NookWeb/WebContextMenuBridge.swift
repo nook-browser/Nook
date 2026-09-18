@@ -172,12 +172,12 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
         self.userContentController = controller
         super.init()
 
-        controller.add(self, name: Self.handlerName)
+        controller.add(self, contentWorld: Self.world, name: Self.handlerName)
         controller.addUserScript(Self.script)
     }
 
     public func detach() {
-        userContentController?.removeScriptMessageHandler(forName: Self.handlerName)
+        userContentController?.removeScriptMessageHandler(forName: Self.handlerName, contentWorld: Self.world)
         userContentController = nil
     }
 
@@ -200,6 +200,13 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
     }
 
     private static let handlerName = "contextMenuPayload"
+
+    /// The bridge runs in its own world so the page cannot reach the handler. Now that this
+    /// handler can open a tab, leaving it in the page world would let any site call
+    /// `postMessage({ middleClickHref })` in a loop and bury the user in tabs with no click
+    /// ever happening. An isolated world sees the same DOM, which is all the script needs.
+    private static let world = WKContentWorld.world(name: "NookContextMenuBridge")
+
     private static let scriptSource: String = """
     // Nook Context Menu Bridge
     (function() {
@@ -290,9 +297,16 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             try {
                 var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
                 if (!link || !link.href) { return; }
-                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload) {
-                    window.webkit.messageHandlers.contextMenuPayload.postMessage({ middleClickHref: link.href });
-                }
+                var href = link.href;
+                // Decide once the event has finished propagating. Listeners the page adds to
+                // document or window after ours run after ours, so a page that cancels the
+                // click and opens its own tab would otherwise leave the user with two.
+                setTimeout(function() {
+                    if (event.defaultPrevented) { return; }
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload) {
+                        window.webkit.messageHandlers.contextMenuPayload.postMessage({ middleClickHref: href });
+                    }
+                }, 0);
             } catch (error) {
                 console.error('[Nook Context Menu] auxclick error', error);
             }
@@ -305,7 +319,8 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
         WKUserScript(
             source: scriptSource,
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
+            forMainFrameOnly: false,
+            in: world
         )
     }
 }
