@@ -97,7 +97,6 @@ extension WebsiteShortcutProfile {
             name: "Figma",
             domainPatterns: ["*.figma.com", "figma.com"],
             shortcuts: [
-                .init(key: "s", modifiers: [.command], description: "Save to version history"),
                 .init(key: "k", modifiers: [.command], description: "Search / Quick Actions"),
                 .init(key: "d", modifiers: [.command], description: "Duplicate"),
                 .init(key: "+", modifiers: [.command], description: "Zoom In"),
