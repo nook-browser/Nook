@@ -523,7 +523,7 @@ gh api repos/nook-browser/Nook/commits/main --jq '.sha' ; git rev-parse HEAD
 ```
 Expected: both SHAs equal. The push removes `.github/workflows/enforce-pr-base.yml` with the rest of the old tree.
 
-- [ ] **Step 2 (Bain): secrets on the org repo**
+- [x] **Step 2 (Bain): secrets on the org repo**
 
 The org repo holds the old team's certificate and no Sparkle key. Replace them from the same files used for the fork on 2026-09-14:
 
@@ -538,7 +538,7 @@ gh secret list -R nook-browser/Nook
 ```
 Expected: six secrets, all dated today.
 
-- [ ] **Step 3: Ship**
+- [x] **Step 3: Ship**
 
 ```bash
 git push org main:release
@@ -548,7 +548,7 @@ gh release view v1.1.0 -R nook-browser/Nook --json assets --jq '.assets[].name'
 ```
 Expected: the run succeeds; the appcast's first item is 1.1.0 with `<link>`, the `informationalUpdate` block, and an `edSignature`; the release lists `Nook-v1.1.0.dmg`.
 
-- [ ] **Step 4: Release notes**
+- [x] **Step 4: Release notes**
 
 ```bash
 gh release edit v1.1.0 -R nook-browser/Nook --notes-file - <<'EOF'
@@ -562,7 +562,7 @@ Full change list since 1.0.7: ad blocking runs on adblock-rust with EasyList, Ea
 EOF
 ```
 
-- [ ] **Step 5: Retire the fork and repoint origin**
+- [x] **Step 5: Retire the fork and repoint origin**
 
 ```bash
 git remote set-url origin https://github.com/nook-browser/Nook.git
