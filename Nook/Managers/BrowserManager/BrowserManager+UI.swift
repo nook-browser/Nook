@@ -68,10 +68,6 @@ extension BrowserManager: TabActions {
         gradientColorManager.accentColor
     }
 
-    var incognitoAccentColor: Color {
-        SpaceGradient.incognito.primaryColor
-    }
-
     func copyToPasteboard(_ string: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(string, forType: .string)

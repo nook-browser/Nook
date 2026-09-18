@@ -129,6 +129,9 @@ public enum NookDesign {
         public static let dropBorderActive = Color.primary.opacity(0.4)    // dashed drop target while dragging
         public static let scrim = Color.black.opacity(0.4)                 // modal dimming behind a dialog
         public static let privateTint = Color(red: 0.36, green: 0.22, blue: 0.62).opacity(0.38) // private window chrome
+        /// The neutral accent a private window's chrome uses in place of a space's. Keep in step
+        /// with `SpaceGradient.incognito`, which is the persisted form of the same color.
+        public static let incognitoAccent = Color(hex: "#8E8E93")
 
         #if os(macOS)
         public static let windowBackground = Color(nsColor: .windowBackgroundColor)

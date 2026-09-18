@@ -60,7 +60,6 @@ struct WindowView: View {
                 // Tab closure toast
                 if browserManager.showTabClosureToast && browserManager.tabClosureToastCount > 0 {
                     TabClosureToast()
-                        .environmentObject(browserManager)
                 }
 
                 // Copy URL toast

@@ -133,8 +133,6 @@ private struct RuleEditSheet: View {
     let onSave: (SiteRoutingRule) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(TabsController.self) private var tabs
-    @Environment(\.siteRouting) private var siteRouting
 
     @State private var domain: String = ""
     @State private var pathPrefix: String = ""

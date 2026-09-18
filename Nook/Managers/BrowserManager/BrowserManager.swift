@@ -1012,6 +1012,7 @@ class BrowserManager: ObservableObject {
             .background(BackgroundWindowModifier())
             .ignoresSafeArea(.all)
             .environmentObject(self)
+            .environment(\.tabActions, self)
             .environment(tabs)
             .environment(windowRegistry)
             .environment(webViewCoordinator)

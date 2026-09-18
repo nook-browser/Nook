@@ -28,8 +28,6 @@ import NookWeb
     var tabClosureToastCount: Int { get }
     /// The active space's accent, already published for the window.
     var accentColor: Color { get }
-    /// The neutral accent a private window draws instead of a space's.
-    var incognitoAccentColor: Color { get }
     func copyToPasteboard(_ string: String)
     func share(_ url: URL)
 }

@@ -21,7 +21,7 @@ public struct EmptyWebsiteView: View {
         GeometryReader { proxy in
             ZStack {
                 // Match the container background so this reads as chrome, not webview content.
-                let accent = windowState.isIncognito ? (actions?.incognitoAccentColor ?? .gray) : (actions?.accentColor ?? .accentColor)
+                let accent = windowState.isIncognito ? NookDesign.Surface.incognitoAccent : (actions?.accentColor ?? .accentColor)
                 let isActive = windowRegistry.activeWindowId == windowState.id
 
                 NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)
