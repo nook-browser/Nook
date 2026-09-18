@@ -194,6 +194,9 @@ jobs:
           DMG_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}/Nook-${VERSION}.dmg"
           DATE=$(date -R)
 
+          # The filter-list refresh step left tracked files modified; drop that so the
+          # branch switch is not refused.
+          git checkout -- .
           git fetch origin gh-pages
           git checkout gh-pages
 
