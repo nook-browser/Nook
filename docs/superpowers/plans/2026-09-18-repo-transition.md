@@ -40,7 +40,7 @@
 **Interfaces:**
 - Produces: nothing new. `TabsController.defaultDirectory` and `DevMCPServer.loadOrCreateToken` resolve to `~/Library/Application Support/com.gstudios.nook/` at runtime.
 
-- [ ] **Step 1: Replace the literal in code**
+- [x] **Step 1: Replace the literal in code**
 
 ```bash
 cd /Users/bain/git/Nook
@@ -54,7 +54,7 @@ grep -rn 'com\.baingurley\.nook' Nook.xcodeproj Nook App Packages/*/Sources Sett
 ```
 Expected: the final grep prints nothing.
 
-- [ ] **Step 2: Update CLAUDE.md**
+- [x] **Step 2: Update CLAUDE.md**
 
 Replace every `com.baingurley.nook` in `CLAUDE.md` with `com.gstudios.nook`:
 ```bash
@@ -63,7 +63,7 @@ grep -c 'com.gstudios.nook' CLAUDE.md
 ```
 Expected: 6 or more.
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 ```bash
 xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build \
@@ -72,7 +72,7 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build 
 ```
 Expected: `** BUILD SUCCEEDED **` and `com.gstudios.nook`. Do not launch.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Nook.xcodeproj/project.pbxproj Packages Nook CLAUDE.md
@@ -93,7 +93,7 @@ Assisted by Claude Code."
 **Interfaces:**
 - Produces: every future appcast item has the shape Sparkle 2.8.1 reads as informational for hosts below build 130 (`SUAppcast.m` parses `sparkle:informationalUpdate` with `sparkle:belowVersion` children into a `<130` entry; `SPUAppcastItemStateResolver` compares the host's `CFBundleVersion` against it). The `<link>` element is the item's `infoURL`, which the "Learn More" button opens.
 
-- [ ] **Step 1: Feed URL and links**
+- [x] **Step 1: Feed URL and links**
 
 ```bash
 sed -i '' 's#https://l984-451.github.io/Nook/appcast.xml#https://nook-browser.github.io/Nook/appcast.xml#' Nook/Info.plist CLAUDE.md
@@ -102,7 +102,7 @@ grep -rn 'l984-451' README.md CONTRIBUTING.md TRADEMARK.md LICENSE-EXCEPTION.md 
 ```
 Expected: nothing.
 
-- [ ] **Step 2: Fork status paragraph in CLAUDE.md**
+- [x] **Step 2: Fork status paragraph in CLAUDE.md**
 
 Replace the paragraph starting `**Fork status**:` with:
 
@@ -110,7 +110,7 @@ Replace the paragraph starting `**Fork status**:` with:
 **Repo status**: `nook-browser/Nook` is the canonical repo and `origin`; Bain Gurley is the maintainer since September 2026. The project ran as the fork `l984-451/Nook` from March to September 2026 and that fork is archived. The 24 upstream commits from March 2026 that the fork never took (sidebar animation work) were superseded by the September remodel. Treat this repo as the only source of truth.
 ```
 
-- [ ] **Step 3: Appcast entry in the workflow**
+- [x] **Step 3: Appcast entry in the workflow**
 
 In `.github/workflows/macos-notarize.yml`, change the `ENTRY` heredoc so the item reads:
 
@@ -141,7 +141,7 @@ Add this comment above the heredoc:
           # The informational scope shows them a link instead. Keep it on every item.
 ```
 
-- [ ] **Step 4: Validate the YAML and build**
+- [x] **Step 4: Validate the YAML and build**
 
 ```bash
 python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/macos-notarize.yml')); print('yaml ok')" 2>/dev/null || ruby -ryaml -e "YAML.load_file('.github/workflows/macos-notarize.yml'); puts 'yaml ok'"
@@ -151,7 +151,7 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build 
 ```
 Expected: `yaml ok`, `** BUILD SUCCEEDED **`, the org feed URL.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Nook/Info.plist .github/workflows/macos-notarize.yml README.md CONTRIBUTING.md TRADEMARK.md LICENSE-EXCEPTION.md CLAUDE.md
@@ -183,7 +183,7 @@ What is copied, from the first previous id whose Application Support holds `defa
 
 Not copied: `ContentBlocker/` (a compile cache), `WebKit/ContentRuleLists` (recompiled), `Caches`, `HTTPStorages` (WebKit's cookies live under `WebsiteDataStore`). Keychain items use literal service names (`com.nook.basicAuth`, `com.nook.aiProvider`) and carry over on their own. Extensions live under `Application Support/Nook/Extensions`, not under the bundle id. `FileManager.copyItem` clones on APFS, so the 900 MB data store on this Mac copies in well under a second.
 
-- [ ] **Step 1: Write the migration**
+- [x] **Step 1: Write the migration**
 
 `App/LegacyDataMigration.swift`:
 
@@ -255,7 +255,7 @@ enum LegacyDataMigration {
 }
 ```
 
-- [ ] **Step 2: Run it before SwiftUI**
+- [x] **Step 2: Run it before SwiftUI**
 
 `NookApp`'s stored properties (`WebViewCoordinator()`, `KeyboardShortcutManager()`, `MCPManager()`, `TabOrganizerManager()`) are initialised before `init()`'s body runs, and some read defaults or Application Support. A separate entry point runs first. Create `App/Main.swift`:
 
@@ -279,7 +279,7 @@ enum Main {
 
 In `App/NookApp.swift`, delete the `@main` line above `struct NookApp: App {`. `NookApp.main()` then resolves to SwiftUI's default. The `@NSApplicationDelegateAdaptor` stays where it is (only `NookApp` declares one).
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 ```bash
 xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build \
@@ -287,7 +287,7 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build 
 ```
 Expected: `** BUILD SUCCEEDED **`.
 
-- [ ] **Step 4: Verify on this Mac against real data**
+- [x] **Step 4: Verify on this Mac against real data**
 
 This Mac holds `com.baingurley.nook` data (current) and `io.browsewithnook.nook` data (March 2026). First confirm nothing exists under the new id yet, then launch in the background and read the log.
 
@@ -307,7 +307,7 @@ defaults read com.gstudios.nook settings.didFinishOnboarding
 ```
 Expected: log lines `Migrating data from com.baingurley.nook to com.gstudios.nook`, four `Copied …` lines (store, shm, wal, Tabs) plus `Copied WebsiteDataStore`, `Copied N defaults`, `SwiftData container initialized successfully`, and `Tabs loaded: loaded, N items` with the same N the last `com.baingurley.nook` run logged. `data stores match`. Onboarding reads `1`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add App/LegacyDataMigration.swift App/Main.swift App/NookApp.swift
@@ -333,7 +333,7 @@ Mapping, in the old model's terms: `isPinned` was the global "essentials" row, p
 - Consumes: `TabTree.createSpace(id:name:icon:accentHex:after:now:)`, `createFolder(id:title:in:after:now:) throws`, `createTab(id:url:title:in:after:now:) throws`, `rename(_:customTitle:now:) throws`, `children(of:)`, `orderedSpaces`, `items` from `NookTabsCore`; `SpaceGradient.decode(_:).primaryColorHex` from `Nook/Models/Space/SpaceGradient.swift`.
 - Produces: `LegacyTabImport.tree(from: ModelContext, now: Date) -> TabTree?` (nil when the store has no spaces or nothing imports). `TabsController.init(..., legacyTree: () -> TabTree? = { nil }, ...)`, called only when the load outcome is `.firstLaunch`.
 
-- [ ] **Step 1: Write the importer**
+- [x] **Step 1: Write the importer**
 
 `Nook/Models/Legacy/LegacyTabImport.swift`:
 
@@ -414,7 +414,7 @@ enum LegacyTabImport {
 }
 ```
 
-- [ ] **Step 2: Let TabsController take it**
+- [x] **Step 2: Let TabsController take it**
 
 In `Packages/NookWeb/Sources/NookWeb/TabsController.swift`, add the parameter after `legacyProfiles`:
 
@@ -447,7 +447,7 @@ In `Nook/Managers/BrowserManager/BrowserManager.swift`, the `TabsController(` ca
             legacyTree: { [modelContext] in LegacyTabImport.tree(from: modelContext) })
 ```
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 ```bash
 xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build \
@@ -455,7 +455,7 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build 
 ```
 Expected: `** BUILD SUCCEEDED **`.
 
-- [ ] **Step 4: Verify against the March 2026 store in a staged home**
+- [x] **Step 4: Verify against the March 2026 store in a staged home**
 
 The real home already migrated in Task 3 from `com.baingurley.nook`, so the 1.0.x path runs in a scratch `HOME` holding a copy of the `io.browsewithnook.nook` Application Support folder (31 MB). `NSHomeDirectory()` honours `HOME`, so file paths land in the staged tree; defaults still go to the real cfprefsd and are not checked here.
 
@@ -477,7 +477,7 @@ print('spaces:', [sp['name'] for sp in s['spaces']])
 ```
 Expected: the sqlite line prints the counts (on this Mac: 5 spaces, 8 folders, 43 tabs). The log shows `Migrating data from io.browsewithnook.nook`, `SwiftData container initialized successfully` (no "schema mismatch" line), `Imported 5 spaces and N items` with N near 51, and `Tabs loaded: firstLaunch, N items`. `structure.json` lists the five space names. If the log shows a schema-mismatch reset, stop: the 1.0.x store cannot be opened by the current schema and the import needs a different route; report it.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Nook/Models/Legacy/LegacyTabImport.swift Packages/NookWeb/Sources/NookWeb/TabsController.swift Nook/Managers/BrowserManager/BrowserManager.swift
@@ -492,7 +492,7 @@ Assisted by Claude Code."
 
 **Files:** none modified.
 
-- [ ] **Step 1: Release build**
+- [x] **Step 1: Release build**
 
 ```bash
 xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build-release \
@@ -500,7 +500,7 @@ xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath buil
 ```
 Expected: `** BUILD SUCCEEDED **`.
 
-- [ ] **Step 2: Run it against the migrated real home**
+- [x] **Step 2: Run it against the migrated real home**
 
 ```bash
 open -g build-release/Build/Products/Release/Nook.app; sleep 10
@@ -518,7 +518,7 @@ Expected: no `Migration` line (it ran in Task 3), `Tabs loaded: loaded`, the blo
 
 **Files:** none in the tree. Operates on GitHub with `gh` and `git`. Steps marked **Bain** need values only Bain has.
 
-- [ ] **Step 1: Push this history to the org repo**
+- [x] **Step 1: Push this history to the org repo**
 
 The org's `Main protection` ruleset blocks non-fast-forward pushes and deletions but bypasses org admins, which Bain is. The lease pins the push to the upstream head recorded on 2026-09-18.
 
