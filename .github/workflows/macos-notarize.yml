@@ -2,7 +2,7 @@ name: macOS Build, Sign, Notarize & Release
 
 on:
   push:
-    branches: [release]
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -19,15 +19,28 @@ jobs:
 
       - name: Set version info
         run: |
-          SHORT_VERSION=$(grep 'MARKETING_VERSION' Nook.xcodeproj/project.pbxproj \
-            | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          # The tag names the release: vX.Y.Z is official, vX.Y.Z-beta.N is a beta. The
+          # marketing version comes from the tag so the app's own version string says beta;
+          # the build number stays in the project and must be bumped for every tag.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="v$(grep 'MARKETING_VERSION' Nook.xcodeproj/project.pbxproj \
+              | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+          fi
+          SHORT_VERSION="${VERSION#v}"
           BUILD_NUMBER=$(grep 'CURRENT_PROJECT_VERSION' Nook.xcodeproj/project.pbxproj \
             | head -n1 | grep -oE '[0-9]+' | tail -n1)
-          VERSION="v${SHORT_VERSION}"
+          case "$SHORT_VERSION" in
+            *-beta.*) IS_BETA=true;  DISPLAY_VERSION="${SHORT_VERSION%%-beta.*} beta ${SHORT_VERSION##*-beta.}" ;;
+            *)        IS_BETA=false; DISPLAY_VERSION="$SHORT_VERSION" ;;
+          esac
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "SHORT_VERSION=$SHORT_VERSION" >> $GITHUB_ENV
+          echo "DISPLAY_VERSION=$DISPLAY_VERSION" >> $GITHUB_ENV
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
-          echo "Building version $SHORT_VERSION (build $BUILD_NUMBER)"
+          echo "IS_BETA=$IS_BETA" >> $GITHUB_ENV
+          echo "Building $DISPLAY_VERSION ($SHORT_VERSION, build $BUILD_NUMBER)"
 
       - name: Import Developer ID certificate
         env:
@@ -75,6 +88,7 @@ jobs:
             CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            MARKETING_VERSION="$SHORT_VERSION" \
             CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS" \
             CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
             PROVISIONING_PROFILE_SPECIFIER="" \
@@ -162,7 +176,7 @@ jobs:
 
       - name: Create DMG
         run: |
-          hdiutil create -volname "Nook $SHORT_VERSION" \
+          hdiutil create -volname "Nook $DISPLAY_VERSION" \
             -srcfolder "Nook.app" \
             -ov -format UDZO "Nook-${VERSION}.dmg"
 
@@ -181,11 +195,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create the release (or update if tag already exists)
+          # Create the release (or update if it already exists). Betas are prereleases
+          # and say so at the top of their notes.
+          if [ "$IS_BETA" = "true" ]; then
+            PRERELEASE="--prerelease"
+            printf 'This is a beta build. Use it, and report what breaks in Issues.\n\n' > notes.md
+          else
+            PRERELEASE=""
+            : > notes.md
+          fi
           gh release create "$VERSION" \
-            --title "Nook $SHORT_VERSION" \
+            --title "Nook $DISPLAY_VERSION" \
+            --notes-file notes.md \
             --generate-notes \
-            --target release \
+            $PRERELEASE \
             "Nook-${VERSION}.dmg" \
           || gh release upload "$VERSION" "Nook-${VERSION}.dmg" --clobber
 
@@ -205,7 +228,7 @@ jobs:
           # The informational scope shows them a link instead. Keep it on every item.
           ENTRY=$(cat << XMLEOF
             <item>
-              <title>Version ${SHORT_VERSION}</title>
+              <title>Version ${DISPLAY_VERSION}</title>
               <link>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</link>
               <sparkle:releaseNotesLink>https://github.com/${{ github.repository }}/releases/tag/${VERSION}</sparkle:releaseNotesLink>
               <sparkle:informationalUpdate>

@@ -56,9 +56,9 @@ xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath buil
 ## Git Workflow
 
 - **`develop`** is the development branch and the GitHub default branch. Commit and branch from here.
-- **`main`** holds the last release-ready state. Fast-forward it from `develop` when cutting a release.
-- **Gitflow naming.** Short-lived work goes on `feature/<name>` or `hotfix/<name>` branched from `develop` (hotfixes from `main`), merged back and deleted. The September 2026 cleanup deleted every stale upstream branch; only `main`, `develop`, `release` and `gh-pages` are long-lived and protected (deletion and force-push blocked, org admins bypass).
-- **`release`** is the ship branch. A push to `release` triggers the notarize workflow, which builds, signs, notarizes, uploads a DMG to a GitHub release named after the marketing version, and updates the Sparkle appcast. Ship by fast-forwarding `main` to `develop`, then `release` to `main`, and pushing.
+- **`main`** holds the last official release. Fast-forward it from `develop` when promoting a beta.
+- **Releases are tags.** A push of `vX.Y.Z-beta.N` runs the notarize workflow as a beta: the app's marketing version becomes `X.Y.Z-beta.N`, the GitHub release is a prerelease titled "Nook X.Y.Z beta N" with a beta notice, and the appcast item is titled the same. A push of `vX.Y.Z` is the official release. Every tag needs its own `CURRENT_PROJECT_VERSION` bump first, since Sparkle orders by build number. Betas and official releases share the default Sparkle channel for now; a beta channel behind a Settings toggle comes with the first official release under the new bundle id.
+- **Gitflow naming.** Short-lived work goes on `feature/<name>` or `hotfix/<name>` branched from `develop` (hotfixes from `main`), merged back and deleted. Only `main`, `develop` and `gh-pages` are long-lived and protected (deletion and force-push blocked, org admins bypass). The `release` branch was retired 2026-09-18 when tags took over.
 - `feature/download-memory` (local only, formerly `fix/download-memory`) is an unfinished WIP branch: URLSession-streamed downloads, based on an old commit; rebase onto `develop` before finishing.
 - AI assistance must be disclosed per CONTRIBUTING.md.
 
@@ -306,7 +306,7 @@ Transitive: swift-atomics, swift-numerics, swift-collections, swift-transformers
 
 ## CI/CD
 
-One GitHub Actions workflow, `.github/workflows/macos-notarize.yml`: on push to `release`, builds Release for arm64, re-signs the Sparkle framework and XPC services, notarizes, creates and signs a DMG, uploads to the GitHub release, appends an entry to `appcast.xml` on `gh-pages`.
+One GitHub Actions workflow, `.github/workflows/macos-notarize.yml`: on push of a `v*` tag, builds Release for arm64, re-signs the Sparkle framework and XPC services, notarizes, creates and signs a DMG, uploads to the GitHub release, appends an entry to `appcast.xml` on `gh-pages`.
 
 **Known state**: runner is `macos-26` (restored 2026-09-14; the SDK 26 deployment target requires it). The workflow uses the runner's default Xcode and does not pin a version. The restored pipeline works: the 2026-09-14 run (workflow_dispatch, 7m33s) published `v1.2.1` with a notarized DMG. Local tags `v1.1.x`/`v1.2.0` were never published.
 
