@@ -101,6 +101,18 @@ class BrowserToolExecutor {
         return browserManager.getWebView(for: itemID, in: windowState.id)
     }
 
+    /// JSON-encodes a string for interpolation into a script. `JSONSerialization` raises an
+    /// ObjC `NSInvalidArgumentException` for a bare string at the top level unless
+    /// `.fragmentsAllowed` is set, and neither `try` nor `try?` catches an ObjC exception:
+    /// it unwinds through the Swift async frames, leaves the main thread's executor tracking
+    /// pointing at a dead stack frame, and the next `MainActor.assumeIsolated` anywhere in the
+    /// app segfaults in `swift_getObjectType`.
+    private func jsLiteral(_ value: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed]),
+              let literal = String(data: data, encoding: .utf8) else { return "\"\"" }
+        return literal
+    }
+
     private func executeNavigateToURL(_ args: [String: Any], browserManager: BrowserManager, windowState: BrowserWindowState) async throws -> String {
         guard let urlString = args["url"] as? String,
               let url = URL(string: urlString) else {
@@ -126,7 +138,7 @@ class BrowserToolExecutor {
 
         let script: String
         if let selector = selector {
-            let selectorJSON = String(data: try JSONSerialization.data(withJSONObject: selector), encoding: .utf8) ?? "\"\""
+            let selectorJSON = jsLiteral(selector)
             script = """
             (function() {
                 const el = document.querySelector(\(selectorJSON));
@@ -172,7 +184,7 @@ class BrowserToolExecutor {
 
         // Support clicking by CSS selector OR by visible text
         if let selector = args["selector"] as? String, !selector.isEmpty {
-            let selectorJSON = String(data: try JSONSerialization.data(withJSONObject: selector), encoding: .utf8) ?? "\"\""
+            let selectorJSON = jsLiteral(selector)
             let script = """
             (function() {
                 const sel = \(selectorJSON);
@@ -186,7 +198,7 @@ class BrowserToolExecutor {
             let result = try await webView.evaluateJavaScript(script)
             return result as? String ?? "Click executed"
         } else if let text = args["text"] as? String, !text.isEmpty {
-            let textJSON = String(data: try JSONSerialization.data(withJSONObject: text), encoding: .utf8) ?? "\"\""
+            let textJSON = jsLiteral(text)
             let script = """
             (function() {
                 const query = \(textJSON).toLowerCase();
@@ -227,7 +239,7 @@ class BrowserToolExecutor {
 
         let filter = args["filter"] as? String ?? ""
         let limit = args["limit"] as? Int ?? 50
-        let filterJSON = String(data: (try? JSONSerialization.data(withJSONObject: filter)) ?? Data("\"\"".utf8), encoding: .utf8) ?? "\"\""
+        let filterJSON = jsLiteral(filter)
 
         let script = """
         (function() {
