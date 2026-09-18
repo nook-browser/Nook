@@ -38,6 +38,7 @@ final class BrowserModel: ObservableObject {
     @Published var settingsPath: [SettingsRoute] = []
     /// Live downloads, held only because WKDownload.delegate is weak.
     var downloads: [IOSDownload] = []
+    private var memory: MemoryPressureWatcher?
     private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "BrowserModel")
 
     init() {
@@ -90,12 +91,18 @@ final class BrowserModel: ObservableObject {
         if let selected = window.selectedItemID {
             tabs.select(selected, in: window)
         }
+        memory = MemoryPressureWatcher(tabs: tabs)
         #if DEBUG
         // Hands-off checks: `xcrun simctl launch <udid> com.gstudios.nook -NookStartURL <url>`.
         // http links opened from outside go to the default browser, which Nook cannot be
         // until Apple grants the web-browser entitlement.
         if let start = UserDefaults.standard.string(forKey: "NookStartURL") {
             navigate(start)
+        }
+        // After the startup warm-up, so there is something to unload.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(8))
+            MemoryPressureWatcher.simulateWarningIfRequested()
         }
         #endif
         objectWillChange.send()
