@@ -9,6 +9,7 @@
 import AppKit
 import OSLog
 import Sparkle
+import WebKit
 import NookWeb
 
 /// Handles application-level lifecycle events and coordinates app termination
@@ -123,7 +124,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// Sets up global mouse button event monitoring for extra physical mouse buttons
     ///
     /// Many mice have extra buttons beyond left/right click. This maps them to browser actions:
-    /// - **Button 2** (middle click/scroll wheel button): Open command palette
+    /// - **Button 2** (middle click/scroll wheel button): resets a hovered pinned tab to its
+    ///   URL, closes a hovered sidebar tab, is left to the page when it lands on web content,
+    ///   and otherwise opens the command palette
     /// - **Button 3** (typically a side button labeled "Back"): Navigate back in history
     /// - **Button 4** (typically a side button labeled "Forward"): Navigate forward in history
     ///
@@ -141,6 +144,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                 case 2:  // Middle mouse button
                     if let hoveredId = manager.hoveredPinnedTabId, manager.tabs.item(hoveredId)?.url != nil {
                         manager.tabs.resetToHome(hoveredId)
+                    } else if let hoveredId = registry.windows.values
+                        .first(where: { $0.window === event.window })?.hoveredItemID {
+                        // Middle click closes a sidebar tab, the same way Cmd+W does: a
+                        // pinned tab or favorite keeps its place, a regular tab goes to
+                        // the reopen history.
+                        manager.tabs.close(hoveredId)
+                    } else if Self.isOverWebContent(event) {
+                        // The page's own auxclick handler opens the link, if there is one.
+                        // Claiming the click here would open the palette on top of it.
+                        break
                     } else {
                         registry.activeWindow?.commandPalette?.open()
                     }
@@ -168,6 +181,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             }
             return event
         }
+    }
+
+    /// Whether a mouse event landed inside page content rather than Nook's own chrome.
+    /// Used to leave middle clicks over a page to the page's link handler.
+    private static func isOverWebContent(_ event: NSEvent) -> Bool {
+        guard let contentView = event.window?.contentView else { return false }
+        var view = contentView.hitTest(event.locationInWindow)
+        while let current = view {
+            if current is WKWebView { return true }
+            view = current.superview
+        }
+        return false
     }
 
     /// Handles URLs opened from external sources (e.g., Finder, other apps)

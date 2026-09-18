@@ -11,6 +11,7 @@
 import Combine
 import FaviconFinder
 import NookBlocker
+import NookTabsCore
 import NookSettings
 import OSLog
 import SwiftUI
@@ -691,6 +692,23 @@ public final class PageSession: NSObject, Identifiable {
         if let webView = primaryWebView as? SessionWebView {
             webView.contextMenuPayloadDidUpdate(payload)
         }
+    }
+
+    // MARK: - Opening links
+
+    /// Opens `url` in a background tab in this page's window and space. Used by
+    /// "Open Link in New Tab" in the context menu and by a middle click on a link.
+    /// A private window's own tree keeps the link inside that window.
+    ///
+    /// The URL comes from the page's own markup, so the scheme is checked here rather
+    /// than at each caller: a page must not be able to talk Nook into opening a tab on
+    /// `javascript:`, `data:` or `file:`.
+    /// ponytail: http(s) only. Widen if someone reports a legitimate scheme.
+    public func openInNewTab(_ url: URL) {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
+        guard let tabs = controller, let window = tabs.window(for: self) else { return }
+        let parent = tabs.spaceID(of: itemID).map { Parent.tabs(spaceID: $0) }
+        tabs.open(url: url, in: window, placement: .background, parent: parent)
     }
 
     // MARK: - Equality

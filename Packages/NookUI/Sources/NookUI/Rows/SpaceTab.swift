@@ -163,6 +163,14 @@ public struct SpaceTab: View {
             withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering
             }
+            // Read by the middle-click handler in AppDelegate. Only clear the slot if
+            // it still points at this row, so the enter of the next row wins the race
+            // against the exit of this one.
+            if hovering {
+                windowState.hoveredItemID = item.id
+            } else if windowState.hoveredItemID == item.id {
+                windowState.hoveredItemID = nil
+            }
         }
         .onChange(of: isTextFieldFocused) { _, focused in
             if isRenaming && !focused { commitRename() }

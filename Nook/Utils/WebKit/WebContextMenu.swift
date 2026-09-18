@@ -225,13 +225,10 @@ final class HandlerMenuItem: NSMenuItem {
 }
 
 extension FocusableWKWebView {
-    /// Opens `url` in the background in the owning page's window and space. A private page's
-    /// window is private, so the link stays in that window's in-memory tree.
+    /// Opens `url` in the background in the owning page's window and space. A middle click
+    /// on a link takes the same path, so the placement and scheme rules live on the session.
     func openLinkInNewTab(_ url: URL) {
-        guard let session = owningSession, let tabs = session.controller,
-              let window = tabs.window(for: session) else { return }
-        let parent = tabs.spaceID(of: session.itemID).map { Parent.tabs(spaceID: $0) }
-        tabs.open(url: url, in: window, placement: .background, parent: parent)
+        owningSession?.openInNewTab(url)
     }
 
     func downloadImage(from url: URL?, promptForLocation: Bool = false) {
