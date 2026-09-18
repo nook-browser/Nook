@@ -3,89 +3,145 @@
   <h1><b>Nook</b></h1>
   <p>
     A fast, minimal browser with a sidebar-first design for macOS.
+    <br>
   </p>
 </div>
 
 <p align="center">
-  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-26.0+-blue" alt="macOS 26.0+"></a>
-  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-5-orange" alt="Swift"></a>
+  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-15.5+-blue" alt="macOS 15.5+"></a>
+  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-6-orange" alt="Swift"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-green" alt="GPL-3.0"></a>
+  <a href="https://github.com/nook-browser/Nook/pulls"><img src="https://img.shields.io/github/issues-pr/nook-browser/Nook" alt="Open pull requests"></a>
+  <a href="https://github.com/nook-browser/Nook/issues"><img src="https://img.shields.io/github/issues/nook-browser/Nook" alt="Open issues"></a>
+  <a href="https://github.com/nook-browser/Nook/graphs/contributors"><img src="https://img.shields.io/github/contributors/nook-browser/Nook" alt="Contributors"></a>
+  <a href="https://deepwiki.com/nook-browser/Nook"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a>
+  <a href=""><img src="https://img.shields.io/coderabbit/prs/github/nook-browser/Nook?utm_source=oss&utm_medium=github&utm_campaign=nook-browser%2FNook&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews" alt="CodeRabbit Pull Request Reviews"></a>
 </p>
 
+
 <p align="center">
-  <a href="https://github.com/nook-browser/Nook/releases/latest"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+  <a href="https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
 </p>
+
+> **Status:** Development started back up in September 2026 under a new maintainer. The next release is 1.3.0; see [Releases](https://github.com/nook-browser/Nook/releases) for the current download.
+
+## Features  
+
+-  **Sidebar-first navigation** – vertical tabs that feel natural and uncluttered.
+-  **Performance** – optimized with modern macOS APIs for speed and low memory use.  
+-  **Minimal, modern UI** – focused on content, not chrome.  
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26" alt="Nook screenshot">
 </p>
 
----
 
-## Status
+## Getting Started  
 
-Nook started as a fork of [nook-browser/Nook](https://github.com/nook-browser/Nook), which went dormant in March 2026. As of September 2026 I've taken it over as a solo project: the upstream remote is gone, nothing merges back, and this repo is the only source of truth going forward.
+### Download
+[![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/nook/releases/download/v1.0.2/Nook-v1.0.2.dmg)
 
-## Why this exists
+### or, Build from Source
 
-A few things I actually care about, in order:
-
-- **Speed**: startup, tab switching, scrolling, sidebar interaction. If a change makes the browser feel slower, it doesn't ship.
-- **Ad blocking that's actually built in**: not an extension you have to remember to install. Filter list compiling and rule matching happen in-process.
-- **Battery and CPU balance**: no polling timers, no busy-waiting. Heavy work, like filter compiling and on-device AI, runs off the main thread, is cancellable, and unloads when idle.
-
-Everything else is negotiable against those three.
-
-## Features
-
-- **Sidebar-first navigation**: spaces, pinned tabs, and folders instead of a horizontal tab strip.
-- **Built-in ad and tracker blocking**: content rule lists plus AdGuard-style scriptlets, compiled and cached locally.
-- **Web extensions**: Chrome Web Store-compatible extensions via WKWebExtension.
-- **On-device AI**: local LLM tab grouping on Apple Silicon (MLX), plus an AI chat sidebar that talks to your own provider (Gemini, OpenRouter, Ollama, or any OpenAI-compatible endpoint).
-- **YouTube tweaks and built-in SponsorBlock**: hide Shorts and home shelves, auto-skip sponsor segments.
-- **Split view, command palette, quick peek**: the usual power-user shortcuts, without a settings maze.
-- **Profile isolation**: separate, non-persistent data stores for incognito and ephemeral profiles.
-
-## Requirements
-
-- macOS 26.0 or later, Apple Silicon
-- Xcode 26 or later to build (Xcode 27 also works; the deployment target stays 26.0)
-
-## Building
-
+#### Prerequisites  
+- macOS 15.5+
+- [Xcode](https://developer.apple.com/xcode/) (to build from source)
 ```bash
+
 git clone https://github.com/nook-browser/Nook.git
 cd Nook
 open Nook.xcodeproj
 ```
 
-You'll need to set your own Development Team under Signing & Capabilities to build and run locally. To build unsigned from the command line instead:
+Some obj-c libraries may not play nice with Intel Macs, though there should technically be full interoperability. You can use any number of resources to debug. You will also need to delete a couple lines of code for *older* versions of macOS than Tahoe (26.0).
 
-```bash
-xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build \
-  CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
-```
+You’ll need to set your personal Development Team in Signing to build locally.
 
-## Repository layout
+Join our Discord to help with development: https://discord.gg/J3XfPvg7Fs
+
+## Project Structure
 
 ```
 Nook/
-├── App/                 App entry point, AppDelegate, window management
-├── Nook/Managers/       ~30 feature managers (business logic, one per domain)
-├── Nook/Models/         Data models and SwiftData entities
-├── Nook/Components/     SwiftUI views, including Settings
-├── Nook/Design/         Design tokens (spacing, radii, motion, elevation)
-├── Settings/            NookSettingsService, backed by UserDefaults
-├── CommandPalette/      Command palette UI
-└── docs/                Architecture notes and design specs
+├── Nook/
+│   ├── Managers/              # Core business logic and state management
+│   │   ├── BrowserManager/    # Central coordinator for browser state
+│   │   ├── TabManager/        # Tab lifecycle and organization
+│   │   ├── ProfileManager/    # User profile and data isolation
+│   │   ├── ExtensionManager/  # Browser extension support
+│   │   ├── HistoryManager/    # Browsing history tracking
+│   │   ├── DownloadManager/   # File download handling
+│   │   ├── CookieManager/     # Cookie storage and management
+│   │   ├── CacheManager/      # Web cache management
+│   │   ├── SettingsManager/   # User preferences
+│   │   ├── DialogManager/     # System dialogs and alerts
+│   │   ├── SearchManager/     # Search functionality
+│   │   ├── SplitViewManager/  # Split-screen tab viewing
+│   │   ├── PeekManager/       # Quick preview feature
+│   │   ├── DragManager/       # Drag-and-drop operations
+│   │   └── ...
+│   │
+│   ├── Models/                # Data models and business entities
+│   │   ├── Tab/              # Tab model and state
+│   │   ├── Space/            # Workspace organization
+│   │   ├── Profile/          # User profile data model
+│   │   ├── History/          # Browsing history entries
+│   │   ├── Extension/        # Extension metadata
+│   │   ├── Settings/         # Settings data structures
+│   │   └── BrowserConfig/    # Browser configuration
+│   │
+│   ├── Components/            # SwiftUI views and UI components
+│   │   ├── Browser/          # Main browser window UI
+│   │   ├── Sidebar/          # Sidebar navigation UI
+│   │   ├── CommandPalette/   # Quick action interface
+│   │   ├── Settings/         # Settings screens
+│   │   ├── Extensions/       # Extension management UI
+│   │   ├── Peek/             # Preview overlay UI
+│   │   ├── Dialog/           # Modal dialogs
+│   │   ├── FindBar/          # In-page search
+│   │   └── ...
+│   │
+│   ├── Utils/                # Utility functions and helpers
+│   │   ├── WebKit/           # WebKit extensions
+│   │   ├── Shaders/          # Metal shaders for UI effects
+│   │   └── Debug/            # Development tools
+│   │
+│   ├── Protocols/            # Swift protocols and interfaces
+│   ├── Adapters/             # External API adapters
+│   ├── ThirdParty/           # Third-party dependencies
+│   └── Supporting Files/     # App configuration and resources
+│
+├── Config/                   # Build and project configuration
+└── assets/                   # Static assets and resources
 ```
 
-Nook uses a manager-based architecture: each feature domain (tabs, extensions, ad blocking, downloads, and so on) has its own `@MainActor`-confined manager, coordinated through `BrowserManager`. `CLAUDE.md` has the full breakdown if you're digging in.
+### Architecture Overview
 
-## Contributing
+Nook follows a manager-based architecture where:
+- **Managers** handle business logic and coordinate between different parts of the app
+- **Models** represent data and state using Swift's `@Observable` macro
+- **Components** are SwiftUI views that reactively update based on model changes
+- **BrowserManager** acts as the central coordinator, connecting all managers together
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and PR guidelines. AI-assisted contributions are fine as long as you disclose them and can actually explain what the code does.
 
-## License
+---
 
-Nook is licensed under [GPL-3.0](./LICENSE). With the exception of the third-party libraries in `Nook/ThirdParty`, all code here is GPL-3.0; the third-party code is licensed per-folder under its own terms.
+<div align="center">
+
+## Star History
+
+<a href="https://www.star-history.com/#nook-browser/nook&type=date&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=nook-browser/nook&type=date&legend=bottom-right" width="600" />
+ </picture>
+</a>
+
+</div>
+
+---
+
+### LICENSES
+With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses.
+
