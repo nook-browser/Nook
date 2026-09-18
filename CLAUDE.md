@@ -165,7 +165,7 @@ Every package targets `.macOS("26.0"), .iOS("26.0")` and Swift language mode 5 a
 | `UI/` | Shared UI components |
 | `Navigation/` | Sidebar structure (header, bottom bar, spaces list, context menus) |
 | `Onboarding/` | 4 stages: Hello → TabLayout → Import (`SafariImportFlow`) → Final. Metal-shader transitions. |
-| `docs/` | `adblocker-architecture.md`; `gui-remodel-next-moves.md`; `superpowers/specs/` and `superpowers/plans/` (design specs and implementation plans, including the September 2026 GUI remodel spec `2026-09-14-gui-remodel-design.md` and its five phase plans) |
+| `docs/` | `adblocker-architecture.md`. Design specs, implementation plans and handoff notes are kept locally under `docs/superpowers/` and are gitignored; they are never committed. |
 | `ASSESSMENT.md` | Build and warning audit snapshot from 2026-03-20. Numbers are stale; the category breakdown is still useful. |
 
 ## Design System
