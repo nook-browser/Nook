@@ -41,7 +41,9 @@ struct RootView: View {
                 }
             }
             .nookEnvironment(model)
+            .dialogHost()
         }
+        .dialogHost(enabled: model.sheet == nil)
         .task {
             await model.start()
             model.openDebugSheetIfRequested()
