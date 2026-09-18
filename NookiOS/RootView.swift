@@ -32,7 +32,20 @@ struct RootView: View {
                 .padding(.horizontal, NookDesign.Spacing.md)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 }
         }
-        .task { await model.start() }
+        .sheet(item: $model.sheet) { sheet in
+            // A sheet does not inherit the scene's environment values.
+            Group {
+                switch sheet {
+                case .tabs: TabSheet()
+                case .settings: Text("Settings")
+                }
+            }
+            .nookEnvironment(model)
+        }
+        .task {
+            await model.start()
+            model.openDebugSheetIfRequested()
+        }
         .onOpenURL { model.navigate($0.absoluteString) }
     }
 }
