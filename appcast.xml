@@ -10,6 +10,23 @@
   <language>en</language>
 
   <item>
+    <title>Version 1.1.0</title>
+    <link>https://github.com/nook-browser/Nook/releases/tag/v1.1.0</link>
+    <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.1.0</sparkle:releaseNotesLink>
+    <sparkle:informationalUpdate>
+      <sparkle:belowVersion>110</sparkle:belowVersion>
+    </sparkle:informationalUpdate>
+    <pubDate>Fri, 18 Sep 2026 13:06:34 -0500</pubDate>
+    <enclosure
+      url="https://github.com/nook-browser/Nook/releases/download/v1.1.0/Nook-v1.1.0.dmg"
+      sparkle:version="110"
+      sparkle:shortVersionString="1.1.0"
+      sparkle:edSignature="AMESS//WyxS/IfKodGJjHfTq6GtRWR5H/tywBNEfTY6yrF3BKzAefGWBU0/fv53NenuNi954Usi4lzyv78VVAg=="
+      length="32254342"
+      type="application/octet-stream"/>
+  </item>
+
+  <item>
     <title>Version 1.0.7</title>
     <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.0.6</sparkle:releaseNotesLink>
     <pubDate>Mon, 2 Mar 2026 02:12:53 +0000</pubDate>
