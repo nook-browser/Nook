@@ -285,6 +285,24 @@ keyword changes, mechanical and behavior-free.
 twin in phase 3. `nookGlassEffect` survives unchanged, since Liquid Glass
 exists on iOS 26.
 
+### Outcome
+
+The seven packages match this plan, with a handful of deviations.
+`FocusableWKWebView` stayed in the app rather than moving with the sessions
+that depend on it, since it is an `NSView` subclass with no iOS equivalent
+yet; it reaches `PageSession` through a new `SessionWebView` seam instead.
+The find bar stayed in the app too, typed directly on `FindManager`, rather
+than joining the rest of the shared rows in `NookUI`. `TabActions` grew to
+10 members instead of the 8 sketched here once space creation, deletion,
+pasteboard and sharing calls were accounted for. `NookUI` picked up a second
+platform wrapper beyond `Haptics.swift`: `HoverTracking.swift`, for the
+NSTrackingArea-based hover pattern this file already requires elsewhere.
+`DownloadManager` stayed untouched, exactly as planned, still pending the
+`fix/download-memory` rewrite. One behavior changed: the persisted ad-block
+allowlist now loads at launch, because the old code read a `settings`
+reference that was `nil` at attach time and silently skipped it; the package
+seam wiring fixed that as a side effect rather than by design.
+
 ## Phase 3: the iOS app
 
 ### Sharing discipline
