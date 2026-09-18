@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  AIConfigService.swift
 //  Nook

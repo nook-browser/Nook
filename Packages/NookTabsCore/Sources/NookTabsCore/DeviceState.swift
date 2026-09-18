@@ -1,3 +1,4 @@
+// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 import Foundation
 
 /// State that belongs to this Mac only and never syncs.
