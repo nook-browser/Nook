@@ -13,9 +13,9 @@ import AppKit
 import UIKit
 #endif
 
-enum Haptics {
+public enum Haptics {
     /// The small click the sidebar plays when a selection snaps into place.
-    @MainActor static func alignment() {
+    @MainActor public static func alignment() {
         #if os(macOS)
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         #else

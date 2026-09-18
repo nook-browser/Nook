@@ -3,8 +3,11 @@
 //  RootView.swift
 //  NookiOS
 //
-//  Milestone one: the selected page above a URL field. The bottom bar, tab sheet and space
-//  dots replace this in the second plan.
+//  The page fills the scene and the bar floats over it. SwiftUI raises the
+//  stack's bottom safe area when the keyboard appears, which is what lets the
+//  bar ride the keyboard with no keyboard-frame observer. The page keeps its
+//  full height and gets a scroll inset instead, so content behind the glass is
+//  still reachable, the way Safari does it.
 //
 
 import SwiftUI
@@ -14,23 +17,20 @@ import NookWeb
 
 struct RootView: View {
     @EnvironmentObject private var model: BrowserModel
-    @State private var address = ""
+    @State private var barHeight: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .bottom) {
             if let session = model.selectedSession {
-                WebViewContainer(webView: session.activeWebView)
+                WebViewContainer(webView: session.activeWebView, bottomInset: barHeight)
+                    .ignoresSafeArea(.container, edges: .top)
             } else {
                 Color.clear
             }
-            TextField("Search or enter address", text: $address)
-                .textFieldStyle(.roundedBorder)
-                .keyboardType(.webSearch)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.go)
-                .onSubmit { model.navigate(address) }
-                .padding(NookDesign.Spacing.md)
+
+            BottomBar()
+                .padding(.horizontal, NookDesign.Spacing.md)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 }
         }
         .task { await model.start() }
         .onOpenURL { model.navigate($0.absoluteString) }
@@ -39,14 +39,21 @@ struct RootView: View {
 
 struct WebViewContainer: UIViewRepresentable {
     let webView: WKWebView
+    /// How much of the page the floating bar covers.
+    let bottomInset: CGFloat
 
     func makeUIView(context: Context) -> UIView { UIView() }
 
     func updateUIView(_ view: UIView, context: Context) {
-        guard webView.superview !== view else { return }
-        view.subviews.forEach { $0.removeFromSuperview() }
-        webView.frame = view.bounds
-        webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(webView)
+        if webView.superview !== view {
+            view.subviews.forEach { $0.removeFromSuperview() }
+            webView.frame = view.bounds
+            webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            view.addSubview(webView)
+        }
+        let scroll = webView.scrollView
+        guard scroll.contentInset.bottom != bottomInset else { return }
+        scroll.contentInset.bottom = bottomInset
+        scroll.verticalScrollIndicatorInsets.bottom = bottomInset
     }
 }
