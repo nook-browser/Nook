@@ -43,8 +43,10 @@ public struct SponsorBlockSegment: Codable, Identifiable {
 
 /// Response from the privacy-preserving hash-prefix endpoint.
 /// Each entry contains segments for a single video matching the hash prefix.
+/// The live endpoint returns only `videoID` and `segments`; `hash` is documented
+/// but omitted in practice, so it stays optional and the video is matched by id.
 struct SponsorBlockHashResponse: Codable {
     let videoID: String
-    let hash: String
+    let hash: String?
     let segments: [SponsorBlockSegment]
 }

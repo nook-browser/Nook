@@ -148,7 +148,9 @@ public final class SponsorBlockManager {
 
             let hashResponses = try JSONDecoder().decode([SponsorBlockHashResponse].self, from: data)
 
-            guard let videoResponse = hashResponses.first(where: { $0.hash == fullHash }) else {
+            guard let videoResponse = hashResponses.first(where: {
+                $0.videoID == videoID || $0.hash == fullHash
+            }) else {
                 segmentCache[videoID] = CachedSegments(segments: [], fetchedAt: Date())
                 sbLog.info("No hash match for \(videoID, privacy: .public)")
                 return []
