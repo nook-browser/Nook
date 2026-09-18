@@ -24,6 +24,7 @@ final class DevMCPServer {
 
     nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "DevMCP")
     nonisolated private static let maxBody = 8 * 1024 * 1024
+    nonisolated private static let toolTimeout: Double = 30
 
     private weak var browserManager: BrowserManager?
     private var listener: NWListener?
@@ -158,12 +159,43 @@ final class DevMCPServer {
         case "tools/call":
             let name = params["name"] as? String ?? ""
             let args = params["arguments"] as? [String: Any] ?? [:]
-            result = await callTool(name, args)
+            guard let called = await withTimeout(Self.toolTimeout, operation: { await self.callTool(name, args) }) else {
+                return (200, rpcError(id: id, code: -32001, message: "Tool \(name) did not answer within \(Int(Self.toolTimeout))s"))
+            }
+            result = called
         default:
             return (200, rpcError(id: id, code: -32601, message: "Method not found: \(method)"))
         }
         return (200, try? JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": id, "result": result]))
     }
+
+    /// A tool that never returns must not hold its connection open for ever, so
+    /// every call races a deadline and nil means the deadline won. The losing work
+    /// is cancelled but may not notice: `evaluateJavaScript` cannot be cancelled.
+    private func withTimeout<T: Sendable>(_ seconds: Double, operation: @escaping @MainActor () async -> T) async -> T? {
+        // Not a task group: a group waits for its children even after cancelAll(),
+        // so an abandoned evaluateJavaScript would still hold the connection open
+        // for as long as it took. These two tasks race and the loser is dropped.
+        let latch = Latch()
+        return await withCheckedContinuation { (cont: CheckedContinuation<T?, Never>) in
+            let work = Task { @MainActor in
+                let value = await operation()
+                guard !latch.done else { return }
+                latch.done = true
+                cont.resume(returning: value)
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(seconds))
+                guard !latch.done else { return }
+                latch.done = true
+                work.cancel()
+                cont.resume(returning: nil)
+            }
+        }
+    }
+
+    /// Whether the race above has already been decided. Main actor only.
+    private final class Latch { var done = false }
 
     private func rpcError(id: Any, code: Int, message: String) -> Data? {
         try? JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": id, "error": ["code": code, "message": message]])
@@ -257,8 +289,13 @@ final class DevMCPServer {
         return String(decoding: data, as: UTF8.self)
     }
 
-    private func callTool(_ name: String, _ args: [String: Any]) async -> [String: Any] {
+    private func callTool(_ rawName: String, _ args: [String: Any]) async -> [String: Any] {
         guard let bm = browserManager, let window else { return text("No browser window", error: true) }
+
+        // The chat's executeJavaScript evaluates an expression, so `return` (which
+        // every agent writes) is a syntax error. Here it is another name for
+        // `evaluate`, which runs the code as an async function body.
+        let name = rawName == "executeJavaScript" ? "evaluate" : rawName
 
         do {
             if BrowserTools.toolsByName[name] != nil {

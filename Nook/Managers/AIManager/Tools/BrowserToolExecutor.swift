@@ -385,24 +385,25 @@ class BrowserToolExecutor {
             return "No active tab"
         }
 
-        let queryJSON = String(data: (try? JSONSerialization.data(withJSONObject: query)) ?? Data("\"\"".utf8), encoding: .utf8) ?? "\"\""
+        // The query goes in as an argument. Interpolating it meant JSON-encoding a
+        // bare String, which JSONSerialization rejects as an invalid top-level type
+        // by raising an ObjC exception rather than returning an error.
         let script = """
-        (function() {
-            const text = document.body.innerText;
-            const query = \(queryJSON).toLowerCase();
-            const matches = [];
-            let idx = text.toLowerCase().indexOf(query);
-            while (idx !== -1 && matches.length < 10) {
-                const start = Math.max(0, idx - 50);
-                const end = Math.min(text.length, idx + query.length + 50);
-                matches.push({ index: idx, context: text.substring(start, end) });
-                idx = text.toLowerCase().indexOf(query, idx + 1);
-            }
-            return JSON.stringify({ count: matches.length, matches: matches });
-        })();
+        const text = document.body.innerText;
+        const needle = query.toLowerCase();
+        const hay = text.toLowerCase();
+        const matches = [];
+        let idx = needle ? hay.indexOf(needle) : -1;
+        while (idx !== -1 && matches.length < 10) {
+            const start = Math.max(0, idx - 50);
+            const end = Math.min(text.length, idx + needle.length + 50);
+            matches.push({ index: idx, context: text.substring(start, end) });
+            idx = hay.indexOf(needle, idx + needle.length);
+        }
+        return JSON.stringify({ count: matches.length, matches: matches });
         """
 
-        let result = try await webView.evaluateJavaScript(script)
+        let result = try await webView.callAsyncJavaScript(script, arguments: ["query": query], contentWorld: .page)
         return result as? String ?? "No matches found"
     }
 
