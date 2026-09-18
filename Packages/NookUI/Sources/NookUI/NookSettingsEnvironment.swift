@@ -1,29 +1,27 @@
 // Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 //
 //  NookSettingsEnvironment.swift
-//  Nook
+//  NookUI
 //
 //  The SwiftUI glue NookSettings cannot carry: the settings service lives in a
-//  Foundation-only package, so the environment key and the SwiftUI-typed
-//  conveniences over its value types stay here.
+//  Foundation-only package, so the environment key lives here, where the shared
+//  settings bodies and both platforms' app targets all reach one key.
 //
 
 import NookSettings
 import SwiftUI
 
-// MARK: - Environment Key
-
 private struct NookSettingsServiceKey: EnvironmentKey {
     @MainActor
     static var defaultValue: NookSettingsService {
-        // This should never be called since we always inject from NookApp
-        // But EnvironmentKey protocol requires a default value
+        // Never reached in either app: both targets inject the real service at
+        // the root. EnvironmentKey requires a default, so this is it.
         return NookSettingsService()
     }
 }
 
 extension EnvironmentValues {
-    var nookSettings: NookSettingsService {
+    public var nookSettings: NookSettingsService {
         get { self[NookSettingsServiceKey.self] }
         set { self[NookSettingsServiceKey.self] = newValue }
     }
