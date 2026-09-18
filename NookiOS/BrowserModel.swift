@@ -56,6 +56,13 @@ final class BrowserModel: ObservableObject {
         tabs.attach(window: window)
         currentProfileValue = window.spaceID.flatMap { tabs.profile(forSpace: $0) }
 
+        // Ad blocking is a core feature on the phone: on unless the user has turned it off.
+        // The settings service registers false as the default, so only the persisted domain
+        // says whether the user ever chose.
+        let persisted = UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
+        if persisted?["settings.adBlockerEnabled"] == nil {
+            settings.adBlockerEnabled = true
+        }
         blocker.setEnabled(settings.blockCrossSiteTracking || settings.adBlockerEnabled)
         log.notice("Model ready: \(self.tabs.orderedSpaces.count) spaces, selected \(String(describing: self.window.selectedItemID), privacy: .public)")
     }
@@ -74,6 +81,14 @@ final class BrowserModel: ObservableObject {
         if let selected = window.selectedItemID {
             tabs.select(selected, in: window)
         }
+        #if DEBUG
+        // Hands-off checks: `xcrun simctl launch <udid> com.gstudios.nook -NookStartURL <url>`.
+        // http links opened from outside go to the default browser, which Nook cannot be
+        // until Apple grants the web-browser entitlement.
+        if let start = UserDefaults.standard.string(forKey: "NookStartURL") {
+            navigate(start)
+        }
+        #endif
         objectWillChange.send()
     }
 
