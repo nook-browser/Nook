@@ -45,7 +45,7 @@ xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath buil
 
 **There is no test target.** `xcodebuild test -scheme Nook` fails. Verification is a build plus manual run. If the working tree holds someone else's uncommitted edits, verify committed work in a detached worktree (`git worktree add --detach /tmp/x HEAD`) with its own `-derivedDataPath` instead of building the dirty tree.
 
-**Signing**: Set your Development Team in Xcode Signing settings. Team IDs in the project: `ZHB786H6YN` (Bain Gurley, local) and `96M8ZZRJK6` (CI). `Nook/Nook-CI.entitlements` is a reduced entitlements file used for the CI build step because push and autofill require provisioning profiles. The workflow's final re-sign also uses `Nook-CI.entitlements`. Release DMGs therefore lack push and autofill entitlements, and no provisioning profile is embedded.
+**Signing**: Set your Development Team in Xcode Signing settings. Team IDs in the project: `ZHB786H6YN` (Bain Gurley, local) and `96M8ZZRJK6` (CI). `Nook/Nook-CI.entitlements` is a reduced entitlements file used for the CI build step because push and autofill require provisioning profiles. The workflow's final re-sign also uses `Nook-CI.entitlements`. Release DMGs therefore lack push and autofill entitlements, and no provisioning profile is embedded. A local **signed** Debug build needs a Mac Team Provisioning Profile for `com.gstudios.nook`, which the September bundle-id change left uncreated; `xcodebuild ... -allowProvisioningUpdates` makes it, once. Without it the build fails at `GatherProvisioningInputs` with "No profiles for 'com.gstudios.nook' were found"; the unsigned invocation above sidesteps it.
 
 **Metal**: One shader (`Onboarding/Components/ViewTransition.metal`). Xcode 26+ needs the Metal Toolchain component: `xcodebuild -downloadComponent MetalToolchain`.
 
@@ -59,6 +59,7 @@ xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath buil
 - **`main`** holds the last official release. Fast-forward it from `develop` when promoting a beta.
 - **Releases are tags.** A push of `vX.Y.Z-beta.N` runs the notarize workflow as a beta: the app's marketing version becomes `X.Y.Z-beta.N`, the GitHub release is a prerelease titled "Nook X.Y.Z beta N" with a beta notice, and the appcast item is titled the same. A push of `vX.Y.Z` is the official release. Every tag needs its own `CURRENT_PROJECT_VERSION` bump first, since Sparkle orders by build number. Betas and official releases share the default Sparkle channel for now; a beta channel behind a Settings toggle comes with the first official release under the new bundle id.
 - **Gitflow naming.** Short-lived work goes on `feature/<name>` or `hotfix/<name>` branched from `develop` (hotfixes from `main`), merged back and deleted. Only `main`, `develop` and `gh-pages` are long-lived and protected (deletion and force-push blocked, org admins bypass). The `release` branch was retired 2026-09-18 when tags took over.
+- `feature/ios-chrome` holds the iOS visible chrome (bar, tab sheet, settings, dialogs, downloads, memory pressure, touch drag, iPad) as an iOS-only lineage branched from `0f2745c`. The same content also reached `develop` through unrelated PR merges, so a PR from it shows no diff; it is a readable record, not something to merge.
 - `feature/download-memory` (local only, formerly `fix/download-memory`) is an unfinished WIP branch: URLSession-streamed downloads, based on an old commit; rebase onto `develop` before finishing.
 - AI assistance must be disclosed per CONTRIBUTING.md.
 
@@ -141,7 +142,7 @@ Seven local SPM packages under `Packages/`, wired into `Nook.xcodeproj` as local
 | `NookBlocker` | `NookSettings` | The content blocker: `ContentBlockerManager`, `FilterListManager`, `ContentRuleListCompiler`, `RustContentBlockingConverter`, `AdvancedRulesEngine`, `BlockerEngine`, `TrackingParamStripper`, `OAuthDetector`, `WKUserScript+NookOwned.swift`, the JS in `Resources/`, and the Rust FFI as a `binaryTarget` over `Nook/ThirdParty/AdblockRustFFI/NookAdblock.xcframework`. |
 | `NookTweaks` | `NookSettings`, `NookBlocker` | Site tweak managers: YouTube, Facebook, SocialImage, SponsorBlock, SiteRouting, plus their JS in `Resources/`. |
 | `NookWeb` | `NookTabsCore`, `NookSettings`, `NookDesign`, `NookBlocker`, `NookTweaks`, FaviconFinder | `TabsController`, `PageSession`, `BrowserWindowState`, `WindowRegistry`, `SearchManager`, `FaviconCache`, `HistoryManager`, `Profile`, `BrowserConfig`, and the ObjC `MuteableWKWebView` as a C target. |
-| `NookUI` | `NookBlocker`, `NookDesign`, `NookSettings`, `NookTabsCore`, `NookTweaks`, `NookWeb` | Shared SwiftUI: the tab/folder/space rows, `SpacesList`, the three context-menu builders, `EmptyWebsiteView`, the toasts, and the settings tab bodies for General, Appearance, Spaces, Ad Blocker, Air Traffic Control, YouTube and Social Media. |
+| `NookUI` | `NookBlocker`, `NookDesign`, `NookSettings`, `NookTabsCore`, `NookTweaks`, `NookWeb` | Shared SwiftUI: the tab/folder/space rows, `SpacesList`, the three context-menu builders, `EmptyWebsiteView`, the toasts, the settings tab bodies for General, Appearance, Spaces, Ad Blocker, Air Traffic Control, YouTube and Social Media, and `NookSettingsEnvironment.swift`, the `\.nookSettings` environment key both app targets inject. |
 
 Platform differences are resolved in `NookDesign.swift` or in the thin wrapper files (`Platform.swift` in `NookWeb`, `Haptics.swift` and `HoverTracking.swift` in `NookUI`), never in view bodies; a file that would need more than one `#if os` gets a `+macOS.swift` sibling instead (e.g. `Nook/Browser/TabsController+macOS.swift`, `BrowserWindowState+macOS.swift`).
 
@@ -160,7 +161,6 @@ Every package targets `.macOS("26.0"), .iOS("26.0")` and Swift language mode 5 a
 | `Nook/Utils/` | Utilities, WebKit extensions (`FocusableWKWebView.swift`, `WebContextMenu.swift`), `WebStoreInjector.js` (Chrome Web Store install button) |
 | `Nook/ThirdParty/` | Embedded dependencies, including the Rust FFI crate whose `NookAdblock.xcframework` output is consumed by `Packages/NookBlocker` |
 | `Nook/Browser/` | One file, `TabsController+macOS.swift`: the macOS-only slice of the tab model that stayed out of `Packages/NookWeb` (see Tab Model below) |
-| `Settings/` | One file, `NookSettingsEnvironment.swift`: the SwiftUI environment key and conveniences over `NookSettings`' value types, since a Foundation-only package cannot import SwiftUI. `NookSettingsService` itself lives in `Packages/NookSettings`. |
 | `CommandPalette/` | Command palette UI |
 | `UI/` | Shared UI components |
 | `Navigation/` | Sidebar structure (header, bottom bar, spaces list, context menus) |
