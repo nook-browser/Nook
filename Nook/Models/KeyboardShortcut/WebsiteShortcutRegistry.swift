@@ -97,6 +97,7 @@ extension WebsiteShortcutProfile {
             name: "Figma",
             domainPatterns: ["*.figma.com", "figma.com"],
             shortcuts: [
+                .init(key: "s", modifiers: [.command], description: "Save to version history"),
                 .init(key: "k", modifiers: [.command], description: "Search / Quick Actions"),
                 .init(key: "d", modifiers: [.command], description: "Duplicate"),
                 .init(key: "+", modifiers: [.command], description: "Zoom In"),
@@ -113,7 +114,19 @@ extension WebsiteShortcutProfile {
             ],
             icon: "paintbrush.pointed"
         ),
-        
+
+        // MARK: - draw.io
+        .init(
+            name: "draw.io",
+            // "*.x" matches the bare host too, so these cover app.diagrams.net and draw.io.
+            domainPatterns: ["*.diagrams.net", "*.draw.io"],
+            shortcuts: [
+                .init(key: "s", modifiers: [.command], description: "Save"),
+                .init(key: "f", modifiers: [.command], description: "Find / Replace"),
+            ],
+            icon: "square.on.circle"
+        ),
+
         // MARK: - Notion
         .init(
             name: "Notion",
