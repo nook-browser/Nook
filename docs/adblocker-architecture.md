@@ -2,121 +2,122 @@
 
 ## Overview
 
-Nook's ad blocker is built directly into the browser on top of the same two AdGuard
-components AdGuard for Safari and wBlock use, both GPL-3.0:
+Nook blocks ads itself. There is no extension, no Safari content-blocker app, and no
+AdGuard code in the build any more: SafariConverterLib and the `@adguard/safari-extension`
+runtime were both removed in September 2026, along with `RequestStatsEngine` and its
+blocked-request counter.
 
-- **SafariConverterLib** (SPM, product `ContentBlockerConverter`, targets `ContentBlockerConverter` + `FilterEngine`)
-  converts AdGuard/uBlock filter rules into Safari content-blocker JSON plus an "advanced rules" text,
-  and provides `FilterEngine`/`WebExtension` for per-URL lookup of those advanced rules.
-- **@adguard/safari-extension** (npm, bundled as `Resources/nook-advanced-blocking.js`) applies advanced
-  rules in-page. It bundles AdGuard ExtendedCss and AdGuard Scriptlets. Rebuild recipe:
-  `Resources/BUILD-advanced-blocking.md`.
+Rules are converted by Brave's adblock-rust, network blocking is handed to WebKit as
+compiled `WKContentRuleList`s, and everything WebKit cannot express is done by Nook's own
+scripts, injected into `WKWebView` as `WKUserScript`s.
 
-Unlike a Safari extension, Nook injects directly into `WKWebView` via `WKUserScript`, which gives
-per-tab control (whitelist, temporary disable, OAuth exemption) and no extension process.
-
-Everything in `Packages/NookBlocker/Sources/NookBlocker/` (moved there from `Nook/Managers/ContentBlockerManager/`
-in the September 2026 phase 2 package split) is Foundation + WebKit only, so it is reusable as-is for an
-iOS target.
+The code is `Packages/NookBlocker/Sources/NookBlocker/`, Foundation and WebKit only, with
+no AppKit, so it ports to iOS unchanged. It reaches the app through two protocols in
+`BlockablePage.swift`: `BlockablePage` (one live page: `itemID`, `isOAuthFlow`, `webView`)
+and `ContentBlockerHost` (the live pages, the shared `WKUserContentController`, and a hook
+run against each freshly made controller). `PageSession` in `Packages/NookWeb` is the only
+implementation today. Filter list snapshots and scripts are read through `Bundle.module`
+from `Sources/NookBlocker/Resources/`.
 
 ## Pipeline
 
 ```
-Filter lists (bundled snapshots in Resources/, refreshed daily from the network)
-  ↓ FilterListManager.loadAllFilterRulesAsLines()        (disk cache → bundled fallback)
-  ↓ SafariConverterLib.convertArray(advancedBlocking: true)
-  ├─ safariRulesJSON  → ContentRuleListCompiler → 30K-entry chunks → WKContentRuleListStore.compile()
-  │                     → [WKContentRuleList]   (network blocking, css-display-none incl. :has())
-  └─ advancedRulesText → AdvancedRulesEngine.build() → WebExtension.buildFilterEngine()
-                         (trie index, serialized under Application Support/.../AdvancedRules)
+Filter lists (bundled snapshots in Resources/, refreshed on each list's own interval)
+  ↓ FilterListManager
+  ↓ RustContentBlockingConverter.convert()   (adblock-rust, feature `content_blocking`)
+  ├─ content-blocking JSON → ContentRuleListCompiler → 30K-entry chunks
+  │    → WKContentRuleListStore.compile() → [WKContentRuleList]
+  │      (network blocking plus css-display-none, including :has())
+  ├─ cosmetic rules the converter could not express → BlockerEngine (adblock::Engine)
+  └─ raw $removeparam lines → TrackingParamStripper
 ```
 
-Compiled rule lists and the advanced text are cached by SHA-256 of the input rules, so a launch with
-unchanged lists does no conversion.
+**FilterListManager** downloads, caches and validates the lists. Defaults are always on and
+ship as snapshots in `Resources/` (EasyList, EasyPrivacy, Peter Lowe's, the uBlock filters,
+unbreak, badware, privacy and quick-fixes lists, URLhaus, AdGuard URL tracking, and the
+bundle-only `nook-filters-default.txt`), so the first run is protected before any network
+request. Each list refreshes on its own `! Expires:` interval with a conditional GET.
+`scripts/refresh-filter-lists.sh` updates the bundled snapshots and runs in CI before each
+release build.
 
-## Three blocking layers
+**ContentRuleListCompiler** splits the converted rules into 30,000-entry chunks and compiles
+each into the `WKContentRuleListStore`. Results are keyed by a SHA-256 of the rule text, and
+a `converter-adblock-rust` stamp file in the cache directory invalidates anything written by
+the old converter.
 
-1. **WKContentRuleList** (native, out of process): network blocking, exceptions, simple and `:has()`
-   element hiding, plus a few hardcoded YouTube endpoint rules. Added to the shared
-   `WKWebViewConfiguration` and to every fresh `WKUserContentController`.
-2. **Advanced rules** (cosmetic CSS with styles, extended CSS, scriptlets, JS): looked up per frame URL
-   by `AdvancedRulesEngine.configuration(for:topUrl:)` and applied by the runtime script.
-   - Main frame: `Tab.decidePolicyFor` → `ContentBlockerManager.setupContentBlockerScripts` embeds the
-     configuration as `window.__nookAdvancedBlockingConfig` in a user script that precedes the runtime,
-     so rules apply synchronously at document start.
-   - Subframes: the runtime posts `{url, topUrl}` to the `nookAdvancedBlocking` reply handler
-     (`WKScriptMessageHandlerWithReply`, registered on every controller) and applies the answer.
-     AdGuard's delayed-event dispatcher holds `DOMContentLoaded`/`load` up to 1s meanwhile.
-   Domain, path, `$elemhide`/`$generichide` and scriptlet exceptions are handled by FilterEngine.
-3. **Site-specific scripts** (`Resources/*-blocker.js`): YouTube, Facebook, X. Added once as static
-   user scripts, main frame only, wrapped in a hostname guard. Each guards against double execution
-   with `window.__nook<Name>Loaded`.
+**BlockerEngine** owns the single `adblock::Engine` in the app. It is `@MainActor` with a
+synchronous `configuration(for:topUrl:)` lookup, because the main-frame config script has to
+be installed before the navigation commits; only `build(rules:)` runs off the actor. Plain
+cosmetic filters never reach it, since the converter turns those into `css-display-none`
+entries WebKit applies itself. Scriptlets are not executed (the engine is given no
+resources), and true procedural operators (`:has-text`, `:upward`, `:matches-css`) are
+skipped.
 
-## Script ownership
+**AdvancedRulesEngine** installs the scripts and answers lookups. `nook-cosmetic.js` runs at
+document start in all frames: in the main frame it reads `window.__nookCosmeticConfig`, set
+synchronously by the config script before navigation; in subframes it asks the
+`nookAdvancedBlocking` reply handler. Either way it injects one stylesheet. Alongside it go
+the static site scripts (`youtube-ad-blocker.js`, `facebook-sponsored-blocker.js`,
+`instagram-sponsored-blocker.js`, `twitter-ad-blocker.js`, plus `facebook-feed-prune.js` and
+`instagram-feed-prune.js`, which strip Meta's ads out of the feed data before the page
+renders them) and `nook-stealth-redirects.js`, which answers a small table of known ad URLs
+with an inert `data:` stub so a blocked request does not read as a failure to anti-adblock
+scripts.
 
-Every user script the blocker owns starts with `// Nook Content Blocker` (static runtime + site
-scripts) or `// Nook Content Blocker Config` (per-navigation main-frame configuration). Removal and
-replacement filter by those prefixes; nothing else in the app may use them.
-
-Static scripts live on the shared configuration's controller and are copied into each new controller
-by `BrowserConfiguration.freshUserContentController()`. Per navigation only the config script changes.
+**TrackingParamStripper** implements `$removeparam` for main-frame navigations. It parses
+the raw filter lines the converter drops, and `PageSession` applies it in
+`decidePolicyFor` before the load starts.
 
 ## Exemptions
 
-`isExempt(tab, host)` = blocker disabled, tab temporarily disabled (basic-auth flow), host or any
-parent domain whitelisted, or OAuth flow. Exempt webviews have rule lists and scripts removed and are
-tracked in a weak set; state only changes on transitions, not on every navigation.
+`ContentBlockerManager` owns enable and disable, the allowlist (domain suffix match), the
+per-tab temporary disable, the OAuth exemption from `OAuthDetector`, the per-navigation
+main-frame config, and the subframe lookups behind the `nookAdvancedBlocking` handler. An
+exempt web view has its rule lists and scripts removed; state changes on transitions, not on
+every navigation.
 
-## Filter lists
+## Script ownership
 
-Default (always on, snapshots bundled): EasyList, EasyPrivacy, Peter Lowe's, uBlock filters /
-unbreak / badware / privacy / quick fixes, URLhaus. `nook-filters-default.txt` is bundle-only.
-Optional lists (AdGuard, Fanboy, regional) are downloaded on enable. Each list is refreshed on its
-own `! Expires:` interval (uBO quick fixes: 8h, URLhaus: 12h, EasyList: 4 days; default 24h, clamped
-1h to 7d) with conditional GET (ETag / If-Modified-Since). A check for due lists runs right after
-activation and hourly. `scripts/refresh-filter-lists.sh` re-downloads the bundled snapshots; CI runs
-it before every release build.
+Every script the blocker injects starts with `// Nook Content Blocker`, or
+`// Nook Content Blocker Config` for the per-navigation main-frame config. There is no
+remove-one API, so changing one script means `removeAllUserScripts()` and re-adding the
+survivors. That controller is shared with `WKWebExtensionController`, which is never told
+its content scripts were cleared, so filter with `.nookOwned`
+(`WKUserScript+NookOwned.swift`) before re-adding and let the extension
+controller look after its own. Prefer install-once, self-gating scripts: put changing state
+behind the message handler instead of baking it into the script source.
 
-## Tracking parameter removal (`$removeparam`)
+## Rules
 
-WebKit cannot rewrite URLs, and SafariConverterLib drops `$removeparam` rules. `TrackingParamStripper`
-parses them from the raw filter lines (uBO privacy list, AdGuard URL Tracking Protection, unbreak) and
-`Tab.decidePolicyFor` restarts main-frame GET navigations without the matching parameters. Exempt tabs
-and back/forward navigations are left alone. Matching is host-suffix plus substring, not full ABP
-pattern semantics.
+- **Never convert a rule that cancels another rule.** A cosmetic exception (`#@#`) and
+  `$badfilter` both describe the absence of a rule and have no standalone content-blocking
+  form. The crate inverts an `UNHIDE` filter's domains into `unless_domain`, so
+  `redtube.com#@#svg` becomes "hide every svg on the web except redtube.com".
+  `cancels_another_rule` in `Nook/ThirdParty/AdblockRustFFI/src/content_blocking_ffi.rs`
+  skips both, and `tests/no_overbroad_rules.rs` fails the build if one escapes.
+- **An `@@` exception cannot override a block in another list.** WebKit evaluates each
+  compiled `WKContentRuleList` on its own. Use a scriptlet or the stub table instead.
+- **Never stub a vendor that validates its payload.** Ad-Shield compares the script it
+  fetches against an `X-Length` header, and a `data:` URL has no headers, so an empty stub
+  reads as malformed and it replaces the document with an error modal. Blocking is the
+  milder failure. Stubs only suit detectors that check whether a load succeeded.
+- Do not re-inject scripts after load; scriptlets are not idempotent.
+- Do not rewrite `:has()` rules out of the content rule list; WebKit supports them natively.
+- Site scripts observe `childList` only, validate content (for instance the word
+  "Sponsored"), set `display: none`, and guard with `window.__nook<Name>Loaded`.
 
-## Blocked-request counts
+## Known limits
 
-Content rule lists report nothing, so the same rules are also loaded into Brave's adblock-rust
-(`Nook/ThirdParty/AdblockRustFFI`, MPL-2.0, C API over a static library wrapped in an xcframework
-and consumed by `Packages/NookBlocker` as a `binaryTarget`). `nook-request-stats.js`
-observes every resource URL a page tries to load (fetch, XHR, beacon, WebSocket, and DOM-inserted
-img/script/link/iframe/media via one MutationObserver), batches them, and posts to the
-`nookRequestStats` handler. `RequestStatsEngine` checks them on a serial queue and adds to
-`Tab.blockedRequestCount`, which resets on each main-frame navigation and shows in the extension
-library's Content Blocker row. The engine is serialized per rules hash so warm starts deserialize
-instead of rebuilding. Counting never blocks or delays a request.
-
-## Known limits (WebKit)
-
-No `$redirect`, `$csp`, `$replace`, `$header`. Scriptlets run in the page world from the user-script
-realm, so they are not blocked by page CSP; raw `#%#` JS rules still go through a script element and
-lose on strict-CSP sites. Counts are approximate: adblock-rust and the Safari conversion can disagree
-on edge cases, and CSS background images are not observed.
+No `$redirect`, `$csp`, `$replace` or `$header`, since WebKit's rule lists cannot express
+them. No scriptlet execution. Procedural cosmetic operators are dropped. Nothing counts
+blocked requests any more.
 
 ## Updating dependencies
 
-- Runtime JS: follow `Resources/BUILD-advanced-blocking.md` (bump `@adguard/safari-extension`).
-- SafariConverterLib: bump the SPM requirement in the Xcode project; keep it on the same major as the
-  npm package.
-- Filter list snapshots: `scripts/refresh-filter-lists.sh` (keep its URL list in sync with `FilterListManager.defaultLists`).
-- adblock-rust: `Nook/ThirdParty/AdblockRustFFI/build.sh` (needs Rust; the built `.a` is committed, wrapped
-  in `NookAdblock.xcframework`).
-
-## History
-
-- Originally 97 hand-written scriptlet templates with a custom parser.
-- March 2026: SafariConverterLib + AdGuard Scriptlets corelibs JSON, with a home-grown advanced-rules
-  interpreter (`AdvancedBlockingEngine`).
-- September 2026: interpreter replaced by SafariConverterLib's FilterEngine + `@adguard/safari-extension`;
-  per-frame lookup, proper extended CSS, exception handling, no double injection, bundled list snapshots.
+- Filter list snapshots: `scripts/refresh-filter-lists.sh` (keep its URL list in sync with
+  `FilterListManager`'s defaults).
+- adblock-rust: `Nook/ThirdParty/AdblockRustFFI/build.sh` (needs Rust). It produces
+  `NookAdblock.xcframework`, consumed by `Packages/NookBlocker` as a `binaryTarget`. The
+  `content-blocking` and `css-validation` features are both required: without the latter the
+  crate's selector validator is a stub that never classifies procedural filters, so they
+  arrive as raw text and inject invalid CSS.
