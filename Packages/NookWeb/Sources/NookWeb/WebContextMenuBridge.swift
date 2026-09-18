@@ -187,6 +187,14 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             session?.deliverContextMenuPayload(nil)
             return
         }
+        // A middle click on a link rides the same bridge: WebKit does not turn one into a
+        // navigation, so the page has to report it.
+        if let href = dictionary["middleClickHref"] as? String {
+            if let url = URL(string: href) {
+                session?.openInNewTab(url)
+            }
+            return
+        }
         let payload = WebContextMenuPayload(dictionary: dictionary)
         session?.deliverContextMenuPayload(payload)
     }
@@ -268,6 +276,28 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
         }
 
         document.addEventListener('contextmenu', capturePayload, true);
+
+        // Middle click on a link. WebKit does not deliver this as a navigation, so the
+        // page reports the href and the app opens a background tab. auxclick is the event
+        // for non-primary buttons; button 1 is the middle one.
+        //
+        // Deliberately on the bubble phase, and skipped once the page has called
+        // preventDefault. That is the contract other browsers keep: a page that wants to
+        // handle its own middle clicks cancels the event, and a single-page app that
+        // answers with window.open would otherwise give us two tabs for one click.
+        document.addEventListener('auxclick', function(event) {
+            if (event.button !== 1 || event.defaultPrevented) { return; }
+            try {
+                var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+                if (!link || !link.href) { return; }
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload) {
+                    window.webkit.messageHandlers.contextMenuPayload.postMessage({ middleClickHref: link.href });
+                }
+            } catch (error) {
+                console.error('[Nook Context Menu] auxclick error', error);
+            }
+        }, false);
+
         console.log('[Nook Context Menu] Event listener registered');
     })();
     """

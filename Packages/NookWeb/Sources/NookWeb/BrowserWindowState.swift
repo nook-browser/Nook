@@ -83,6 +83,11 @@ public class BrowserWindowState {
     /// Compositor version counter for this window (incremented when tab ownership changes)
     public var compositorVersion: Int = 0
 
+    /// The sidebar tab row the pointer is over, for middle-click to close.
+    /// Observation-ignored on purpose: this changes on every hover and nothing
+    /// renders from it, so tracking it would invalidate views for nothing.
+    @ObservationIgnored public var hoveredItemID: UUID?
+
     /// The platform window, set by the app once it exists.
     @ObservationIgnored public weak var windowHandle: WindowHandle? {
         didSet { applyPendingFrame() }
