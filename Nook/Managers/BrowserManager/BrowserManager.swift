@@ -944,6 +944,7 @@ class BrowserManager: ObservableObject {
         windowState.isSidebarVisible = isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
+        windowState.sidebarPiPController = SidebarPiPController()
         // NSWindow reference is set by WindowFocusBridge.attach in ContentView
         windowState.urlBarFrame = urlBarFrame
 

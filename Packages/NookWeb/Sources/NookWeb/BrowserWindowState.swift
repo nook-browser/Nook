@@ -64,6 +64,7 @@ public class BrowserWindowState {
     // updating; `@ObservationIgnored` storage is for references nothing renders from.
 
     @ObservationIgnored public var extensionLibraryPanelStorage: Any?
+    @ObservationIgnored public var sidebarPiPStorage: Any?
     @ObservationIgnored public weak var commandPaletteStorage: AnyObject?
     /// Read inside the toast view body, so it stays observed.
     public var shortcutConflictStorage: Any?

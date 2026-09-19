@@ -141,10 +141,14 @@ extension BrowserManager: TabEventObserver {
 
     func tabActivated(new session: PageSession, previous: PageSession?) {
         ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
+        updateSidebarPiP(new: session, previous: previous)
     }
 
     func tabClosed(itemID: UUID) {
         ExtensionManager.shared.notifyTabClosed(itemID: itemID)
+        for window in windowRegistry?.windows.values ?? [:].values {
+            window.sidebarPiPController?.exitIfShowing(itemID)
+        }
     }
 
     func tabMoved(itemID: UUID, from oldIndex: Int?, in oldWindow: BrowserWindowState?, pinnedChanged: Bool) {
@@ -162,6 +166,31 @@ extension BrowserManager: TabEventObserver {
 
     func wakeBackgroundWorkers() {
         ExtensionManager.shared.wakeBackgroundWorkers()
+    }
+
+    /// Leaving a playing video moves it into the sidebar panel; coming back puts it inline again.
+    /// Runs before the compositor refreshes, so the outgoing web view is still mounted.
+    private func updateSidebarPiP(new session: PageSession, previous: PageSession?) {
+        guard let windowState = windowRegistry?.activeWindow else { return }
+        windowState.sidebarPiPController?.exitIfShowing(session.itemID)
+
+        guard nookSettings?.autoPictureInPicture == true,
+            let previous, previous.hasPlayingVideo, !previous.isPrivate,
+            // Another window or the other split pane may still be showing it.
+            !tabs.isVisibleInAnyWindow(previous.itemID)
+        else { return }
+
+        guard let webView = getWebView(for: previous.itemID, in: windowState.id) ?? previous.assignedWebView
+        else { return }
+
+        // No sidebar means nothing to anchor to, so fall back to the system PiP window.
+        guard windowState.isSidebarVisible, let controller = windowState.sidebarPiPController else {
+            PiPManager.shared.requestPiP(for: previous, webView: webView)
+            return
+        }
+        controller.enter(session: previous, webView: webView) {
+            PiPManager.shared.requestPiP(for: previous, webView: webView)
+        }
     }
 
     var nativeController: WKWebExtensionController? {
