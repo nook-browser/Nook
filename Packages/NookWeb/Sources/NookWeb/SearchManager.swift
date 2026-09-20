@@ -15,11 +15,15 @@ import SwiftUI
 public class SearchManager {
     public var suggestions: [SearchSuggestion] = []
     public var isLoading: Bool = false
+    /// Bare host the omnibox completes to inline, e.g. `facebook.com`. Only set when history has one
+    /// worth offering; the palette re-checks that it still prefixes the typed text before showing it.
+    public var autofillHost: String?
     
     public init() {}
 
     private let session = URLSession.shared
     private var searchTask: Task<Void, Never>?
+    private var autofillTask: Task<Void, Never>?
     private var searchGeneration = UUID()
     private weak var tabs: TabsController?
     private weak var window: BrowserWindowState?
@@ -99,6 +103,15 @@ public class SearchManager {
             return
         }
 
+        // Runs outside searchTask's debounce: the inline completion has to keep pace with typing.
+        autofillTask?.cancel()
+        autofillTask = Task { [weak self] in
+            guard let self, let historyManager = self.historyManager else { return }
+            let host = await historyManager.autofillHost(prefix: query.trimmingCharacters(in: .whitespacesAndNewlines))
+            guard !Task.isCancelled, self.searchGeneration == generation else { return }
+            self.autofillHost = host
+        }
+
         let tabs = Array(searchTabs(for: query).prefix(2))
         let urlSuggestion: SearchSuggestion? = isLikelyURL(query)
             ? SearchSuggestion(text: query, type: .url) : nil
@@ -113,7 +126,7 @@ public class SearchManager {
             do { try await Task.sleep(for: .milliseconds(125)) } catch { return }
             guard let self, !Task.isCancelled else { return }
             async let web = self.fetchWebSuggestions(for: query)
-            let history = Array(await self.searchHistory(for: query).prefix(2))
+            let history = Array(await self.searchHistory(for: query).prefix(3))
             guard !Task.isCancelled, self.searchGeneration == generation,
                   self.window?.spaceID == space else { return }
             self.updateSuggestionsIfNeeded(Array((urlRows + tabs + history + carriedWeb).prefix(5)))
@@ -238,6 +251,8 @@ public class SearchManager {
     
     public func clearSuggestions() {
         searchTask?.cancel()
+        autofillTask?.cancel()
+        autofillHost = nil
         searchGeneration = UUID()
         if !suggestions.isEmpty {
             withAnimation(.easeInOut(duration: 0.2)) {
