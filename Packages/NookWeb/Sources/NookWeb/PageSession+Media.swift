@@ -124,24 +124,17 @@ extension PageSession {
     }
 
     // MARK: - Native Audio Monitoring
+
+    /// Core Audio reports output start/stop through a property listener, so there is no timer here.
     func startNativeAudioMonitoring() {
         guard !isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = true
-
-        audioMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.checkNativeAudioActivity() }
-        }
-
         setupAudioSessionNotifications()
     }
 
     func stopNativeAudioMonitoring() {
         guard isMonitoringNativeAudio else { return }
         isMonitoringNativeAudio = false
-
-        audioMonitoringTimer?.invalidate()
-        audioMonitoringTimer = nil
-
         removeCoreAudioPropertyListeners()
     }
 
@@ -156,11 +149,9 @@ extension PageSession {
         init(session: PageSession) { self.session = session }
     }
 
+    // No throttle: the old 0.5s guard existed to dedupe the 1 Hz poll against listener
+    // callbacks. With listeners only, throttling would swallow a stop that follows a start.
     func checkNativeAudioActivity() {
-        let now = Date()
-        guard now.timeIntervalSince(lastAudioDeviceCheckTime) > 0.5 else { return }
-        lastAudioDeviceCheckTime = now
-
         let isDeviceActive = isDefaultAudioDeviceActive()
 
         if isDeviceActive && hasAudioContent {

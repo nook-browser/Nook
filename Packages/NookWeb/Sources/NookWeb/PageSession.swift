@@ -156,9 +156,10 @@ public final class PageSession: NSObject, Identifiable {
     @ObservationIgnored var audioDeviceListenerProc: AudioDeviceListenerProc?
     @ObservationIgnored var audioListenerHelper: AudioListenerHelper?
     @ObservationIgnored var isMonitoringNativeAudio = false
-    @ObservationIgnored var lastAudioDeviceCheckTime: Date = Date()
-    @ObservationIgnored var audioMonitoringTimer: Timer?
     @ObservationIgnored var hasAddedCoreAudioListener = false
+    /// AudioDeviceID the "is running somewhere" listener is currently attached to.
+    /// UInt32 rather than AudioDeviceID so this file stays free of a macOS-only type.
+    @ObservationIgnored var audioRunningListenerDevice: UInt32?
     @ObservationIgnored var profileAwaitCancellable: AnyCancellable?
     @ObservationIgnored var webStoreHandler: AnyObject?
     @ObservationIgnored var didNotifyOpenToExtensions: Bool = false
