@@ -259,6 +259,10 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func loadURL(_ url: URL, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        guard ExtensionManager.extensionMayOpen(url, for: extensionContext) else {
+            completionHandler(error(4, "Extensions cannot open \(url.scheme ?? "this") URLs"))
+            return
+        }
         // An unloaded tab gets a page (not selected) that loads `url` directly.
         guard let page = tabs.ensureSession(for: itemID) else {
             completionHandler(error(3, "Tab is not loaded"))

@@ -32,7 +32,6 @@ final class NativeMessagingHandler: NSObject {
 
     let applicationId: String
     private let callerOrigins: Set<String>
-    private let callerExtensionIDs: Set<String>
 
     // Port mode state (main thread only)
     private weak var port: WKWebExtension.MessagePort?
@@ -50,30 +49,21 @@ final class NativeMessagingHandler: NSObject {
 
     init(applicationId: String, extensionContext: WKWebExtensionContext) {
         self.applicationId = applicationId
-        let identity = Self.callerIdentity(for: extensionContext)
-        self.callerOrigins = identity.origins
-        self.callerExtensionIDs = identity.extensionIDs
+        self.callerOrigins = Self.origins(for: extensionContext)
         super.init()
     }
 
     /// How the calling extension identifies itself to host manifests: Chrome `allowed_origins`
-    /// entries (`chrome-extension://<id>/`, or `nook-extension://<id>/` for Nook-specific hosts)
-    /// and Firefox `allowed_extensions` IDs.
-    private static func callerIdentity(for context: WKWebExtensionContext) -> (origins: Set<String>, extensionIDs: Set<String>) {
+    /// entries (`chrome-extension://<id>/`, or `nook-extension://<id>/` for Nook-specific hosts).
+    /// Firefox `allowed_extensions` is not honored: a gecko ID is only what the extension's own
+    /// manifest claims, and nothing here verifies it the way AMO signing does.
+    private static func origins(for context: WKWebExtensionContext) -> Set<String> {
         let id = context.uniqueIdentifier
         var origins: Set<String> = ["nook-extension://\(id)/"]
         if ExtensionStore.isValidExtensionID(id) {
             origins.insert("chrome-extension://\(id)/")
         }
-        var extensionIDs: Set<String> = []
-        let manifest = context.webExtension.manifest
-        for key in ["browser_specific_settings", "applications"] {
-            if let gecko = (manifest[key] as? [String: Any])?["gecko"] as? [String: Any],
-               let geckoId = gecko["id"] as? String {
-                extensionIDs.insert(geckoId)
-            }
-        }
-        return (origins, extensionIDs)
+        return origins
     }
 
     private static func error(_ code: ErrorCode, _ description: String) -> NSError {
@@ -256,7 +246,7 @@ final class NativeMessagingHandler: NSObject {
     /// Find a host manifest for `applicationId` that allows the calling extension, and return
     /// its validated executable. Mirrors Chrome's rules: the manifest `name` must match, the
     /// type must be stdio, the path must be absolute, and the caller must be listed in
-    /// `allowed_origins` (Chrome) or `allowed_extensions` (Firefox).
+    /// `allowed_origins`.
     private func resolveHostExecutable() -> URL? {
         // Host names are dot-separated lowercase alphanumerics and underscores; this also keeps
         // the manifest filename from escaping the host directories.
@@ -291,10 +281,7 @@ final class NativeMessagingHandler: NSObject {
             }
 
             let allowedOrigins = Set(json["allowed_origins"] as? [String] ?? [])
-            let allowedExtensions = Set(json["allowed_extensions"] as? [String] ?? [])
-            guard !allowedOrigins.isDisjoint(with: callerOrigins)
-                    || !allowedExtensions.isDisjoint(with: callerExtensionIDs)
-            else {
+            guard !allowedOrigins.isDisjoint(with: callerOrigins) else {
                 Self.logger.info("Host manifest \(manifestURL.path, privacy: .public) does not allow this extension")
                 continue
             }

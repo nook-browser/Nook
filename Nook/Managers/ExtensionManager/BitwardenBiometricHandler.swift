@@ -29,6 +29,14 @@ final class BitwardenBiometricHandler: InternalNativePortHandler {
 
     static let applicationIdentifiers = ["com.8bit.bitwarden"]
 
+    /// Bitwarden's Chrome Web Store ID and Safari extension bundle identifier.
+    /// A copy installed under a random UUID does not qualify; its name is all that would
+    /// identify it, and any extension can claim a name.
+    static let extensionIdentifiers: Set<String> = [
+        "nngceckbapebfimnlniiiahkandclblb",
+        "com.bitwarden.desktop.safari",
+    ]
+
     // MARK: - Biometric status enum (matches Bitwarden's BiometricStatus)
 
     private enum BiometricStatus: Int {
@@ -73,7 +81,7 @@ final class BitwardenBiometricHandler: InternalNativePortHandler {
 
         case "getBiometricsStatusForUser":
             let status = checkBiometricStatusForUser(userId: userId)
-            Self.logger.info("[Bitwarden] getBiometricsStatusForUser(\(userId, privacy: .public)) -> \(status.rawValue)")
+            Self.logger.info("[Bitwarden] getBiometricsStatusForUser(\(userId, privacy: .private(mask: .hash))) -> \(status.rawValue)")
             sendResponse(port: port, messageId: messageId, response: status.rawValue)
             return true
 
@@ -86,7 +94,7 @@ final class BitwardenBiometricHandler: InternalNativePortHandler {
             return true
 
         case "unlockWithBiometricsForUser":
-            Self.logger.info("[Bitwarden] unlockWithBiometricsForUser(\(userId, privacy: .public))")
+            Self.logger.info("[Bitwarden] unlockWithBiometricsForUser(\(userId, privacy: .private(mask: .hash)))")
             unlockWithBiometrics(userId: userId) { keyB64 in
                 if let keyB64 {
                     Self.logger.info("[Bitwarden] unlockWithBiometricsForUser -> success (key length: \(keyB64.count))")
@@ -180,10 +188,20 @@ final class BitwardenBiometricHandler: InternalNativePortHandler {
     private func unlockWithBiometrics(userId: String, completion: @escaping (String?) -> Void) {
         let account = Self.keychainAccount(for: userId)
 
-        // Perform Keychain access on a background thread since Touch ID blocks
-        DispatchQueue.global(qos: .userInitiated).async {
-            let context = LAContext()
-            context.localizedReason = "unlock Bitwarden vault"
+        // Require Touch ID before touching the Keychain: an item stored without a biometric
+        // ACL would otherwise come back unprompted. The query reuses the evaluated context, so
+        // an item that does carry an ACL does not prompt a second time. The reply runs off the
+        // main thread, which the blocking Keychain read needs.
+        let context = LAContext()
+        context.localizedReason = "unlock Bitwarden vault"
+        context.evaluatePolicy(
+            .deviceOwnerAuthenticationWithBiometrics,
+            localizedReason: "unlock your Bitwarden vault"
+        ) { success, _ in
+            guard success else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
 
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,

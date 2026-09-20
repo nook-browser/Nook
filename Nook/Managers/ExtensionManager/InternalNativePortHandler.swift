@@ -19,6 +19,10 @@ protocol InternalNativePortHandler: AnyObject {
     /// e.g. ["com.8bit.bitwarden"] for Bitwarden biometric port.
     static var applicationIdentifiers: [String] { get }
 
+    /// The installed extension IDs allowed to reach this handler. The application identifier
+    /// is chosen by the caller, so it says nothing about who is calling.
+    static var extensionIdentifiers: Set<String> { get }
+
     /// Handle an incoming message on the port.
     /// Return `true` if the message was handled, `false` to fall through to generic handling.
     func handleMessage(

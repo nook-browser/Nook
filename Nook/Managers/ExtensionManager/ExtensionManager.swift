@@ -135,9 +135,15 @@ final class ExtensionManager: NSObject, ObservableObject,
         Self.logger.debug("Registered \(self.internalPortHandlers.count) internal native port handlers")
     }
 
-    /// Lookup an internal handler for a native messaging application identifier.
-    func internalHandler(for applicationId: String) -> (any InternalNativePortHandler)? {
-        return internalPortHandlers[applicationId]
+    /// Lookup an internal handler for a native messaging application identifier. Only the
+    /// extension the handler was written for gets it: any extension can name any application.
+    func internalHandler(
+        for applicationId: String, context: WKWebExtensionContext
+    ) -> (any InternalNativePortHandler)? {
+        guard let handler = internalPortHandlers[applicationId],
+              type(of: handler).extensionIdentifiers.contains(context.uniqueIdentifier)
+        else { return nil }
+        return handler
     }
 
     // MARK: - Extension Context Identity
