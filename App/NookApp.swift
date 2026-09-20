@@ -196,6 +196,7 @@ struct NookApp: App {
             [webViewCoordinator, weak browserManager] windowId in
             // Only cleanup if browserManager still exists (it's captured weakly)
             if let browserManager = browserManager {
+                browserManager.sidebarPiPWindowClosing(windowId)
                 webViewCoordinator.cleanupWindow(windowId, tabs: browserManager.tabs)
                 if let windowState = browserManager.windowRegistry?.windows[windowId] {
                     browserManager.tabs.detach(window: windowState)

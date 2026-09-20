@@ -141,10 +141,14 @@ extension BrowserManager: TabEventObserver {
 
     func tabActivated(new session: PageSession, previous: PageSession?) {
         ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
+        updateSidebarPiP(new: session, previous: previous)
     }
 
     func tabClosed(itemID: UUID) {
         ExtensionManager.shared.notifyTabClosed(itemID: itemID)
+        for window in windowRegistry?.windows.values ?? [:].values {
+            window.sidebarPiPController?.exitIfShowing(itemID)
+        }
     }
 
     func tabMoved(itemID: UUID, from oldIndex: Int?, in oldWindow: BrowserWindowState?, pinnedChanged: Bool) {
@@ -162,6 +166,57 @@ extension BrowserManager: TabEventObserver {
 
     func wakeBackgroundWorkers() {
         ExtensionManager.shared.wakeBackgroundWorkers()
+    }
+
+    /// Leaving a playing video moves it into the sidebar panel; coming back puts it inline again.
+    /// Runs before the compositor refreshes, so the outgoing web view is still mounted.
+    private func updateSidebarPiP(new session: PageSession, previous: PageSession?) {
+        guard let windowState = windowRegistry?.activeWindow else { return }
+        // Any window may hold it: the video follows focus, the tab can be reached from anywhere.
+        for window in windowRegistry?.windows.values ?? [:].values {
+            window.sidebarPiPController?.exitIfShowing(session.itemID)
+        }
+
+        guard nookSettings?.autoPictureInPicture == true,
+            let previous, previous.hasPlayingVideo, !previous.isPrivate,
+            // Another window or the other split pane may still be showing it.
+            !tabs.isVisibleInAnyWindow(previous.itemID),
+            SidebarPiPController.allows(previous.url),
+            // A video already playing keeps the spot, whether it is in the sidebar or in its tab.
+            !tabs.sessions.contains(where: { $0 !== previous && $0 !== session && $0.hasPlayingVideo })
+        else { return }
+
+        guard let webView = getWebView(for: previous.itemID, in: windowState.id) ?? previous.assignedWebView
+        else { return }
+
+        // No sidebar means nothing to anchor to, so fall back to the system PiP window.
+        guard windowState.isSidebarVisible, let controller = windowState.sidebarPiPController else {
+            PiPManager.shared.requestPiP(for: previous, webView: webView)
+            return
+        }
+        controller.enter(session: previous, webView: webView) {
+            PiPManager.shared.requestPiP(for: previous, webView: webView)
+        }
+    }
+
+    /// The video follows the focused window, docked or floating, so its drop zone is always here.
+    func moveSidebarPiP(to windowState: BrowserWindowState) {
+        guard !windowState.isIncognito, let target = windowState.sidebarPiPController, !target.isShowing,
+            let source = windowRegistry?.windows.values.compactMap(\.sidebarPiPController)
+                .first(where: { $0 !== target && $0.isShowing }),
+            source.isFloating || windowState.isSidebarVisible
+        else { return }
+        target.adopt(from: source)
+    }
+
+    /// A closing window takes its pages' views with it, so no controller may keep showing one.
+    func sidebarPiPWindowClosing(_ windowId: UUID) {
+        for window in windowRegistry?.windows.values ?? [:].values {
+            guard let controller = window.sidebarPiPController, let itemID = controller.itemID,
+                window.id == windowId || getWebView(for: itemID, in: windowId) != nil
+            else { continue }
+            controller.exit()
+        }
     }
 
     var nativeController: WKWebExtensionController? {
