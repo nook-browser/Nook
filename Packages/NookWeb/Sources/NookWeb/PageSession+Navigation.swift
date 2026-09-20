@@ -12,7 +12,7 @@ import WebKit
 import NookBlocker
 import NookTweaks
 // MARK: - WKNavigationDelegate
-extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
+extension PageSession: WKNavigationDelegate {
 
     // MARK: - Loading Start
     public func webView(
@@ -49,6 +49,9 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
     ) {
         loadingState = .didCommit
         controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
+        // A new page gets its dialogs back.
+        jsDialogCount = 0
+        jsDialogsSuppressed = false
 
         if let newURL = webView.url {
             self.url = newURL
@@ -386,78 +389,6 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         controller?.sessionDelegate?.addDownload(
             download, originalURL: originalURL, suggestedFilename: suggestedFilename)
     }
-
-    // MARK: - WKDownloadDelegate
-    public func download(
-        _ download: WKDownload, decideDestinationUsing response: URLResponse,
-        suggestedFilename: String, completionHandler: @escaping (URL?) -> Void
-    ) {
-        // Handle download destination directly
-        guard
-            let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
-                .first
-        else {
-            completionHandler(nil)
-            return
-        }
-
-        let defaultName = suggestedFilename.isEmpty ? "download" : suggestedFilename
-        let cleanName = defaultName.replacingOccurrences(of: "/", with: "_")
-        var dest = downloads.appendingPathComponent(cleanName)
-
-        // Handle duplicate files
-        let ext = dest.pathExtension
-        let base = dest.deletingPathExtension().lastPathComponent
-        var counter = 1
-        while FileManager.default.fileExists(atPath: dest.path) {
-            let newName = "\(base) (\(counter))" + (ext.isEmpty ? "" : ".\(ext)")
-            dest = downloads.appendingPathComponent(newName)
-            counter += 1
-        }
-
-        completionHandler(dest)
-    }
-
-    public func download(
-        _ download: WKDownload, decideDestinationUsing response: URLResponse,
-        suggestedFilename: String, completionHandler: @escaping (URL, Bool) -> Void
-    ) {
-        // Handle download destination directly for macOS
-        guard
-            let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
-                .first
-        else {
-            completionHandler(
-                FileManager.default.temporaryDirectory.appendingPathComponent("download"), false)
-            return
-        }
-
-        let defaultName = suggestedFilename.isEmpty ? "download" : suggestedFilename
-        let cleanName = defaultName.replacingOccurrences(of: "/", with: "_")
-        var dest = downloads.appendingPathComponent(cleanName)
-
-        // Handle duplicate files
-        let ext = dest.pathExtension
-        let base = dest.deletingPathExtension().lastPathComponent
-        var counter = 1
-        while FileManager.default.fileExists(atPath: dest.path) {
-            let newName = "\(base) (\(counter))" + (ext.isEmpty ? "" : ".\(ext)")
-            dest = downloads.appendingPathComponent(newName)
-            counter += 1
-        }
-
-        // Return true to grant sandbox extension - this allows WebKit to write to the destination
-        completionHandler(dest, true)
-    }
-
-    public func download(_ download: WKDownload, didFinishDownloadingTo location: URL) {
-        // Download completed successfully
-    }
-
-    public func download(_ download: WKDownload, didFailWithError error: Error) {
-        // Download failed
-    }
-
 }
 
 // MARK: - Find in Page

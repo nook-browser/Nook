@@ -169,14 +169,24 @@ extension PageSession: WKUIDelegate {
         }
     }
 
+    /// Counts a dialog. From the second one since the last main-frame commit the presenter offers
+    /// to stop them, so `while(1) alert()` cannot hold the window.
+    private func nextDialogSuppressor() -> (() -> Void)? {
+        jsDialogCount += 1
+        guard jsDialogCount > 1 else { return nil }
+        return { [weak self] in self?.jsDialogsSuppressed = true }
+    }
+
     public func webView(
         _ webView: WKWebView,
         runJavaScriptAlertPanelWithMessage message: String,
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping () -> Void
     ) {
-        guard let alerts = controller?.alerts else { return completionHandler() }
-        alerts.presentAlert(message: message, over: webView, completion: completionHandler)
+        guard !jsDialogsSuppressed, let alerts = controller?.alerts else { return completionHandler() }
+        alerts.presentAlert(
+            message: message, host: frame.securityOrigin.host, over: webView,
+            onSuppress: nextDialogSuppressor(), completion: completionHandler)
     }
 
     public func webView(
@@ -185,8 +195,10 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (Bool) -> Void
     ) {
-        guard let alerts = controller?.alerts else { return completionHandler(false) }
-        alerts.presentConfirm(message: message, over: webView, completion: completionHandler)
+        guard !jsDialogsSuppressed, let alerts = controller?.alerts else { return completionHandler(false) }
+        alerts.presentConfirm(
+            message: message, host: frame.securityOrigin.host, over: webView,
+            onSuppress: nextDialogSuppressor(), completion: completionHandler)
     }
 
     public func webView(
@@ -196,8 +208,10 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (String?) -> Void
     ) {
-        guard let alerts = controller?.alerts else { return completionHandler(nil) }
-        alerts.presentPrompt(prompt: prompt, defaultText: defaultText, over: webView, completion: completionHandler)
+        guard !jsDialogsSuppressed, let alerts = controller?.alerts else { return completionHandler(nil) }
+        alerts.presentPrompt(
+            prompt: prompt, defaultText: defaultText, host: frame.securityOrigin.host, over: webView,
+            onSuppress: nextDialogSuppressor(), completion: completionHandler)
     }
 
     // MARK: - File Upload Support
@@ -264,6 +278,7 @@ extension PageSession: WKUIDelegate {
         decisionHandler: @escaping (WKPermissionDecision) -> Void
     ) {
 
-        decisionHandler(.grant)
+        // WebKit asks the user per origin; a page never gets capture on its own say-so.
+        decisionHandler(.prompt)
     }
 }

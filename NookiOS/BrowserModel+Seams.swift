@@ -124,24 +124,46 @@ extension BrowserModel: AlertPresenter {
         top.present(alert, animated: true)
     }
 
-    func presentAlert(message: String, over webView: WKWebView, completion: @escaping () -> Void) {
-        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+    /// Titled with the frame that asked. From a page's second dialog on, `onSuppress` is set
+    /// and a third button ends the run; `dismissed` is what a cancelled dialog answers.
+    private func pageDialog(
+        host: String, message: String, onSuppress: (() -> Void)?, dismissed: @escaping () -> Void
+    ) -> UIAlertController {
+        let alert = UIAlertController(
+            title: host.isEmpty ? nil : "\(host) says", message: message, preferredStyle: .alert)
+        if let onSuppress {
+            alert.addAction(UIAlertAction(title: "Don't Allow More Dialogs", style: .destructive) { _ in
+                onSuppress()
+                dismissed()
+            })
+        }
+        return alert
+    }
+
+    func presentAlert(
+        message: String, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping () -> Void
+    ) {
+        let alert = pageDialog(host: host, message: message, onSuppress: onSuppress, dismissed: completion)
         alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completion() })
         present(alert, over: webView, cancel: completion)
     }
 
-    func presentConfirm(message: String, over webView: WKWebView, completion: @escaping (Bool) -> Void) {
-        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+    func presentConfirm(
+        message: String, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping (Bool) -> Void
+    ) {
+        let alert = pageDialog(host: host, message: message, onSuppress: onSuppress) { completion(false) }
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completion(false) })
         alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completion(true) })
         present(alert, over: webView) { completion(false) }
     }
 
     func presentPrompt(
-        prompt: String, defaultText: String?, over webView: WKWebView,
-        completion: @escaping (String?) -> Void
+        prompt: String, defaultText: String?, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping (String?) -> Void
     ) {
-        let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+        let alert = pageDialog(host: host, message: prompt, onSuppress: onSuppress) { completion(nil) }
         alert.addTextField { $0.text = defaultText }
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completion(nil) })
         alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak alert] _ in
