@@ -321,8 +321,10 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
             return
         }
 
-        // Air Traffic Control — route cross-domain navigations to designated spaces
-        if let url = navigationAction.request.url {
+        // Air Traffic Control — route cross-domain navigations to designated spaces.
+        // Main frame only: an embedded iframe must not open tabs in another space.
+        if navigationAction.targetFrame?.isMainFrame == true,
+           let url = navigationAction.request.url {
             var currentHost = self.url.host?.lowercased() ?? ""
             if currentHost.hasPrefix("www.") { currentHost = String(currentHost.dropFirst(4)) }
             var destHost = url.host?.lowercased() ?? ""
@@ -492,14 +494,10 @@ extension PageSession {
             return
         }
 
-        // Use JavaScript to search and highlight text
-        let escapedText = text.replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
-
+        // Use JavaScript to search and highlight text. The query arrives as the
+        // `searchText` argument, never as part of the script source.
         let script = """
-            (function() {
+            return (function() {
                 // Check if document is ready
                 if (!document.body) {
                     return { matchCount: 0, currentIndex: 0, error: 'Document not ready' };
@@ -513,13 +511,7 @@ extension PageSession {
                     parent.normalize();
                 });
 
-                if ('\(escapedText)' === '') {
-                    return { matchCount: 0, currentIndex: 0 };
-                }
-
-                var searchText = '\(escapedText)';
                 var matchCount = 0;
-                var currentIndex = 0;
 
                 // Create a tree walker to find text nodes
                 var walker = document.createTreeWalker(
@@ -543,26 +535,28 @@ extension PageSession {
                     textNodes.push(node);
                 }
 
-                // Search and highlight
+                // Search and highlight. DOM calls only: page text must never be
+                // parsed as HTML.
+                var escaped = searchText.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
                 textNodes.forEach(function(textNode) {
-                    var text = textNode.textContent;
-                    if (text && text.length > 0) {
-                        var regex = new RegExp('(' + searchText.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + ')', 'gi');
-                        var matches = text.match(regex);
+                    var regex = new RegExp(escaped, 'gi');
+                    var ranges = [];
+                    var m;
+                    while ((m = regex.exec(textNode.data)) !== null) {
+                        ranges.push([m.index, m[0].length]);
+                    }
+                    matchCount += ranges.length;
 
-                        if (matches && matches.length > 0) {
-                            matchCount += matches.length;
-                            var highlightedHTML = text.replace(regex, '<span class="nook-find-highlight" style="background-color: yellow; color: black;">$1</span>');
-
-                            var wrapper = document.createElement('div');
-                            wrapper.innerHTML = highlightedHTML;
-
-                            var parent = textNode.parentNode;
-                            while (wrapper.firstChild) {
-                                parent.insertBefore(wrapper.firstChild, textNode);
-                            }
-                            parent.removeChild(textNode);
-                        }
+                    // Split from the end so earlier offsets stay valid
+                    for (var i = ranges.length - 1; i >= 0; i--) {
+                        var match = textNode.splitText(ranges[i][0]);
+                        match.splitText(ranges[i][1]);
+                        var span = document.createElement('span');
+                        span.className = 'nook-find-highlight';
+                        span.style.backgroundColor = 'yellow';
+                        span.style.color = 'black';
+                        match.parentNode.replaceChild(span, match);
+                        span.appendChild(match);
                     }
                 });
 
@@ -577,14 +571,16 @@ extension PageSession {
             })();
             """
 
-        webView.evaluateJavaScript(script) { result, error in
-            if let error = error {
+        webView.callAsyncJavaScript(script, arguments: ["searchText": text], in: nil, in: .page) { result in
+            let value: Any
+            switch result {
+            case .success(let v): value = v
+            case .failure(let error):
                 completion(.failure(error))
                 return
             }
 
-
-            if let dict = result as? [String: Any],
+            if let dict = value as? [String: Any],
                 let matchCount = dict["matchCount"] as? Int,
                 let currentIndex = dict["currentIndex"] as? Int
             {

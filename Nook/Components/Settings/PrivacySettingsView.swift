@@ -213,9 +213,7 @@ struct PrivacySettingsView: View {
     private func clearAllWebsiteData() {
         isClearing = true
         Task {
-            let dataStore = WKWebsiteDataStore.default()
-            let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
-            await dataStore.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast)
+            await removeWebsiteData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes())
             await cookieManager.loadCookies()
             await cacheManager.loadCacheData()
             await MainActor.run {
@@ -230,8 +228,18 @@ struct PrivacySettingsView: View {
     
     private func clearCache() {
         Task {
-            let dataStore = WKWebsiteDataStore.default()
-            await dataStore.removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache], modifiedSince: Date.distantPast)
+            await removeWebsiteData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
+        }
+    }
+
+    /// Tabs use one store per space; Peek and the base config have used the default.
+    @MainActor
+    private func removeWebsiteData(ofTypes dataTypes: Set<String>) async {
+        let tabs = browserManager.tabs
+        let dataStores: [WKWebsiteDataStore] = tabs.orderedSpaces.compactMap { tabs.profile(forSpace: $0.id)?.dataStore }
+            + [WKWebsiteDataStore.default()]
+        for dataStore in dataStores {
+            await dataStore.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast)
         }
     }
     

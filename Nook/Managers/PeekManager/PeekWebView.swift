@@ -24,8 +24,7 @@ struct PeekWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         // Use profile-specific WebView configuration if available
         let configuration: WKWebViewConfiguration
-        if let spaceID = session.sourceProfileId,
-           let profile = peekManager?.browserManager?.tabs.profile(forSpace: spaceID) {
+        if let profile = session.sourceProfile {
             configuration = BrowserConfiguration.shared.webViewConfiguration(for: profile)
         } else {
             // A copy with its own controller: the view can be adopted into a tab, which

@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftUI
+import NookWeb
 
 @MainActor
 class PeekSession: ObservableObject, Identifiable {
@@ -16,7 +17,8 @@ class PeekSession: ObservableObject, Identifiable {
     let sourceURL: URL?
     let targetURL: URL
     let windowId: UUID
-    let sourceProfileId: UUID?
+    /// The source page's profile. A private page's ephemeral one has no space id to look up.
+    let sourceProfile: Profile?
 
     @Published var currentURL: URL
     @Published var title: String
@@ -29,13 +31,13 @@ class PeekSession: ObservableObject, Identifiable {
         sourceTabId: UUID?,
         sourceURL: URL?,
         windowId: UUID,
-        sourceProfileId: UUID? = nil
+        sourceProfile: Profile? = nil
     ) {
         self.targetURL = targetURL
         self.sourceTabId = sourceTabId
         self.sourceURL = sourceURL
         self.windowId = windowId
-        self.sourceProfileId = sourceProfileId
+        self.sourceProfile = sourceProfile
         self.currentURL = targetURL
         self.title = targetURL.absoluteString
     }
