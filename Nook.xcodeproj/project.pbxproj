@@ -716,8 +716,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Aeastr/Garnish";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = ffbd0091ed25eb3e250ca47b5ccc8c4f9a6a3420;
 			};
 		};
 		7FAFC5D82E3ADDCD009D7DC4 /* XCRemoteSwiftPackageReference "FaviconFinder" */ = {
