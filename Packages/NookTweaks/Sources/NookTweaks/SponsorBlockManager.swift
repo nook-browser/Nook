@@ -104,7 +104,7 @@ public final class SponsorBlockManager {
         if let cached = segmentCache[videoID],
            Date().timeIntervalSince(cached.fetchedAt) < cacheTTL
         {
-            sbLog.info("Cache hit for \(videoID, privacy: .public): \(cached.segments.count) segments")
+            sbLog.info("Cache hit for \(videoID, privacy: .private(mask: .hash)): \(cached.segments.count) segments")
             return cached.segments
         }
 
@@ -138,7 +138,7 @@ public final class SponsorBlockManager {
 
             if httpResponse.statusCode == 404 {
                 cache([], for: videoID)
-                sbLog.info("No segments found for \(videoID, privacy: .public)")
+                sbLog.info("No segments found for \(videoID, privacy: .private(mask: .hash))")
                 return []
             }
 
@@ -153,7 +153,7 @@ public final class SponsorBlockManager {
                 $0.videoID == videoID || $0.hash == fullHash
             }) else {
                 cache([], for: videoID)
-                sbLog.info("No hash match for \(videoID, privacy: .public)")
+                sbLog.info("No hash match for \(videoID, privacy: .private(mask: .hash))")
                 return []
             }
 
@@ -163,7 +163,7 @@ public final class SponsorBlockManager {
             }.sorted { $0.startTime < $1.startTime }
 
             cache(segments, for: videoID)
-            sbLog.info("Fetched \(segments.count) segments for \(videoID, privacy: .public)")
+            sbLog.info("Fetched \(segments.count) segments for \(videoID, privacy: .private(mask: .hash))")
             return segments
 
         } catch {

@@ -33,14 +33,17 @@ enum RustContentBlockingConverter {
     /// Convert filter rules to WKContentRuleList entries.
     /// Safe to call off the main actor; holds no shared state.
     nonisolated static func convert(rules: [String]) -> Output {
-        let text = rules.joined(separator: "\n")
+        var text = rules.joined(separator: "\n")
         var ruleCount = 0
         var skipped = 0
         var unconverted = 0
 
-        let json: String? = text.withCString { ptr -> String? in
+        // Pass the byte count, not strlen: a NUL in one list would otherwise
+        // cut off every list after it.
+        let json: String? = text.withUTF8 { buf -> String? in
             guard let raw = nook_adblock_convert_to_content_blocking(
-                ptr, strlen(ptr), &ruleCount, &skipped, &unconverted
+                UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count,
+                &ruleCount, &skipped, &unconverted
             ) else { return nil }
             defer { nook_adblock_string_free(raw) }
             return String(cString: raw)

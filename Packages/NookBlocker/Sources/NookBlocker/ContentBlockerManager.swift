@@ -167,8 +167,9 @@ public final class ContentBlockerManager: NSObject {
     /// Load rules (disk cache, else bundled snapshot), compile rule lists, build the advanced engine.
     private func rebuild() async {
         let loadStart = CFAbsoluteTimeGetCurrent()
+        let enabledFilenames = filterListManager.enabledOptionalFilterListFilenames
         let rules = await Task.detached(priority: .userInitiated) { [filterListManager] in
-            filterListManager.loadAllFilterRulesAsLines()
+            filterListManager.loadAllFilterRulesAsLines(enabledFilenames: enabledFilenames)
         }.value
         cbLog.info("Loaded \(rules.count) filter rules in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - loadStart), privacy: .public)s")
 
@@ -241,7 +242,7 @@ public final class ContentBlockerManager: NSObject {
     private func strippedTrackingParams(for url: URL, exempt: Bool) -> URL? {
         guard isEnabled, !exempt else { return nil }
         guard let stripped = trackingParamStripper.strip(url) else { return nil }
-        cbLog.info("removeparam \(url.host ?? "-", privacy: .public): \(url.query?.count ?? 0, privacy: .public) -> \(stripped.query?.count ?? 0, privacy: .public) query chars")
+        cbLog.info("removeparam \(url.host ?? "-", privacy: .private(mask: .hash)): \(url.query?.count ?? 0, privacy: .public) -> \(stripped.query?.count ?? 0, privacy: .public) query chars")
         return stripped
     }
 
@@ -256,7 +257,7 @@ public final class ContentBlockerManager: NSObject {
         reconcile(webView, exempt: exempt)
         let config = exempt ? nil : advancedRulesEngine.configUserScript(for: url)
         replaceConfigScript(in: webView.configuration.userContentController, with: config)
-        cbLog.info("main frame \(url.host ?? "-", privacy: .public): exempt=\(exempt) config=\(config?.source.count ?? 0, privacy: .public)B ruleLists=\(self.compiledRuleLists.count)")
+        cbLog.info("main frame \(url.host ?? "-", privacy: .private(mask: .hash)): exempt=\(exempt) config=\(config?.source.count ?? 0, privacy: .public)B ruleLists=\(self.compiledRuleLists.count)")
     }
 
     /// Swap the main-frame configuration script. It must precede the runtime script, so it goes first.
@@ -393,7 +394,7 @@ extension ContentBlockerManager: WKScriptMessageHandlerWithReply {
         }
 
         let conf = advancedRulesEngine.configuration(for: pageUrl, topUrl: message.frameInfo.isMainFrame ? nil : topUrl)
-        cbLog.info("frame lookup \(pageUrl.host ?? "-", privacy: .public) main=\(message.frameInfo.isMainFrame) rules=\(conf == nil ? 0 : 1, privacy: .public)")
+        cbLog.info("frame lookup \(pageUrl.host ?? "-", privacy: .private(mask: .hash)) main=\(message.frameInfo.isMainFrame) rules=\(conf == nil ? 0 : 1, privacy: .public)")
         replyHandler(conf, nil)
     }
 }

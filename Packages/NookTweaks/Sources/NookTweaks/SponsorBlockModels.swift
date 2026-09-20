@@ -50,4 +50,16 @@ struct SponsorBlockHashResponse: Codable {
     let videoID: String
     let hash: String?
     let segments: [SponsorBlockSegment]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        videoID = try c.decode(String.self, forKey: .videoID)
+        hash = try c.decodeIfPresent(String.self, forKey: .hash)
+        // The API is a third party: a range like [0, 1e9] would skip any video to
+        // its end. The comparisons also reject NaN and infinity.
+        segments = try c.decode([SponsorBlockSegment].self, forKey: .segments).filter {
+            $0.segment.count == 2 && $0.segment[0] >= 0
+                && $0.segment[0] < $0.segment[1] && $0.segment[1] < 86400
+        }
+    }
 }
