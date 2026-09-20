@@ -159,7 +159,12 @@ actor HistoryStore {
                         if !visit.title.isEmpty { entry.title = visit.title }
                         entry.tabId = visit.tabId
                     }
-                    if entry.profileId == nil { entry.profileId = visit.profileId }
+                    if entry.profileId == nil, visit.profileId != nil {
+                        entry.profileId = visit.profileId
+                        // The row leaves every other profile's `visible(to:)` here, so an index
+                        // built for one of those is still counting a row it can no longer see.
+                        autofillCache = nil
+                    }
                 } else {
                     modelContext.insert(HistoryEntity(url: url, title: visit.title.isEmpty ? (visit.url.host ?? "Unknown") : visit.title,
                         visitDate: visit.timestamp, tabId: visit.tabId, lastVisited: visit.timestamp, profileId: visit.profileId))
