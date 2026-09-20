@@ -104,7 +104,7 @@ public final class SponsorBlockManager {
         if let cached = segmentCache[videoID],
            Date().timeIntervalSince(cached.fetchedAt) < cacheTTL
         {
-            sbLog.info("Cache hit for \(videoID, privacy: .public): \(cached.segments.count) segments")
+            sbLog.info("Cache hit for \(videoID, privacy: .private(mask: .hash)): \(cached.segments.count) segments")
             return cached.segments
         }
 
@@ -137,8 +137,8 @@ public final class SponsorBlockManager {
             guard let httpResponse = response as? HTTPURLResponse else { return [] }
 
             if httpResponse.statusCode == 404 {
-                segmentCache[videoID] = CachedSegments(segments: [], fetchedAt: Date())
-                sbLog.info("No segments found for \(videoID, privacy: .public)")
+                cache([], for: videoID)
+                sbLog.info("No segments found for \(videoID, privacy: .private(mask: .hash))")
                 return []
             }
 
@@ -152,8 +152,8 @@ public final class SponsorBlockManager {
             guard let videoResponse = hashResponses.first(where: {
                 $0.videoID == videoID || $0.hash == fullHash
             }) else {
-                segmentCache[videoID] = CachedSegments(segments: [], fetchedAt: Date())
-                sbLog.info("No hash match for \(videoID, privacy: .public)")
+                cache([], for: videoID)
+                sbLog.info("No hash match for \(videoID, privacy: .private(mask: .hash))")
                 return []
             }
 
@@ -162,8 +162,8 @@ public final class SponsorBlockManager {
                     && (seg.actionType == "skip" || seg.actionType == "mute")
             }.sorted { $0.startTime < $1.startTime }
 
-            segmentCache[videoID] = CachedSegments(segments: segments, fetchedAt: Date())
-            sbLog.info("Fetched \(segments.count) segments for \(videoID, privacy: .public)")
+            cache(segments, for: videoID)
+            sbLog.info("Fetched \(segments.count) segments for \(videoID, privacy: .private(mask: .hash))")
             return segments
 
         } catch {
@@ -199,8 +199,12 @@ public final class SponsorBlockManager {
     }
 
     /// Report a viewed segment to SponsorBlock (telemetry to support community data).
-    public func reportViewedSegment(uuid: String) {
-        guard let url = URL(string: "\(Self.baseURL)/viewedVideoSponsorTime?UUID=\(uuid)") else { return }
+    /// Nothing is sent from a private page, or once SponsorBlock is switched off.
+    public func reportViewedSegment(uuid: String, isPrivate: Bool) {
+        guard settings.sponsorBlockEnabled, !isPrivate else { return }
+        var components = URLComponents(string: "\(Self.baseURL)/viewedVideoSponsorTime")
+        components?.queryItems = [URLQueryItem(name: "UUID", value: uuid)]
+        guard let url = components?.url else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         Task.detached {
@@ -209,6 +213,13 @@ public final class SponsorBlockManager {
     }
 
     // MARK: - Helpers
+
+    /// Stores a result and drops the expired ones, so the cache cannot outgrow an hour of viewing.
+    private func cache(_ segments: [SponsorBlockSegment], for videoID: String) {
+        let now = Date()
+        segmentCache = segmentCache.filter { now.timeIntervalSince($0.value.fetchedAt) < cacheTTL }
+        segmentCache[videoID] = CachedSegments(segments: segments, fetchedAt: now)
+    }
 
     public func isYouTubeDomain(_ host: String) -> Bool {
         let lowered = host.lowercased()

@@ -34,13 +34,17 @@ final class PeekManager: ObservableObject {
             return
         }
 
+        // A private page never falls back to the default persistent store.
+        let profile = source?.profile
+        if source?.isPrivate == true, profile == nil { return }
+
         let windowId = windowRegistry?.activeWindow?.id ?? UUID()
         let session = PeekSession(
             targetURL: url,
             sourceTabId: source?.itemID,
             sourceURL: source?.url,
             windowId: windowId,
-            sourceProfileId: source?.profile?.id
+            sourceProfile: profile
         )
 
         // Create WebView FIRST, then activate
@@ -96,12 +100,12 @@ final class PeekManager: ObservableObject {
     }
 
     /// Turns the Peek page into a selected tab of `window`. The Peek web view moves over when it
-    /// exists. A private window opens the URL fresh in its own tree: the Peek view runs on a
-    /// persistent data store and must not become a private page.
+    /// exists. A private window opens the URL fresh in its own tree, and a view on a private
+    /// page's ephemeral store never becomes a saved tab.
     @discardableResult
     private func adoptPeekPage(_ session: PeekSession, in window: BrowserWindowState, browserManager: BrowserManager) -> UUID? {
         let tabs = browserManager.tabs
-        if !window.isIncognito, let webView = webViewCoordinator?.webView {
+        if !window.isIncognito, session.sourceProfile?.isEphemeral != true, let webView = webViewCoordinator?.webView {
             return tabs.adopt(webView: webView, url: session.currentURL, title: webView.title ?? session.currentURL.host ?? "",
                               in: window, placement: .newTab)
         }

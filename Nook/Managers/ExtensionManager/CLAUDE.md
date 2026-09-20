@@ -54,7 +54,7 @@ Supported formats: `.zip`, `.appex` (Safari extension bundle), `.app` (scans `Co
 2. `ExtensionUtils.validateManifest()`, MV3 service-worker check, `patchManifestForWebKit()`.
 3. **ID**: caller-supplied stable ID (store ID, Safari bundle identifier), else the Chrome ID derived from the manifest `key` (SHA-256, first 16 bytes, hex mapped to a-p), else a random UUID. Installs made before September 2026 have UUID IDs.
 4. Same ID already installed: same version is rejected, a different version is an **in-place update** (entity kept, so enabled state, optional grants, and storage under the same `uniqueIdentifier` survive). A UUID-ID copy with the same name is replaced when a stable-ID install arrives.
-5. **Consent**: `ExtensionPermissionView` sheet for every fresh install, and for updates only when the new version adds permissions or hosts. Background updates (`interactive: false`) that need consent are skipped.
+5. **Consent**: `ExtensionPermissionView` sheet for every fresh install, and for updates only when the new version adds permissions or hosts. Background updates (`interactive: false`) that need consent are skipped. A sideload whose ID matches a store install (a copied manifest `key` does it) always gets the full fresh-install sheet, and the store build's optional grants are dropped.
 6. Swap into `~/Library/Application Support/Nook/Extensions/{extensionId}/`, save `ExtensionEntity` (`sourceStore` set for store installs), then `registerContext(for:webExtension:)`.
 
 `registerContext` is the single place a context is created: identity, required permissions and patterns, restored optional grants, externally_connectable bridge, `load`, background start, URL grants for already-open tabs.
@@ -116,7 +116,7 @@ Looks up host manifests in order:
 1. `~/Library/Application Support/Nook/NativeMessagingHosts/`
 2. Chrome, Chromium, Edge, Brave, Mozilla standard paths (user, then system)
 
-A manifest is used only if `name` equals the host name, `type` is stdio, `path` is absolute, the binary is executable under an allowed prefix, and the caller is allowed: `allowed_origins` contains `chrome-extension://<id>/` (store and key-derived IDs only) or `nook-extension://<id>/`, or Firefox `allowed_extensions` contains the manifest's gecko ID. Extensions with UUID IDs cannot reach third-party hosts; reinstall from the store to get a Chrome ID.
+A manifest is used only if `name` equals the host name, `type` is stdio, `path` is absolute, the binary is executable under an allowed prefix, and the caller is allowed: `allowed_origins` contains `chrome-extension://<id>/` (store and key-derived IDs only) or `nook-extension://<id>/`. Firefox `allowed_extensions` is ignored: a gecko ID is only what the caller's own manifest claims, and nothing binds it the way AMO signing does. A Mozilla-directory manifest is still used when it also lists a matching `allowed_origins` entry. Extensions with UUID IDs cannot reach third-party hosts; reinstall from the store to get a Chrome ID.
 
 Protocol: 4-byte native-endian length prefix + JSON, 1 MB cap. Single-shot mode (5 s timeout) and long-lived ports. All callbacks into WebKit run on the main thread; port handlers stay retained in `nativeMessagingHandlers` until the port disconnects or the host exits.
 
@@ -132,7 +132,7 @@ func webExtensionController(_:, sendMessage:, to applicationId: String, for:, re
 ```
 Similarly, `connectUsing` must use the completion handler form (not `async throws`) and the port type is `WKWebExtension.MessagePort` (Swift name for `WKWebExtensionMessagePort`).
 
-**Unavailable host caching** — Extensions like Bitwarden poll `sendNativeMessage` every ~500ms. Missing or disallowed hosts are cached per extension+host in `unavailableNativeHosts` (timeouts are not cached) and return `(["command": "disconnected"], nil)` immediately. Ports to such hosts fall back to in-process handling (`InternalNativePortHandler`, then clipboard/popover commands).
+**Unavailable host caching** — Extensions like Bitwarden poll `sendNativeMessage` every ~500ms. Missing or disallowed hosts are cached per extension+host in `unavailableNativeHosts` (timeouts are not cached) and return `(["command": "disconnected"], nil)` immediately. Ports to such hosts fall back to in-process handling (`InternalNativePortHandler`, then clipboard/popover commands). An internal handler is given only to the extension IDs it lists in `extensionIdentifiers` (Bitwarden: the Chrome store ID and the Safari bundle identifier), never on the application identifier alone; a Bitwarden copy installed under a legacy UUID ID gets no biometric unlock until it is reinstalled.
 
 **Safari extension commands** — intercepted before the host lookup: `copyToClipboard`, `readFromClipboard` (both permission-gated, see Permission Model), `showPopover` (routes to `extensionContext.performAction(for:)`), `sleep` (30 s long-poll reply).
 

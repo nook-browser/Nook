@@ -15,10 +15,31 @@ final class BasicAuthDialogModel {
     var username: String
     var password: String
     var rememberCredential: Bool
-    let host: String
+    /// `scheme://host:port` of whoever is asking.
+    let origin: String
+    /// Text chosen by the server; shown labelled as such, never as the site's identity.
+    let realm: String
+    let isProxy: Bool
+    /// The password would cross the network in cleartext.
+    let isInsecure: Bool
+    /// False where nothing is saved: private windows and proxies.
+    let canRemember: Bool
 
-    init(host: String, username: String = "", password: String = "", rememberCredential: Bool = false) {
-        self.host = host
+    init(
+        origin: String,
+        realm: String = "",
+        isProxy: Bool = false,
+        isInsecure: Bool = false,
+        canRemember: Bool = true,
+        username: String = "",
+        password: String = "",
+        rememberCredential: Bool = false
+    ) {
+        self.origin = origin
+        self.realm = realm
+        self.isProxy = isProxy
+        self.isInsecure = isInsecure
+        self.canRemember = canRemember
         self.username = username
         self.password = password
         self.rememberCredential = rememberCredential
@@ -44,13 +65,28 @@ struct BasicAuthDialog: DialogPresentable {
         DialogHeader(
             icon: "lock.circle",
             title: "Authentication Required",
-            subtitle: "The server \(model.host) is requesting credentials."
+            subtitle: "The \(model.isProxy ? "proxy" : "server") \(model.origin) is requesting credentials."
         )
     }
 
     @ViewBuilder
     func dialogContent() -> some View {
         VStack(alignment: .leading, spacing: 16) {
+            if !model.realm.isEmpty || model.isInsecure {
+                VStack(alignment: .leading, spacing: NookDesign.Spacing.sm) {
+                    if !model.realm.isEmpty {
+                        // verbatim: the realm must not be parsed as Markdown (links).
+                        Text(verbatim: "The site says: \u{201C}\(model.realm)\u{201D}")
+                            .foregroundStyle(.secondary)
+                    }
+                    if model.isInsecure {
+                        Label("Your password will be sent unencrypted.", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .font(NookDesign.Font.caption)
+            }
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("User name")
                     .font(NookDesign.Font.label)
@@ -74,10 +110,12 @@ struct BasicAuthDialog: DialogPresentable {
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
             }
 
-            Toggle(isOn: $model.rememberCredential) {
-                Text("Remember for this site")
+            if model.canRemember {
+                Toggle(isOn: $model.rememberCredential) {
+                    Text("Remember for this site")
+                }
+                .toggleStyle(.switch)
             }
-            .toggleStyle(.switch)
         }
         .padding(.horizontal, 4)
     }

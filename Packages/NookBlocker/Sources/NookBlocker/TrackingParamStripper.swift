@@ -101,6 +101,8 @@ public struct TrackingParamStripper {
                 if value.hasPrefix("/"), value.count > 2, let end = value.lastIndex(of: "/"), end != value.startIndex {
                     let body = String(value[value.index(after: value.startIndex)..<end])
                     let flags = value[value.index(after: end)...]
+                    // These run on the main actor for every navigation; a long pattern from a list is not worth the risk.
+                    guard body.count <= 200 else { return nil }
                     guard let re = try? NSRegularExpression(pattern: body, options: flags.contains("i") ? [.caseInsensitive] : []) else { return nil }
                     param = .regex(re)
                 } else {
@@ -134,6 +136,8 @@ public struct TrackingParamStripper {
             if hint.hasSuffix("|") { hint.removeLast() }
             if !hint.isEmpty { pathHint = hint }
         }
+        // A bare `$removeparam` strips every parameter from every navigation, OAuth callbacks included.
+        if case .all = p, host == nil, pathHint == nil, permitted.isEmpty { return nil }
         return Rule(host: host, pathHint: pathHint, param: p, permittedDomains: permitted, restrictedDomains: restricted, isException: isException)
     }
 }

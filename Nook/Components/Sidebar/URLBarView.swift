@@ -31,10 +31,17 @@ struct URLBarView: View {
                                 Image(systemName: isSecure(for: session) ? "lock.fill" : "globe")
                                     .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                                     .foregroundStyle(.secondary)
-                                (Text(displayHost(for: session)).foregroundStyle(.primary) + Text(displayPath(for: session)).foregroundStyle(.tertiary))
-                                    .font(NookDesign.Font.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
+                                // Two texts so a narrow sidebar cuts the path first and then the
+                                // host's head: `accounts.google.com.x.evil.tld` must keep `evil.tld`.
+                                HStack(spacing: 0) {
+                                    Text(displayHost(for: session)).foregroundStyle(.primary)
+                                        .truncationMode(.head)
+                                        .layoutPriority(1)
+                                    Text(displayPath(for: session)).foregroundStyle(.tertiary)
+                                        .truncationMode(.tail)
+                                }
+                                .font(NookDesign.Font.secondary)
+                                .lineLimit(1)
                             }
                         } else {
                             HStack(spacing: NookDesign.Spacing.xs) {

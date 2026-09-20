@@ -216,6 +216,13 @@ extension ExtensionManager {
         let keyId = (manifest["key"] as? String).flatMap(Self.chromeExtensionID(fromManifestKey:))
         let hasStableId = callerId != nil || keyId != nil
         let extensionId = callerId ?? keyId ?? UUID().uuidString
+        // The ID names a directory under Extensions/, and a Safari bundle identifier comes from
+        // an Info.plist nobody vetted. Keep it to one plain path component.
+        guard !extensionId.isEmpty, extensionId != ".", extensionId != "..",
+              extensionId.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0)) })
+        else {
+            throw ExtensionError.installationFailed("Invalid extension identifier")
+        }
         // Patch before parsing so the consent sheet sees Nook's bridge content script hosts too.
         patchManifestForWebKit(at: manifestURL, extensionId: extensionId)
 
@@ -247,8 +254,13 @@ extension ExtensionManager {
                 previous = try? await WKWebExtension(resourceBaseURL: URL(fileURLWithPath: existing.packagePath))
             }
         }
-        let consent = Self.consentItems(for: staged, comparedTo: previous)
-        let needsConsent = existing == nil || !consent.permissions.isEmpty || !consent.hosts.isEmpty
+        // A sideloaded package gets a store install's ID by copying its manifest `key`, and as an
+        // update it would take over that extension's storage without a word. Ask as for a fresh
+        // install, listing everything it requests.
+        let replacesStoreInstall = existing?.sourceStore != nil && store == nil
+        let consent = Self.consentItems(for: staged, comparedTo: replacesStoreInstall ? nil : previous)
+        let needsConsent = existing == nil || replacesStoreInstall
+            || !consent.permissions.isEmpty || !consent.hosts.isEmpty
         if needsConsent {
             guard interactive else {
                 Self.logger.info("Skipping update of '\(name, privacy: .public)': new version requests additional permissions")
@@ -257,7 +269,7 @@ extension ExtensionManager {
             guard await confirmInstallation(
                 of: staged, name: name,
                 permissions: consent.permissions, hosts: consent.hosts,
-                isUpdate: existing != nil
+                isUpdate: existing != nil && !replacesStoreInstall
             ) else {
                 throw ExtensionError.cancelled
             }
@@ -290,6 +302,11 @@ extension ExtensionManager {
             entity.lastUpdateDate = Date()
             entity.packagePath = finalDir.path
             entity.iconPath = findExtensionIcon(in: finalDir, manifest: manifest)
+            if replacesStoreInstall {
+                // Optional grants were given to the store build, not to this package.
+                entity.grantedOptionalPermissions = nil
+                entity.grantedOptionalMatchPatterns = nil
+            }
         } else {
             entity = ExtensionEntity(
                 id: extensionId,
@@ -541,6 +558,20 @@ extension ExtensionManager {
     }
 
     func uninstallExtension(_ extensionId: String) {
+        // Storage is keyed by ID, so anything left behind would be inherited by the next package
+        // installed under this ID. The fetch starts before the context unloads; removal works on
+        // an unloaded extension.
+        if let controller = extensionController {
+            let types = WKWebExtensionController.allExtensionDataTypes
+            controller.fetchDataRecords(ofTypes: types) { records in
+                MainActor.assumeIsolated {
+                    let own = records.filter { $0.uniqueIdentifier == extensionId }
+                    guard !own.isEmpty else { return }
+                    controller.removeData(ofTypes: types, from: own) {}
+                }
+            }
+        }
+
         if let context = extensionContexts.removeValue(forKey: extensionId), context.isLoaded {
             do {
                 try extensionController?.unload(context)

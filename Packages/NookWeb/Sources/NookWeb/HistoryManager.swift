@@ -232,7 +232,9 @@ actor HistoryStore {
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
         do {
             if let profile {
-                try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.lastVisited < cutoff && $0.profileId == profile })
+                // Same rows `visible(to:)` shows: untagged legacy rows appear in every space,
+                // so clearing one space has to take them too.
+                try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.lastVisited < cutoff && ($0.profileId == profile || $0.profileId == nil) })
             } else {
                 try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.lastVisited < cutoff })
             }

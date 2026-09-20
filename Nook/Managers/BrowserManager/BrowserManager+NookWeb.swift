@@ -76,10 +76,6 @@ extension BrowserManager: PageSessionDelegate {
             challenge, for: session, completionHandler: completionHandler)
     }
 
-    func beginIdentityFlow(_ request: IdentityRequest, from session: PageSession) {
-        authenticationManager.beginIdentityFlow(request, from: session)
-    }
-
     func loadZoom(for itemID: UUID) { loadZoomForTab(itemID) }
 
     func cleanupZoom(for itemID: UUID) { cleanupZoomForTab(itemID) }
@@ -233,39 +229,60 @@ extension BrowserManager: TabEventObserver {
 // MARK: - AlertPresenter
 
 extension BrowserManager: AlertPresenter {
-    func presentAlert(message: String, over webView: WKWebView, completion: @escaping () -> Void) {
+    /// A page dialog named for the frame that asked, so an iframe cannot speak as the site
+    /// around it. `suppressible` adds the checkbox that ends an endless run of them.
+    private func pageDialog(host: String, fallbackTitle: String, message: String, suppressible: Bool) -> NSAlert {
         let alert = NSAlert()
-        alert.messageText = "JavaScript Alert"
+        alert.messageText = host.isEmpty ? fallbackTitle : "\(host) says"
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
-        guard let window = webView.window else { return completion() }
-        alert.beginSheetModal(for: window) { _ in completion() }
+        if suppressible {
+            alert.showsSuppressionButton = true
+            alert.suppressionButton?.title = "Don't allow more dialogs from this page"
+        }
+        return alert
     }
 
-    func presentConfirm(message: String, over webView: WKWebView, completion: @escaping (Bool) -> Void) {
-        let alert = NSAlert()
-        alert.messageText = "JavaScript Confirm"
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
+    func presentAlert(
+        message: String, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping () -> Void
+    ) {
+        let alert = pageDialog(
+            host: host, fallbackTitle: "JavaScript Alert", message: message, suppressible: onSuppress != nil)
+        guard let window = webView.window else { return completion() }
+        alert.beginSheetModal(for: window) { _ in
+            if alert.suppressionButton?.state == .on { onSuppress?() }
+            completion()
+        }
+    }
+
+    func presentConfirm(
+        message: String, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping (Bool) -> Void
+    ) {
+        let alert = pageDialog(
+            host: host, fallbackTitle: "JavaScript Confirm", message: message, suppressible: onSuppress != nil)
         alert.addButton(withTitle: "Cancel")
         guard let window = webView.window else { return completion(false) }
-        alert.beginSheetModal(for: window) { completion($0 == .alertFirstButtonReturn) }
+        alert.beginSheetModal(for: window) {
+            if alert.suppressionButton?.state == .on { onSuppress?() }
+            completion($0 == .alertFirstButtonReturn)
+        }
     }
 
     func presentPrompt(
-        prompt: String, defaultText: String?, over webView: WKWebView,
-        completion: @escaping (String?) -> Void
+        prompt: String, defaultText: String?, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping (String?) -> Void
     ) {
-        let alert = NSAlert()
-        alert.messageText = "JavaScript Prompt"
-        alert.informativeText = prompt
-        alert.addButton(withTitle: "OK")
+        let alert = pageDialog(
+            host: host, fallbackTitle: "JavaScript Prompt", message: prompt, suppressible: onSuppress != nil)
         alert.addButton(withTitle: "Cancel")
         let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         textField.stringValue = defaultText ?? ""
         alert.accessoryView = textField
         guard let window = webView.window else { return completion(nil) }
         alert.beginSheetModal(for: window) {
+            if alert.suppressionButton?.state == .on { onSuppress?() }
             completion($0 == .alertFirstButtonReturn ? textField.stringValue : nil)
         }
     }

@@ -30,6 +30,9 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
     private var stdoutPipe: Pipe?
     private let lock = NSLock()
 
+    /// Maximum allowed size for a single stdio message (10 MB), the same as the SSE transport
+    private static let maxMessageSize = 10 * 1024 * 1024
+
     init(command: String, args: [String] = [], envVars: [String: String] = [:]) {
         self.command = command
         self.args = args
@@ -58,38 +61,11 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
         process.standardOutput = stdoutPipe
         process.standardError = FileHandle.nullDevice
 
-        var env = ProcessInfo.processInfo.environment
-
-        // Remove sensitive environment variables that shouldn't be passed to MCP servers
-        let sensitiveKeys: Set<String> = [
-            "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
-            "GITHUB_TOKEN", "GH_TOKEN", "GITLAB_TOKEN",
-            "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
-            "DATABASE_URL", "DB_PASSWORD",
-            "SECRET_KEY", "PRIVATE_KEY",
-            "STRIPE_SECRET_KEY", "TWILIO_AUTH_TOKEN",
-        ]
-        let beforeCount = env.count
-        for key in sensitiveKeys {
-            env.removeValue(forKey: key)
-        }
-        // Also remove any key containing "SECRET", "PASSWORD", "PRIVATE_KEY", or "_TOKEN"
-        // (but keep PATH, HOME, TERM, etc.)
-        let safePatterns: Set<String> = ["PATH", "HOME", "USER", "SHELL", "TERM", "LANG", "LC_", "TMPDIR", "XDG_"]
-        env = env.filter { (key, _) in
-            let upper = key.uppercased()
-            // Keep if it's a known-safe key
-            if safePatterns.contains(where: { upper.hasPrefix($0) }) { return true }
-            // Remove if it looks like a secret
-            if upper.contains("SECRET") || upper.contains("PASSWORD") || upper.contains("PRIVATE_KEY") { return false }
-            if upper.contains("_TOKEN") && !upper.hasPrefix("DBUS") { return false }
-            if upper.contains("_API_KEY") { return false }
-            // Keep everything else
-            return true
-        }
-        let filteredCount = beforeCount - env.count
-        if filteredCount > 0 {
-            Self.log.info("Filtered \(filteredCount) sensitive environment variables from MCP subprocess")
+        // Pass only what a child needs to run. A deny-list of secret-looking names always
+        // misses one, so anything else the server needs goes in its configured envVars.
+        let inheritedKeys: Set<String> = ["PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "TMPDIR", "TERM"]
+        var env = ProcessInfo.processInfo.environment.filter { (key, _) in
+            inheritedKeys.contains(key) || key.hasPrefix("LC_")
         }
 
         // Apply user-specified env vars (these are intentional)
@@ -176,6 +152,13 @@ final class StdioTransport: MCPTransportProtocol, @unchecked Sendable {
                         if !messageData.isEmpty {
                             continuation.yield(Data(messageData))
                         }
+                    }
+
+                    // SECURITY: A child that never sends a newline would grow this without bound
+                    if buffer.count > StdioTransport.maxMessageSize {
+                        StdioTransport.log.warning("MCP stdio message exceeds maximum size limit (\(StdioTransport.maxMessageSize) bytes), closing stream")
+                        continuation.finish()
+                        break
                     }
                 }
             }

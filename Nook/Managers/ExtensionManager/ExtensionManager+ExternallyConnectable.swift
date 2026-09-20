@@ -701,8 +701,9 @@ extension ExtensionManager {
                     var outgoingMessage = message;
 
                     if (outgoingMessage && typeof outgoingMessage === 'object') {
-                        // Preserve sender when provided by the page; default to page semantics.
-                        outgoingMessage = Object.assign({ sender: 'page' }, outgoingMessage);
+                        // Always stamp page semantics; a sender the page supplied must not win,
+                        // or it could pose as one of the extension's own contexts.
+                        outgoingMessage = Object.assign({}, outgoingMessage, { sender: 'page' });
                         // Proton's broker enforces a version field for internal messages.
                         if (runtimeVersion && typeof outgoingMessage.version === 'undefined') {
                             outgoingMessage.version = runtimeVersion;
@@ -965,7 +966,12 @@ extension ExtensionManager {
                     // Handle height update from iframe
                     if (data.command === 'updateAutofillInlineMenuListHeight' && data.styles && data.styles.height) {
                         var iframe = findBitwardenIframe();
-                        if (iframe) {
+                        // Any page script or frame can post this command; only the menu frame,
+                        // or another frame of the extension that owns it, may resize the menu.
+                        var fromMenu = iframe && (event.source === iframe.contentWindow ||
+                            (event.origin.indexOf('webkit-extension://') === 0 &&
+                             iframe.src.indexOf(event.origin + '/') === 0));
+                        if (fromMenu) {
                             iframe.style.height = data.styles.height;
                             iframe.style.opacity = '1';
                             iframe.style.display = 'block';

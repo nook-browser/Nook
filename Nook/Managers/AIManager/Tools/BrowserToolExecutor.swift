@@ -114,10 +114,19 @@ class BrowserToolExecutor {
         return literal
     }
 
+    /// Only web URLs. A file: URL would load with read access to its directory, and the
+    /// read tools never prompt, so a page could have a local file read and sent elsewhere.
+    private func webURL(_ string: String) -> URL? {
+        guard let url = URL(string: string),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else { return nil }
+        return url
+    }
+
     private func executeNavigateToURL(_ args: [String: Any], browserManager: BrowserManager, windowState: BrowserWindowState) async throws -> String {
         guard let urlString = args["url"] as? String,
-              let url = URL(string: urlString) else {
-            return "Invalid URL"
+              let url = webURL(urlString) else {
+            return "Invalid URL: only http and https URLs are allowed"
         }
 
         let newTab = args["newTab"] as? Bool ?? false
@@ -460,8 +469,10 @@ class BrowserToolExecutor {
     }
 
     private func executeCreateTab(_ args: [String: Any], browserManager: BrowserManager, windowState: BrowserWindowState) throws -> String {
-        if let urlString = args["url"] as? String,
-           let url = URL(string: urlString) {
+        if let urlString = args["url"] as? String, !urlString.isEmpty {
+            guard let url = webURL(urlString) else {
+                return "Invalid URL: only http and https URLs are allowed"
+            }
             browserManager.tabs.open(url: url, in: windowState, placement: .newTab)
             return "Created new tab with URL: \(urlString)"
         }

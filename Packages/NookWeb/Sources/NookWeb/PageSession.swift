@@ -144,6 +144,9 @@ public final class PageSession: NSObject, Identifiable {
 
     /// One-shot initial-navigation suppression for a WebKit-created popup.
     @ObservationIgnored var isPopupHost: Bool = false
+    /// JavaScript dialogs since the last commit, and whether the user silenced the page.
+    @ObservationIgnored var jsDialogCount = 0
+    @ObservationIgnored var jsDialogsSuppressed = false
     @ObservationIgnored var hasFavicon: Bool = false
     @ObservationIgnored var faviconFetchInFlight: Bool = false
     @ObservationIgnored var faviconFetchAttempts: Int = 0
@@ -339,7 +342,6 @@ public final class PageSession: NSObject, Identifiable {
         webView.isInspectable = true
         webView.allowsLinkPreview = true
         webView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true
-        webView.configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
     }
 
     /// Installs a WebKit-created popup view as this session's primary view. WebKit drives the
@@ -642,8 +644,10 @@ public final class PageSession: NSObject, Identifiable {
 
         faviconFetchAttempts += 1
 
-        // FaviconFinder parses HTML <link> tags, then falls back to /favicon.ico.
-        if let nsImage = await Self.fetchFaviconImage(for: url) {
+        // FaviconFinder parses HTML <link> tags, then falls back to /favicon.ico. It only
+        // fetches through URLSession.shared (shared cookies, disk URLCache), so a private
+        // page skips it and takes the root icon below.
+        if !isPrivate, let nsImage = await Self.fetchFaviconImage(for: url) {
             FaviconCache.shared.store(nsImage, for: cacheKey)
             favicon = SwiftUI.Image(platformImage: nsImage)
             hasFavicon = true
@@ -652,8 +656,9 @@ public final class PageSession: NSObject, Identifiable {
 
         // Last resort: the root /favicon.ico (for sites whose <link> targets return 403).
         if let rootFaviconURL = URL(string: "/favicon.ico", relativeTo: url)?.absoluteURL,
-           let nsImage = await Self.downloadImage(from: rootFaviconURL) {
-            FaviconCache.shared.store(nsImage, for: cacheKey)
+           let nsImage = await Self.downloadImage(from: rootFaviconURL, isPrivate: isPrivate) {
+            // A private page's host must not reach ~/Library/Caches/FaviconCache.
+            FaviconCache.shared.store(nsImage, for: cacheKey, toDisk: !isPrivate)
             favicon = SwiftUI.Image(platformImage: nsImage)
             hasFavicon = true
             return
@@ -675,9 +680,13 @@ public final class PageSession: NSObject, Identifiable {
         }
     }
 
-    private static func downloadImage(from url: URL) async -> PlatformImage? {
+    /// No cookies, no disk cache: what private pages fetch their favicon with.
+    private static let privateFaviconSession = URLSession(configuration: .ephemeral)
+
+    private static func downloadImage(from url: URL, isPrivate: Bool) async -> PlatformImage? {
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let session = isPrivate ? privateFaviconSession : URLSession.shared
+            let (data, response) = try await session.data(from: url)
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else { return nil }
             return PlatformImage(data: data)
         } catch {

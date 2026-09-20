@@ -13,9 +13,9 @@ import NookTweaks
 extension PageSession {
     /// Script message handler names this session registers on each of its web views.
     var messageHandlerNames: [String] {
-        ["linkHover", "commandHover", "commandClick", "pipStateChange",
+        ["linkHover", "commandHover", "pipStateChange",
          "mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
-         "historyStateDidChange", "NookIdentity", "nookShortcutDetect",
+         "historyStateDidChange", "nookShortcutDetect",
          "nookAdBlocker", "nookSponsorBlock"]
     }
 
@@ -165,25 +165,6 @@ extension PageSession {
                 document.addEventListener('keydown', e => reportHover(currentHoveredLink, e.metaKey));
                 document.addEventListener('keyup', e => reportHover(currentHoveredLink, e.metaKey));
                 window.addEventListener('blur', () => reportHover(null, false));
-
-                // Handle command+click for new tabs
-                document.addEventListener('click', function(e) {
-                    if (e.metaKey) {
-                        var target = e.target;
-                        while (target && target !== document) {
-                            if (target.tagName === 'A' && target.href) {
-                                e.preventDefault();
-                                e.stopPropagation();
-
-                                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.commandClick) {
-                                    window.webkit.messageHandlers.commandClick.postMessage(target.href);
-                                }
-                                return false;
-                            }
-                            target = target.parentElement;
-                        }
-                    }
-                });
             })();
             """
 
@@ -308,6 +289,12 @@ extension PageSession: WKScriptMessageHandler {
         _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
     ) {
         // WKScriptMessageHandler callbacks run on main thread; no dispatch needed
+
+        // These handlers live in the page world, so any frame can post to them. Every script
+        // that feeds them runs in the main frame only; media state is the exception, since a
+        // player can sit in a subframe.
+        guard message.frameInfo.isMainFrame || message.name.hasPrefix("mediaStateChange_") else { return }
+
         switch message.name {
         case "linkHover":
             let href = message.body as? String
@@ -316,11 +303,6 @@ extension PageSession: WKScriptMessageHandler {
         case "commandHover":
             let href = message.body as? String
             self.onCommandHover?(href)
-
-        case "commandClick":
-            if let href = message.body as? String, let url = URL(string: href) {
-                self.handleCommandClick(url: url)
-            }
 
         case "pipStateChange":
             if let dict = message.body as? [String: Any], let active = dict["active"] as? Bool {
@@ -359,14 +341,18 @@ extension PageSession: WKScriptMessageHandler {
             }
 
         case "historyStateDidChange":
-            if let href = message.body as? String, let url = URL(string: href) {
+            // The message is only a signal. The address comes from WebKit, never from the body:
+            // a page could otherwise put any URL, lock icon included, in the URL bar. WebKit
+            // has already updated webView.url for a same-document navigation by the time
+            // the message arrives.
+            if let url = message.webView?.url {
                 if self.url.absoluteString != url.absoluteString {
                     self.url = url
                     // NOTE: Do NOT call syncTabAcrossWindows here. SPA navigations
                     // (pushState/replaceState/popstate) happen inside the webview — the
-                    // content is already at the correct state. Calling syncTab would see a
-                    // URL mismatch (webView.url lags behind the JS-driven URL change) and
-                    // force webView.load(), causing a full page reload that breaks SPA
+                    // content is already at the correct state. Calling syncTab would
+                    // webView.load() every view of this item whose URL differs, a full
+                    // page reload that breaks SPA
                     // back/forward (e.g., Facebook lightbox close via browser back).
 
                     // Fetch updated title after SPA navigation
@@ -388,9 +374,6 @@ extension PageSession: WKScriptMessageHandler {
                 }
             }
 
-        case "NookIdentity":
-            handleOAuthRequest(message: message)
-            
         case "nookShortcutDetect":
             handleShortcutDetection(message: message)
 
@@ -420,12 +403,16 @@ extension PageSession: WKScriptMessageHandler {
             }
 
         case "nookSponsorBlock":
-            if let body = message.body as? [String: Any],
+            // Only a YouTube page has a reason to ask for segments or report a skip.
+            if let sponsorBlock = controller?.sponsorBlock,
+               sponsorBlock.isYouTubeDomain(message.frameInfo.securityOrigin.host),
+               let body = message.body as? [String: Any],
                let type = body["type"] as? String
             {
                 switch type {
                 case "video-changed":
-                    if let videoID = body["videoID"] as? String {
+                    if let videoID = body["videoID"] as? String,
+                       videoID.range(of: "^[A-Za-z0-9_-]{11}\\z", options: .regularExpression) != nil {
                         Task { @MainActor [weak self] in
                             guard let webView = message.webView else { return }
                             let segments = await self?.controller?.sponsorBlock
@@ -436,8 +423,9 @@ extension PageSession: WKScriptMessageHandler {
                     }
                 case "segment-skipped":
                     // Telemetry: report viewed segment to SponsorBlock
-                    if let uuid = body["uuid"] as? String {
-                        controller?.sponsorBlock.reportViewedSegment(uuid: uuid)
+                    if let uuid = body["uuid"] as? String,
+                       uuid.range(of: "^[0-9a-f]{64,}\\z", options: .regularExpression) != nil {
+                        sponsorBlock.reportViewedSegment(uuid: uuid, isPrivate: isPrivate)
                     }
                 default:
                     break
@@ -462,82 +450,5 @@ extension PageSession: WKScriptMessageHandler {
         
         // Update the detector with detected shortcuts for this URL
         controller?.sessionDelegate?.updateDetectedShortcuts(for: url, shortcuts: shortcuts)
-    }
-
-    /// Command-click opens the link in a background tab of the window showing this page. A
-    /// private page's links stay in its private window.
-    func handleCommandClick(url: URL) {
-        guard let controller, let window = controller.window(for: self) else { return }
-        controller.open(url: url, in: window, placement: .background)
-    }
-
-    func handleOAuthRequest(message: WKScriptMessage) {
-        guard let dict = message.body as? [String: Any],
-            let urlString = dict["url"] as? String,
-            let url = URL(string: urlString)
-        else {
-            return
-        }
-        let interactive = dict["interactive"] as? Bool ?? true
-        let prefersEphemeral = dict["prefersEphemeral"] as? Bool ?? false
-        let providedScheme = (dict["callbackScheme"] as? String)?.trimmingCharacters(
-            in: .whitespacesAndNewlines)
-        let rawRequestId = (dict["requestId"] as? String)?.trimmingCharacters(
-            in: .whitespacesAndNewlines)
-        let requestId = (rawRequestId?.isEmpty == false ? rawRequestId! : UUID().uuidString)
-
-
-        guard let delegate = controller?.sessionDelegate else {
-            finishIdentityFlow(requestId: requestId, with: .failure(.unableToStart))
-            return
-        }
-
-        let identityRequest = IdentityRequest(
-            requestId: requestId,
-            url: url,
-            interactive: interactive,
-            prefersEphemeralSession: prefersEphemeral,
-            explicitCallbackScheme: providedScheme?.isEmpty == true ? nil : providedScheme
-        )
-
-        delegate.beginIdentityFlow(identityRequest, from: self)
-    }
-
-    public func finishIdentityFlow(
-        requestId: String,
-        with result: IdentityFlowResult
-    ) {
-        guard let webView else {
-            return
-        }
-
-        var payload: [String: Any] = ["requestId": requestId]
-
-        switch result {
-        case .success(let url):
-            payload["status"] = "success"
-            payload["url"] = url.absoluteString
-        case .cancelled:
-            payload["status"] = "cancelled"
-            payload["code"] = "cancelled"
-            payload["message"] = "Authentication cancelled by user."
-        case .failure(let failure):
-            payload["status"] = "failure"
-            payload["code"] = failure.code
-            payload["message"] = failure.message
-        }
-
-        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
-            let jsonString = String(data: data, encoding: .utf8)
-        else {
-            return
-        }
-
-        let script =
-            "window.__nookCompleteIdentityFlow && window.__nookCompleteIdentityFlow(\(jsonString));"
-        webView.evaluateJavaScript(script) { _, error in
-            if let error {
-            }
-        }
     }
 }

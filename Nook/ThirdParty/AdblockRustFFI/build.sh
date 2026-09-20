@@ -9,10 +9,10 @@ export PATH="$HOME/.cargo/bin:$PATH"
 # otherwise copy every target/ file into the app bundle). build/ is gitignored.
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$PWD/../../../build/AdblockRustFFI-target}"
 
-cargo test --release
-cargo build --release --target aarch64-apple-darwin
-cargo build --release --target aarch64-apple-ios
-cargo build --release --target aarch64-apple-ios-sim
+cargo test --release --locked
+cargo build --release --locked --target aarch64-apple-darwin
+cargo build --release --locked --target aarch64-apple-ios
+cargo build --release --locked --target aarch64-apple-ios-sim
 rm -rf NookAdblock.xcframework
 xcodebuild -create-xcframework \
   -library "$CARGO_TARGET_DIR/aarch64-apple-darwin/release/libnook_adblock.a" -headers include \

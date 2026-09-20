@@ -24,6 +24,8 @@ public class Download: Identifiable {
     let suggestedFilename: String
     let destinationPreference: DestinationPreference
     let allowedContentTypes: [UTType]?
+    /// Save Image and the media download button: the page chose the URL, so only an image or video is kept.
+    let mediaOnly: Bool
     var destinationURL: URL?
     var progress: Double
     var state: DownloadState {
@@ -92,7 +94,8 @@ public class Download: Identifiable {
         originalURL: URL,
         suggestedFilename: String,
         destinationPreference: DestinationPreference = .automaticDownloadsFolder,
-        allowedContentTypes: [UTType]? = nil
+        allowedContentTypes: [UTType]? = nil,
+        mediaOnly: Bool = false
     ) {
         id = UUID()
         self.download = download
@@ -100,6 +103,7 @@ public class Download: Identifiable {
         self.suggestedFilename = suggestedFilename
         self.destinationPreference = destinationPreference
         self.allowedContentTypes = allowedContentTypes
+        self.mediaOnly = mediaOnly
         progress = 0.0
         state = .pending
         downloadedBytes = 0
@@ -278,14 +282,16 @@ public class DownloadManager: NSObject {
         originalURL: URL,
         suggestedFilename: String,
         destinationPreference: Download.DestinationPreference = .automaticDownloadsFolder,
-        allowedContentTypes: [UTType]? = nil
+        allowedContentTypes: [UTType]? = nil,
+        mediaOnly: Bool = false
     ) -> Download {
         let downloadModel = Download(
             download: download,
             originalURL: originalURL,
             suggestedFilename: suggestedFilename,
             destinationPreference: destinationPreference,
-            allowedContentTypes: allowedContentTypes
+            allowedContentTypes: allowedContentTypes,
+            mediaOnly: mediaOnly
         )
         let delegate = DownloadDelegate(downloadManager: self, download: downloadModel)
 
@@ -413,6 +419,28 @@ public class DownloadManager: NSObject {
         guard let download = downloads[id] else { return }
         download.destinationURL = destination
     }
+
+    /// Sets the `com.apple.quarantine` extended attribute on a downloaded file.
+    ///
+    /// This ensures macOS Gatekeeper will prompt the user before opening
+    /// executables, disk images, or other potentially dangerous files
+    /// downloaded from the web.
+    nonisolated static func setQuarantineAttribute(on fileURL: URL) {
+        // com.apple.quarantine format: flags;timestamp_hex;agent_name;uuid
+        // 0083 = "downloaded from the web, not yet opened by the user"
+        let quarantineValue = "0083;\(String(format: "%08x", Int(Date().timeIntervalSince1970)));Nook;\(UUID().uuidString)"
+        guard let data = quarantineValue.data(using: .utf8) else { return }
+
+        fileURL.withUnsafeFileSystemRepresentation { path in
+            guard let path = path else { return }
+            let result = setxattr(path, "com.apple.quarantine", (data as NSData).bytes, data.count, 0, 0)
+            if result != 0 {
+                #if DEBUG
+                print("Failed to set quarantine attribute on \(fileURL.lastPathComponent): errno \(errno)")
+                #endif
+            }
+        }
+    }
 }
 
 // MARK: - Download Delegate
@@ -473,6 +501,20 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
             cleanName = String(cleanName.dropFirst())
         }
         if cleanName.isEmpty { cleanName = "download" }
+        // A page picked this URL for a one-click save; anything but an image or video is dropped.
+        if download.mediaOnly {
+            let mimeType = response.mimeType?.lowercased() ?? ""
+            guard mimeType.hasPrefix("image/") || mimeType.hasPrefix("video/") else {
+                downloadManager?.updateDownloadState(download.id, state: .cancelled)
+                completion(.cancel)
+                return
+            }
+            // The server also names the file, and it can claim image/jpeg for "photo.jpg.dmg".
+            let named = UTType(filenameExtension: (cleanName as NSString).pathExtension)
+            if named?.conforms(to: .image) != true, named?.conforms(to: .audiovisualContent) != true {
+                cleanName += "." + (UTType(mimeType: mimeType)?.preferredFilenameExtension ?? "media")
+            }
+        }
         // Limit filename length to 255 characters (filesystem maximum)
         if cleanName.count > 255 {
             let ext = (cleanName as NSString).pathExtension
@@ -592,32 +634,10 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
 
         // Set quarantine attribute so Gatekeeper warns about downloaded executables
         if let destinationURL = download.destinationURL {
-            DownloadDelegate.setQuarantineAttribute(on: destinationURL)
+            DownloadManager.setQuarantineAttribute(on: destinationURL)
         }
 
         downloadManager?.updateDownloadState(download.id, state: .completed)
-    }
-
-    /// Sets the `com.apple.quarantine` extended attribute on a downloaded file.
-    ///
-    /// This ensures macOS Gatekeeper will prompt the user before opening
-    /// executables, disk images, or other potentially dangerous files
-    /// downloaded from the web.
-    private static func setQuarantineAttribute(on fileURL: URL) {
-        // com.apple.quarantine format: flags;timestamp_hex;agent_name;uuid
-        // 0083 = "downloaded from the web, not yet opened by the user"
-        let quarantineValue = "0083;\(String(format: "%08x", Int(Date().timeIntervalSince1970)));Nook;\(UUID().uuidString)"
-        guard let data = quarantineValue.data(using: .utf8) else { return }
-
-        fileURL.withUnsafeFileSystemRepresentation { path in
-            guard let path = path else { return }
-            let result = setxattr(path, "com.apple.quarantine", (data as NSData).bytes, data.count, 0, 0)
-            if result != 0 {
-                #if DEBUG
-                print("Failed to set quarantine attribute on \(fileURL.lastPathComponent): errno \(errno)")
-                #endif
-            }
-        }
     }
 
     func download(_: WKDownload, didFailWithError error: Error, resumeData _: Data?) {
@@ -631,6 +651,11 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
         #if DEBUG
         print("Download will perform HTTP redirection")
         #endif
+        // Cookies were picked for the first URL only; a redirect must not carry them to another host.
+        var request = request
+        if download.mediaOnly {
+            request.setValue(nil, forHTTPHeaderField: "Cookie")
+        }
         decisionHandler(request)
     }
 

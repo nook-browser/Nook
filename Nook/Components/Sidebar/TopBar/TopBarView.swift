@@ -174,12 +174,19 @@ struct TopBarView: View {
         HStack(spacing: 8) {
             if browserManager.tabs.selectedSession(in: windowState) != nil {
                 // URL text area — tappable to open command palette
-                Text(displayURL)
+                // Two texts so a narrow bar cuts the path or title first and then the host's
+                // head: `accounts.google.com.x.evil.tld` must keep `evil.tld`.
+                HStack(spacing: 0) {
+                    Text(displayURL.host)
+                        .truncationMode(.head)
+                        .layoutPriority(1)
+                    Text(displayURL.rest)
+                        .truncationMode(.tail)
+                }
                     .font(NookDesign.Font.body)
                     .foregroundStyle(urlBarTextColor)
                     .tracking(-0.1)
                     .lineLimit(1)
-                    .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -406,10 +413,10 @@ struct TopBarView: View {
         #endif
     }
 
-    private var displayURL: AttributedString {
+    private var displayURL: (host: AttributedString, rest: AttributedString) {
         guard let currentTab = browserManager.tabs.selectedSession(in: windowState)
         else {
-            return ""
+            return ("", "")
         }
 
         return formatURL(
@@ -419,12 +426,13 @@ struct TopBarView: View {
         )
     }
 
+    /// The host apart from what follows it, so each can truncate its own way.
     private func formatURL(_ url: URL, title: String?, isHovering: Bool)
-        -> AttributedString
+        -> (host: AttributedString, rest: AttributedString)
     {
         if isHovering {
             guard let host = url.host else {
-                return AttributedString(url.absoluteString)
+                return (AttributedString(url.absoluteString), "")
             }
 
             let cleanHost =
@@ -444,25 +452,23 @@ struct TopBarView: View {
 
             pathString.foregroundColor = urlBarTextColor.opacity(0.35)
 
-            return hostString + pathString
+            return (hostString, pathString)
         }
 
         guard let host = url.host else {
-            return AttributedString(url.absoluteString)
+            return (AttributedString(url.absoluteString), "")
         }
 
         let cleanHost =
             host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
 
         if url.path.isEmpty || url.path == "/" {
-            return AttributedString(cleanHost)
+            return (AttributedString(cleanHost), "")
         } else {
             let displayTitle = title ?? cleanHost
-            var result = AttributedString(cleanHost)
             var titlePart = AttributedString(" / " + displayTitle)
             titlePart.foregroundColor = urlBarTextColor.opacity(0.35)
-            result.append(titlePart)
-            return result
+            return (AttributedString(cleanHost), titlePart)
         }
     }
 

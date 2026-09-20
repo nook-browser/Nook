@@ -54,7 +54,8 @@ public func normalizeURL(_ input: String, queryTemplate: String) -> String {
   }
 
   let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
-  let urlString = String(format: queryTemplate, encoded)
+  // Not String(format:): the template is user-editable, and a stray %d or %n reads past the arguments.
+  let urlString = queryTemplate.replacingOccurrences(of: "%@", with: encoded)
   return urlString
 }
 

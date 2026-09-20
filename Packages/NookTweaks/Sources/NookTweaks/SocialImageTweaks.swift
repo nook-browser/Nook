@@ -97,7 +97,7 @@ public enum SocialImageTweaks {
                   url.scheme == "https",
                   let webView = message.webView
             else { return }
-            socialLog.debug("Downloading \(url.absoluteString, privacy: .public) (\(body["note"] as? String ?? "image", privacy: .public))")
+            socialLog.debug("Downloading from \(url.host ?? "", privacy: .public) (\(body["note"] as? String ?? "image", privacy: .public))")
             SocialImageTweaks.downloader?.downloadImage(at: url, from: webView)
         }
     }

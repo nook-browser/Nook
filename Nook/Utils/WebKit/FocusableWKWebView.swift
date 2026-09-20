@@ -100,7 +100,8 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
             return
         }
 
-        guard let url = resolveImageURL(from: identifier) else {
+        guard let url = resolveImageURL(from: identifier),
+              ["http", "https", "data", "blob"].contains(url.scheme?.lowercased() ?? "") else {
             return
         }
 
@@ -208,6 +209,13 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
 
+        // The page chose this URL. Cookies for any other site would make the save a credentialed
+        // cross-site GET; public CDN media does not need them.
+        guard Self.isSameSite(url.host, self.url?.host) else {
+            completion(request)
+            return
+        }
+
         configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
             var decoratedRequest = request
             let filteredCookies = Self.relevantCookies(for: url, from: cookies)
@@ -231,8 +239,17 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
         }
 
         var enrichedRequest = request
-        if enrichedRequest.value(forHTTPHeaderField: "Referer") == nil {
-            enrichedRequest.setValue(tab.url.absoluteString, forHTTPHeaderField: "Referer")
+        // Origin only, and nothing on an https to http downgrade: the page's path and query stay private.
+        var origin = URLComponents()
+        origin.scheme = tab.url.scheme
+        origin.host = tab.url.host
+        origin.port = tab.url.port
+        origin.path = "/"
+        if enrichedRequest.value(forHTTPHeaderField: "Referer") == nil,
+           tab.url.host != nil,
+           tab.url.scheme == "http" || originalURL.scheme == "https",
+           let referer = origin.string {
+            enrichedRequest.setValue(referer, forHTTPHeaderField: "Referer")
         }
 
         // Call WKWebView's startDownload method (inherited from WKWebView)
@@ -258,8 +275,21 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
             originalURL: originalURL,
             suggestedFilename: proposedName,
             destinationPreference: destinationPreference,
-            allowedContentTypes: Self.imageContentTypes
+            allowedContentTypes: Self.imageContentTypes,
+            mediaOnly: true
         )
+    }
+
+    // No public suffix list: hosts match when one equals or contains the other, so a page on a
+    // bare shared suffix (github.io) would match its subdomains. Use a PSL if that proves too loose.
+    private static func isSameSite(_ lhs: String?, _ rhs: String?) -> Bool {
+        func bare(_ host: String?) -> String {
+            let host = host?.lowercased() ?? ""
+            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        }
+        let a = bare(lhs), b = bare(rhs)
+        guard !a.isEmpty, !b.isEmpty else { return false }
+        return a == b || a.hasSuffix(".\(b)") || b.hasSuffix(".\(a)")
     }
 
     private static func relevantCookies(for url: URL, from cookies: [HTTPCookie]) -> [HTTPCookie] {
@@ -305,7 +335,12 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
             .first?
             .lowercased()
 
-        let fileExtension = mimeType.flatMap { mimeTypeToExtension($0) } ?? "img"
+        // The page wrote this URL; without the check "Save Image" would write a .dmg or .command.
+        guard let mimeType, mimeType.hasPrefix("image/") else {
+            return
+        }
+
+        let fileExtension = mimeTypeToExtension(mimeType)
         let suggestedFilename = "image.\(fileExtension)"
 
         let imageData: Data?
@@ -325,6 +360,8 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
 
         do {
             try data.write(to: tempURL, options: .atomic)
+            // Same quarantine as a network download; the move below carries the attribute along.
+            DownloadManager.setQuarantineAttribute(on: tempURL)
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 switch destinationPreference {

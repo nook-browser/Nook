@@ -89,7 +89,7 @@ public final class FilterListManager {
     }
 
     /// Filenames of enabled optional filter lists (persisted externally via NookSettingsService)
-    nonisolated(unsafe) public var enabledOptionalFilterListFilenames: Set<String> = []
+    public var enabledOptionalFilterListFilenames: Set<String> = []
 
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "FilterListManager")
 
@@ -165,10 +165,10 @@ public final class FilterListManager {
     }
 
     /// Load all cached filter lists and return as individual rule lines for SafariConverterLib.
-    nonisolated func loadAllFilterRulesAsLines() -> [String] {
+    /// Runs off the main actor, so the caller passes a snapshot of the enabled set.
+    nonisolated func loadAllFilterRulesAsLines(enabledFilenames: Set<String>) -> [String] {
         var allLines: [String] = []
 
-        let enabledFilenames = enabledOptionalFilterListFilenames
         let optionalLists = Self.optionalLists.filter { enabledFilenames.contains($0.filename) }
 
         var contents: [String] = []
@@ -279,6 +279,14 @@ public final class FilterListManager {
 
             guard httpResponse.statusCode == 200 else {
                 Self.log.warning("\(list.name): HTTP \(httpResponse.statusCode)")
+                return false
+            }
+
+            // Drop an oversized body before decoding and scanning it. Most lists
+            // arrive compressed with no declared length, so the byte count is checked too.
+            if let maxSize = list.knownSizeRange?.upperBound,
+               max(Int64(data.count), httpResponse.expectedContentLength) > Int64(maxSize) {
+                Self.log.warning("\(list.name, privacy: .public): body exceeds \(maxSize) bytes, keeping previous cached version")
                 return false
             }
 
