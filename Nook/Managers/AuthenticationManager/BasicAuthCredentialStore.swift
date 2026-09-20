@@ -12,7 +12,7 @@ import Foundation
 import Security
 #endif
 
-/// Simple persistence layer for HTTP basic-auth credentials keyed by host.
+/// Simple persistence layer for HTTP basic-auth credentials keyed by protection space.
 /// Uses the keychain to keep secrets off disk and available across launches.
 @MainActor
 final class BasicAuthCredentialStore {
@@ -28,14 +28,23 @@ final class BasicAuthCredentialStore {
 
     private let service = "com.nook.basicAuth"
 
-    func credential(for host: String) -> StoredCredential? {
-        guard !host.isEmpty else { return nil }
+    /// Keychain account for a protection space inside one space's data store. Scheme, port and
+    /// realm are part of it so a password saved for https is never sent to http or another port.
+    /// A newline cannot appear in a host or a header value, so a realm cannot forge another
+    /// origin's account. Entries from before this format are bare hosts and never match.
+    static func account(for space: URLProtectionSpace, scope: UUID) -> String {
+        let origin = "\(space.protocol ?? "")://\(space.host.lowercased()):\(space.port)"
+        return [scope.uuidString, origin, space.realm ?? ""].joined(separator: "\n")
+    }
+
+    func credential(for account: String) -> StoredCredential? {
+        guard !account.isEmpty else { return nil }
 
         #if canImport(Security)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: host,
+            kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -52,7 +61,7 @@ final class BasicAuthCredentialStore {
             return StoredCredential(username: payload.username, password: payload.password)
         } catch {
             // If decoding fails, remove the corrupt record so future prompts can succeed.
-            _ = deleteCredential(for: host)
+            _ = deleteCredential(for: account)
             return nil
         }
         #else
@@ -61,8 +70,8 @@ final class BasicAuthCredentialStore {
     }
 
     @discardableResult
-    func saveCredential(_ credential: StoredCredential, for host: String) -> Bool {
-        guard !host.isEmpty else { return false }
+    func saveCredential(_ credential: StoredCredential, for account: String) -> Bool {
+        guard !account.isEmpty else { return false }
 
         #if canImport(Security)
         do {
@@ -71,7 +80,7 @@ final class BasicAuthCredentialStore {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
-                kSecAttrAccount as String: host
+                kSecAttrAccount as String: account
             ]
 
             let attributes: [String: Any] = [kSecValueData as String: data]
@@ -96,14 +105,14 @@ final class BasicAuthCredentialStore {
     }
 
     @discardableResult
-    func deleteCredential(for host: String) -> Bool {
-        guard !host.isEmpty else { return false }
+    func deleteCredential(for account: String) -> Bool {
+        guard !account.isEmpty else { return false }
 
         #if canImport(Security)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: host
+            kSecAttrAccount as String: account
         ]
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound

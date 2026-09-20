@@ -7,6 +7,7 @@
 //
 
 import AppKit
+import CryptoKit
 import Foundation
 import WebKit
 import NookBlocker
@@ -16,6 +17,14 @@ import NookWeb
 final class AuthenticationManager: NSObject {
     private weak var browserManager: BrowserManager?
     private let credentialStore = BasicAuthCredentialStore()
+
+    /// UserDefaults dictionary of accepted untrusted certificates: "host:port" to the leaf's SHA-256.
+    private static let certificateExceptionsKey = "security.acceptedCertificateExceptions"
+    /// Exceptions accepted in private windows; gone at quit.
+    private var privateCertificateExceptions: [String: String] = [:]
+    /// Connections waiting on a certificate alert that is already up, so one page load asks once.
+    private var pendingCertificateDecisions: [String: [(Bool) -> Void]] = [:]
+
     func attach(browserManager: BrowserManager) {
         self.browserManager = browserManager
     }
@@ -27,11 +36,26 @@ final class AuthenticationManager: NSObject {
     ) -> Bool {
         switch challenge.protectionSpace.authenticationMethod {
         case NSURLAuthenticationMethodDefault, NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodHTTPDigest:
-            let host = challenge.protectionSpace.host
+            let space = challenge.protectionSpace
 
-            if !host.isEmpty,
-               challenge.previousFailureCount == 0,
-               let stored = credentialStore.credential(for: host) {
+            // Without a host the prompt could only show text the server chose.
+            guard !space.host.isEmpty else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return true
+            }
+
+            // An image or frame from another host must not raise a prompt over this page or
+            // draw out a saved password. Rejecting the space lets the 401 stand without any
+            // credential storage being consulted, which default handling would do. A proxy
+            // is set by the system, not the page, and its host never matches.
+            guard space.isProxy() || Self.isPageHost(space.host, of: tab) else {
+                completionHandler(.rejectProtectionSpace, nil)
+                return true
+            }
+
+            if challenge.previousFailureCount == 0,
+               let account = credentialAccount(for: space, tab: tab),
+               let stored = credentialStore.credential(for: account) {
                 completionHandler(.useCredential, stored.asURLCredential)
                 return true
             }
@@ -50,9 +74,15 @@ final class AuthenticationManager: NSObject {
                 if SecTrustEvaluateWithError(trust, &error) {
                     completionHandler(.useCredential, URLCredential(trust: trust))
                 } else if Self.isPrivateHost(challenge.protectionSpace.host) {
-                    // Accept self-signed / untrusted certs for local network hosts
-                    // (routers, NAS devices, IoT, etc.) instead of silently cancelling
-                    completionHandler(.useCredential, URLCredential(trust: trust))
+                    // Local network hosts (routers, NAS devices, IoT, etc.) are usually
+                    // self-signed: accept once the user has confirmed this certificate
+                    confirmUntrustedCertificate(trust, for: challenge.protectionSpace, tab: tab) { accepted in
+                        if accepted {
+                            completionHandler(.useCredential, URLCredential(trust: trust))
+                        } else {
+                            completionHandler(.cancelAuthenticationChallenge, nil)
+                        }
+                    }
                 } else {
                     completionHandler(.cancelAuthenticationChallenge, nil)
                 }
@@ -83,6 +113,84 @@ final class AuthenticationManager: NSObject {
         }
     }
 
+    /// True when `host` serves the page in `tab`: the committed one, or the one a main-frame
+    /// navigation is loading (the web view's url moves as soon as that starts).
+    private static func isPageHost(_ host: String, of tab: PageSession) -> Bool {
+        let host = host.lowercased()
+        return tab.url.host?.lowercased() == host || tab.activeWebView.url?.host?.lowercased() == host
+    }
+
+    /// Keychain account for this challenge, or nil when nothing may be read or saved: private
+    /// sessions leave no trace, and a proxy's password is never replayed without asking.
+    private func credentialAccount(for space: URLProtectionSpace, tab: PageSession) -> String? {
+        guard !tab.isPrivate, !space.isProxy(), let scope = tab.profile?.id else { return nil }
+        return BasicAuthCredentialStore.account(for: space, scope: scope)
+    }
+
+    // MARK: - Untrusted Certificates
+
+    /// Trust on first use: a certificate the user accepted for `host:port` is accepted again,
+    /// anything else asks, and a certificate that replaced an accepted one says so.
+    private func confirmUntrustedCertificate(
+        _ trust: SecTrust,
+        for space: URLProtectionSpace,
+        tab: PageSession,
+        completion: @escaping (Bool) -> Void
+    ) {
+        guard let leaf = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])?.first else {
+            return completion(false)
+        }
+        let fingerprint = SHA256.hash(data: SecCertificateCopyData(leaf) as Data)
+            .map { String(format: "%02x", $0) }.joined()
+        let key = "\(space.host.lowercased()):\(space.port)"
+        let isPrivate = tab.isPrivate
+
+        let persisted = UserDefaults.standard.dictionary(forKey: Self.certificateExceptionsKey) as? [String: String]
+        let known = (isPrivate ? privateCertificateExceptions[key] : nil) ?? persisted?[key]
+        if known == fingerprint { return completion(true) }
+
+        // Same rule as credential prompts: no alert over a page for another host's resource.
+        guard Self.isPageHost(space.host, of: tab) else { return completion(false) }
+
+        let pendingKey = "\(key) \(fingerprint) \(isPrivate)"
+        if pendingCertificateDecisions[pendingKey] != nil {
+            pendingCertificateDecisions[pendingKey]?.append(completion)
+            return
+        }
+        pendingCertificateDecisions[pendingKey] = [completion]
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "The certificate for \(key) cannot be verified"
+        alert.informativeText = known == nil
+            ? "Nook cannot confirm that this is really \(space.host). Someone on your network could be answering in its place. Continue only if you expect this device to use a self-signed certificate."
+            : "The certificate has CHANGED since it was last accepted. A reset or replaced device does that, and so does someone intercepting the connection."
+        // Cancel first, so Return takes the safe choice.
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Continue")
+
+        let finish: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            guard let self else { return completion(false) }
+            let accepted = response == .alertSecondButtonReturn
+            if accepted, isPrivate {
+                self.privateCertificateExceptions[key] = fingerprint
+            } else if accepted {
+                var exceptions = UserDefaults.standard.dictionary(forKey: Self.certificateExceptionsKey) as? [String: String] ?? [:]
+                exceptions[key] = fingerprint
+                UserDefaults.standard.set(exceptions, forKey: Self.certificateExceptionsKey)
+            }
+            self.pendingCertificateDecisions.removeValue(forKey: pendingKey)?.forEach { $0(accepted) }
+        }
+
+        if let window = tab.activeWebView.window {
+            alert.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            finish(alert.runModal())
+        }
+    }
+
+    // MARK: - Basic Auth Prompt
+
     private func presentBasicCredentialPrompt(
         for challenge: URLAuthenticationChallenge,
         tab: PageSession,
@@ -93,21 +201,26 @@ final class AuthenticationManager: NSObject {
             return
         }
 
-        let host = challenge.protectionSpace.host
-        let displayHost: String
-        if !host.isEmpty {
-            displayHost = host
-        } else if let realm = challenge.protectionSpace.realm, !realm.isEmpty {
-            displayHost = realm
-        } else if let url = tab.activeWebView.url {
-            displayHost = url.host ?? url.absoluteString
-        } else {
-            displayHost = "this site"
-        }
+        let space = challenge.protectionSpace
+        let host = space.host
+        let scheme = space.protocol ?? "http"
+        let isDefaultPort = space.port == 0 || (scheme == "http" && space.port == 80) || (scheme == "https" && space.port == 443)
+        let displayHost = host.contains(":") ? "[\(host)]" : host
+        let origin = "\(scheme)://\(displayHost)" + (isDefaultPort ? "" : ":\(space.port)")
 
-        let prefilledCredential = !host.isEmpty ? credentialStore.credential(for: host) : nil
+        // The realm is the server's own text: drop control and bidi characters and keep it short.
+        let unprintable = CharacterSet.controlCharacters.union(.newlines)
+        let realmScalars = (space.realm ?? "").unicodeScalars.filter { !unprintable.contains($0) }
+        let realm = String(String(String.UnicodeScalarView(realmScalars)).prefix(64))
+
+        let account = credentialAccount(for: space, tab: tab)
+        let prefilledCredential = account.flatMap { credentialStore.credential(for: $0) }
         let model = BasicAuthDialogModel(
-            host: displayHost,
+            origin: origin,
+            realm: realm,
+            isProxy: space.isProxy(),
+            isInsecure: scheme == "http" || !space.receivesCredentialSecurely,
+            canRemember: account != nil,
             username: prefilledCredential?.username ?? "",
             password: prefilledCredential?.password ?? "",
             rememberCredential: prefilledCredential != nil
@@ -126,12 +239,15 @@ final class AuthenticationManager: NSObject {
                 guard let self else { return }
                 NSApp.mainWindow?.makeFirstResponder(nil)
 
-                if !host.isEmpty {
+                if let account {
                     if remember {
-                        self.credentialStore.saveCredential(.init(username: username, password: password), for: host)
+                        self.credentialStore.saveCredential(.init(username: username, password: password), for: account)
                     } else {
-                        self.credentialStore.deleteCredential(for: host)
+                        self.credentialStore.deleteCredential(for: account)
                     }
+                    // Entries from before accounts carried scheme, port and realm were keyed
+                    // by bare host. Nothing reads them any more; do not leave the secret behind.
+                    self.credentialStore.deleteCredential(for: host)
                 }
 
                 manager.dialogManager.closeDialog()
