@@ -48,6 +48,8 @@ extension PageSession: WKNavigationDelegate, WKDownloadDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
+        // First commit of the process is the launch-to-first-paint mark; later ones no-op.
+        LaunchMetrics.markFirstPaint()
         controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
