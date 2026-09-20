@@ -83,6 +83,18 @@ class TabCompositorManager: ObservableObject {
         restartTimer(for: itemID)
     }
 
+    /// A page became active through normal selection.
+    ///
+    /// Deliberately does not load the view: the caller is already loading it, and routing through
+    /// `load` would re-enter `setupWebView` before its notify-once guard is set. Only the budget
+    /// work happens here, which is what selection used to skip entirely.
+    func pageActivated(_ itemID: UUID) {
+        markTabAccessed(itemID)
+        if mode.maxLoadedTabs != nil {
+            enforceMaxLoadedTabs()
+        }
+    }
+
     func load(_ session: PageSession) {
         markTabAccessed(session.itemID)
         session.loadWebViewIfNeeded()
