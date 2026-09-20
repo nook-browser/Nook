@@ -33,6 +33,7 @@ struct HoverTrackingView: NSViewRepresentable {
 final class HoverTrackingNSView: NSView {
     var onHover: ((Bool) -> Void)?
     private var trackingArea: NSTrackingArea?
+    private var isHovered = false
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -47,14 +48,47 @@ final class HoverTrackingNSView: NSView {
         )
         addTrackingArea(area)
         trackingArea = area
+        // AppKit sends no mouseExited for an area removed while the pointer is inside it, so a
+        // relayout under the cursor would leave the row hovered until it was entered again.
+        resyncHover()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        resyncHover()
+    }
+
+    /// Derives hover from where the pointer actually is, for the cases no enter/exit arrives.
+    private func resyncHover() {
+        guard let window, window.isKeyWindow else {
+            setHover(false, deferred: true)
+            return
+        }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        setHover(bounds.contains(point), deferred: true)
+    }
+
+    /// `deferred` keeps a resync out of the layout pass that triggered it; real enter and exit
+    /// events stay synchronous so hover never lags a frame behind the pointer.
+    private func setHover(_ value: Bool, deferred: Bool = false) {
+        guard value != isHovered else { return }
+        isHovered = value
+        guard deferred else {
+            onHover?(value)
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isHovered == value else { return }
+            self.onHover?(value)
+        }
     }
 
     override func mouseEntered(with event: NSEvent) {
-        onHover?(true)
+        setHover(true)
     }
 
     override func mouseExited(with event: NSEvent) {
-        onHover?(false)
+        setHover(false)
     }
 }
 
