@@ -111,7 +111,8 @@ public class SearchManager {
         autofillTask = Task { [weak self] in
             guard let self, let historyManager = self.historyManager else { return }
             let host = await historyManager.autofillHost(prefix: query.trimmingCharacters(in: .whitespacesAndNewlines))
-            guard !Task.isCancelled, self.searchGeneration == generation else { return }
+            guard !Task.isCancelled, self.searchGeneration == generation,
+                  self.window?.spaceID == space else { return }
             self.autofillHost = host
         }
 
