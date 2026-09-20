@@ -40,8 +40,21 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build 
   CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
 
 # Release build (Apple Silicon only; MLX has no x86_64 slice)
-xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build
+# The two coverage flags are required: see Code Coverage below.
+xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build \
+  ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO
 ```
+
+**Code coverage must be disabled on the build command, not just in the project.** Xcode defaults
+`ENABLE_CODE_COVERAGE` and `CLANG_COVERAGE_MAPPING` to `YES`, and a plain Release build ships a
+binary carrying live `__llvm_prf_cnts` counters: every basic block increments one at runtime, and
+the counter array is dirty, unshareable memory in each launch. Setting the flags in
+`project.pbxproj` only de-instruments the app target; SPM package targets (MLX, SwiftSoup,
+NookWeb, OrderedCollections) do not inherit project-level settings and stay instrumented. Passing
+the flags on the `xcodebuild` invocation covers everything. Measured on 1.3.0: 81.7 MB binary with
+67,242 profiling symbols, versus 54.2 MB and zero with the flags. Verify with
+`nm <binary> | grep -c __llvm_prf` (expect 0) rather than `-showBuildSettings`, which reports
+`CLANG_COVERAGE_MAPPING = YES` even when the project sets it to `NO`.
 
 **There is no test target.** `xcodebuild test -scheme Nook` fails. Verification is a build plus manual run. If the working tree holds someone else's uncommitted edits, verify committed work in a detached worktree (`git worktree add --detach /tmp/x HEAD`) with its own `-derivedDataPath` instead of building the dirty tree.
 

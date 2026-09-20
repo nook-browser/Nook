@@ -92,7 +92,9 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="$ENTITLEMENTS" \
             CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ENABLE_CODE_COVERAGE=NO \
+            CLANG_COVERAGE_MAPPING=NO
           cp -R "build/Build/Products/Release/Nook.app" ./Nook.app
 
       - name: Re-sign for notarization
