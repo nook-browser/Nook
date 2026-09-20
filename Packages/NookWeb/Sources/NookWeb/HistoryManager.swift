@@ -244,7 +244,15 @@ actor HistoryStore {
             sortBy: [SortDescriptor(\.visitCount, order: .reverse), SortDescriptor(\.lastVisited, order: .reverse)]
         )
         descriptor.fetchLimit = 10_000
-        let entries = (try? modelContext.fetch(descriptor)) ?? []
+        let entries: [HistoryEntity]
+        do {
+            entries = try modelContext.fetch(descriptor)
+        } catch {
+            // Caching this as an empty index would suppress autofill until it aged out. Offer
+            // nothing for this keystroke and let the next one retry the fetch.
+            Self.logger.error("Autofill index build failed: \(error.localizedDescription, privacy: .public)")
+            return [:]
+        }
         let hosts = AutofillRanking.aggregate(entries.map { ($0.url, $0.visitCount, $0.lastVisited) })
         autofillCache = AutofillIndex(profile: profile, built: Date(), hosts: hosts)
         return hosts
