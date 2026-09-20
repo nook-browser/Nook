@@ -972,6 +972,7 @@ class BrowserManager: ObservableObject {
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
         // The newly active window's space is the app's login context.
         windowSpaceChanged(windowState)
+        moveSidebarPiP(to: windowState)
     }
 
     // MARK: - Window-Aware Tab Operations

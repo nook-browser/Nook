@@ -4,9 +4,8 @@
 //  Nook
 //
 //  Picture-in-picture pinned to the sidebar: when a playing video's tab is left, its live web
-//  view moves into the sidebar directly above the media controls bar. The page is not cloned,
-//  and the view never leaves the window: the compositor hands it over and takes it back, which
-//  is the same move it makes on every tab switch.
+//  view moves into the sidebar directly above the media controls bar, and can be dragged out
+//  into a floating panel and back. The page is not cloned: one live view changes superview.
 //
 
 import AppKit
@@ -26,6 +25,14 @@ import NookWeb
 final class SidebarPiPController {
     private static let logger = Logger(subsystem: "com.gstudios.nook", category: "SidebarPiP")
 
+    private(set) var isFloating = false
+    /// While the float panel is being dragged the sidebar shows its drop zone.
+    private(set) var isDragging = false
+    private(set) var isOverDock = false
+    @ObservationIgnored private var floatWindow: NSPanel?
+    @ObservationIgnored weak var dockZoneView: NSView?
+    @ObservationIgnored private static var lastFloatWidth: CGFloat = 420
+
     private(set) var itemID: UUID?
     private(set) var webView: WKWebView?
     private(set) var aspect: CGFloat = 16 / 9
@@ -42,6 +49,15 @@ final class SidebarPiPController {
 
 
     var isShowing: Bool { itemID != nil }
+
+    /// Feeds that autoplay whatever scrolls past: leaving one is not leaving a video.
+    private static let excludedHosts = ["instagram.com"]
+
+    static func allows(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return true }
+        return !excludedHosts.contains { host == $0 || host.hasSuffix("." + $0) }
+    }
+    var isDocked: Bool { isShowing && !isFloating }
 
     // MARK: - Enter
 
@@ -75,6 +91,7 @@ final class SidebarPiPController {
             guard let self, let rect = Self.rect(from: result), rect.width > 1, rect.height > 1,
                 rect != self.videoRect
             else { return }
+            Self.logger.notice("crop drifted: \(String(describing: self.videoRect), privacy: .public) -> \(String(describing: rect), privacy: .public)")
             self.videoRect = rect
             self.aspect = max(rect.width / rect.height, 0.1)
         }
@@ -94,6 +111,12 @@ final class SidebarPiPController {
     /// in the host's layer. The compositor resizes the view when it takes it back.
     func exit() {
         guard itemID != nil else { return }
+        closeFloat()
+        clear()
+    }
+
+    private func clear() {
+        isFloating = false
         itemID = nil
         webView = nil
         session = nil
@@ -108,10 +131,101 @@ final class SidebarPiPController {
         exit()
     }
 
+    // MARK: - Floating
+
+    /// Called mid-drag from the sidebar: the panel appears under the pointer and keeps following.
+    func popOut() {
+        guard let webView, !isFloating else { return }
+        let size = CGSize(width: Self.lastFloatWidth, height: Self.lastFloatWidth / aspect)
+        let mouse = NSEvent.mouseLocation
+        let origin = CGPoint(x: mouse.x - size.width / 2, y: mouse.y - size.height / 2)
+        let panel = SidebarPiPFloatPanel(contentRect: CGRect(origin: origin, size: size))
+        let root = FloatRootView(controller: self, frame: CGRect(origin: .zero, size: size))
+        root.container.crop = videoRect
+        panel.contentView = root
+        // With the web view as first responder, YouTube's search box took focus within a second
+        // of every pop-out and dropped its history over the video.
+        panel.initialFirstResponder = root
+
+        // Set before the move: the docked host must see it and leave the view alone.
+        isFloating = true
+        webView.removeFromSuperview()
+        webView.autoresizingMask = []
+        root.container.addSubview(webView)
+        panel.orderFrontRegardless()
+        floatWindow = panel
+        DispatchQueue.main.async { self.trackDrag() }
+    }
+
+    /// Back into the sidebar: the docked host adopts the view once it is orphaned.
+    func dock() {
+        guard isFloating else { return }
+        closeFloat()
+        isFloating = false
+    }
+
+    private func closeFloat() {
+        guard let floatWindow else { return }
+        Self.lastFloatWidth = floatWindow.frame.width
+        webView?.removeFromSuperview()
+        floatWindow.close()
+        self.floatWindow = nil
+    }
+
+    /// Moves the panel with the mouse until release, docking when released over the drop zone.
+    func trackDrag() {
+        guard let window = floatWindow, NSEvent.pressedMouseButtons & 1 == 1 else { return }
+        let start = NSEvent.mouseLocation
+        let grab = CGPoint(x: start.x - window.frame.minX, y: start.y - window.frame.minY)
+        window.trackEvents(matching: [.leftMouseDragged, .leftMouseUp], timeout: NSEvent.foreverDuration,
+                           mode: .eventTracking) { [weak self] event, stop in
+            guard let self, let event, event.type == .leftMouseDragged else {
+                stop.pointee = true
+                guard let self else { return }
+                let shouldDock = self.isOverDock
+                self.isDragging = false
+                self.isOverDock = false
+                if shouldDock { self.dock() }
+                return
+            }
+            let mouse = NSEvent.mouseLocation
+            window.setFrameOrigin(CGPoint(x: mouse.x - grab.x, y: mouse.y - grab.y))
+            if !self.isDragging { self.isDragging = true }
+            let over = self.dockZone?.contains(mouse) == true
+            if over != self.isOverDock { self.isOverDock = over }
+        }
+    }
+
+    private var dockZone: CGRect? {
+        guard let view = dockZoneView, let window = view.window else { return nil }
+        return window.convertToScreen(view.convert(view.bounds, to: nil))
+    }
+
+    /// Takes over another window's video, docked or floating, when this window gains focus.
+    func adopt(from other: SidebarPiPController) {
+        videoRect = other.videoRect
+        aspect = other.aspect
+        session = other.session
+        barSession = other.barSession
+        webView = other.webView
+        floatWindow = other.floatWindow
+        (floatWindow?.contentView as? FloatRootView)?.controller = self
+        isFloating = other.isFloating
+        itemID = other.itemID
+        other.floatWindow = nil
+        other.barSession = nil
+        other.clear()
+    }
+
+    func togglePlay() {
+        webView?.evaluateJavaScript(
+            "(function(){const v=document.querySelector('video'); if(v){v.paused ? v.play() : v.pause();}})();")
+    }
+
     // MARK: - Measurement
 
-    /// Read-only. Scrolls the video into view, then reports where it sits in the viewport so the
-    /// host can crop to it. Nothing on the page is styled, hidden or moved: every previous
+    /// Scrolls the video into view, then reports where it sits in the viewport so the host can
+    /// crop to it. Nothing on the page is styled, hidden or moved: every previous
     /// attempt to isolate the video with CSS was defeated by the site's own stacking contexts.
     static let measureScript = """
     (function() {
@@ -134,6 +248,10 @@ final class SidebarPiPController {
             w = paintedWidth;
             h = paintedHeight;
         }
+        // A page reduced to its video must not hold text focus: a focused search box drops its
+        // suggestions over the video.
+        const a = document.activeElement;
+        if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) a.blur();
         return { ok: true, x: x, y: y, w: w, h: h };
     })();
     """
@@ -169,8 +287,8 @@ struct SidebarPiPView: View {
 
     var body: some View {
         Group {
-            if let controller, controller.isShowing, let webView = controller.webView {
-                SidebarPiPWebViewHost(webView: webView, videoRect: controller.videoRect)
+            if let controller, controller.isDocked, let webView = controller.webView {
+                SidebarPiPWebViewHost(controller: controller, webView: webView, videoRect: controller.videoRect)
                     .aspectRatio(controller.aspect, contentMode: .fit)
                     .onAppear { controller.remeasure() }
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
@@ -180,12 +298,27 @@ struct SidebarPiPView: View {
                     }
                     .onHoverTracking { hovering in
                         withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
+                        if hovering { controller.remeasure() }
                     }
+                    .gesture(DragGesture(minimumDistance: NookDesign.Spacing.md)
+                        .onChanged { _ in controller.popOut() })
                     .padding(.horizontal, 8)
                     .transition(.collapseIntoBar)
+            } else if let controller, controller.isFloating, controller.isDragging {
+                dropZone(controller)
             }
         }
         .animation(NookDesign.Motion.spring, value: controller?.itemID)
+    }
+
+    private func dropZone(_ controller: SidebarPiPController) -> some View {
+        NookDesign.Radius.shape(NookDesign.Radius.md)
+            .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [NookDesign.Spacing.sm, NookDesign.Spacing.xs]))
+            .overlay { Label("Dock video", systemImage: "pip.enter").font(NookDesign.Font.caption) }
+            .foregroundStyle(controller.isOverDock ? .primary : .tertiary)
+            .aspectRatio(controller.aspect, contentMode: .fit)
+            .background(DockZoneReporter(controller: controller))
+            .padding(.horizontal, 8)
     }
 
     @ViewBuilder
@@ -193,7 +326,7 @@ struct SidebarPiPView: View {
         ZStack {
             Color.black.opacity(0.35)
 
-            HStack(spacing: NookDesign.Spacing.sm) {
+            HStack(spacing: NookDesign.Spacing.xl) {
                 Button("Rewind", systemImage: "gobackward.10") { controller.seek(-10) }
                 Button(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill") {
                     guard let session = controller.session else { return }
@@ -238,6 +371,7 @@ struct SidebarPiPView: View {
 /// and renders untouched; a layer transform on the clipping container scales the video's rect to
 /// fill the sidebar slot. Nothing is injected, so no site's CSS can defeat it.
 private struct SidebarPiPWebViewHost: NSViewRepresentable {
+    let controller: SidebarPiPController
     let webView: WKWebView
     let videoRect: CGRect
 
@@ -250,6 +384,8 @@ private struct SidebarPiPWebViewHost: NSViewRepresentable {
     }
 
     func updateNSView(_ container: NSView, context: Context) {
+        // A host on its way out still gets updates; it must not take back a view that floated.
+        guard !controller.isFloating, controller.webView === webView else { return }
         if webView.superview !== container {
             webView.removeFromSuperview()
             // No autoresizing and no frame change: the page must keep the layout it was measured
@@ -268,9 +404,16 @@ private struct SidebarPiPWebViewHost: NSViewRepresentable {
 
 /// Flipped so its coordinates match CSS pixels, which is what the measured rect is in.
 private final class CropContainerView: NSView {
-    var crop: CGRect = .zero
+    var crop: CGRect = .zero { didSet { needsLayout = true } }
 
     override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    // The page gets no clicks or scrolls: a click would select its tab, a scroll would move
+    // the video out from under the crop.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        super.hitTest(point) == nil ? nil : self
+    }
 
     override func layout() {
         super.layout()
@@ -281,6 +424,148 @@ private final class CropContainerView: NSView {
             CATransform3DMakeTranslation(-crop.minX, -crop.minY, 0),
             CATransform3DMakeScale(scale, scale, 1))
     }
+}
+
+/// Tells the controller where the sidebar's drop zone is on screen.
+private struct DockZoneReporter: NSViewRepresentable {
+    let controller: SidebarPiPController
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ view: NSView, context: Context) { controller.dockZoneView = view }
+}
+
+// MARK: - Float panel
+
+/// Above every app and on every space, fullscreen ones included, without taking focus.
+private final class SidebarPiPFloatPanel: NSPanel {
+    init(contentRect: CGRect) {
+        super.init(contentRect: contentRect, styleMask: [.borderless, .nonactivatingPanel, .resizable],
+                   backing: .buffered, defer: false)
+        isReleasedWhenClosed = false
+        level = .floating
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        hidesOnDeactivate = false
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        contentAspectRatio = contentRect.size
+        contentMinSize = CGSize(width: 240, height: 240 * contentRect.height / contentRect.width)
+    }
+}
+
+/// The panel's content: the cropped video, hover controls, and the mouse-down that starts a drag.
+private final class FloatRootView: NSView {
+    weak var controller: SidebarPiPController? { didSet { trackPlayState() } }
+    let container = CropContainerView(frame: .zero)
+    private let controls = NSView()
+    private var playButton: NSButton?
+    /// Same target as the media bar's buttons.
+    private static let buttonSize: CGFloat = 24
+
+    init(controller: SidebarPiPController, frame: CGRect) {
+        self.controller = controller
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.cgColor
+        layer?.cornerRadius = NookDesign.Radius.md
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+
+        container.wantsLayer = true
+        container.layer?.masksToBounds = true
+        controls.wantsLayer = true
+        controls.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.35).cgColor
+        controls.isHidden = true
+        for view in [container, controls] {
+            view.frame = bounds
+            view.autoresizingMask = [.width, .height]
+            addSubview(view)
+        }
+
+        let play = button("pause.fill", "Play or Pause") { [weak self] in self?.controller?.togglePlay() }
+        playButton = play
+        let transport = NSStackView(views: [
+            button("gobackward.10", "Rewind") { [weak self] in self?.controller?.seek(-10) },
+            play,
+            button("goforward.10", "Forward") { [weak self] in self?.controller?.seek(10) },
+        ])
+        let corner = NSStackView(views: [
+            button("pip.enter", "Return to sidebar") { [weak self] in self?.controller?.dock() },
+            button("xmark", "Return video to its tab") { [weak self] in self?.controller?.exit() },
+        ])
+        transport.spacing = NookDesign.Spacing.xl
+        corner.spacing = NookDesign.Spacing.sm
+        for stack in [transport, corner] {
+            stack.translatesAutoresizingMaskIntoConstraints = false
+            controls.addSubview(stack)
+        }
+        NSLayoutConstraint.activate([
+            transport.centerXAnchor.constraint(equalTo: controls.centerXAnchor),
+            transport.centerYAnchor.constraint(equalTo: controls.centerYAnchor),
+            corner.topAnchor.constraint(equalTo: controls.topAnchor, constant: NookDesign.Spacing.xs),
+            corner.trailingAnchor.constraint(equalTo: controls.trailingAnchor, constant: -NookDesign.Spacing.xs),
+        ])
+        trackPlayState()
+    }
+
+    /// Re-arms itself on each change, so the icon follows the session without a timer.
+    private func trackPlayState() {
+        let playing = withObservationTracking {
+            controller?.session?.hasPlayingVideo == true
+        } onChange: { [weak self] in
+            DispatchQueue.main.async { self?.trackPlayState() }
+        }
+        playButton?.image = NSImage(systemSymbolName: playing ? "pause.fill" : "play.fill",
+                                    accessibilityDescription: playing ? "Pause" : "Play")
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    private func button(_ symbol: String, _ label: String, action: @escaping () -> Void) -> NSButton {
+        let button = ClosureButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: label)!,
+                                   target: nil, action: nil)
+        button.handler = action
+        button.target = button
+        button.action = #selector(ClosureButton.fire)
+        button.isBordered = false
+        button.contentTintColor = .white
+        button.symbolConfiguration = .init(pointSize: 16, weight: .medium)
+        button.toolTip = label
+        button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: Self.buttonSize),
+            button.heightAnchor.constraint(equalToConstant: Self.buttonSize),
+        ])
+        return button
+    }
+
+    override var acceptsFirstResponder: Bool { true }
+
+    // The panel never becomes key, so every click is a first click.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { controller?.dock() } else { controller?.trackDrag() }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        controls.isHidden = false
+        controller?.remeasure()
+    }
+
+    override func mouseExited(with event: NSEvent) { controls.isHidden = true }
+}
+
+private final class ClosureButton: NSButton {
+    var handler: (() -> Void)?
+    @objc func fire() { handler?() }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 // MARK: - Transition
