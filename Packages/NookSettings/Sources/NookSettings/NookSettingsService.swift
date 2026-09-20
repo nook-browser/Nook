@@ -700,10 +700,8 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
     public var description: String {
         switch self {
         case .powerSaving: return "Aggressively unloads tabs to minimize memory and battery usage. Best for laptops on battery."
-        case .standard:
-            return "Balanced tab management for everyday browsing. Keeps up to "
-                + "\(Self.memoryScaledTabCap) tabs loaded on this Mac, unloading the least recently used."
-        case .performance: return "No limit on loaded tabs. For power users with lots of memory."
+        case .standard: return "Balanced tab management for everyday browsing."
+        case .performance: return "Keeps tabs loaded longer for power users with many tabs open."
         }
     }
 
@@ -723,29 +721,13 @@ public enum TabManagementMode: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Ceiling on pages kept loaded. `nil` means no ceiling.
-    ///
-    /// This is a backstop, not the everyday policy: `unloadTimeout` and memory pressure do the
-    /// routine work, which is what Chrome, Edge, Firefox and Safari all rely on. None of them
-    /// caps by tab count, and WebKit removed its own 20-WebProcess limit years ago, so a cap that
-    /// binds constantly would evict pages the user is actively cycling through.
-    ///
-    /// `standard` scales with the machine instead of picking a fixed number, the way WebKit sizes
-    /// its own caches. At a measured median of ~150 MB per WebContent process, 1.5 tabs per GB
-    /// budgets roughly a fifth of memory for web content: 12 tabs at 8 GB, 24 at 16 GB, 48 at 32 GB.
-    /// The floor keeps small machines usable; the ceiling is where the timeout dominates anyway.
     public var maxLoadedTabs: Int? {
         switch self {
         case .powerSaving: return 8
-        case .standard: return Self.memoryScaledTabCap
+        case .standard: return nil
         case .performance: return nil
         }
     }
-
-    static let memoryScaledTabCap: Int = {
-        let gigabytes = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
-        return min(48, max(8, Int((gigabytes * 1.5).rounded())))
-    }()
 
     public var unloadsOnBackground: Bool {
         switch self {
