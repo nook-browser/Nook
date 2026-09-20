@@ -2,7 +2,8 @@
 // Facebook and Instagram play video through MSE blob: URLs, so the saveable MP4 (with audio) lives in
 // React props: browser_native_hd_url / playable_url on Facebook, video_versions on Instagram.
 // social-image-download.js dispatches 'nook-social-video-url' on a <video>; this answers synchronously
-// in the element's data-nook-video-url attribute. It reads data only; the app checks the host before saving.
+// in the element's data-nook-video-url attribute. It reads data only. The app does not check the host:
+// it takes any https URL, sends cookies only to the page's own site, and keeps only an image or video.
 (function () {
     if (!/(^|\.)(instagram\.com|facebook\.com)$/.test(location.hostname)) return;
 
