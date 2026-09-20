@@ -77,6 +77,15 @@ public final class HistoryManager {
         return await storeTask.value.search(query: query, profile: profile, page: page, pageSize: pageSize)
     }
 
+    /// Bare host for omnibox inline autofill, e.g. `facebo` -> `facebook.com`. Nil when nothing qualifies.
+    /// Skips the pending-write await the other reads take: a keystroke-rate query wants speed, and a
+    /// host that is one visit stale autofills the same either way.
+    public func autofillHost(prefix: String, minVisits: Int = 2) async -> String? {
+        let profile = currentProfileId
+        guard !Task.isCancelled else { return nil }
+        return await storeTask.value.autofillHost(prefix: prefix, profile: profile, minVisits: minVisits)
+    }
+
     public func getMostVisited(limit: Int = 10) async -> [HistoryEntry] {
         let profile = currentProfileId
         await pendingWrite?.value
@@ -190,6 +199,26 @@ actor HistoryStore {
             }
         } catch { Self.logger.error("History search failed: \(error.localizedDescription, privacy: .public)") }
         return (Array(matches.dropFirst(start).prefix(pageSize)), false)
+    }
+
+    /// Highest-ranked host whose name, minus `www.`, starts with `prefix`. Ranked by total visits
+    /// across the whole host, then recency, so a popular origin beats a deep page visited once.
+    func autofillHost(prefix: String, profile: UUID?, minVisits: Int) -> String? {
+        guard AutofillRanking.isUsable(prefix: prefix) else { return nil }
+        let interval = BrowserPerformance.signposter.beginInterval("HistoryAutofill")
+        defer { BrowserPerformance.signposter.endInterval("HistoryAutofill", interval) }
+        // ponytail: scans the 2000 most-visited rows; build an in-memory host index if this shows in a trace.
+        var descriptor = FetchDescriptor<HistoryEntity>(
+            predicate: visible(to: profile),
+            sortBy: [SortDescriptor(\.visitCount, order: .reverse), SortDescriptor(\.lastVisited, order: .reverse)]
+        )
+        descriptor.fetchLimit = 2000
+        guard !Task.isCancelled, let entries = try? modelContext.fetch(descriptor) else { return nil }
+        return AutofillRanking.bestHost(
+            in: entries.map { ($0.url, $0.visitCount, $0.lastVisited) },
+            prefix: prefix,
+            minVisits: minVisits
+        )
     }
 
     func mostVisited(profile: UUID?, limit: Int) -> [HistoryEntry] {
