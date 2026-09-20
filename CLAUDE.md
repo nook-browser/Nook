@@ -326,6 +326,16 @@ One GitHub Actions workflow, `.github/workflows/macos-notarize.yml`: on push of 
 
 **Known state**: runner is `macos-26` (restored 2026-09-14; the SDK 26 deployment target requires it). The workflow uses the runner's default Xcode and does not pin a version. The restored pipeline works: the 2026-09-14 run (workflow_dispatch, 7m33s) published `v1.2.1` with a notarized DMG. Local tags `v1.1.x`/`v1.2.0` were never published.
 
+## User-Visible Text
+
+**Never add, reword or remove text a user can read without asking first.** Settings labels,
+descriptions and footers, menu items, button titles, dialog copy, toasts, onboarding text, error
+messages and release notes are all product copy, not implementation detail. They carry promises:
+a `TabManagementMode.description` claiming "Keeps up to 48 tabs loaded on this Mac" is a
+commitment the code has to keep, and it shipped once while the budget enforcing it was inert.
+Changing a mechanism does not license changing the words that describe it. Propose the wording,
+get approval, then edit. This applies even when the existing copy looks wrong.
+
 ## Code Style
 
 - No SwiftLint or SwiftFormat enforced; follow existing patterns
