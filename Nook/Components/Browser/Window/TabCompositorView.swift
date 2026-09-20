@@ -1,5 +1,6 @@
 // Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
 import AppKit
+import OSLog
 import WebKit
 import NookSettings
 import NookTabsCore
@@ -12,6 +13,18 @@ import NookWeb
 /// favorites are exempt.
 @MainActor
 class TabCompositorManager: ObservableObject {
+    private static let log = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "TabCompositor")
+
+    /// Why a page was unloaded. Logged so the unload policy is observable in a running build:
+    /// without it there is no way to tell "the budget never fired" from "it fired and did nothing".
+    enum EvictionReason: String {
+        case timeout, budget, memoryPressure, background
+    }
+
+    /// Pages currently holding a web view.
+    var loadedCount: Int { tabs?.sessions.filter { !$0.isUnloaded }.count ?? 0 }
+
     private var unloadTimers: [UUID: Timer] = [:]
     private var lastAccessTimes: [UUID: Date] = [:]
     private var memoryPressureSource: DispatchSourceMemoryPressure?
@@ -79,9 +92,11 @@ class TabCompositorManager: ObservableObject {
     }
 
     /// Automatic eviction of a page no window shows.
-    private func evict(_ session: PageSession) {
+    private func evict(_ session: PageSession, reason: EvictionReason) {
         forget(session.itemID)
         session.unload()
+        Self.log.notice(
+            "evicted: \(reason.rawValue, privacy: .public), loaded now \(self.loadedCount, privacy: .public)")
     }
 
     func forget(_ itemID: UUID) {
@@ -133,7 +148,7 @@ class TabCompositorManager: ObservableObject {
             restartTimer(for: itemID)
             return
         }
-        evict(session)
+        evict(session, reason: .timeout)
     }
 
     // MARK: - Exemptions
@@ -205,7 +220,8 @@ class TabCompositorManager: ObservableObject {
         } else {
             count = Int(ceil(Double(candidates.count) * mode.memoryPressureUnloadFraction))
         }
-        candidates.prefix(count).forEach(evict)
+        Self.log.notice("memory pressure: loaded \(self.loadedCount, privacy: .public), evicting \(count, privacy: .public)")
+        candidates.prefix(count).forEach { evict($0, reason: .memoryPressure) }
     }
 
     // MARK: - Background Unloading
@@ -230,7 +246,7 @@ class TabCompositorManager: ObservableObject {
 
     private func handleAppDidResignActive() {
         guard mode.unloadsOnBackground, let sessions = tabs?.sessions else { return }
-        sessions.filter(canUnloadInactive).forEach(evict)
+        sessions.filter(canUnloadInactive).forEach { evict($0, reason: .background) }
     }
 
     // MARK: - Loaded Page Budget
@@ -242,6 +258,10 @@ class TabCompositorManager: ObservableObject {
 
         // canUnloadInactive already leaves pinned tabs and favorites out of the count.
         let loaded = sessions.filter(canUnloadInactive)
+        // Logged either way: silence here would be ambiguous between a cap that never binds and
+        // code that never runs, which is exactly what made an earlier measurement useless.
+        Self.log.notice(
+            "budget check: cap \(maxTabs, privacy: .public), unloadable \(loaded.count, privacy: .public), loaded \(self.loadedCount, privacy: .public)")
         guard loaded.count > maxTabs else { return }
 
         // Grace period: pages accessed within the last 30 seconds stay.
@@ -252,7 +272,9 @@ class TabCompositorManager: ObservableObject {
             return now.timeIntervalSince(lastAccess) > gracePeriod
         }
         let toUnload = eligible.sorted { importance($0) < importance($1) }.prefix(max(0, loaded.count - maxTabs))
-        toUnload.forEach(evict)
+        Self.log.notice(
+            "budget: cap \(maxTabs, privacy: .public), unloadable \(loaded.count, privacy: .public), evicting \(toUnload.count, privacy: .public)")
+        toUnload.forEach { evict($0, reason: .budget) }
 
         // A burst can exceed the budget while every page is inside its grace period. Retry once
         // at the next expiry rather than waiting for another user action.
