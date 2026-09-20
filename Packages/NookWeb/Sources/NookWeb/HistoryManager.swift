@@ -111,6 +111,24 @@ public final class HistoryManager {
 @ModelActor
 actor HistoryStore {
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "History")
+    /// Past this age the autofill index is rebuilt, whatever it holds.
+    private static let indexMaxAge: TimeInterval = 300
+
+    private struct AutofillIndex {
+        let profile: UUID?
+        let built: Date
+        var hosts: [String: HostStat]
+
+        /// Folds a visit in, when this index covers that profile. The test mirrors what
+        /// `visible(to:)` selects: an all-profiles index covers every visit, and a per-profile
+        /// index also covers the profile-less rows it would have fetched.
+        mutating func record(url: String, profile visitProfile: UUID?, at date: Date) {
+            guard profile == nil || visitProfile == nil || profile == visitProfile else { return }
+            AutofillRanking.add(url: url, visits: 1, at: date, to: &hosts)
+        }
+    }
+
+    private var autofillCache: AutofillIndex?
 
     private func visible(to profile: UUID?) -> Predicate<HistoryEntity> {
         guard let profile else { return #Predicate { _ in true } }
@@ -146,12 +164,14 @@ actor HistoryStore {
                     modelContext.insert(HistoryEntity(url: url, title: visit.title.isEmpty ? (visit.url.host ?? "Unknown") : visit.title,
                         visitDate: visit.timestamp, tabId: visit.tabId, lastVisited: visit.timestamp, profileId: visit.profileId))
                 }
+                autofillCache?.record(url: url, profile: visit.profileId, at: visit.timestamp)
                 // Bound each transaction while avoiding a disk save for every imported row.
                 if (index + 1).isMultiple(of: 500) { try modelContext.save() }
             }
             try modelContext.save()
         } catch {
             modelContext.rollback()
+            autofillCache = nil
             Self.logger.error("History write failed: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -203,22 +223,31 @@ actor HistoryStore {
 
     /// Highest-ranked host whose name, minus `www.`, starts with `prefix`. Ranked by total visits
     /// across the whole host, then recency, so a popular origin beats a deep page visited once.
+    /// Reads the cached index, so a keystroke costs a prefix scan over hosts rather than a fetch.
     func autofillHost(prefix: String, profile: UUID?, minVisits: Int) -> String? {
         guard AutofillRanking.isUsable(prefix: prefix) else { return nil }
-        let interval = BrowserPerformance.signposter.beginInterval("HistoryAutofill")
-        defer { BrowserPerformance.signposter.endInterval("HistoryAutofill", interval) }
-        // ponytail: scans the 2000 most-visited rows; build an in-memory host index if this shows in a trace.
+        return AutofillRanking.bestHost(in: autofillIndex(for: profile), prefix: prefix, minVisits: minVisits)
+    }
+
+    /// Host index for `profile`, built on first use. `addVisits` folds new visits in rather than
+    /// dropping it, and the age check bounds how long a delete made elsewhere can leave it wrong.
+    private func autofillIndex(for profile: UUID?) -> [String: HostStat] {
+        if let cache = autofillCache, cache.profile == profile,
+           Date().timeIntervalSince(cache.built) < Self.indexMaxAge {
+            return cache.hosts
+        }
+        let interval = BrowserPerformance.signposter.beginInterval("HistoryAutofillIndex")
+        defer { BrowserPerformance.signposter.endInterval("HistoryAutofillIndex", interval) }
+        // ponytail: one fetch of the 10k most-visited rows; page it if a history that size shows up.
         var descriptor = FetchDescriptor<HistoryEntity>(
             predicate: visible(to: profile),
             sortBy: [SortDescriptor(\.visitCount, order: .reverse), SortDescriptor(\.lastVisited, order: .reverse)]
         )
-        descriptor.fetchLimit = 2000
-        guard !Task.isCancelled, let entries = try? modelContext.fetch(descriptor) else { return nil }
-        return AutofillRanking.bestHost(
-            in: entries.map { ($0.url, $0.visitCount, $0.lastVisited) },
-            prefix: prefix,
-            minVisits: minVisits
-        )
+        descriptor.fetchLimit = 10_000
+        let entries = (try? modelContext.fetch(descriptor)) ?? []
+        let hosts = AutofillRanking.aggregate(entries.map { ($0.url, $0.visitCount, $0.lastVisited) })
+        autofillCache = AutofillIndex(profile: profile, built: Date(), hosts: hosts)
+        return hosts
     }
 
     func mostVisited(profile: UUID?, limit: Int) -> [HistoryEntry] {
@@ -239,6 +268,7 @@ actor HistoryStore {
                 try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.lastVisited < cutoff })
             }
             try modelContext.save()
+            autofillCache = nil
         } catch { Self.logger.error("History clear failed: \(error.localizedDescription, privacy: .public)") }
     }
 
@@ -246,6 +276,7 @@ actor HistoryStore {
         do {
             try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.id == id })
             try modelContext.save()
+            autofillCache = nil
         } catch { Self.logger.error("History deletion failed: \(error.localizedDescription, privacy: .public)") }
     }
 
