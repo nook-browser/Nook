@@ -66,8 +66,20 @@ public final class TabsController {
     @ObservationIgnored public weak var tabEvents: TabEventObserver?
     @ObservationIgnored public weak var alerts: AlertPresenter?
 
+    /// Launch argument that redirects tab state, e.g. `-NookStateDir /tmp/bench`.
+    /// Read from the argument domain only, never from persisted defaults, so a stray written
+    /// key can never silently point a real user's session somewhere else.
+    nonisolated public static let stateDirArgument = "NookStateDir"
+
     nonisolated public static var defaultDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        // Every build shares one bundle id, so a benchmark or scripted run would otherwise write
+        // over a real session's tabs. This gives such a run a throwaway directory to use.
+        let arguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        if let override = arguments[stateDirArgument] as? String, !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+                .appendingPathComponent("Tabs", isDirectory: true)
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(Bundle.main.bundleIdentifier ?? "Nook", isDirectory: true)
             .appendingPathComponent("Tabs", isDirectory: true)
     }
