@@ -477,7 +477,8 @@ private struct HTTPRequest {
             guard let colon = line.firstIndex(of: ":") else { continue }
             headers[line[..<colon].lowercased()] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
         }
-        let length = Int(headers["content-length"] ?? "0") ?? 0
+        // A negative length would build an inverted range below and trap before the token check.
+        let length = max(0, Int(headers["content-length"] ?? "0") ?? 0)
         let bodyStart = split.upperBound
         guard buffer.count - bodyStart >= length else { return nil }
         method = String(start[0])
