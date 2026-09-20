@@ -47,7 +47,7 @@ public final class SiteRoutingManager {
     public func applyRoute(url: URL, from page: AnyObject?) -> Bool {
         guard let host, let rule = resolve(url: url) else { return false }
         guard host.route(url: url, toSpace: rule.targetSpaceId, from: page) else { return false }
-        logger.info("Route matched: \(url.absoluteString, privacy: .public) → space \(rule.targetSpaceId, privacy: .public)")
+        logger.info("Route matched: \(url.host ?? "", privacy: .public) → space \(rule.targetSpaceId, privacy: .public)")
         return true
     }
 

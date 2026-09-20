@@ -64,9 +64,12 @@ class ZoomManager: ObservableObject {
         // Update tab zoom level
         setZoomLevel(clampedZoom, for: tabId)
 
-        // Save for domain if available
+        // Save for domain if available. A private page (non-persistent data store) zooms
+        // the view only: its host must not reach UserDefaults.
         if let domain = domain {
-            saveZoomLevel(clampedZoom, for: domain)
+            if webView.configuration.websiteDataStore.isPersistent {
+                saveZoomLevel(clampedZoom, for: domain)
+            }
             currentDomain = domain
         }
 
