@@ -41,8 +41,8 @@ enum LegacyDataMigration {
         for name in ["default.store", "default.store-shm", "default.store-wal", "Tabs"] {
             copy(source.appendingPathComponent(name), to: target.appendingPathComponent(name))
         }
-        copy(webKit.appendingPathComponent(old).appendingPathComponent("WebsiteDataStore"),
-             to: webKit.appendingPathComponent(currentBundleID).appendingPathComponent("WebsiteDataStore"))
+        copyDataStores(from: webKit.appendingPathComponent(old).appendingPathComponent("WebsiteDataStore"),
+                       to: webKit.appendingPathComponent(currentBundleID).appendingPathComponent("WebsiteDataStore"))
 
         if let domain = defaults.persistentDomain(forName: old) {
             for (key, value) in domain where defaults.object(forKey: key) == nil {
@@ -50,6 +50,39 @@ enum LegacyDataMigration {
             }
             log.notice("Copied \(domain.count) defaults from \(old, privacy: .public)")
         }
+    }
+
+    /// Caches WebKit refills on demand. Copying them doubles disk use and makes the first launch
+    /// after an update wait on hundreds of MB for nothing: measured at 468 MB of NetworkCache in
+    /// one space alone. Logins and site data live in the other directories, so those still move.
+    private static let regenerableStoreDirectories: Set<String> = ["NetworkCache", "MediaCache"]
+
+    /// Copies each per-space data store, leaving the regenerable caches behind.
+    private static func copyDataStores(from: URL, to: URL) {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: from.path), !fm.fileExists(atPath: to.path) else { return }
+        guard let stores = try? fm.contentsOfDirectory(at: from, includingPropertiesForKeys: nil) else {
+            // Unreadable source: fall back to the whole-directory copy rather than migrating nothing.
+            copy(from, to: to)
+            return
+        }
+        var skipped = 0
+        for store in stores {
+            let target = to.appendingPathComponent(store.lastPathComponent, isDirectory: true)
+            guard let children = try? fm.contentsOfDirectory(at: store, includingPropertiesForKeys: nil) else {
+                copy(store, to: target)
+                continue
+            }
+            do { try fm.createDirectory(at: target, withIntermediateDirectories: true) } catch { continue }
+            for child in children {
+                if regenerableStoreDirectories.contains(child.lastPathComponent) {
+                    skipped += 1
+                    continue
+                }
+                copy(child, to: target.appendingPathComponent(child.lastPathComponent))
+            }
+        }
+        log.notice("Copied \(stores.count, privacy: .public) data stores, skipped \(skipped, privacy: .public) regenerable caches")
     }
 
     private static func copy(_ from: URL, to: URL) {
