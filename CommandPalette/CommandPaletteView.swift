@@ -545,6 +545,7 @@ struct CommandPaletteView: View {
     /// suggestion is selected by hand, since the field then holds that row's text instead.
     private var autofillTarget: String? {
         guard activeSiteSearch == nil,
+              !text.isEmpty,
               selectedSuggestionIndex == -1,
               text == userTypedText,
               let host = searchManager.autofillHost,

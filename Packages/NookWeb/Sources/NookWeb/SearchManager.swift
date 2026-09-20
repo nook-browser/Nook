@@ -99,6 +99,8 @@ public class SearchManager {
         updateSpaceContext()
         let space = currentSpaceId
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            autofillTask?.cancel()
+            autofillHost = nil
             updateSuggestionsIfNeeded([])
             return
         }
