@@ -187,9 +187,9 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             session?.deliverContextMenuPayload(nil)
             return
         }
-        // A middle click on a link rides the same bridge: WebKit does not turn one into a
-        // navigation, so the page has to report it.
-        if let href = dictionary["middleClickHref"] as? String {
+        // A middle click or Command-click on a link rides the same bridge: WebKit does not
+        // turn either into a new tab, so the page has to report it.
+        if let href = (dictionary["middleClickHref"] ?? dictionary["commandClickHref"]) as? String {
             if let url = URL(string: href) {
                 session?.openInNewTab(url)
             }
@@ -293,7 +293,7 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
         // handle its own middle clicks cancels the event, and a single-page app that
         // answers with window.open would otherwise give us two tabs for one click.
         document.addEventListener('auxclick', function(event) {
-            if (event.button !== 1 || event.defaultPrevented) { return; }
+            if (!event.isTrusted || event.button !== 1 || event.defaultPrevented) { return; }
             try {
                 var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
                 if (!link || !link.href) { return; }
@@ -309,6 +309,25 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
                 }, 0);
             } catch (error) {
                 console.error('[Nook Context Menu] auxclick error', error);
+            }
+        }, false);
+
+        // Command-click on a link opens it in a background tab. Only a real click counts:
+        // isTrusted is false for anything the page dispatches itself. Listening on window,
+        // bubble phase, puts this after the page's document listeners, so a page that
+        // cancels the click keeps it. preventDefault stops the link loading in this tab
+        // too, and has to happen now, so unlike middle click this cannot wait a tick.
+        window.addEventListener('click', function(event) {
+            if (!event.isTrusted || !event.metaKey || event.button !== 0 || event.defaultPrevented) { return; }
+            try {
+                var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+                if (!link || !link.href) { return; }
+                event.preventDefault();
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload) {
+                    window.webkit.messageHandlers.contextMenuPayload.postMessage({ commandClickHref: link.href });
+                }
+            } catch (error) {
+                console.error('[Nook Context Menu] command click error', error);
             }
         }, false);
 

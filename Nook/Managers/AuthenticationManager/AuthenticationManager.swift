@@ -14,45 +14,10 @@ import NookWeb
 
 @MainActor
 final class AuthenticationManager: NSObject {
-    typealias IdentityRequest = NookWeb.IdentityRequest
-    typealias IdentityFlowResult = NookWeb.IdentityFlowResult
-    typealias IdentityFailure = NookWeb.IdentityFailure
-
     private weak var browserManager: BrowserManager?
     private let credentialStore = BasicAuthCredentialStore()
-    private var activeIdentityRequest: IdentityRequest?
-    private weak var activeIdentitySession: PageSession?
-    private var waitingForMiniWindow = false
     func attach(browserManager: BrowserManager) {
         self.browserManager = browserManager
-    }
-
-    func beginIdentityFlow(_ request: IdentityRequest, from tab: PageSession) {
-        // Non-interactive flows cannot be satisfied without UI today.
-        if request.interactive == false {
-            tab.finishIdentityFlow(requestId: request.requestId, with: .failure(.interactionRequired))
-            return
-        }
-
-        browserManager?.contentBlockerManager.disableTemporarily(for: tab, duration: 15 * 60)
-
-        cancelActiveIdentityFlow()
-
-        guard let manager = browserManager else {
-            tab.finishIdentityFlow(requestId: request.requestId, with: .failure(.fallbackUnavailable))
-            return
-        }
-
-        activeIdentityRequest = request
-        activeIdentitySession = tab
-        waitingForMiniWindow = true
-
-        manager.externalMiniWindowManager.present(url: request.url) { [weak self] success, finalURL in
-            guard let self else { return }
-            Task { @MainActor in
-                self.handleMiniWindowCompletion(success: success, finalURL: finalURL)
-            }
-        }
     }
 
     func handleAuthenticationChallenge(
@@ -116,37 +81,6 @@ final class AuthenticationManager: NSObject {
         case 127: return true                                      // 127.0.0.0/8
         default: return false
         }
-    }
-
-    private func handleMiniWindowCompletion(success: Bool, finalURL: URL?) {
-        guard let request = activeIdentityRequest, let tab = activeIdentitySession else {
-            clearActiveIdentityState()
-            return
-        }
-
-        waitingForMiniWindow = false
-        defer { clearActiveIdentityState() }
-
-        guard success, let url = finalURL else {
-            tab.finishIdentityFlow(requestId: request.requestId, with: .failure(.fallbackCancelled))
-            return
-        }
-
-        tab.finishIdentityFlow(requestId: request.requestId, with: .success(url))
-        tab.activeWebView.reload()
-    }
-
-    private func cancelActiveIdentityFlow() {
-        if let request = activeIdentityRequest, let tab = activeIdentitySession {
-            tab.finishIdentityFlow(requestId: request.requestId, with: .cancelled)
-        }
-        clearActiveIdentityState()
-    }
-
-    private func clearActiveIdentityState() {
-        activeIdentityRequest = nil
-        activeIdentitySession = nil
-        waitingForMiniWindow = false
     }
 
     private func presentBasicCredentialPrompt(

@@ -102,7 +102,6 @@ extension BrowserModel: PageSessionDelegate {
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) -> Bool { false }
 
-    func beginIdentityFlow(_ request: IdentityRequest, from session: PageSession) {}
     func loadZoom(for itemID: UUID) {}
     func cleanupZoom(for itemID: UUID) {}
     func setMuteState(_ muted: Bool, for itemID: UUID) {}

@@ -37,6 +37,15 @@ class KeyboardShortcutManager {
     /// Detector for website keyboard shortcut conflicts
     let websiteShortcutDetector = WebsiteShortcutDetector()
 
+    /// Actions a page's self-reported shortcuts never take the first press of. The report
+    /// comes from the page, so a site could otherwise swallow the keys that leave it.
+    /// Keyed by action so a rebound shortcut stays covered; built-in site profiles are
+    /// not affected.
+    private static let neverYieldedToPageReports: Set<ShortcutAction> = [
+        .closeTab, .closeWindow, .closeBrowser, .newTab, .newWindow,
+        .focusAddressBar, .openCommandPalette, .toggleFullScreen,
+    ]
+
     init() {
         loadShortcuts()
         setupGlobalMonitor()
@@ -244,7 +253,8 @@ class KeyboardShortcutManager {
             let shouldPass = websiteShortcutDetector.shouldPassToWebsite(
                 keyCombination,
                 windowId: windowId,
-                nookActionName: shortcut.action.displayName
+                nookActionName: shortcut.action.displayName,
+                allowPageReports: !Self.neverYieldedToPageReports.contains(shortcut.action)
             )
             
             if shouldPass {

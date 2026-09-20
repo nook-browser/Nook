@@ -76,10 +76,6 @@ extension BrowserManager: PageSessionDelegate {
             challenge, for: session, completionHandler: completionHandler)
     }
 
-    func beginIdentityFlow(_ request: IdentityRequest, from session: PageSession) {
-        authenticationManager.beginIdentityFlow(request, from: session)
-    }
-
     func loadZoom(for itemID: UUID) { loadZoomForTab(itemID) }
 
     func cleanupZoom(for itemID: UUID) { cleanupZoomForTab(itemID) }
