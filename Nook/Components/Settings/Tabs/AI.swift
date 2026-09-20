@@ -782,8 +782,10 @@ struct SettingsAITab: View {
             do {
                 switch provider.providerType {
                 case .gemini:
-                    let url = URL(string: "\(provider.baseURL)/models?key=\(provider.apiKey)")!
-                    let (_, response) = try await URLSession.shared.data(from: url)
+                    // The key goes in a header; in the URL it would reach logs and proxies
+                    var request = URLRequest(url: URL(string: "\(provider.baseURL)/models")!)
+                    request.setValue(provider.apiKey, forHTTPHeaderField: "x-goog-api-key")
+                    let (_, response) = try await URLSession.shared.data(for: request)
                     if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                         connectionTestResult = "Success: Connection verified"
                     } else {
