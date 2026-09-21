@@ -137,6 +137,7 @@ build-release-signed/
 # notes. adblocker-architecture.md is the one committed doc, referenced by CLAUDE.md.
 docs/*
 !docs/adblocker-architecture.md
+tasks/
 .superpowers/
 .playwright-mcp/
 build-ios/
