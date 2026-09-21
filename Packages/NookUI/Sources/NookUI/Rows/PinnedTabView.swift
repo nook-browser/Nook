@@ -64,12 +64,12 @@ public struct PinnedTabView<Icon: View>: View {
                         Image(systemName: "arrow.uturn.backward")
                             .font(NookDesign.Font.caption)
                             .foregroundStyle(.secondary)
-                            .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+                            .frame(width: NookDesign.Size.cornerButton, height: NookDesign.Size.cornerButton)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("Reset to Pinned URL")
-                    .padding(NookDesign.Spacing.xs)
+                    .padding(NookDesign.Spacing.xxs)
                 }
             }
             .frame(maxWidth: .infinity)

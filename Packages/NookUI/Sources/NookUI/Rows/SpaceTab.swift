@@ -114,9 +114,9 @@ public struct SpaceTab: View {
                     // while the hover close button covers the trailing edge.
                     Button { tabs.resetToHome(item.id) } label: {
                         Image(systemName: "arrow.uturn.backward")
-                            .font(NookDesign.Font.secondary)
+                            .font(NookDesign.Font.caption)
                             .foregroundStyle(.tertiary)
-                            .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+                            .frame(width: NookDesign.Size.cornerButton, height: NookDesign.Size.cornerButton)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

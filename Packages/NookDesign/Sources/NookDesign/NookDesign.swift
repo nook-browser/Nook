@@ -83,6 +83,7 @@ public enum NookDesign {
         public static let spaceIcon: CGFloat = 14      // switcher and header symbol
         public static let rowGlyph: CGFloat = 13       // inline glyphs in a row: audio, lock, chevron
         public static let rowButton: CGFloat = 20      // hover-only close/unload button in a row
+        public static let cornerButton: CGFloat = 14   // button tucked into a tile corner, kept off the tile's centre
         public static let hairlineWidth: CGFloat = 1   // 1pt rule
         public static let waveAmplitude: CGFloat = 3   // peak of the separator's working wave
         public static let waveLength: CGFloat = 56     // one full cycle of that wave
