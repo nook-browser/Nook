@@ -97,11 +97,13 @@ final class TabOrganizerManager {
                 .compactMap { id in tabs.session(for: id)?.url ?? tabs.item(id)?.url }
             let duplicates = TabOrganizationPlan.duplicates(in: inputs, filed: filed)
             let kept = inputs.filter { !duplicates.contains($0.index) }
+            // Up to 10 titles per folder, fewer when there are many folders, to keep the prompt bounded.
+            let perFolder = min(10, max(3, 48 / max(1, folderIDs.count)))
             let folders = section.filter(\.isFolder).map { folder in
                 ExistingFolder(
                     id: folder.id,
                     name: folder.displayTitle,
-                    sampleTitles: tabs.children(of: .folder(itemID: folder.id)).prefix(3).map(\.displayTitle)
+                    sampleTitles: tabs.children(of: .folder(itemID: folder.id)).filter { !$0.isFolder }.prefix(perFolder).map(\.displayTitle)
                 )
             }
 

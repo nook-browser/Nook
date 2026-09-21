@@ -18,6 +18,12 @@ enum TabOrganizationModel {
     static let cleanTitleLength = 30
 
     private static let unrelated = "Unrelated"
+    /// Folder names that say nothing about their tabs. The model proposes them despite the prompt,
+    /// and they collect whatever fits nowhere else, so a folder with one of these names is dropped.
+    private static let genericNames: Set<String> = [
+        "general", "miscellaneous", "misc", "other", "others", "various", "personal", "technology", "tech",
+        "web", "internet", "online", "content & media", "media", "resources", "reference", "browsing", "websites",
+    ]
     private static let maxFolderNameLength = 40
     private static let maxTitleLength = 60
 
@@ -67,6 +73,7 @@ enum TabOrganizationModel {
         for folder in proposed {
             let name = clean(folder.name, limit: maxFolderNameLength)
             guard !name.isEmpty, name.caseInsensitiveCompare(unrelated) != .orderedSame,
+                  !genericNames.contains(name.lowercased()),
                   !folders.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { continue }
             folders.append((name, clean(folder.about, limit: 120)))
         }
@@ -180,9 +187,14 @@ enum TabOrganizationModel {
         return members.mapValues { $0.sorted() }
     }
 
-    /// For each new group, the existing folder that already covers its topic, or nil.
+    /// For each new group, the existing folder that already covers its topic, or nil. Names are
+    /// compared in code first: most existing folders were named by an earlier run, so the same topic
+    /// comes back under the same or a near-identical name. Only the rest go to the model, and
+    /// strictly: asked loosely, it handed every new group to some existing folder.
     private static func existingFolderNames(covering groups: [(name: String, about: String)], in existing: [ExistingFolder]) async throws -> [String?] {
-        guard !groups.isEmpty else { return [] }
+        var result = groups.map { group in existing.first { sameTopic($0.name, group.name) }?.name }
+        let open = groups.indices.filter { result[$0] == nil }
+        guard !open.isEmpty else { return result }
         let new = "New"
         let entry = DynamicGenerationSchema(name: "Match", properties: [
             .init(name: "folder", schema: DynamicGenerationSchema(type: Int.self)),
@@ -193,19 +205,29 @@ enum TabOrganizationModel {
             ),
         ])
         let session = LanguageModelSession(model: model, instructions: "You compare browser tab folders by topic. Most new folders match no existing folder.")
-        let lines = groups.enumerated().map { "\($0.offset + 1). \($0.element.name): \($0.element.about)" }
+        let lines = open.enumerated().map { "\($0.offset + 1). \(groups[$0.element].name): \(groups[$0.element].about)" }
         let held = existing.map { $0.sampleTitles.isEmpty ? "- \($0.name)" : "- \($0.name), holding: \($0.sampleTitles.joined(separator: "; "))" }
         let matched = try await session.respond(
             to: "Existing folders:\n\(held.joined(separator: "\n"))\nNew folders:\n\(lines.joined(separator: "\n"))",
-            schema: try entries(of: entry, count: groups.count), options: options(for: groups.count)
+            schema: try entries(of: entry, count: open.count), options: options(for: open.count)
         ).content
-        var result = [String?](repeating: nil, count: groups.count)
         for item in try matched.value([GeneratedContent].self, forProperty: "entries") {
             let index = try item.value(Int.self, forProperty: "folder") - 1
             let name = try item.value(String.self, forProperty: "sameAs")
-            if result.indices.contains(index), name != new { result[index] = name }
+            if open.indices.contains(index), name != new { result[open[index]] = name }
         }
         return result
+    }
+
+    /// True when every word of the shorter name appears in the longer one: "3D Printing" and
+    /// "3D Printing Models". Sharing one word is not enough ("Home Finance", "Home Automation").
+    static func sameTopic(_ a: String, _ b: String) -> Bool {
+        func words(_ name: String) -> Set<String> {
+            Set(name.lowercased().split { !$0.isLetter && !$0.isNumber }.map { $0.hasSuffix("s") && $0.count > 3 ? String($0.dropLast()) : String($0) })
+        }
+        let (x, y) = (words(a), words(b))
+        guard !x.isEmpty, !y.isEmpty else { return false }
+        return x.isSubset(of: y) || y.isSubset(of: x)
     }
 
     // MARK: - Renaming
