@@ -21,11 +21,11 @@ struct ExtensionLibraryButton: View {
     @State private var anchorView: NSView?
 
     var body: some View {
-        Button("Extensions", systemImage: "square.grid.2x2") {
+        Button("More", systemImage: "ellipsis") {
             togglePanel()
         }
         .labelStyle(.iconOnly)
-        .buttonStyle(NookIconButtonStyle(size: 28, radius: NookDesign.Radius.lg))
+        .buttonStyle(NookIconButtonStyle(size: NookDesign.Size.iconButton, radius: NookDesign.Radius.sm))
         .foregroundStyle(Color.primary)
         .background(ButtonAnchorCapture(window: $capturedWindow, anchorView: $anchorView))
         .onChange(of: windowState.isExtensionLibraryVisible) { _, visible in

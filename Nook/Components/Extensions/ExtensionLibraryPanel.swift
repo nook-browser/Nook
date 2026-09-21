@@ -11,6 +11,13 @@ import NookDesign
 import NookSettings
 import NookWeb
 
+/// Borderless panels cannot become key by default, and AppKit draws controls in a non-key
+/// window unemphasized, which left the switches grey instead of accent-coloured.
+@MainActor
+private final class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
 @MainActor
 final class ExtensionLibraryPanelController {
     private var panel: NSPanel?
@@ -59,7 +66,6 @@ final class ExtensionLibraryPanelController {
 
         let root = AnyView(
             content
-                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
                 .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         )
 
@@ -101,7 +107,7 @@ final class ExtensionLibraryPanelController {
 
         panel.setFrame(NSRect(origin: origin, size: panelSize), display: true)
         panel.invalidateShadow()
-        panel.orderFront(nil)
+        panel.makeKeyAndOrderFront(nil)
         panel.alphaValue = 1
 
         // Delay event monitor installation so the current click doesn't immediately dismiss
@@ -123,7 +129,7 @@ final class ExtensionLibraryPanelController {
     // MARK: - Private
 
     private func createPanel() -> NSPanel {
-        let panel = NSPanel(
+        let panel = KeyablePanel(
             contentRect: NSRect(origin: .zero, size: CGSize(width: panelWidth, height: 400)),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -133,7 +139,10 @@ final class ExtensionLibraryPanelController {
         panel.hidesOnDeactivate = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        // The AppKit window shadow is drawn from the window rect on a transparent panel, which
+        // put a hard square box around the rounded glass. nookElevation(.floating) already
+        // supplies the shadow inside SwiftUI.
+        panel.hasShadow = false
         panel.isReleasedWhenClosed = false
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
