@@ -38,36 +38,16 @@ The exception covers Nook's own source. It does not reach code Nook links that
 others license under GPL-3.0, because Nook cannot add permissions to work it
 does not own.
 
-**The macOS build links GPL-3.0 code Nook does not own, and therefore cannot be
-conveyed through any app store.** It is distributed as a notarized DMG through
-Sparkle, a channel with no terms that conflict with the GPL, so the exception is
-not needed for it and does not apply to it. The macOS build is not sandboxed and
-so was never eligible for the Mac App Store in any case.
-
-The code in question is uBlock Origin's scriptlet library, vendored verbatim at
-commit `e530864c464e912840e72b60e9f072bc54daba5e` under
+Nook links uBlock Origin's scriptlet library, vendored verbatim at commit
+`e530864c464e912840e72b60e9f072bc54daba5e` under
 [`Packages/NookBlocker/ThirdParty/ubo-scriptlets/`](./Packages/NookBlocker/ThirdParty/ubo-scriptlets/).
 Copyright (C) 2019-present Raymond Hill, GNU GPL version 3 or later. Each file
-keeps its original header and none is modified;
-[`scripts/build-scriptlets.mjs`](./scripts/build-scriptlets.mjs) reads them and
-generates the resource manifest the blocker hands to adblock-rust. Every
-general-purpose scriptlet library is GPL-3.0, uBlock Origin's included, and
-`@adguard/scriptlets`, Adblock Plus's snippets and the uBO bodies embedded in
-`@ghostery/adblocker` are no different. Brave's `adblock-resources` is MPL-2.0
-but holds only 17 Brave-specific scripts and no general library at all.
+keeps its original header and none is modified.
 
-**The iOS build excludes them**, because the App Store is its only channel and
-the exception cannot be extended to Raymond Hill's work. The exclusion is a
-single `#if os(iOS)` in
-[`ScriptletResources.swift`](./Packages/NookBlocker/Sources/NookBlocker/ScriptletResources.swift),
-which is a licence boundary rather than a feature flag. Nothing else may be
-allowed to switch it, and an iOS build that ships these bodies is a licence
-violation rather than a bug.
-
-AdGuard's SafariConverterLib and the `@adguard/safari-extension` bundle inside
-`nook-advanced-blocking.js` were removed in September 2026 and replaced by
-`adblock-rust` under MPL-2.0. That replacement stands on its own merits and is
-unaffected by the above.
+The macOS build ships it and is distributed as a notarized DMG, not through an
+app store. The iOS build excludes it, since the App Store is its only channel;
+the exclusion is a single `#if os(iOS)` in
+[`ScriptletResources.swift`](./Packages/NookBlocker/Sources/NookBlocker/ScriptletResources.swift).
 
 The filter lists under `Packages/NookBlocker/Sources/NookBlocker/Resources/` are
 data rather than linked code, and travel as separate works under their own
