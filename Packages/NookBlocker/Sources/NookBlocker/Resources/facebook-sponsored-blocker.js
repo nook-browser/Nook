@@ -99,6 +99,14 @@
     return id + ' "' + author + '"';
   }
 
+  // A post you can link to is a real post. Ads have no permalink. Measured against a
+  // live feed rather than assumed: of these four, /groups/ matched 55 organic posts
+  // and /reel/ 48, while none matched an ad. /posts/, /photos/ and /videos/ were
+  // dropped because /posts/ matched an ad and none of the three matched anything
+  // organic, so keeping them only cost a miss.
+  var PERMALINK_SEL = 'a[href*="/groups/"],a[href*="/reel/"],' +
+    'a[href*="/permalink/"],a[href*="story_fbid"]';
+
   function hidePost(post, reason) {
     if (!post || markedPosts.has(post)) return;
     markedPosts.add(post);
@@ -166,6 +174,28 @@
       if (post6 && !markedPosts.has(post6)) {
         hidePost(post6, 'ads-ig-redirect-href');
       }
+    }
+
+    // Strategy 4b: the CTA-card ad, which carries no attributionsrc, no /ads/about link and
+    // no data-ad-preview, so every strategy above misses it. Two signals, because
+    // data-ad-rendering-role on its own is on organic posts as well (see Strategy 2):
+    // the role value "cta-", and the absence of any permalink. An ad has no post URL to
+    // link to; an organic post links its timestamp at one. Measured on a live feed:
+    // no cta- post carried one, against 103 of 131 other posts that did.
+    // Only new cta- elements are walked, so this does not re-scan the feed.
+    var ctaCards = document.querySelectorAll('[data-ad-rendering-role="cta-"]');
+    for (var q = 0; q < ctaCards.length; q++) {
+      var cc = ctaCards[q];
+      if (processedAnchors.has(cc)) continue;
+      processedAnchors.add(cc);
+
+      var post7 = getPostContainer(cc);
+      if (!post7 || markedPosts.has(post7)) continue;
+      if (post7.querySelector(PERMALINK_SEL)) {
+        console.log(TAG, 'skip cta-: post has a permalink, treating as organic');
+        continue;
+      }
+      hidePost(post7, 'cta-card+no-permalink');
     }
 
     // (Strategy 5, data-ad-comet-preview / data-ad-preview, removed 2026-09: live logs showed it

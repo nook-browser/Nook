@@ -57,12 +57,16 @@ skipped.
 document start in all frames: in the main frame it reads `window.__nookCosmeticConfig`, set
 synchronously by the config script before navigation; in subframes it asks the
 `nookAdvancedBlocking` reply handler. Either way it injects one stylesheet. Alongside it go
-the static site scripts (`youtube-ad-blocker.js`, `facebook-sponsored-blocker.js`,
+the static site scripts (`facebook-sponsored-blocker.js`,
 `instagram-sponsored-blocker.js`, `twitter-ad-blocker.js`, plus `facebook-feed-prune.js` and
 `instagram-feed-prune.js`, which strip Meta's ads out of the feed data before the page
-renders them) and `nook-stealth-redirects.js`, which answers a small table of known ad URLs
-with an inert `data:` stub so a blocked request does not read as a failure to anti-adblock
-scripts.
+renders them) and `nook-stealth-redirects.js`, which answers a blocked ad URL with the resource uBlock
+Origin's `$redirect=` rules name for it, so the request does not read as a failure to
+anti-adblock scripts and an ad library that a page depends on gets a working shim. Its
+table is built per navigation by `AdvancedRulesEngine` and carried in the same config
+script as the cosmetic rules, because most `$redirect=` rules are domain-scoped.
+`$redirect-rule=` is excluded: it applies only to requests that are blocked anyway, which
+the page cannot know.
 
 **TrackingParamStripper** implements `$removeparam` for main-frame navigations. It parses
 the raw filter lines the converter drops, and `PageSession` applies it in

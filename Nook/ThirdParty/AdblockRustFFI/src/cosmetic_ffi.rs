@@ -5,7 +5,7 @@
 //!
 //! There is no separate cache type here. `Engine::url_cosmetic_resources` is
 //! the crate's public cosmetic API (`CosmeticFilterCache` is `pub(crate)`), and
-//! `nook_adblock_engine_from_rules` already builds an `Engine`. So the caller
+//! `nook_adblock_engine_from_lists` already builds an `Engine`. So the caller
 //! builds one engine and uses it for both request matching and cosmetic lookup,
 //! freeing it with `nook_adblock_engine_free` as before.
 //!
@@ -14,10 +14,9 @@
 //! compiled WKContentRuleList and are not looked up here. This path carries
 //! what the content rule list cannot express, chiefly procedural filters.
 //!
-//! Scriptlets: `injected_script` comes back populated only if the engine was
-//! given resources via `use_resources`, and Nook gives it none, because
-//! scriptlet bodies are GPL-3.0 wherever they are sourced from. See the
-//! scriptlet note in docs/superpowers/plans/2026-09-17-adblock-rust-swap.md.
+//! Scriptlets: `injected_script` is populated from the Nook-authored resource
+//! set installed by `nook_adblock_engine_use_resources`. Borrowed bodies stay
+//! out; see LICENSE-EXCEPTION.md.
 
 use crate::guard;
 use adblock::Engine;
@@ -29,7 +28,7 @@ use std::ptr;
 /// keys hide_selectors, procedural_actions, injected_script, exceptions and
 /// generichide. Returns NULL when nothing applies or on bad input.
 ///
-/// `engine` must come from nook_adblock_engine_from_rules. As with request
+/// `engine` must come from nook_adblock_engine_from_lists. As with request
 /// matching, the caller must serialize all calls on a given engine.
 ///
 /// Free the result with nook_adblock_string_free.
@@ -70,7 +69,7 @@ pub unsafe extern "C" fn nook_adblock_cosmetic_for_url(
 mod tests {
     use super::*;
     use crate::content_blocking_ffi::nook_adblock_string_free;
-    use crate::{nook_adblock_engine_free, nook_adblock_engine_from_rules};
+    use crate::{engine_from_test_rules, nook_adblock_engine_free};
     use serde_json::Value;
 
     // :has-text is a procedural operator, so it cannot become a content rule
@@ -81,7 +80,7 @@ mod tests {
         let c = CString::new(url).unwrap();
         unsafe {
             let engine =
-                nook_adblock_engine_from_rules(rules.as_ptr() as *const c_char, rules.len());
+                engine_from_test_rules(rules);
             assert!(!engine.is_null());
             let p = nook_adblock_cosmetic_for_url(engine, c.as_ptr());
             let out = if p.is_null() {
@@ -170,7 +169,7 @@ mod tests {
             let c = CString::new("https://example.com/").unwrap();
             assert!(nook_adblock_cosmetic_for_url(ptr::null_mut(), c.as_ptr()).is_null());
             let engine =
-                nook_adblock_engine_from_rules(RULES.as_ptr() as *const c_char, RULES.len());
+                engine_from_test_rules(RULES);
             assert!(nook_adblock_cosmetic_for_url(engine, ptr::null()).is_null());
             nook_adblock_engine_free(engine);
         }

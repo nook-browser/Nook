@@ -328,3 +328,20 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod enforcement_tests {
+    use super::*;
+
+    /// WebKit matches `if-domain` exactly unless the entry starts with `*`, so a
+    /// `youtube.com##` cosmetic rule would never fire on `www.youtube.com`. This
+    /// is the rule that hides YouTube's "ad blockers are not allowed" dialog.
+    #[test]
+    fn cosmetic_if_domain_reaches_subdomains() {
+        let text = "youtube.com##tp-yt-paper-dialog:has(ytd-enforcement-dialog-view-model)\n";
+        let converted = convert_text(text);
+        assert_eq!(converted.rules.len(), 1, "expected exactly one converted rule");
+        let domains = converted.rules[0].trigger.if_domain.as_ref().expect("if-domain");
+        assert_eq!(domains, &vec!["*youtube.com".to_string()]);
+    }
+}

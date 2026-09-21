@@ -2,6 +2,7 @@
 //! Only answers "would this request be blocked?"; no cosmetic filtering.
 
 use adblock::lists::ParseOptions;
+use adblock::resources::{PermissionMask, Resource};
 use adblock::request::Request;
 use adblock::{Engine, FilterSet};
 use std::ffi::CStr;
@@ -24,25 +25,87 @@ unsafe fn cstr<'a>(p: *const c_char) -> Option<&'a str> {
     CStr::from_ptr(p).to_str().ok()
 }
 
+/// The one permission bit Nook grants. A list parsed with it may invoke
+/// `trusted-*` scriptlets; a resource declaring it is refused to every other list.
+pub(crate) const TRUSTED: u8 = 1;
+
+#[derive(serde::Deserialize)]
+struct ListInput {
+    rules: String,
+    #[serde(default)]
+    trusted: bool,
+}
+
+/// Build an engine from a JSON array of `{ "rules": "...", "trusted": bool }`.
+///
+/// Per-list rather than one blob because `ParseOptions::permissions` is applied
+/// at parse time, and it is what gates `trusted-*` scriptlets.
 #[no_mangle]
-pub unsafe extern "C" fn nook_adblock_engine_from_rules(
-    rules_utf8: *const c_char,
-    rules_len: usize,
+pub unsafe extern "C" fn nook_adblock_engine_from_lists(
+    json_utf8: *const c_char,
+    json_len: usize,
 ) -> *mut Engine {
-    if rules_utf8.is_null() {
+    if json_utf8.is_null() {
         return ptr::null_mut();
     }
-    let bytes = std::slice::from_raw_parts(rules_utf8 as *const u8, rules_len);
+    let bytes = std::slice::from_raw_parts(json_utf8 as *const u8, json_len);
     let Ok(text) = std::str::from_utf8(bytes) else {
         return ptr::null_mut();
     };
     guard(
         || {
+            let Ok(lists) = serde_json::from_str::<Vec<ListInput>>(text) else {
+                return ptr::null_mut();
+            };
             let mut set = FilterSet::new(false);
-            set.add_filter_list(text.to_owned(), ParseOptions::default());
+            for list in lists {
+                let permissions = if list.trusted {
+                    PermissionMask::from_bits(TRUSTED)
+                } else {
+                    PermissionMask::default()
+                };
+                set.add_filter_list(
+                    list.rules,
+                    ParseOptions {
+                        permissions,
+                        ..ParseOptions::default()
+                    },
+                );
+            }
             Box::into_raw(Box::new(Engine::new_with_filter_set(set)))
         },
         ptr::null_mut(),
+    )
+}
+
+/// Install Nook's scriptlet resource set. JSON array of `adblock::resources::Resource`.
+///
+/// Top-level scriptlets must be `application/javascript`; `fn/javascript` is
+/// dependency-only. Names must end in `.js`, since lookup appends the extension.
+/// Returns false if the JSON does not parse.
+#[no_mangle]
+pub unsafe extern "C" fn nook_adblock_engine_use_resources(
+    engine: *mut Engine,
+    json_utf8: *const c_char,
+    json_len: usize,
+) -> bool {
+    if engine.is_null() || json_utf8.is_null() {
+        return false;
+    }
+    let bytes = std::slice::from_raw_parts(json_utf8 as *const u8, json_len);
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let engine = &mut *engine;
+    guard(
+        || match serde_json::from_str::<Vec<Resource>>(text) {
+            Ok(resources) => {
+                engine.use_resources(resources);
+                true
+            }
+            Err(_) => false,
+        },
+        false,
     )
 }
 
@@ -134,7 +197,7 @@ mod tests {
         let site = c("https://site.test/");
         let script = c("script");
         unsafe {
-            let e = nook_adblock_engine_from_rules(rules.as_ptr() as *const c_char, rules.len());
+            let e = engine_from_test_rules(rules);
             assert!(!e.is_null());
             assert!(nook_adblock_engine_matches(e, c("https://example.com/ad.js").as_ptr(), site.as_ptr(), script.as_ptr()));
             assert!(!nook_adblock_engine_matches(e, c("https://other.test/x.js").as_ptr(), site.as_ptr(), script.as_ptr()));
@@ -178,3 +241,99 @@ mod tests {
         assert!(rules[0].trigger.url_filter.contains("example"));
     }
 }
+
+/// Wraps a bare rules blob as the single untrusted list the new builder expects.
+#[cfg(test)]
+pub(crate) fn engine_from_test_rules(rules: &str) -> *mut Engine {
+    let json = serde_json::json!([{ "rules": rules, "trusted": false }]).to_string();
+    unsafe { nook_adblock_engine_from_lists(json.as_ptr() as *const c_char, json.len()) }
+}
+
+#[cfg(test)]
+mod scriptlet_tests {
+    use super::*;
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine as _;
+    use std::ffi::{CStr, CString};
+
+    fn resource(name: &str, body: &str, trusted: bool) -> String {
+        format!(
+            r#"{{"name":"{name}","aliases":[],"kind":{{"mime":"application/javascript"}},"content":"{}","dependencies":[],"permission":{}}}"#,
+            STANDARD.encode(body),
+            if trusted { TRUSTED } else { 0 }
+        )
+    }
+
+    /// injected_script for `url`, or "" when nothing applies.
+    fn injected(lists: &str, resources: &str, url: &str) -> String {
+        unsafe {
+            let l = CString::new(lists).unwrap();
+            let engine = nook_adblock_engine_from_lists(l.as_ptr(), lists.len());
+            assert!(!engine.is_null(), "engine build failed");
+            let r = CString::new(resources).unwrap();
+            assert!(nook_adblock_engine_use_resources(engine, r.as_ptr(), resources.len()));
+            let u = CString::new(url).unwrap();
+            let out = cosmetic_ffi::nook_adblock_cosmetic_for_url(engine, u.as_ptr());
+            let text = if out.is_null() {
+                String::new()
+            } else {
+                let s = CStr::from_ptr(out).to_string_lossy().into_owned();
+                content_blocking_ffi::nook_adblock_string_free(out);
+                s
+            };
+            nook_adblock_engine_free(engine);
+            serde_json::from_str::<serde_json::Value>(&text)
+                .map(|v| v["injected_script"].as_str().unwrap_or("").to_string())
+                .unwrap_or_default()
+        }
+    }
+
+    const BODY: &str = "function nookMark(a) { window.__m = a; }";
+
+    #[test]
+    fn plain_scriptlet_runs_from_any_list() {
+        let lists = r#"[{"rules":"example.com##+js(mark, hello)","trusted":false}]"#;
+        let res = format!("[{}]", resource("mark.js", BODY, false));
+        let out = injected(lists, &res, "https://example.com/");
+        assert!(out.contains(r#"nookMark("hello")"#), "got: {out}");
+    }
+
+    #[test]
+    fn trusted_scriptlet_runs_from_a_trusted_list() {
+        let lists = r#"[{"rules":"example.com##+js(trusted-mark, hello)","trusted":true}]"#;
+        let res = format!("[{}]", resource("trusted-mark.js", BODY, true));
+        let out = injected(lists, &res, "https://example.com/");
+        assert!(out.contains(r#"nookMark("hello")"#), "got: {out}");
+    }
+
+    /// The point of the trust model: an untrusted list cannot reach a trusted body.
+    #[test]
+    fn trusted_scriptlet_is_refused_to_an_untrusted_list() {
+        let lists = r#"[{"rules":"example.com##+js(trusted-mark, hello)","trusted":false}]"#;
+        let res = format!("[{}]", resource("trusted-mark.js", BODY, true));
+        let out = injected(lists, &res, "https://example.com/");
+        assert!(!out.contains("nookMark"), "trusted body leaked: {out}");
+    }
+
+    #[test]
+    fn unknown_scriptlet_name_injects_nothing() {
+        let lists = r#"[{"rules":"example.com##+js(no-such-thing, x)","trusted":true}]"#;
+        let res = format!("[{}]", resource("mark.js", BODY, false));
+        assert_eq!(injected(lists, &res, "https://example.com/"), "");
+    }
+
+    /// Only `function name(...)` bodies receive their arguments. Arrow and
+    /// `async function` forms fall back to inlining with no call and no args.
+    #[test]
+    fn only_function_declarations_receive_arguments() {
+        let lists = r#"[{"rules":"example.com##+js(arrow, hello)","trusted":false}]"#;
+        let arrow = "const nookArrow = (a) => { window.__m = a; };";
+        let res = format!("[{}]", resource("arrow.js", arrow, false));
+        let out = injected(lists, &res, "https://example.com/");
+        assert!(
+            !out.contains(r#"nookArrow("hello")"#),
+            "crate gained arrow support: {out}"
+        );
+    }
+}
+

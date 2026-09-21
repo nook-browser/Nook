@@ -30,24 +30,41 @@ public final class BlockerEngine {
 
     public var isLoaded: Bool { engine != nil }
 
-    /// Build or rebuild from filter rules, replacing any previous engine.
+    /// Build or rebuild from the filter lists, replacing any previous engine.
+    /// Per list rather than one blob: `ParseOptions.permissions` is applied at
+    /// parse time and is what gates `trusted-*` scriptlets.
     /// Construction runs off the main actor; only the finished pointer crosses back.
-    func build(rules: [String]) async {
-        guard !rules.isEmpty else {
+    func build(sources: [FilterListManager.Source]) async {
+        guard !sources.isEmpty else {
             clear()
             log.info("No filter rules; blocker engine cleared")
             return
         }
         let start = CFAbsoluteTimeGetCurrent()
-        let text = rules.joined(separator: "\n")
+        let payload = sources.map { ["rules": $0.rules, "trusted": $0.isTrusted] as [String: Any] }
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let text = String(data: data, encoding: .utf8) else {
+            log.error("Could not encode filter lists for the engine")
+            return
+        }
+        let resources = ScriptletResources.json()
         let built = await Task.detached(priority: .userInitiated) { () -> UnsafeMutableRawPointer? in
             // Pass the byte count, not strlen: a NUL in one list would otherwise
             // cut off every list after it.
             var utf8 = text
-            return utf8.withUTF8 { buf in
-                nook_adblock_engine_from_rules(
+            let engine = utf8.withUTF8 { buf in
+                nook_adblock_engine_from_lists(
                     UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count)
             }
+            guard let engine else { return nil }
+            if var resources {
+                let ok = resources.withUTF8 { buf in
+                    nook_adblock_engine_use_resources(
+                        engine, UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count)
+                }
+                if !ok { log.error("Scriptlet resource set rejected by the engine") }
+            }
+            return engine
         }.value
 
         clear()
@@ -56,6 +73,8 @@ public final class BlockerEngine {
             log.error("Failed to build the blocker engine")
             return
         }
+        let trusted = sources.filter(\.isTrusted).count
+        log.info("Engine sources: \(sources.count, privacy: .public) list(s), \(trusted, privacy: .public) trusted, resources: \(resources != nil ? "yes" : "no", privacy: .public)")
         log.info("Blocker engine built in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - start), privacy: .public)s")
     }
 
@@ -104,8 +123,16 @@ public final class BlockerEngine {
             return try? JSONSerialization.jsonObject(with: d) as? [String: Any]
         }
 
-        if procedural.isEmpty { return nil }
-        return ["extendedCss": procedural]
+        let scriptlets = object["injected_script"] as? String ?? ""
+        if !scriptlets.isEmpty {
+            log.info("Scriptlets for \(pageUrl.host ?? "?", privacy: .public): \(scriptlets.count, privacy: .public) bytes")
+        }
+
+        if procedural.isEmpty && scriptlets.isEmpty { return nil }
+        var config: [String: Any] = [:]
+        if !procedural.isEmpty { config["extendedCss"] = procedural }
+        if !scriptlets.isEmpty { config["scriptlets"] = scriptlets }
+        return config
     }
 
     /// True when the request would be blocked. Used by the dev MCP `check_urls`

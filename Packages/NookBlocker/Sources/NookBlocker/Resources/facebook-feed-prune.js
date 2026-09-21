@@ -164,6 +164,20 @@
     return o;
   }
 
+  // The gate is deliberately narrow, and widening it to "anything containing
+  // SponsoredData" is a trap. Facebook streams ~4KB decoys that hold no ad at all:
+  //
+  //   {"q7z":{"data":{"node":{"s":{"__typename":"SponsoredData"}}},
+  //           "edges":[{"node":{"s":{"__typename":"SponsoredData"}}}],
+  //           "require":[{"node":{"s":{"__typename":"SponsoredData"}}}],
+  //           "p":"3f0a7c1b9e42d685..." (the same 20 hex chars repeated to pad),
+  //           "extensions":{"is_final":true}}}
+  //
+  // Three stubs at the three paths a blocker prunes, no advertiser, no image, no
+  // link, and a single-key wrapper whose name rotates. Measured on a live feed:
+  // 34 payloads carried a sponsored marker, 9 carried a feed connection name, and
+  // none carried both. Pruning one of these removes nothing and tells Facebook it
+  // is being pruned. A real ad arrives under a connection this list names.
   var WANT = /"(news_feed|marketplace_home_feed|AdsSideFeedUnit)"/;
   window.__nookFBFilter = flags;
   var origParse = JSON.parse;

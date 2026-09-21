@@ -172,8 +172,9 @@ public final class ContentBlockerManager: NSObject {
     private func rebuild() async {
         let loadStart = CFAbsoluteTimeGetCurrent()
         let enabledFilenames = filterListManager.enabledOptionalFilterListFilenames
-        let rules = await Task.detached(priority: .userInitiated) { [filterListManager] in
-            filterListManager.loadAllFilterRulesAsLines(enabledFilenames: enabledFilenames)
+        let (sources, rules) = await Task.detached(priority: .userInitiated) { [filterListManager] in
+            let sources = filterListManager.loadFilterSources(enabledFilenames: enabledFilenames)
+            return (sources, FilterListManager.lines(from: sources))
         }.value
         cbLog.info("Loaded \(rules.count) filter rules in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - loadStart), privacy: .public)s")
 
@@ -182,7 +183,7 @@ public final class ContentBlockerManager: NSObject {
         compiledRuleLists = result.ruleLists
         cbLog.info("Compile completed in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - compileStart), privacy: .public)s")
 
-        await advancedRulesEngine.build(rules: rules)
+        await advancedRulesEngine.build(sources: sources)
         trackingParamStripper = await Task.detached(priority: .userInitiated) { TrackingParamStripper(rules: rules) }.value
         lastRulesHash = result.rulesHash
     }

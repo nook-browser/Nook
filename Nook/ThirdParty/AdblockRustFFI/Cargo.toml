@@ -21,6 +21,11 @@ crate-type = ["staticlib"]
 # css-display-none actions with selectors Safari cannot parse.
 adblock = { version = "0.13.3", features = ["content-blocking", "css-validation"] }
 serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+base64 = "0.22"
+serde_json = "1"
 
 [profile.release]
 lto = true

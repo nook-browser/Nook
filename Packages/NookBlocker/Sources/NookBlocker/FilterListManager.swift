@@ -31,14 +31,17 @@ public final class FilterListManager {
         let knownSizeRange: ClosedRange<Int>?  // Expected size range to detect gross tampering
         public let category: FilterListCategory
         public let isOptional: Bool
+        /// May invoke `trusted-*` scriptlets. uBO parity: its own lists only.
+        public let isTrusted: Bool
 
-        init(name: String, url: URL, filename: String, knownSizeRange: ClosedRange<Int>?, category: FilterListCategory = .ads, isOptional: Bool = false) {
+        init(name: String, url: URL, filename: String, knownSizeRange: ClosedRange<Int>?, category: FilterListCategory = .ads, isOptional: Bool = false, isTrusted: Bool = false) {
             self.name = name
             self.url = url
             self.filename = filename
             self.knownSizeRange = knownSizeRange
             self.category = category
             self.isOptional = isOptional
+            self.isTrusted = isTrusted
         }
     }
 
@@ -46,11 +49,11 @@ public final class FilterListManager {
         FilterList(name: "EasyList", url: URL(string: "https://easylist.to/easylist/easylist.txt")!, filename: "easylist.txt", knownSizeRange: 100_000...10_000_000, category: .ads),
         FilterList(name: "EasyPrivacy", url: URL(string: "https://easylist.to/easylist/easyprivacy.txt")!, filename: "easyprivacy.txt", knownSizeRange: 50_000...5_000_000, category: .privacy),
         FilterList(name: "Peter Lowe's", url: URL(string: "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext")!, filename: "peter-lowes.txt", knownSizeRange: 10_000...2_000_000, category: .ads),
-        FilterList(name: "uBlock Filters", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt")!, filename: "ublock-filters.txt", knownSizeRange: 50_000...5_000_000, category: .ads),
-        FilterList(name: "uBlock Unbreak", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt")!, filename: "ublock-unbreak.txt", knownSizeRange: 5_000...2_000_000, category: .ads),
-        FilterList(name: "uBlock Badware", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt")!, filename: "ublock-badware.txt", knownSizeRange: 5_000...2_000_000, category: .malware),
-        FilterList(name: "uBlock Privacy", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt")!, filename: "ublock-privacy.txt", knownSizeRange: 5_000...2_000_000, category: .privacy),
-        FilterList(name: "uBlock Quick Fixes", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt")!, filename: "ublock-quick-fixes.txt", knownSizeRange: 1_000...2_000_000, category: .ads),
+        FilterList(name: "uBlock Filters", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt")!, filename: "ublock-filters.txt", knownSizeRange: 50_000...5_000_000, category: .ads, isTrusted: true),
+        FilterList(name: "uBlock Unbreak", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt")!, filename: "ublock-unbreak.txt", knownSizeRange: 5_000...2_000_000, category: .ads, isTrusted: true),
+        FilterList(name: "uBlock Badware", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt")!, filename: "ublock-badware.txt", knownSizeRange: 5_000...2_000_000, category: .malware, isTrusted: true),
+        FilterList(name: "uBlock Privacy", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt")!, filename: "ublock-privacy.txt", knownSizeRange: 5_000...2_000_000, category: .privacy, isTrusted: true),
+        FilterList(name: "uBlock Quick Fixes", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt")!, filename: "ublock-quick-fixes.txt", knownSizeRange: 1_000...2_000_000, category: .ads, isTrusted: true),
         FilterList(name: "AdGuard URL Tracking Protection", url: URL(string: "https://filters.adtidy.org/extension/ublock/filters/17.txt")!, filename: "adguard-url-tracking.txt", knownSizeRange: 20_000...5_000_000, category: .privacy),
         FilterList(name: "Online Malicious URL Blocklist", url: URL(string: "https://malware-filter.gitlab.io/malware-filter/urlhaus-filter-online.txt")!, filename: "urlhaus-filter.txt", knownSizeRange: 10_000...5_000_000, category: .malware),
     ]
@@ -165,30 +168,39 @@ public final class FilterListManager {
     }
 
     /// Load all cached filter lists and return as individual rule lines for SafariConverterLib.
+    /// One entry per list, carrying whether it may use `trusted-*` scriptlets.
+    /// The engine is built from these rather than one blob because
+    /// `ParseOptions.permissions` is applied per parse.
+    public struct Source: Sendable {
+        public let rules: String
+        public let isTrusted: Bool
+    }
+
     /// Runs off the main actor, so the caller passes a snapshot of the enabled set.
-    nonisolated func loadAllFilterRulesAsLines(enabledFilenames: Set<String>) -> [String] {
-        var allLines: [String] = []
-
-        let optionalLists = Self.optionalLists.filter { enabledFilenames.contains($0.filename) }
-
-        var contents: [String] = []
-        for list in Self.defaultLists + optionalLists {
-            if let content = loadCachedList(list) { contents.append(content) }
+    nonisolated func loadFilterSources(enabledFilenames: Set<String>) -> [Source] {
+        let optional = Self.optionalLists.filter { enabledFilenames.contains($0.filename) }
+        var sources: [Source] = []
+        for list in Self.defaultLists + optional {
+            if let content = loadCachedList(list) {
+                sources.append(Source(rules: content, isTrusted: list.isTrusted))
+            }
         }
         for name in Self.bundledOnlyLists {
             if let url = Bundle.module.url(forResource: name, withExtension: "txt", subdirectory: "Resources"),
                let content = try? String(contentsOf: url, encoding: .utf8) {
-                contents.append(content)
+                sources.append(Source(rules: content, isTrusted: true))
             }
         }
-        for content in contents {
-            let lines = content.components(separatedBy: "\n")
+        return sources
+    }
+
+    /// The same rules as `loadFilterSources`, flattened for the content rule list compiler.
+    nonisolated static func lines(from sources: [Source]) -> [String] {
+        sources.flatMap { source in
+            source.rules.components(separatedBy: "\n")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
-            allLines.append(contentsOf: lines)
         }
-
-        return allLines
     }
 
     // MARK: - Expiry

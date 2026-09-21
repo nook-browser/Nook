@@ -1,43 +1,46 @@
 // Nook Content Blocker
-// Stealth redirects: answer known ad URLs with an inert stub instead of letting
-// the content rule list fail them. A blocked request fails loudly (fetch
-// rejects, XHR reports status 0, script/img fire error) and anti-adblock
-// services read exactly those signals. A stub loads normally and does nothing,
-// so there is nothing to detect and still no ad.
+// Stealth redirects: answer a known ad URL with the resource uBlock Origin's
+// $redirect= rules name for it, instead of letting the content rule list fail
+// it. A blocked request fails loudly (fetch rejects, XHR reports status 0,
+// script/img fire error) and anti-adblock services read exactly those signals.
+// A substituted body loads normally, and for the ad libraries whose rules name
+// a real shim it also keeps pages working that would otherwise break on a
+// missing googletag or google.ima.
 //
 // Covers requests JavaScript starts: fetch, XMLHttpRequest, and script/img
 // elements built in code. It cannot cover a <script src> written in the page's
 // own HTML: WebKit begins that load as the parser reaches the tag, before any
 // observer could rewrite it. Those stay blocked and stay visible as errors.
 //
-// Everything not in TABLE is untouched and still blocked by the rule lists.
+// The table is per navigation and main frame only, set synchronously by
+// AdvancedRulesEngine before this runs, because most $redirect rules are
+// domain-scoped and a page needs only a handful. A subframe has no table and
+// falls through to the rule lists, which still block. Everything not in the
+// table is untouched and still blocked.
+//
+// Never answer a vendor that validates its payload. Ad-Shield compares the
+// script it receives against an X-Length response header, and a data: URL has
+// no headers, so an empty body reads as malformed and it escalates. The
+// generator drops those rules; see scripts/build-redirects.mjs.
 (function () {
   'use strict';
 
   if (window.__nookStealthRedirectsLoaded) return;
   window.__nookStealthRedirectsLoaded = true;
 
-  // Inert stubs. An empty script and a 1x1 transparent GIF, as data: URLs so
-  // the browser loads them itself and fires the real load event.
-  const JS_STUB = 'data:application/javascript,';
-  const GIF_STUB = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  // [regexSource, dataURL, [requestType, ...]]
+  const TABLE = Array.isArray(window.__nookRedirects) ? window.__nookRedirects : [];
+  if (TABLE.length === 0) return;
 
-  // Phase 1 is hand-seeded with the loaders that anti-adblock scripts probe.
-  // Later this comes from the $redirect rules already in the filter lists.
-  // Deliberately not here yet: gpt.js and google-ima.js are API shims, not
-  // empty files, so an empty stub can break a page worse than a blocked one.
-  // Add them with a real shim, and a site that proves each one is needed.
-  // Never stub Ad-Shield (html-load.*, ad-shield CDN mirrors). It compares the
-  // script it receives against an X-Length response header, and a data: URL
-  // carries no headers, so an empty stub reads as "script malformed" and it
-  // escalates: on jeepforum.com it replaced the whole document with an
-  // error-report.com modal. Blocking it outright is the milder failure.
-  const TABLE = [
-    [/\/pagead\/js\/adsbygoogle\.js/, 'js'],   // Google AdSense loader
-    [/a\.pub\.network\/core\/imgs\//, 'img']   // Freestar detection image
-  ];
+  const compiled = [];
+  for (let i = 0; i < TABLE.length; i++) {
+    try {
+      compiled.push([new RegExp(TABLE[i][0]), TABLE[i][1], TABLE[i][2] || []]);
+    } catch (e) { /* a pattern JavaScriptCore will not take is simply skipped */ }
+  }
 
-  function stubFor(value) {
+  // `types` empty means the rule is not restricted to a request type.
+  function bodyFor(value, type) {
     if (!value) return null;
     let href;
     try {
@@ -45,13 +48,26 @@
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
       href = url.href;
     } catch (e) { return null; }
-    for (let i = 0; i < TABLE.length; i++) {
-      if (TABLE[i][0].test(href)) return TABLE[i][1];
+    for (let i = 0; i < compiled.length; i++) {
+      const [re, body, types] = compiled[i];
+      if (types.length !== 0 && types.indexOf(type) === -1) continue;
+      if (re.test(href)) return body;
     }
     return null;
   }
 
-  function stubURL(kind) { return kind === 'img' ? GIF_STUB : JS_STUB; }
+  // The bodies arrive as data: URLs. fetch and XHR want the decoded text and
+  // its type; script and img want the URL as it stands.
+  function decode(dataURL) {
+    const comma = dataURL.indexOf(',');
+    const meta = dataURL.slice(5, comma);
+    const isBase64 = meta.endsWith(';base64');
+    const mime = (isBase64 ? meta.slice(0, -7) : meta) || 'text/plain';
+    const payload = dataURL.slice(comma + 1);
+    try {
+      return { mime, text: isBase64 ? atob(payload) : decodeURIComponent(payload) };
+    } catch (e) { return { mime, text: '' }; }
+  }
 
   // MARK: - fetch
 
@@ -61,13 +77,13 @@
       window.fetch = function (input) {
         try {
           const target = typeof input === 'string' ? input : (input && input.url);
-          const kind = stubFor(target);
-          if (kind) {
-            const body = kind === 'img' ? new Blob([], { type: 'image/gif' }) : '';
-            return Promise.resolve(new Response(body, {
+          const body = bodyFor(target, 'xhr');
+          if (body) {
+            const { mime, text } = decode(body);
+            return Promise.resolve(new Response(text, {
               status: 200,
               statusText: 'OK',
-              headers: { 'Content-Type': kind === 'img' ? 'image/gif' : 'application/javascript' }
+              headers: { 'Content-Type': mime }
             }));
           }
         } catch (e) { /* fall through to the real fetch */ }
@@ -83,15 +99,15 @@
     const origSend = XMLHttpRequest.prototype.send;
 
     XMLHttpRequest.prototype.open = function (method, url) {
-      try { this.__nookStub = stubFor(url); } catch (e) { this.__nookStub = null; }
+      try { this.__nookStub = bodyFor(url, 'xhr'); } catch (e) { this.__nookStub = null; }
       return origOpen.apply(this, arguments);
     };
 
     XMLHttpRequest.prototype.send = function () {
-      const kind = this.__nookStub;
-      if (!kind) return origSend.apply(this, arguments);
+      const stub = this.__nookStub;
+      if (!stub) return origSend.apply(this, arguments);
       const xhr = this;
-      const body = '';
+      const body = decode(stub).text;
       try {
         // Shadow the prototype accessors on this instance so the caller reads a
         // finished, empty, successful response.
@@ -116,7 +132,7 @@
 
   // MARK: - script.src / img.src, set in code
 
-  function patchSrc(proto) {
+  function patchSrc(proto, type) {
     const desc = Object.getOwnPropertyDescriptor(proto, 'src');
     if (!desc || !desc.set || !desc.get) return;
     Object.defineProperty(proto, 'src', {
@@ -125,16 +141,16 @@
       get: function () { return desc.get.call(this); },
       set: function (value) {
         try {
-          const kind = stubFor(value);
-          if (kind) return desc.set.call(this, stubURL(kind));
+          const body = bodyFor(value, type);
+          if (body) return desc.set.call(this, body);
         } catch (e) { /* fall through */ }
         return desc.set.call(this, value);
       }
     });
   }
 
-  try { patchSrc(HTMLScriptElement.prototype); } catch (e) { /* ignore */ }
-  try { patchSrc(HTMLImageElement.prototype); } catch (e) { /* ignore */ }
+  try { patchSrc(HTMLScriptElement.prototype, 'script'); } catch (e) { /* ignore */ }
+  try { patchSrc(HTMLImageElement.prototype, 'image'); } catch (e) { /* ignore */ }
 
   try {
     const origSetAttribute = Element.prototype.setAttribute;
@@ -142,8 +158,8 @@
       try {
         if (String(name).toLowerCase() === 'src' &&
             (this instanceof HTMLScriptElement || this instanceof HTMLImageElement)) {
-          const kind = stubFor(value);
-          if (kind) return origSetAttribute.call(this, name, stubURL(kind));
+          const body = bodyFor(value, this instanceof HTMLScriptElement ? 'script' : 'image');
+          if (body) return origSetAttribute.call(this, name, body);
         }
       } catch (e) { /* fall through */ }
       return origSetAttribute.apply(this, arguments);

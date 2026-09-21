@@ -16,7 +16,7 @@ extension PageSession {
         ["linkHover", "commandHover", "pipStateChange",
          "mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
          "historyStateDidChange", "nookShortcutDetect",
-         "nookAdBlocker", "nookSponsorBlock"]
+         "nookSponsorBlock"]
     }
 
     /// Per-document observers. Each script guards against a second install in the same document.
@@ -376,31 +376,6 @@ extension PageSession: WKScriptMessageHandler {
 
         case "nookShortcutDetect":
             handleShortcutDetection(message: message)
-
-        case "nookAdBlocker":
-            // Native ad skip — evaluateJavaScript from the app process is invisible
-            // to YouTube's anti-adblock detection (no extension can do this)
-            if let body = message.body as? [String: Any],
-               let type = body["type"] as? String,
-               type == "ad-playing"
-            {
-                message.webView?.evaluateJavaScript("""
-                    (function() {
-                        var v = document.querySelector('#movie_player video');
-                        if (v && isFinite(v.duration) && v.duration > 0) {
-                            v.currentTime = v.duration;
-                        }
-                        var skip = document.querySelector(
-                            '.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern, ' +
-                            '.ytp-ad-skip-button-container button, button[id^="skip-button"], ' +
-                            '.ytp-ad-overlay-close-button'
-                        );
-                        if (skip) skip.click();
-                        var overlay = document.querySelector('.ytp-ad-overlay-container, .ytp-ad-image-overlay');
-                        if (overlay) overlay.style.setProperty('display', 'none', 'important');
-                    })()
-                    """)
-            }
 
         case "nookSponsorBlock":
             // Only a YouTube page has a reason to ask for segments or report a skip.

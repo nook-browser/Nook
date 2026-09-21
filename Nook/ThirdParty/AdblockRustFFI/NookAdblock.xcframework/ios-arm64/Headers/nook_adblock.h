@@ -17,9 +17,16 @@
 extern "C" {
 #endif
 
-/// Build an engine from ABP/uBlock Origin filter-list text (UTF-8, not NUL-terminated).
+/// Build an engine from a JSON array of {"rules": "<filter text>", "trusted": bool}.
+/// Per list because ParseOptions.permissions is applied at parse time, and it is
+/// what gates trusted-* scriptlets.
 /// Returns NULL on failure. Free with nook_adblock_engine_free.
-void *nook_adblock_engine_from_rules(const char *rules_utf8, size_t rules_len);
+void *nook_adblock_engine_from_lists(const char *json_utf8, size_t json_len);
+
+/// Install the scriptlet resource set: a JSON array of adblock::resources::Resource.
+/// Top-level scriptlets must be application/javascript and their names must end
+/// in ".js"; fn/javascript is dependency-only. Returns false if the JSON is bad.
+bool nook_adblock_engine_use_resources(void *engine, const char *json_utf8, size_t json_len);
 
 /// Restore an engine from bytes produced by nook_adblock_engine_serialize.
 /// Returns NULL on failure (corrupt data or version mismatch).
@@ -67,10 +74,10 @@ void nook_adblock_string_free(char *s);
 /// (array of string) and generichide (bool).
 /// Returns NULL when nothing applies, or on a NULL/non-UTF-8 argument.
 ///
-/// `engine` must come from nook_adblock_engine_from_rules. The same thread
+/// `engine` must come from nook_adblock_engine_from_lists. The same thread
 /// safety rule applies as for matching: serialize all calls on a given engine.
 ///
-/// injected_script is always empty unless the engine was given scriptlet
+/// injected_script is empty unless the engine was given scriptlet
 /// resources, and Nook gives it none.
 ///
 /// Free the result with nook_adblock_string_free.
