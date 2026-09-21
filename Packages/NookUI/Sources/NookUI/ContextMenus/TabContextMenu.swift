@@ -187,6 +187,15 @@ public struct TabContextMenu: View {
             }
         }
 
+        if let windowState, let split = windowState.split,
+           split.leftItemID == itemID || split.rightItemID == itemID {
+            Button {
+                actions?.separateSplit(in: windowState)
+            } label: {
+                Label("Separate Tabs", systemImage: "rectangle.split.2x1.slash")
+            }
+        }
+
         if actions?.supportsMultipleWindows == true,
            context != .split, let windowState, let selected = tabs.selectedItemID(in: windowState), selected != itemID {
             Menu {

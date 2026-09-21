@@ -464,7 +464,6 @@ class BrowserManager: ObservableObject {
         self.compositorManager.browserManager = self
         self.splitManager.browserManager = self
         self.windowRegistry = windowRegistry
-        self.splitManager.windowRegistry = windowRegistry
         // Note: settingsManager will be injected later, so we skip initialization here
         self.tabs.history = self.historyManager
         self.tabs.webViews = self

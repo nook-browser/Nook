@@ -28,11 +28,7 @@ final class SplitViewManager: ObservableObject {
         var dragLocation: CGPoint?
     }
 
-    let minFraction: CGFloat = 0.2
-    let maxFraction: CGFloat = 0.8
-
     weak var browserManager: BrowserManager?
-    weak var windowRegistry: WindowRegistry?
 
     @Published private var previews: [UUID: Preview] = [:]
 
@@ -118,29 +114,19 @@ final class SplitViewManager: ObservableObject {
         if showsPane, let tabs = browserManager?.tabs, tabs.item(kept) != nil {
             tabs.select(kept, in: window)
         } else {
+            // No selection change to save the record, so save it here.
+            browserManager?.tabs.mirror(window)
             window.refreshCompositor()
         }
     }
 
-    /// Closes one pane and keeps the other.
-    func closePane(_ side: Side, for windowId: UUID) {
-        exitSplit(keep: side == .left ? .right : .left, for: windowId)
+    /// Ends the split and keeps both tabs open. The active pane stays selected.
+    func separate(in window: BrowserWindowState) {
+        exitSplit(keep: activeSide(for: window.id) ?? .left, for: window.id)
     }
 
     func cleanupWindow(_ windowId: UUID) {
         previews.removeValue(forKey: windowId)
-    }
-
-    /// Leaves any split showing a closed item.
-    func handleTabClosure(_ itemID: UUID) {
-        for window in browserManager?.windowRegistry?.allWindows ?? [] {
-            guard let split = window.split else { continue }
-            if split.leftItemID == itemID {
-                exitSplit(keep: .right, for: window.id)
-            } else if split.rightItemID == itemID {
-                exitSplit(keep: .left, for: window.id)
-            }
-        }
     }
 
     // MARK: - Preview During Drag-Over

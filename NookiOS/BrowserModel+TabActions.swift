@@ -20,6 +20,8 @@ extension BrowserModel: TabActions {
         // No split view on iOS. The menu item that would call this is hidden.
     }
 
+    func separateSplit(in window: BrowserWindowState) {}
+
     func editPinnedURL(url: URL, title: String, onSave: @escaping (URL) -> Void) {
         present(.editPinnedURL(url: url, title: title, onSave: onSave))
     }
