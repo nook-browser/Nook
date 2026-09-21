@@ -103,7 +103,7 @@ The app uses ~30 specialized **Managers**, one per feature domain, coordinated t
 | **PeekManager/** | Quick-preview overlay for links (PeekSession + PeekWebView) |
 | **PrivacyManager/** | `OAuthDetector` (OAuth flows get ad-block exemptions). `OAuthDetector` itself lives in `Packages/NookBlocker/Sources/NookBlocker/`. |
 | **SearchManager** | Search engine integration. Lives in `Packages/NookWeb/Sources/NookWeb/`. |
-| **SplitViewManager/** | Split-screen tab viewing |
+| **SplitViewManager/** | Split view per window. The pair is `BrowserWindowState.split` (two item ids and a fraction, saved with the window); the manager only adds enter, exit, `separate(in:)` and the drag preview state. See Key Patterns. |
 | **ZoomManager/** | Page zoom controls |
 | **PiPManager** | Picture-in-Picture mode |
 | **CacheManager**, **CookieManager** | Web cache and cookie storage/clearing |
@@ -272,6 +272,7 @@ The passkey entitlement (`web-browser.public-key-credential`) was requested and 
 
 - **Pages load on selection**: items have no page until `TabsController.select` (or warming, split panes, an extension) creates a `PageSession` and calls `loadWebViewIfNeeded()`. Go through the intents; do not create sessions or web views directly.
 - **Multi-window webviews**: `WebViewCoordinator` pools views by item id and window id. The first window to show a page holds the session's primary view; other windows get clones, and a primary passes to a clone when its window closes.
+- **Split panes persist**: `TabCompositorWrapper` keeps the two `SplitPaneView`s (`Nook/Components/Browser/Window/SplitPaneView.swift`) while the pair's ids hold and only re-frames them; a rebuild pulls each WKWebView out of its superview, which drops its video surface. The title and the separate/close buttons are glass capsules floating over the page, each in its own `NSHostingView` sized to its content so the rest of the pane passes clicks through. Neither pane is marked active; the URL bar and shortcuts follow the last pane clicked. A split ends through "Separate Tabs" (tab menu, pane button: `TabActions.separateSplit`), by closing a tab (`moveSelectionOff`), or on load when an item is gone (`DeviceState.prune`); the compositor never edits the pair. The sidebar draws the pair as one `SplitTabRow` anchored at the left tab's row, across sections, and hides the other half's row.
 - **Space data isolation**: Each space owns a unique `WKWebsiteDataStore`, keyed by the space's UUID and vended as a `Profile` by `TabsController.profile(forSpace:)`. Two spaces cannot share a login. A private window's ephemeral `Profile` uses a `.nonPersistent()` store destroyed on window close.
 - **Startup tab loading**: `setupWindowState()` → `applyStartupLoadMode()` runs when each window registers via `onWindowRegister`, after waiting up to 2 s for the content blocker. Windows that registered before `NookApp` set the callback are set up retroactively.
 - **Favicon cache**: `FaviconCache.shared` (`Packages/NookWeb/Sources/NookWeb/FaviconCache.swift`): LRU memory cache (200) plus a disk cache at `~/Library/Caches/FaviconCache/{host}.png`, disk I/O on a background queue. Rows show a cached favicon by host without a page; network fetches wait for `ensureFaviconLoaded()` on a live session.
