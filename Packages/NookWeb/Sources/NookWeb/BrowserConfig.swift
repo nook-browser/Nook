@@ -47,7 +47,7 @@ public class BrowserConfiguration {
         config.allowsAirPlayForMediaPlayback = true
         
         // User agent for better compatibility with Client Hints support
-        config.applicationNameForUserAgent = "Version/26.0.1 Safari/605.1.15"
+        config.applicationNameForUserAgent = "Version/\(PlatformUserAgent.safariVersion) Safari/605.1.15"
 
         // Clipboard, picture-in-picture, inline playback and the inspector are spelled differently
         // per platform; see BrowserConfig+macOS.swift and BrowserConfig+iOS.swift.
