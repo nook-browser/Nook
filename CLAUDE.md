@@ -354,10 +354,22 @@ The passkey entitlement (`web-browser.public-key-credential`) was requested and 
 | Package | Product | Purpose | Used by |
 |---------|---------|---------|--------|
 | **Sparkle** | Sparkle | Auto-updates (notarized DMG distribution) | AppDelegate, BrowserManager |
-| **Garnish** | Garnish | Color contrast/mixing utilities | CommandPalette, NookButtonStyle, SidebarAIChat, SidebarMenuHistoryTab |
+| **Garnish** | Garnish | Color contrast/mixing utilities. Pinned by revision, see below | SidebarAIChat, SidebarMenuHistoryTab |
 | **FaviconFinder** | FaviconFinder | Fetches favicon URLs | PageSession, CommandPalette suggestions, SidebarMenuHistoryTab |
 
 Transitive: swift-atomics, swift-log, SwiftSoup, LRUCache, Chronicle.
+
+**Garnish is pinned to revision `ffbd0091`, an untagged commit, and has to stay that way.** Its
+newest tag, 0.1.0, does not build: `Garnish.swift` there constrains four helpers to a
+`PlatformColorProtocol` that exists nowhere in the package, so the compiler stops with "cannot
+find type 'PlatformColorProtocol' in scope". `ffbd0091` sits two commits past that tag and is the
+commit that removes those constraints. Moving the requirement to `exactVersion` breaks the build.
+Nook calls one symbol from it, `Garnish.contrastingShade`, at seven identical call sites.
+
+`Package.resolved` records the Garnish pin as a bare revision. A `-resolvePackageDependencies`
+invocation rewrites it with `"branch": "main"` added, and the next ordinary build strips that back
+out, so committing the output of a resolve starts a diff that reappears on every build. Commit
+what a build leaves behind, which is the form already on `develop`.
 
 **Nook links no GPL-3.0 code it does not own.** SafariConverterLib (AdGuard, GPL-3.0) was removed in September 2026 because a §7 App Store exception can only be granted by a copyright holder. See `LICENSE-EXCEPTION.md`.
 
