@@ -341,7 +341,9 @@ public final class ContentBlockerManager: NSObject {
     private func applyToExistingWebViews(reloadingPagesLoadedWithoutBlocking reloading: Bool = false) {
         for session in self.host?.blockablePages ?? [] {
             guard let wv = session.webView else { continue }
-            if shouldApplyBlocking(to: session) { applyBlocking(to: wv) } else { removeBlocking(from: wv) }
+            // Exempt pages (allowlist, per-tab off, OAuth) loaded as intended; never reload them.
+            guard shouldApplyBlocking(to: session) else { removeBlocking(from: wv); continue }
+            applyBlocking(to: wv)
             guard reloading, let url = wv.url, url.scheme != "about" else { continue }
             wv.reload()
         }
