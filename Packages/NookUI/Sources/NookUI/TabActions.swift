@@ -17,6 +17,8 @@ import NookWeb
 @MainActor public protocol TabActions: AnyObject {
     /// Shows `itemID` beside the window's selected tab.
     func enterSplit(with itemID: UUID, placeOnRight: Bool, in window: BrowserWindowState)
+    /// Ends the window's split and keeps both tabs open.
+    func separateSplit(in window: BrowserWindowState)
     /// The "Edit Pinned URL" dialog. `onSave` gets the edited URL; the app closes the dialog.
     func editPinnedURL(url: URL, title: String, onSave: @escaping (URL) -> Void)
     /// The "New Space" dialog. `onCreate` gets the name and the accent hex.

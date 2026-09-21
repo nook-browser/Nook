@@ -134,12 +134,6 @@ final class SplitDropCaptureView: NSView {
         }
     }
 
-    private func sideForDrag(_ sender: NSDraggingInfo) -> SplitViewManager.Side {
-        let loc = convert(sender.draggingLocation, from: nil)
-        let w = max(bounds.width, 1)
-        return loc.x < (w / 2) ? .left : .right
-    }
-    
     /// Check if drag location is within card bounds and return which side
     /// Card dimensions: 237x394, positioned with 20pt padding from edges
     private func sideForDragInCard(_ sender: NSDraggingInfo) -> SplitViewManager.Side? {

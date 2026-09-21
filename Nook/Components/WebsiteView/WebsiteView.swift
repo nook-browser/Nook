@@ -546,12 +546,11 @@ struct TabCompositorWrapper: NSViewRepresentable {
                             window.makeFirstResponder(webView)
                             return
                         }
-                        // Check pane containers (split view)
-                        for child in subview.subviews {
-                            if let webView = child as? WKWebView, !child.isHidden {
-                                window.makeFirstResponder(webView)
-                                return
-                            }
+                        // Split view: the selected pane's page
+                        if let pane = subview as? SplitPaneView, pane.itemID == currentId,
+                           let webView = pane.content.subviews.first(where: { $0 is WKWebView }) {
+                            window.makeFirstResponder(webView)
+                            return
                         }
                     }
                 }
@@ -577,88 +576,52 @@ struct TabCompositorWrapper: NSViewRepresentable {
         let tabs = browserManager.tabs
         let selected = tabs.selectedSession(in: windowState)
         let split = browserManager.splitManager
-        let splitState = split.getSplitState(for: windowState.id)
 
         // Identify overlay (always preserved)
         let overlay = containerView.subviews.compactMap { $0 as? SplitDropCaptureView }.first
         // Content subviews = everything except the overlay
         let contentSubviews = containerView.subviews.filter { !($0 is SplitDropCaptureView) }
 
-        if splitState.isPreviewActive {
-            // Preview mode: show current tab at full size
+        // A drag preview leaves the panes alone; the drop cards draw over them.
+        let currentId = selected?.itemID
+        let leftId = split.leftTabId(for: windowState.id)
+        let rightId = split.rightTabId(for: windowState.id)
+        let isCurrentPane = (currentId != nil) && (currentId == leftId || currentId == rightId)
+
+        if isCurrentPane, let leftId, let rightId,
+           let leftSession = tabs.ensureSession(for: leftId),
+           let rightSession = tabs.ensureSession(for: rightId) {
+            let gap: CGFloat = 8
+            let total = containerView.bounds
+            let leftWidth = floor(total.width * split.dividerFraction(for: windowState.id))
+            let leftRect = NSRect(x: total.minX, y: total.minY,
+                                  width: max(1, leftWidth - gap/2), height: total.height)
+            let rightRect = NSRect(x: total.minX + leftWidth + gap/2, y: total.minY,
+                                   width: max(1, total.width - leftWidth - gap/2), height: total.height)
+
+            // Panes stay while the pair holds: taking a WKWebView out of its superview
+            // drops its video surface, so a selection change leaves the panes alone.
+            var panes = contentSubviews.compactMap { $0 as? SplitPaneView }
+            if panes.map(\.itemID) == [leftId, rightId] {
+                removeContentViews(contentSubviews.filter { !($0 is SplitPaneView) })
+            } else {
+                removeContentViews(contentSubviews)
+                panes = [(SplitViewManager.Side.left, leftId, leftRect), (.right, rightId, rightRect)].map { side, id, rect in
+                    SplitPaneView(frame: rect, side: side, itemID: id, browserManager: browserManager, windowState: windowState)
+                }
+                panes.forEach { containerView.addSubview($0) }
+            }
+
+            for (pane, session, rect) in [(panes[0], leftSession, leftRect), (panes[1], rightSession, rightRect)] {
+                pane.frame = rect
+                pane.show(pageView(for: session, reusing: pane.content.subviews))
+            }
+        } else {
+            // Single tab (most common path during video playback)
             if let session = selected, !session.isUnloaded {
                 setSingleWebView(pageView(for: session, reusing: contentSubviews), in: containerView, replacing: contentSubviews)
             } else {
                 removeContentViews(contentSubviews)
-            }
-        } else {
-            let currentId = selected?.itemID
-            let leftId = split.leftTabId(for: windowState.id)
-            let rightId = split.rightTabId(for: windowState.id)
-            let isCurrentPane = (currentId != nil) && (currentId == leftId || currentId == rightId)
-
-            if split.isSplit(for: windowState.id) && isCurrentPane {
-                // Split view — uses pane containers so we do a full rebuild here
-                // (pane containers have dynamic styling that must be recreated)
-                removeContentViews(contentSubviews)
-
-                // Auto-heal if one side is missing (tab closed etc.)
-                let leftResolved = leftId.flatMap { tabs.item($0) }
-                let rightResolved = rightId.flatMap { tabs.item($0) }
-                if leftResolved == nil && rightResolved == nil {
-                    browserManager.splitManager.exitSplit(keep: .left, for: windowState.id)
-                } else if leftResolved == nil, let _ = rightResolved {
-                    browserManager.splitManager.exitSplit(keep: .right, for: windowState.id)
-                } else if rightResolved == nil, let _ = leftResolved {
-                    browserManager.splitManager.exitSplit(keep: .left, for: windowState.id)
-                }
-
-                let gap: CGFloat = 8
-                let fraction = max(split.minFraction, min(split.maxFraction, split.dividerFraction(for: windowState.id)))
-                let total = containerView.bounds
-                let leftWidthRaw = floor(total.width * fraction)
-                let rightWidthRaw = max(0, total.width - leftWidthRaw)
-                let leftRect = NSRect(x: total.minX,
-                                      y: total.minY,
-                                      width: max(1, leftWidthRaw - gap/2),
-                                      height: total.height)
-                let rightRect = NSRect(x: total.minX + leftWidthRaw + gap/2,
-                                       y: total.minY,
-                                       width: max(1, rightWidthRaw - gap/2),
-                                       height: total.height)
-
-                let leftId = split.leftTabId(for: windowState.id)
-                let rightId = split.rightTabId(for: windowState.id)
-
-                let activeSide = split.activeSide(for: windowState.id)
-                let accent = browserManager.gradientColorManager.accentNSColor
-
-                if let lId = leftId, let leftSession = tabs.ensureSession(for: lId) {
-                    let lWeb = pageView(for: leftSession, reusing: [])
-                    let pane = makePaneContainer(frame: leftRect, isActive: (activeSide == .left), accent: accent, side: .left)
-                    containerView.addSubview(pane)
-                    lWeb.frame = pane.bounds
-                    lWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
-                    lWeb.isHidden = false
-                    pane.addSubview(lWeb)
-                }
-
-                if let rId = rightId, let rightSession = tabs.ensureSession(for: rId) {
-                    let rWeb = pageView(for: rightSession, reusing: [])
-                    let pane = makePaneContainer(frame: rightRect, isActive: (activeSide == .right), accent: accent, side: .right)
-                    containerView.addSubview(pane)
-                    rWeb.frame = pane.bounds
-                    rWeb.autoresizingMask = [NSView.AutoresizingMask.width, NSView.AutoresizingMask.height]
-                    rWeb.isHidden = false
-                    pane.addSubview(rWeb)
-                }
-            } else {
-                // Single tab (most common path during video playback)
-                if let session = selected, !session.isUnloaded {
-                    setSingleWebView(pageView(for: session, reusing: contentSubviews), in: containerView, replacing: contentSubviews)
-                } else {
-                    removeContentViews(contentSubviews)
-                }
             }
         }
 
@@ -715,43 +678,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         }
     }
 
-    private func makePaneContainer(frame: NSRect, isActive: Bool, accent: NSColor, side: SplitViewManager.Side) -> NSView {
-        let cornerRadius: CGFloat = NookDesign.Radius.md
-        
-        let v = NSView(frame: frame)
-        v.wantsLayer = true
-        
-        if let layer = v.layer {
-            layer.backgroundColor = NSColor.windowBackgroundColor.cgColor
-            
-            // Create mask layer for uneven rounded corners
-            let maskLayer = CAShapeLayer()
-            let maskPath = createUnevenRoundedRectPath(
-                rect: v.bounds,
-                topLeadingRadius: side == .left ? 0 : cornerRadius,
-                bottomLeadingRadius: cornerRadius,
-                bottomTrailingRadius: cornerRadius,
-                topTrailingRadius: side == .right ? 0 : cornerRadius
-            )
-            maskLayer.path = maskPath
-            layer.mask = maskLayer
-            
-            // Add border layer
-            if isActive {
-                let borderLayer = CAShapeLayer()
-                borderLayer.path = maskPath
-                borderLayer.strokeColor = accent.withAlphaComponent(0.9).cgColor
-                borderLayer.fillColor = NSColor.clear.cgColor
-                borderLayer.lineWidth = 1.0
-                layer.addSublayer(borderLayer)
-            }
-        }
-        
-        v.autoresizingMask = [.width, .height]
-        return v
-    }
-
-    private func createUnevenRoundedRectPath(
+    static func createUnevenRoundedRectPath(
         rect: CGRect,
         topLeadingRadius: CGFloat,
         bottomLeadingRadius: CGFloat,

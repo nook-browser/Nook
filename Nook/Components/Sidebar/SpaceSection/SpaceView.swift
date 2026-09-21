@@ -54,17 +54,18 @@ struct SpaceView: View {
         let rows = tabs.rows(space: spaceID)
         let pinned = rows.filter { $0.section == .pinned }
         let regular = rows.filter { $0.section == .tabs }
+        let split = splitPair(in: rows)
 
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: NookDesign.Spacing.sectionGap) {
                 if !pinned.isEmpty {
-                    sectionList(.pinned(spaceID: spaceID), rows: pinned, showsTail: false)
+                    sectionList(.pinned(spaceID: spaceID), rows: pinned, split: split, showsTail: false)
                         .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
                 }
 
                 VStack(spacing: NookDesign.Spacing.sectionGap) {
                     separatorAndNewTab(regular: regular)
-                    sectionList(.tabs(spaceID: spaceID), rows: regular, showsTail: true)
+                    sectionList(.tabs(spaceID: spaceID), rows: regular, split: split, showsTail: true)
                 }
             }
             .animation(NookDesign.Motion.standard, value: pinned.isEmpty)
@@ -77,8 +78,9 @@ struct SpaceView: View {
 
     // MARK: - Sections
 
-    private func sectionList(_ section: Parent, rows allRows: [Row], showsTail: Bool) -> some View {
-        let (rows, split) = splitAdjusted(allRows)
+    private func sectionList(_ section: Parent, rows allRows: [Row], split: SplitPair?, showsTail: Bool) -> some View {
+        // The pair is one row at its anchor; the other half's own row is hidden.
+        let rows = split.map { split in allRows.filter { !split.contains($0.id) || $0.id == split.anchorID } } ?? allRows
         let zone = DropZoneID.section(section)
         let position = dragSession.dropPosition?.zone == zone ? dragSession.dropPosition : nil
         return NookDropZoneHostView(
@@ -146,7 +148,7 @@ struct SpaceView: View {
 
     @ViewBuilder
     private func rowView(_ row: Row, zone: DropZoneID, split: SplitPair?, isDropTarget: Bool) -> some View {
-        if let split, row.id == split.left.id || row.id == split.right.id {
+        if let split, row.id == split.anchorID {
             SplitTabRow(left: split.left, right: split.right, zoneID: zone)
         } else {
             let session = tabs.session(for: row.item.id)
@@ -172,18 +174,20 @@ struct SpaceView: View {
     private struct SplitPair {
         let left: Item
         let right: Item
+        /// The row the pair is drawn at.
+        let anchorID: UUID
+
+        func contains(_ id: UUID) -> Bool { id == left.id || id == right.id }
     }
 
-    /// When both split items are visible rows of one section, the later one is dropped from the
-    /// list and the earlier one renders as the split row, so every displayed row keeps one height.
-    private func splitAdjusted(_ rows: [Row]) -> ([Row], SplitPair?) {
+    /// The window's split pair, anchored at the left tab's row, or the right tab's when the left
+    /// has no visible row (a favorite, or inside a closed folder).
+    private func splitPair(in rows: [Row]) -> SplitPair? {
         guard let split = windowState.split,
-              let leftIndex = rows.firstIndex(where: { $0.id == split.leftItemID }),
-              let rightIndex = rows.firstIndex(where: { $0.id == split.rightItemID }),
-              leftIndex != rightIndex else { return (rows, nil) }
-        var adjusted = rows
-        adjusted.remove(at: max(leftIndex, rightIndex))
-        return (adjusted, SplitPair(left: rows[leftIndex].item, right: rows[rightIndex].item))
+              let left = tabs.item(split.leftItemID), let right = tabs.item(split.rightItemID),
+              let anchor = [left.id, right.id].first(where: { id in rows.contains { $0.id == id } })
+        else { return nil }
+        return SplitPair(left: left, right: right, anchorID: anchor)
     }
 
     // MARK: - Separator and New Tab
