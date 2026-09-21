@@ -35,7 +35,7 @@ open Nook.xcodeproj
 # Debug build, signed with your team
 xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build
 
-# Debug build without signing (fresh machine, no team configured)
+# Compile check only, no team configured. Output will NOT run: see Signing a local build.
 xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build \
   CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
 
@@ -43,7 +43,43 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build 
 # The two coverage flags are required: see Code Coverage below.
 xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build \
   ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO
+
+# Release build you can install and use (Developer ID, hardened runtime).
+# Both signing settings below have traps: see Signing a local build.
+xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build-release \
+  ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO \
+  CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=ZHB786H6YN \
+  CODE_SIGN_IDENTITY="Developer ID Application: Bain Gurley (ZHB786H6YN)" \
+  CODE_SIGN_ENTITLEMENTS="$PWD/Nook/Nook-CI.entitlements" \
+  CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+  OTHER_CODE_SIGN_FLAGS="--timestamp=none"
 ```
+
+**Signing a local build.** `CODE_SIGNING_ALLOWED=NO` skips the signing phase outright, so the
+bundle comes out with no `Contents/_CodeSignature` and `codesign --verify` reports "code has no
+resources but signature indicates they must be present". That recipe answers "does it compile" on
+a machine with no certificate. Anything you launch, install or hand to someone needs the signed
+invocation above. Three things it has to get right:
+
+- **The full `Nook/Nook.entitlements` cannot be ad-hoc signed.** `aps-environment` and
+  `autofill-credential-provider` need a development certificate and a provisioning profile, so
+  `CODE_SIGN_IDENTITY="-"` with signing enabled fails with "has entitlements that require signing
+  with a development certificate". Use `Nook-CI.entitlements`, the same reduced set the release
+  DMGs carry, or create the profile once with `-allowProvisioningUpdates`.
+- **`CODE_SIGN_ENTITLEMENTS` must be an absolute path.** Passed on the command line it reaches
+  every target including the SPM package targets, and each resolves a relative path against its
+  own package directory, so the build dies on `Packages/NookTweaks/Nook/Nook-CI.entitlements`
+  not existing. Same shape as the coverage flags above.
+- **`CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO` or the build ships `get-task-allow`.** Manual signing
+  adds it by default. It lets any local process attach a debugger and read the app's memory, which
+  gives away most of what the hardened runtime is there for. Notarization rejects it too. Verify
+  with `codesign -d --entitlements - <app>`: Release should show `apple-events`, `allow-jit` and
+  the `PIPAgent` mach-lookup, nothing else.
+
+Install with `ditto`, which preserves the bundle seal, rather than `cp -R`:
+`rm -rf /Applications/Nook.app && ditto build-release/Build/Products/Release/Nook.app /Applications/Nook.app`.
+A locally built app carries no quarantine flag, so Gatekeeper stays out of the way even though
+`spctl` reports it as an unnotarized Developer ID build.
 
 **Code coverage must be disabled on the build command, not just in the project.** Xcode defaults
 `ENABLE_CODE_COVERAGE` and `CLANG_COVERAGE_MAPPING` to `YES`, and a plain Release build ships a
