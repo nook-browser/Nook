@@ -10,7 +10,14 @@ import CoreAudio
 public enum PlatformUserAgent {
     /// Desktop Safari, so sites serve what they serve Safari on a Mac.
     public static let custom: String? =
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/\(safariVersion) Safari/605.1.15"
+
+    /// The installed Safari's version, which is the system WebKit's: sites gate features on it
+    /// (Google Docs at 26.4). Safari can run ahead of the OS, so the OS version is only the fallback.
+    public static let safariVersion: String = {
+        let installed = Bundle(path: "/Applications/Safari.app")?.infoDictionary?["CFBundleShortVersionString"] as? String
+        return installed.flatMap(versionToken) ?? osVersion
+    }()
 }
 
 extension WKWebView {
@@ -55,6 +62,9 @@ public enum PlatformUserAgent {
     /// nil keeps WebKit's own iPhone or iPad string, completed by applicationNameForUserAgent
     /// in BrowserConfig+iOS.swift.
     public static let custom: String? = nil
+
+    /// Safari ships with iOS, so its version is the system's.
+    public static let safariVersion: String = osVersion
 }
 
 /// Never installed on iOS; the type exists so PageSession's stored property compiles.
@@ -148,5 +158,19 @@ extension PlatformColor {
             blue: CGFloat(rgb & 0x0000FF) / 255,
             alpha: 1
         )
+    }
+}
+
+extension PlatformUserAgent {
+    /// "26.0" or "26.0.1", the way Safari writes it.
+    static var osVersion: String {
+        let v = ProcessInfo.processInfo.operatingSystemVersion
+        return "\(v.majorVersion).\(v.minorVersion)" + (v.patchVersion > 0 ? ".\(v.patchVersion)" : "")
+    }
+
+    /// A version fit for a header: digits and dots only, or nil.
+    static func versionToken(_ raw: String) -> String? {
+        let ok = raw.first?.isNumber == true && raw.allSatisfy { $0.isASCII && ($0.isNumber || $0 == ".") }
+        return ok ? raw : nil
     }
 }

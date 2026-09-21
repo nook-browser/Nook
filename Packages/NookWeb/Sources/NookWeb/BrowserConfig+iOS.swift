@@ -14,7 +14,7 @@ extension BrowserConfiguration {
     static func applyPlatformPreferences(to config: WKWebViewConfiguration) {
         config.allowsInlineMediaPlayback = true
         config.allowsPictureInPictureMediaPlayback = true
-        config.applicationNameForUserAgent = "Version/26.0 Mobile/15E148 Safari/604.1"
+        config.applicationNameForUserAgent = "Version/\(PlatformUserAgent.safariVersion) Mobile/15E148 Safari/604.1"
     }
 }
 #endif
