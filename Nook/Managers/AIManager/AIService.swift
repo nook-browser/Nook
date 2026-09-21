@@ -284,11 +284,18 @@ class AIService {
         if let browserToolExecutor = browserToolExecutor,
            BrowserToolsConfig.allToolNames.contains(toolCall.name) {
 
-            let executionMode = configService.browserToolsConfig.executionMode
+            let config = configService.browserToolsConfig
+            let executionMode = config.executionMode
 
             // Gate execution behind user approval when in askBeforeExecuting mode
             if executionMode == .disabled {
                 return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Browser tools are disabled.", isError: true)
+            }
+
+            // Re-check the per-tool switch here, not just where tools are advertised: the
+            // model can name a tool it was never offered, or one turned off mid-conversation.
+            if !config.enabledTools.contains(toolCall.name) {
+                return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "\(toolCall.name) is disabled.", isError: true)
             }
 
             // executeJavaScript is left to the confirmation handler below, which prompts on every call

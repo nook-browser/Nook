@@ -127,8 +127,10 @@ final class DevMCPServer {
 
     private func handle(_ req: HTTPRequest) async -> (Int, Data?) {
         // Web pages cannot reach us: they would send an Origin, and could not know the token.
-        if let origin = req.headers["origin"], !origin.hasPrefix("http://127.0.0.1"), !origin.hasPrefix("http://localhost") {
-            return (403, nil)
+        // Compare the parsed host, not a string prefix: http://localhost.attacker.example passed.
+        if let origin = req.headers["origin"] {
+            let host = URL(string: origin)?.host
+            guard host == "127.0.0.1" || host == "localhost" || host == "::1" else { return (403, nil) }
         }
         guard req.headers["authorization"] == "Bearer \(token)" else { return (401, nil) }
         guard req.path.hasPrefix("/mcp") else { return (404, nil) }

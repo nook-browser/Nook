@@ -517,7 +517,9 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
         }
         // Limit filename length to 255 characters (filesystem maximum)
         if cleanName.count > 255 {
-            let ext = (cleanName as NSString).pathExtension
+            // Cap the extension: a server can name a file that is almost all extension, which
+            // made maxBase negative and trapped in String.prefix.
+            let ext = (cleanName as NSString).pathExtension.prefix(32)
             let base = (cleanName as NSString).deletingPathExtension
             let maxBase = 255 - (ext.isEmpty ? 0 : ext.count + 1)
             cleanName = String(base.prefix(maxBase)) + (ext.isEmpty ? "" : ".\(ext)")

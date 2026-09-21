@@ -109,15 +109,9 @@ public final class Profile: NSObject, Identifiable {
 
     // MARK: - Cleanup
     public func clearAllData() async {
-        let allTypes: Set<String> = [
-            WKWebsiteDataTypeCookies,
-            WKWebsiteDataTypeDiskCache,
-            WKWebsiteDataTypeMemoryCache,
-            WKWebsiteDataTypeLocalStorage,
-            WKWebsiteDataTypeIndexedDBDatabases,
-            WKWebsiteDataTypeFetchCache,
-            WKWebsiteDataTypeServiceWorkerRegistrations
-        ]
+        // Everything WebKit supports, not a hand-written list: the old one missed session
+        // storage, WebSQL and the origin-private filesystem, which survived "clear all data".
+        let allTypes = WKWebsiteDataStore.allWebsiteDataTypes()
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             self.dataStore.removeData(ofTypes: allTypes, modifiedSince: .distantPast) {
                 cont.resume()

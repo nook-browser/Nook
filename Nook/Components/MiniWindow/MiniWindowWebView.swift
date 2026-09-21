@@ -73,6 +73,11 @@ struct MiniWindowWebView: NSViewRepresentable {
         /// Weak reference to the webView so we can clean up message handlers in deinit
         private weak var installedWebView: WKWebView?
 
+        /// The detector runs in its own world so the page cannot reach the handler. This
+        /// message decides the host the mini window shows in its title bar and the URL an
+        /// adopted tab records, so in the page world any frame could forge both.
+        private static let world = WKContentWorld.world(name: "NookMiniWindowAuth")
+
         init(session: MiniWindowSession) {
             self.session = session
         }
@@ -84,14 +89,14 @@ struct MiniWindowWebView: NSViewRepresentable {
             let webView = installedWebView
             Task { @MainActor in
                 webView?.configuration.userContentController
-                    .removeScriptMessageHandler(forName: "authCompletion")
+                    .removeScriptMessageHandler(forName: "authCompletion", contentWorld: Coordinator.world)
             }
         }
 
         func installAuthDetectionScript(on webView: WKWebView) {
             // Add message handler for authentication completion
             installedWebView = webView
-            webView.configuration.userContentController.add(self, name: "authCompletion")
+            webView.configuration.userContentController.add(self, contentWorld: Self.world, name: "authCompletion")
             
             // Inject a simpler, less intrusive JavaScript to detect authentication completion
             let authDetectionScript = """
@@ -147,7 +152,12 @@ struct MiniWindowWebView: NSViewRepresentable {
                 })();
             """
             
-            let script = WKUserScript(source: authDetectionScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            let script = WKUserScript(
+                source: authDetectionScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true,
+                in: Self.world
+            )
             webView.configuration.userContentController.addUserScript(script)
         }
 
@@ -212,14 +222,14 @@ struct MiniWindowWebView: NSViewRepresentable {
         // MARK: - WKScriptMessageHandler
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.name == "authCompletion",
+                  message.frameInfo.isMainFrame,
                   let body = message.body as? [String: Any] else { return }
-            
+
             let success = body["success"] as? Bool ?? false
             let shouldClose = body["shouldClose"] as? Bool ?? false
-            let urlString = body["url"] as? String
-            
-            
-            let finalURL = urlString.flatMap { URL(string: $0) }
+            // This URL becomes the window's displayed host and an adopted tab's recorded URL.
+            // Take WebKit's committed URL, never one the script reported.
+            let finalURL = message.webView?.url
             session.completeAuth(success: success, finalURL: finalURL)
             
             // If the site expects the window to close, we could close it automatically
