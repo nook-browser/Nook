@@ -50,8 +50,9 @@ struct TabOrganizationPlan {
 
     /// Every tab whose page an earlier tab already shows. No model involved: two tabs are the
     /// same page when host, path, query and fragment match, ignoring scheme, "www." and a trailing slash.
-    static func duplicates(in inputs: [TabInput]) -> [Int] {
-        var seen = Set<String>()
+    /// `filed` are the URLs of tabs already in the section's folders; a loose copy of one closes too.
+    static func duplicates(in inputs: [TabInput], filed: [URL] = []) -> [Int] {
+        var seen = Set(filed.map(pageKey))
         return inputs.filter { !seen.insert(pageKey($0.url)).inserted }.map(\.index)
     }
 

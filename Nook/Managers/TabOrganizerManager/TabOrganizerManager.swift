@@ -28,8 +28,7 @@ final class TabOrganizerManager {
     /// False when Apple Intelligence is off or the Mac is not eligible; the UI hides the feature then.
     var isAvailable: Bool { TabOrganizationModel.isAvailable }
 
-    /// Most tabs one run takes; 60 titles with URLs fit the model's 4096-token context on macOS 26.
-    static let maxTabs = 60
+    static var maxTabs: Int { TabOrganizationModel.maxTabs }
 
     /// Whether an organization run is currently in progress.
     private(set) var isOrganizing: Bool = false
@@ -93,7 +92,10 @@ final class TabOrganizerManager {
                 if custom == nil, title.count > TabOrganizationModel.cleanTitleLength { renamable.insert(index) }
             }
 
-            let duplicates = TabOrganizationPlan.duplicates(in: inputs)
+            let folderIDs = section.filter(\.isFolder).map(\.id)
+            let filed = folderIDs.flatMap { tabs.tree.subtree(of: $0) }
+                .compactMap { id in tabs.session(for: id)?.url ?? tabs.item(id)?.url }
+            let duplicates = TabOrganizationPlan.duplicates(in: inputs, filed: filed)
             let kept = inputs.filter { !duplicates.contains($0.index) }
             let folders = section.filter(\.isFolder).map { folder in
                 ExistingFolder(
@@ -103,18 +105,17 @@ final class TabOrganizerManager {
                 )
             }
 
+            // Titles run beside the grouping. They are a bonus: an error there must not cost the grouping.
+            async let titled: [TabOrganizationPlan.Rename] = {
+                do {
+                    return try await TabOrganizationModel.renames(for: kept.filter { renamable.contains($0.index) })
+                } catch {
+                    Self.log.error("Renames failed: \(error.localizedDescription)")
+                    return []
+                }
+            }()
             let groups = try await TabOrganizationModel.groups(for: kept, existingFolders: folders)
-            try Task.checkCancellation()
-            // Titles are a bonus: a refusal or an error there must not cost the grouping.
-            let renames: [TabOrganizationPlan.Rename]
-            do {
-                renames = try await TabOrganizationModel.renames(for: kept.filter { renamable.contains($0.index) })
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                Self.log.error("Renames failed: \(error.localizedDescription)")
-                renames = []
-            }
+            let renames = await titled
             try Task.checkCancellation()
 
             let plan = TabOrganizationPlan(groups: groups, renames: renames, duplicates: duplicates)
