@@ -10,11 +10,10 @@ import SwiftUI
 import NookDesign
 
 struct ZoomPopupView: View {
-    @ObservedObject var zoomManager: ZoomManager
+    var zoomManager: ZoomManager
     let onZoomIn: () -> Void
     let onZoomOut: () -> Void
     let onZoomReset: () -> Void
-    let onZoomPresetSelected: (Double) -> Void
     let onDismiss: () -> Void
 
     @State private var isVisible = false
@@ -113,6 +112,9 @@ struct ZoomPopupView: View {
             isVisible = true
             startHideTimer()
         }
+        .onChange(of: zoomManager.currentZoomLevel) {
+            resetHideTimer()
+        }
         .onDisappear {
             hideTimer?.invalidate()
         }
@@ -140,7 +142,6 @@ struct ZoomPopupView: View {
         onZoomIn: {},
         onZoomOut: {},
         onZoomReset: {},
-        onZoomPresetSelected: { _ in },
         onDismiss: {}
     )
     .padding()

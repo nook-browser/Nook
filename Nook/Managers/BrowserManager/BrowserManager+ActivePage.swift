@@ -194,9 +194,8 @@ extension BrowserManager {
             return
         }
 
-        let domain = currentTab.url.host ?? currentTab.url.absoluteString
-        zoomManager.zoomIn(for: webView, domain: domain, tabId: currentTab.itemID)
-        showZoomPopupFeedback()
+        zoomManager.zoomIn(for: webView, tabId: currentTab.itemID)
+        shouldShowZoomPopup = true
     }
 
     /// Zoom out for the current tab
@@ -208,9 +207,8 @@ extension BrowserManager {
             return
         }
 
-        let domain = currentTab.url.host ?? currentTab.url.absoluteString
-        zoomManager.zoomOut(for: webView, domain: domain, tabId: currentTab.itemID)
-        showZoomPopupFeedback()
+        zoomManager.zoomOut(for: webView, tabId: currentTab.itemID)
+        shouldShowZoomPopup = true
     }
 
     /// Reset zoom to 100% for the current tab
@@ -222,49 +220,18 @@ extension BrowserManager {
             return
         }
 
-        let domain = currentTab.url.host ?? currentTab.url.absoluteString
-        zoomManager.resetZoom(for: webView, domain: domain, tabId: currentTab.itemID)
-        showZoomPopupFeedback()
-    }
-
-    private func showZoomPopupFeedback() {
+        zoomManager.resetZoom(for: webView, tabId: currentTab.itemID)
         shouldShowZoomPopup = true
-        zoomPopupHideTimer?.invalidate()
-        zoomPopupHideTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
-            Task { @MainActor in
-                self?.shouldShowZoomPopup = false
-                self?.zoomPopupHideTimer = nil
-            }
-        }
     }
 
-    /// Apply a specific zoom level to the current tab
-    func applyZoomLevel(_ zoomLevel: Double, to tabId: UUID? = nil) {
-        guard let windowState = windowRegistry?.activeWindow else { return }
-
-        let targetTabId = tabId ?? (tabs.activeWindowSession?.itemID)
-        guard let tabId = targetTabId,
-            let webView = getWebView(for: tabId, in: windowState.id),
-            let tab = tabs.session(for: tabId)
-        else {
-            return
-        }
-
-        let domain = tab.url.host ?? tab.url.absoluteString
-        zoomManager.applyZoom(zoomLevel, to: webView, domain: domain, tabId: tabId)
-    }
-
-    /// Load saved zoom level when a tab navigates to a new domain
+    /// Reset zoom when a tab navigates, so a page never inherits the previous page's zoom.
     func loadZoomForTab(_ tabId: UUID) {
-        guard let windowState = windowRegistry?.activeWindow,
-            let webView = getWebView(for: tabId, in: windowState.id),
-            let tab = tabs.session(for: tabId),
-            let domain = tab.url.host
-        else {
-            return
+        // Every window's view of the page, not just the active window's: magnification is per view.
+        for webView in webViewCoordinator?.getAllWebViews(for: tabId) ?? [] {
+            zoomManager.resetZoom(for: webView, tabId: tabId)
         }
-
-        zoomManager.loadSavedZoom(for: webView, domain: domain, tabId: tabId)
+        // A background tab navigating must not move the readout off the tab being looked at.
+        zoomManager.showZoomLevel(for: windowRegistry?.activeWindow?.selectedItemID)
     }
 
     /// Clean up zoom data when a tab is closed
@@ -272,19 +239,4 @@ extension BrowserManager {
         zoomManager.removeTabZoomLevel(for: tabId)
     }
 
-    /// Get current zoom level for display
-    func getCurrentZoomLevel() -> Double {
-        return zoomManager.currentZoomLevel
-    }
-
-    /// Get current zoom percentage for display
-    func getCurrentZoomPercentage() -> String {
-        return zoomManager.getZoomPercentageDisplay()
-    }
-
-    /// Show zoom popup (for external components to trigger)
-    func showZoomPopup() {
-        // This will be handled by the UI layer (TopBarView) observing zoom changes
-        // For now, we'll rely on the zoom button to show the popup
-    }
 }

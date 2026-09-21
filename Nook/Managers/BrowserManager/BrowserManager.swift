@@ -356,7 +356,6 @@ class BrowserManager: ObservableObject {
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
     @Published var urlBarFrame: CGRect = .zero
     @Published var shouldShowZoomPopup: Bool = false
-    var zoomPopupHideTimer: Timer?
     /// The website data store of the active window's space.
     @Published var currentProfile: Profile?
     /// True for the length of a space change, so views do not animate content from the old space

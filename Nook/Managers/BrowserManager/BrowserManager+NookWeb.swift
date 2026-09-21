@@ -136,6 +136,7 @@ extension BrowserManager: TabEventObserver {
     }
 
     func tabActivated(new session: PageSession, previous: PageSession?) {
+        zoomManager.showZoomLevel(for: session.itemID)
         ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
         // The loaded-page budget was only ever reached from startup warming and split view, so
         // opening tabs by hand never checked it and no cap could bind.

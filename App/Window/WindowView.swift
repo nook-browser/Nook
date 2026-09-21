@@ -95,7 +95,6 @@ struct WindowView: View {
                     onZoomIn: { browserManager.zoomInCurrentTab() },
                     onZoomOut: { browserManager.zoomOutCurrentTab() },
                     onZoomReset: { browserManager.resetZoomCurrentTab() },
-                    onZoomPresetSelected: { zoomLevel in browserManager.applyZoomLevel(zoomLevel) },
                     onDismiss: { browserManager.shouldShowZoomPopup = false }
                 )
                 .transition(.scale(scale: 0.0, anchor: .top))
