@@ -14,8 +14,11 @@ import FoundationModels
 
 enum TabOrganizationModel {
 
-    /// Titles at or under this length are left alone.
-    static let cleanTitleLength = 30
+    /// The longest title that fits a sidebar row at the default 250 pt width before the row's
+    /// trailing fade and hover close button. Titles at or under it are left alone, and a rename
+    /// never exceeds it.
+    /// ponytail: a character count, not a measured width; measure against the live sidebar width if wide or narrow sidebars matter.
+    static let cleanTitleLength = 24
 
     private static let unrelated = "Unrelated"
     /// Folder names that say nothing about their tabs. The model proposes them despite the prompt,
@@ -25,7 +28,6 @@ enum TabOrganizationModel {
         "web", "internet", "online", "content & media", "media", "resources", "reference", "browsing", "websites",
     ]
     private static let maxFolderNameLength = 40
-    private static let maxTitleLength = 60
 
     /// Most tabs one run takes. A run holds the tab list, a topic and a folder per tab in one
     /// session, which at 60 tabs does not fit the 4096-token context of macOS 26.
@@ -213,7 +215,7 @@ enum TabOrganizationModel {
     /// Short sidebar titles for the given tabs. Pass only tabs whose titles need it.
     static func renames(for all: [TabInput]) async throws -> [TabOrganizationPlan.Rename] {
         // A site's front page is named after the site; the model strips site names, so it never sees these.
-        let sites = all.compactMap { input in siteTitle(for: input).map { TabOrganizationPlan.Rename(tab: input.index, name: $0) } }
+        let sites = all.compactMap { input in siteTitle(for: input).map { TabOrganizationPlan.Rename(tab: input.index, name: fitted($0)) } }
         let inputs = all.filter { input in !sites.contains { $0.tab == input.index } }
         guard !inputs.isEmpty else { return sites }
         let session = LanguageModelSession(
@@ -224,7 +226,7 @@ enum TabOrganizationModel {
             .init(name: "tab", schema: DynamicGenerationSchema(type: Int.self)),
             .init(
                 name: "title",
-                description: "A short clean title, at most 5 words, built from words already in the title. Remove the site name, separators, counts and marketing words. Keep the words that identify the page.",
+                description: "A short clean title, at most 4 words and \(cleanTitleLength) characters, built from words already in the title. Remove the site name, separators, counts and marketing words. Keep the words that identify the page.",
                 schema: DynamicGenerationSchema(type: String.self)
             ),
         ])
@@ -237,7 +239,7 @@ enum TabOrganizationModel {
         var seen = Set<Int>()
         return try sites + titled.value([GeneratedContent].self, forProperty: "entries").compactMap { item in
             let tab = try item.value(Int.self, forProperty: "tab")
-            let title = clean(try item.value(String.self, forProperty: "title"), limit: maxTitleLength)
+            let title = fitted(try item.value(String.self, forProperty: "title"))
             guard let original = originals[tab], seen.insert(tab).inserted,
                   !title.isEmpty, title.count < original.count else { return nil }
             return TabOrganizationPlan.Rename(tab: tab, name: title)
@@ -249,7 +251,10 @@ enum TabOrganizationModel {
     /// ponytail: matches on host labels, so "bbc.co.uk" works through "bbc" but a site whose name
     /// differs from its domain gets no site title and keeps its full one.
     static func siteTitle(for input: TabInput) -> String? {
-        guard input.url.pathComponents.filter({ $0 != "/" }).count <= 1, let host = input.url.host?.lowercased() else { return nil }
+        // A section is one short word ("/news"); "/beginners-sourdough-bread" is an article.
+        let path = input.url.pathComponents.filter { $0 != "/" }
+        guard path.isEmpty || (path.count == 1 && path[0].count <= 12 && !path[0].contains("-")),
+              let host = input.url.host?.lowercased() else { return nil }
         let labels = host.split(separator: ".").dropLast().filter { $0.count > 2 && $0 != "www" }
         var segments = [input.title]
         for separator in [" | ", " - ", " — ", " – ", ": ", " · "] {
@@ -262,6 +267,21 @@ enum TabOrganizationModel {
         }.min { $0.count < $1.count }?.trimmingCharacters(in: .whitespaces)
         guard let match, !match.isEmpty, match.count < input.title.count else { return nil }
         return match
+    }
+
+    /// A title cut to `cleanTitleLength` at a word boundary, without a dangling "with" or "and".
+    /// The model treats a length in the prompt as a suggestion, so the limit is enforced here.
+    static func fitted(_ title: String) -> String {
+        var text = clean(title, limit: 200)
+        // Over the limit, the first clause is the better cut: "Refinance: What It Is, How…" is "Refinance".
+        if text.count > cleanTitleLength, let end = text.firstIndex(where: { ":,(".contains($0) }), text.distance(from: text.startIndex, to: end) >= 4 {
+            text = String(text[..<end])
+        }
+        var words = text.split(separator: " ").map(String.init)
+        while words.count > 1, words.joined(separator: " ").count > cleanTitleLength { words.removeLast() }
+        while words.count > 1, let last = words.last,
+              ["with", "and", "of", "the", "for", "to", "in", "a", "an", "on", "at", "&", "-", "|", ":"].contains(last.lowercased()) { words.removeLast() }
+        return String(words.joined(separator: " ").prefix(cleanTitleLength)).trimmingCharacters(in: CharacterSet(charactersIn: " ,:;-|"))
     }
 
     // MARK: - Private
