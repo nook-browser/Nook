@@ -12,9 +12,16 @@ import SwiftUI
 
 public extension View {
     /// Liquid Glass layer that floats over content. Sidebar rows use `nookRowSelection`.
+    /// Untinted: the material samples the page behind it, which is the whole effect. Contrast is
+    /// the content's job, so every layer's text uses the roles rather than a fixed colour.
     @ViewBuilder
     func nookGlassEffect<S: Shape>(in shape: S) -> some View {
-        self.glassEffect(.regular, in: shape).nookElevation(.floating)
+        // The clip is not redundant: glassEffect draws the material in `shape` but leaves the
+        // content unclipped, so a full-bleed fill inside runs out to the square corners and the
+        // shadow traces that square. Clipping here means no call site has to remember.
+        self.clipShape(shape)
+            .glassEffect(.regular, in: shape)
+            .nookElevation(.floating)
     }
 
     @ViewBuilder

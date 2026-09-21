@@ -49,7 +49,6 @@ struct SidebarHoverOverlayView: View {
                         .environmentObject(browserManager.gradientColorManager)
                         .environment(\.nookInsideGlass, true)
                         .frame(maxHeight: .infinity)
-                        .background(Color(.windowBackgroundColor).opacity(0.35))
                         .nookGlassEffect(in: NookDesign.Radius.shape(cornerRadius))
                         .alwaysArrowCursor()
                         .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)

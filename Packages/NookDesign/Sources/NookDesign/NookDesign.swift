@@ -137,6 +137,8 @@ public enum NookDesign {
         public static let unloadedOpacity: Double = 0.55
         public static let dropBorderIdle = Color.secondary.opacity(0.3)    // dashed empty-state drop target
         public static let dropBorderActive = Color.primary.opacity(0.4)    // dashed drop target while dragging
+        /// Destructive action fill. Kept at the value the dialog buttons shipped with.
+        public static let danger = Color(hex: "#F60000")
         public static let scrim = Color.black.opacity(0.4)                 // modal dimming behind a dialog
         public static let privateTint = Color(red: 0.36, green: 0.22, blue: 0.62).opacity(0.38) // private window chrome
         /// The neutral accent a private window's chrome uses in place of a space's. Keep in step
@@ -186,7 +188,9 @@ private struct NookElevationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .shadow(color: .black.opacity(level == .floating ? 0.16 : 0), radius: level == .floating ? 32 : 0, y: level == .floating ? 12 : 0)
-            .shadow(color: .black.opacity(level == .flat ? 0 : level == .floating ? 0.06 : 0.05), radius: level == .flat ? 0 : 2, y: level == .flat ? 0 : 1)
+            // Raised only. A 2pt shadow hugs the shape and reads as a dark stroke, which a
+            // floating glass layer does not want: the material defines its own edge.
+            .shadow(color: .black.opacity(level == .raised ? 0.05 : 0), radius: level == .raised ? 2 : 0, y: level == .raised ? 1 : 0)
     }
 }
 

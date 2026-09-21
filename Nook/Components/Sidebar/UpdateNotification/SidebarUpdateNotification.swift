@@ -53,7 +53,7 @@ struct SidebarUpdateNotification: View {
                 VStack(spacing: 0) {
                     Text("New version of Nook available")
                         .font(NookDesign.Font.secondary)
-                        .foregroundColor(.black)
+                        .foregroundStyle(.primary)
                         .offset(y: isExpanded ? -25 : 0)
                         .zIndex(2)
 
@@ -93,10 +93,7 @@ struct SidebarUpdateNotification: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(
-                    NookDesign.Radius.shape(NookDesign.Radius.lg)
-                        .fill(Color.gray.opacity(0.2))
-                )
+                .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
                 .frame(maxWidth: .infinity)
                 .onHoverTracking { hovering in
                     isHovering = hovering

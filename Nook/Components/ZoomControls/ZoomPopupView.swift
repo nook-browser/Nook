@@ -29,15 +29,15 @@ struct ZoomPopupView: View {
             }) {
                 Image(systemName: "minus")
                     .font(NookDesign.Font.secondary)
-                    .foregroundColor(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 28, height: 28)
                     .background(
                         NookDesign.Radius.shape(NookDesign.Radius.sm)
-                            .fill(.white.opacity(0.15))
+                            .fill(NookDesign.Surface.fill)
                     )
                     .overlay(
                         NookDesign.Radius.shape(NookDesign.Radius.sm)
-                            .stroke(.white.opacity(0.3), lineWidth: 1)
+                            .stroke(NookDesign.Surface.hairline, lineWidth: 1)
                     )
             }
             .buttonStyle(PlainButtonStyle())
@@ -50,16 +50,16 @@ struct ZoomPopupView: View {
             }) {
                 Text(zoomManager.getZoomPercentageDisplay())
                     .font(NookDesign.Font.label)
-                    .foregroundColor(.white)
+                    .foregroundStyle(.primary)
                     .frame(minWidth: 50, maxHeight: 28)
                     .padding(.horizontal, 8)
                     .background(
                         NookDesign.Radius.shape(NookDesign.Radius.sm)
-                            .fill(.white.opacity(0.2))
+                            .fill(NookDesign.Surface.fillPressed)
                     )
                     .overlay(
                         NookDesign.Radius.shape(NookDesign.Radius.sm)
-                            .stroke(.white.opacity(0.4), lineWidth: 1)
+                            .stroke(NookDesign.Surface.hairline, lineWidth: 1)
                     )
             }
             .buttonStyle(PlainButtonStyle())
@@ -71,15 +71,15 @@ struct ZoomPopupView: View {
             }) {
                 Image(systemName: "plus")
                     .font(NookDesign.Font.secondary)
-                    .foregroundColor(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 28, height: 28)
                     .background(
                         NookDesign.Radius.shape(NookDesign.Radius.sm)
-                            .fill(.white.opacity(0.15))
+                            .fill(NookDesign.Surface.fill)
                     )
                     .overlay(
                         NookDesign.Radius.shape(NookDesign.Radius.sm)
-                            .stroke(.white.opacity(0.3), lineWidth: 1)
+                            .stroke(NookDesign.Surface.hairline, lineWidth: 1)
                     )
             }
             .buttonStyle(PlainButtonStyle())
@@ -87,24 +87,7 @@ struct ZoomPopupView: View {
         }
         .padding(12)
         .frame(maxWidth: 160)
-        .background(
-            NookDesign.Radius.shape(NookDesign.Radius.lg)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "2A3A1F"),
-                            Color(hex: "1F2A17")
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-        .overlay(
-            NookDesign.Radius.shape(NookDesign.Radius.lg)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
-        )
-        .nookElevation(.floating)
+        .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         .scaleEffect(isVisible ? 1.0 : 0.8)
         .opacity(isVisible ? 1.0 : 0.0)
         .animation(NookDesign.Motion.spring, value: isVisible)
