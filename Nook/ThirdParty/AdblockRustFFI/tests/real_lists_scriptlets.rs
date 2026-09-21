@@ -60,12 +60,14 @@ fn youtube_watch_page_gets_ubos_ad_stack() {
         // The inline globals, and uBO's current request-level technique.
         "setConstant(\"ytInitialPlayerResponse.adPlacements\"",
         "trustedJsonEditXhrRequest(",
-        // Our own nook-filters-default rules, dead until the bodies existed.
-        "preventFetch(",
-        "preventXhr(",
     ] {
         assert!(out.injected_script.contains(needle), "no {needle} for a youtube watch page");
     }
+    // The preventFetch/preventXhr assertions that stood here went with the
+    // nook-filters-default rules they checked: they faked a successful empty
+    // response for ptracking and api/stats/ads, which is a detection surface for
+    // nothing once the player response carries no ad.
+
     // A trusted rule resolving proves the permission bits survive the manifest.
     assert!(
         out.injected_script.matches("try {").count() > 20,
