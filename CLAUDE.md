@@ -279,7 +279,7 @@ The passkey entitlement (`web-browser.public-key-credential`) was requested and 
 
 **Hardened runtime exceptions live in build settings.** `RUNTIME_EXCEPTION_*` in `project.pbxproj` become `com.apple.security.cs.*` entitlements at signing, so neither entitlements file shows them; check a built product with `codesign -d --entitlements -`. Release keeps `ALLOW_JIT` only. `ALLOW_DYLD_ENVIRONMENT_VARIABLES` and `DISABLE_LIBRARY_VALIDATION` are NO in Release (they let any local process inject a dylib into Nook and take its Keychain items and TCC grants) and stay YES in Debug for the debugger and previews.
 
-**Info.plist**: Registers as URL handler for `http`/`https` (LSHandlerRank: Owner) with `CFBundleDocumentTypes` so Nook appears in the default-browser picker. Allows arbitrary loads in web content and local networking. Sparkle: daily check, feed `https://nook-browser.github.io/Nook/appcast.xml`, `SUPublicEDKey` must match the `SPARKLE_SIGNING_KEY` repo secret.
+**Info.plist**: Registers as URL handler for `http`/`https` (`CFBundleURLTypes`, LSHandlerRank `Owner`) plus `CFBundleDocumentTypes` for `public.html`/`public.xhtml`/`public.url` at rank `Default`, so Nook appears in the default-browser picker. The `Owner` rank on the schemes is one of the criteria Apple checks for the macOS browser passkey entitlement; do not lower it. Allows arbitrary loads in web content and local networking. Sparkle: daily check, feed `https://nook-browser.github.io/Nook/appcast.xml`, `SUPublicEDKey` must match the `SPARKLE_SIGNING_KEY` repo secret.
 
 ## Key Patterns
 

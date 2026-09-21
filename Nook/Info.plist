@@ -15,7 +15,7 @@
 				<string>https</string>
 			</array>
 			<key>LSHandlerRank</key>
-			<string>Default</string>
+			<string>Owner</string>
 		</dict>
 	</array>
 	<key>CFBundleDocumentTypes</key>
