@@ -576,61 +576,52 @@ struct TabCompositorWrapper: NSViewRepresentable {
         let tabs = browserManager.tabs
         let selected = tabs.selectedSession(in: windowState)
         let split = browserManager.splitManager
-        let splitState = split.getSplitState(for: windowState.id)
 
         // Identify overlay (always preserved)
         let overlay = containerView.subviews.compactMap { $0 as? SplitDropCaptureView }.first
         // Content subviews = everything except the overlay
         let contentSubviews = containerView.subviews.filter { !($0 is SplitDropCaptureView) }
 
-        if splitState.isPreviewActive {
-            // Preview mode: show current tab at full size
+        // A drag preview leaves the panes alone; the drop cards draw over them.
+        let currentId = selected?.itemID
+        let leftId = split.leftTabId(for: windowState.id)
+        let rightId = split.rightTabId(for: windowState.id)
+        let isCurrentPane = (currentId != nil) && (currentId == leftId || currentId == rightId)
+
+        if isCurrentPane, let leftId, let rightId,
+           let leftSession = tabs.ensureSession(for: leftId),
+           let rightSession = tabs.ensureSession(for: rightId) {
+            let gap: CGFloat = 8
+            let total = containerView.bounds
+            let leftWidth = floor(total.width * split.dividerFraction(for: windowState.id))
+            let leftRect = NSRect(x: total.minX, y: total.minY,
+                                  width: max(1, leftWidth - gap/2), height: total.height)
+            let rightRect = NSRect(x: total.minX + leftWidth + gap/2, y: total.minY,
+                                   width: max(1, total.width - leftWidth - gap/2), height: total.height)
+
+            // Panes stay while the pair holds: taking a WKWebView out of its superview
+            // drops its video surface, so a selection change leaves the panes alone.
+            var panes = contentSubviews.compactMap { $0 as? SplitPaneView }
+            if panes.map(\.itemID) == [leftId, rightId] {
+                removeContentViews(contentSubviews.filter { !($0 is SplitPaneView) })
+            } else {
+                removeContentViews(contentSubviews)
+                panes = [(SplitViewManager.Side.left, leftId, leftRect), (.right, rightId, rightRect)].map { side, id, rect in
+                    SplitPaneView(frame: rect, side: side, itemID: id, browserManager: browserManager, windowState: windowState)
+                }
+                panes.forEach { containerView.addSubview($0) }
+            }
+
+            for (pane, session, rect) in [(panes[0], leftSession, leftRect), (panes[1], rightSession, rightRect)] {
+                pane.frame = rect
+                pane.show(pageView(for: session, reusing: pane.content.subviews))
+            }
+        } else {
+            // Single tab (most common path during video playback)
             if let session = selected, !session.isUnloaded {
                 setSingleWebView(pageView(for: session, reusing: contentSubviews), in: containerView, replacing: contentSubviews)
             } else {
                 removeContentViews(contentSubviews)
-            }
-        } else {
-            let currentId = selected?.itemID
-            let leftId = split.leftTabId(for: windowState.id)
-            let rightId = split.rightTabId(for: windowState.id)
-            let isCurrentPane = (currentId != nil) && (currentId == leftId || currentId == rightId)
-
-            if isCurrentPane, let leftId, let rightId,
-               let leftSession = tabs.ensureSession(for: leftId),
-               let rightSession = tabs.ensureSession(for: rightId) {
-                let gap: CGFloat = 8
-                let total = containerView.bounds
-                let leftWidth = floor(total.width * split.dividerFraction(for: windowState.id))
-                let leftRect = NSRect(x: total.minX, y: total.minY,
-                                      width: max(1, leftWidth - gap/2), height: total.height)
-                let rightRect = NSRect(x: total.minX + leftWidth + gap/2, y: total.minY,
-                                       width: max(1, total.width - leftWidth - gap/2), height: total.height)
-
-                // Panes stay while the pair holds: taking a WKWebView out of its superview
-                // drops its video surface, so a selection change leaves the panes alone.
-                var panes = contentSubviews.compactMap { $0 as? SplitPaneView }
-                if panes.map(\.itemID) == [leftId, rightId] {
-                    removeContentViews(contentSubviews.filter { !($0 is SplitPaneView) })
-                } else {
-                    removeContentViews(contentSubviews)
-                    panes = [(SplitViewManager.Side.left, leftId, leftRect), (.right, rightId, rightRect)].map { side, id, rect in
-                        SplitPaneView(frame: rect, side: side, itemID: id, browserManager: browserManager, windowState: windowState)
-                    }
-                    panes.forEach { containerView.addSubview($0) }
-                }
-
-                for (pane, session, rect) in [(panes[0], leftSession, leftRect), (panes[1], rightSession, rightRect)] {
-                    pane.frame = rect
-                    pane.show(pageView(for: session, reusing: pane.content.subviews))
-                }
-            } else {
-                // Single tab (most common path during video playback)
-                if let session = selected, !session.isUnloaded {
-                    setSingleWebView(pageView(for: session, reusing: contentSubviews), in: containerView, replacing: contentSubviews)
-                } else {
-                    removeContentViews(contentSubviews)
-                }
             }
         }
 
