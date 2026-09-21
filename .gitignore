@@ -133,11 +133,10 @@ Nook/ThirdParty/AdblockRustFFI/target/
 build-release/
 build-release-signed/
 
-# Plans, specs, handoffs and other working notes stay local.
-docs/superpowers/
-docs/ios-port-phase3-handoff.md
-docs/gui-remodel-next-moves.md
+# Everything under docs/ stays local: designs, specs, reviews, handoffs, working
+# notes. adblocker-architecture.md is the one committed doc, referenced by CLAUDE.md.
+docs/*
+!docs/adblocker-architecture.md
 .superpowers/
 .playwright-mcp/
 build-ios/
-docs/ios-chrome-handoff.md
