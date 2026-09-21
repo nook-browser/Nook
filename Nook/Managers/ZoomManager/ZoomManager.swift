@@ -56,6 +56,11 @@ class ZoomManager {
         applyZoom(1.0, to: webView, tabId: tabId)
     }
 
+    /// Points the displayed level at `tabId`. Zoom is per tab, the readout is one value.
+    func showZoomLevel(for tabId: UUID?) {
+        currentZoomLevel = tabId.map { zoomLevel(for: $0) } ?? 1.0
+    }
+
     /// Remove the zoom level for a closed tab
     func removeTabZoomLevel(for tabId: UUID) {
         tabZoomLevels.removeValue(forKey: tabId)
