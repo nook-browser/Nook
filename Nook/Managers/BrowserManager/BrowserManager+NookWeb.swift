@@ -136,6 +136,7 @@ extension BrowserManager: TabEventObserver {
     }
 
     func tabActivated(new session: PageSession, previous: PageSession?) {
+        zoomManager.showZoomLevel(for: session.itemID)
         ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
         updateSidebarPiP(new: session, previous: previous)
     }
