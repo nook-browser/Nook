@@ -16,7 +16,7 @@
 //!
 //! Scriptlets: `injected_script` is populated from the Nook-authored resource
 //! set installed by `nook_adblock_engine_use_resources`. Borrowed bodies stay
-//! out; see LICENSE-EXCEPTION.md.
+//! out.
 
 use crate::guard;
 use adblock::Engine;

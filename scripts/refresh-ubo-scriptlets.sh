@@ -3,8 +3,8 @@
 # manifest. Pass a commit SHA to pin a specific one, otherwise takes the newest
 # commit that touched src/js/resources.
 #
-# These bodies are GPL-3.0 and are not Nook's. Read LICENSE-EXCEPTION.md before
-# changing where they go or which targets see them.
+# These bodies are GPL-3.0 and are not Nook's. The iOS target must not ship them;
+# see the #if os(iOS) in ScriptletResources.swift.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -31,7 +31,7 @@ for f in $(curl -fsSL "https://api.github.com/repos/gorhill/uBlock/contents/src/
 done
 
 echo "$SHA" > "$DEST/UPSTREAM_COMMIT"
-sed -i '' -E "s/commit \`[0-9a-f]{40}\`/commit \`$SHA\`/" "$DEST/README.md" LICENSE-EXCEPTION.md
+sed -i '' -E "s/commit \`[0-9a-f]{40}\`/commit \`$SHA\`/" "$DEST/README.md"
 node scripts/build-scriptlets.mjs
 node scripts/build-redirects.mjs
 node scripts/check-redirects.mjs

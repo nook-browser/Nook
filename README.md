@@ -136,4 +136,4 @@ Nook follows a manager-based architecture where:
 ---
 
 ### LICENSES
-With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses. A GPL-3.0 section 7 additional permission for App Store distribution is in [LICENSE-EXCEPTION.md](./LICENSE-EXCEPTION.md).
+With the exception of third-party libraries in Nook/ThirdParty, all code is under the GPL 3.0 License. The relevant third-party code is licensed per-folder under a variety of free, open-source software licenses.

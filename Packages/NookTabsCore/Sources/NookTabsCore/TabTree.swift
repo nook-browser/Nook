@@ -1,4 +1,4 @@
-// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
+// Licensed under GPL-3.0. See LICENSE.
 import Foundation
 
 /// Spaces and items with the rules that keep them a valid tree.

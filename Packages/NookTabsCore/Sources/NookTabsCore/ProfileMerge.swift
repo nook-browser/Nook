@@ -1,4 +1,4 @@
-// Licensed under GPL-3.0 with the App Store exception in LICENSE-EXCEPTION.md.
+// Licensed under GPL-3.0. See LICENSE.
 import Foundation
 
 /// One-shot migration of the format-1 files, which had profiles above spaces, into format 2,

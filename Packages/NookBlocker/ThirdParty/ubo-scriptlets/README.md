@@ -15,7 +15,6 @@ argument-less scriptlets (`##+js(noeval)` and the like). The binary ones are
 left out: they exist for `$redirect`, which WebKit's content rule lists cannot
 do.
 
-Because this is GPL-3.0 code Nook does not own, Nook's App Store exception cannot
-reach it. See [LICENSE-EXCEPTION.md](../../../../LICENSE-EXCEPTION.md): the macOS
-build links these and is distributed only as a notarized DMG; the iOS build excludes
-them entirely.
+Because this is GPL-3.0 code Nook does not own, the macOS build links it and
+ships as a notarized DMG. The iOS build excludes it via a single `#if os(iOS)`
+in `ScriptletResources.swift`.
