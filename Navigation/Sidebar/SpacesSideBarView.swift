@@ -26,8 +26,8 @@ struct SpacesSideBarView: View {
     @Environment(CommandPalette.self) var commandPalette
     @Environment(TabOrganizerManager.self) var tabOrganizerManager
 
-    // Space navigation
-    @State private var activeSpaceIndex: Int = 0
+    // Space navigation. Keyed by space id: an index outlives the space it pointed at.
+    @State private var activeSpaceID: UUID?
     @State private var activeTabRefreshTrigger: Bool = false
 
     // Hover states
@@ -177,29 +177,31 @@ struct SpacesSideBarView: View {
     }
 
     private func spacesContent(spaces: [SpaceRecord]) -> some View {
-        PageView(selection: $activeSpaceIndex) {
-            ForEach(spaces.indices, id: \.self) { index in
-                makeSpaceView(for: spaces[index], index: index)
+        // A deleted (or private-window) space falls back to the first one still here.
+        let selection = Binding<UUID> {
+            spaces.first { $0.id == activeSpaceID }?.id ?? spaces[0].id
+        } set: { activeSpaceID = $0 }
+
+        return PageView(selection: selection) {
+            ForEach(spaces) { space in
+                makeSpaceView(for: space)
             }
         }
         .pageViewStyle(.scroll)
         .contentShape(Rectangle())
-        // Pages are cached hosting views keyed by index; a different set of spaces needs new pages.
+        // Pages are cached hosting views; a different set of spaces needs new pages.
         .id("\(activeTabRefreshTrigger)|\(spaces.map(\.id.uuidString).joined(separator: ","))")
         .onAppear {
-            if let targetIndex = spaces.firstIndex(where: { $0.id == windowState.spaceID }) {
-                activeSpaceIndex = targetIndex
-            } else {
+            activeSpaceID = windowState.spaceID
+            if !spaces.contains(where: { $0.id == windowState.spaceID }) {
                 tabs.setSpace(spaces[0].id, in: windowState)
             }
         }
-        .onChange(of: activeSpaceIndex) { _, newIndex in
-            handleSpaceIndexChange(newIndex, spaces: spaces)
+        .onChange(of: activeSpaceID) { _, newID in
+            handleSpaceSelectionChange(newID, spaces: spaces)
         }
-        .onChange(of: windowState.spaceID) { _, _ in
-            if let targetIndex = spaces.firstIndex(where: { $0.id == windowState.spaceID }) {
-                activeSpaceIndex = targetIndex
-            }
+        .onChange(of: windowState.spaceID) { _, newID in
+            activeSpaceID = newID
             activeTabRefreshTrigger.toggle()
         }
         .onChange(of: windowState.sidebarContentWidth) { _, _ in
@@ -313,14 +315,14 @@ struct SpacesSideBarView: View {
         }
     }
 
-    private func handleSpaceIndexChange(_ newIndex: Int, spaces: [SpaceRecord]) {
-        guard spaces.indices.contains(newIndex), spaces[newIndex].id != windowState.spaceID else { return }
+    private func handleSpaceSelectionChange(_ newID: UUID?, spaces: [SpaceRecord]) {
+        guard let newID, newID != windowState.spaceID, spaces.contains(where: { $0.id == newID }) else { return }
         // Haptic fires during swipe at 15% offset in PlatformPageView
-        tabs.setSpace(spaces[newIndex].id, in: windowState)
+        tabs.setSpace(newID, in: windowState)
     }
 
     @ViewBuilder
-    private func makeSpaceView(for space: SpaceRecord, index: Int) -> some View {
+    private func makeSpaceView(for space: SpaceRecord) -> some View {
         VStack(spacing: 0) {
             if !windowState.isIncognito {
                 PinnedGrid(
@@ -351,7 +353,6 @@ struct SpacesSideBarView: View {
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
             Spacer()
         }
-        .tag(index)
     }
 
     private var spaceSwitcherTitle: some View {
