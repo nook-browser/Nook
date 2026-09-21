@@ -56,7 +56,7 @@ enum TabOrganizationModel {
 
     // MARK: - Grouping
 
-    /// Groups the loose tabs on their own, then folds the result into existing folders. Existing
+    /// Groups the loose tabs on their own, then folds whole groups into existing folders. Existing
     /// folders stay out of the grouping turns: offered there, they used up the folder budget and
     /// pulled unrelated tabs in.
     static func groups(for inputs: [TabInput], existingFolders: [ExistingFolder]) async throws -> [TabOrganizationPlan.Group] {
@@ -90,7 +90,7 @@ enum TabOrganizationModel {
                     """
             )
         }
-        var groups = folders.compactMap { folder -> TabOrganizationPlan.Group? in
+        let groups = folders.compactMap { folder -> TabOrganizationPlan.Group? in
             // A new folder for one tab is noise.
             guard let tabs = members[folder.name], tabs.count >= 2 else { return nil }
             return TabOrganizationPlan.Group(name: folder.name, existingFolderID: nil, tabs: tabs)
@@ -109,33 +109,11 @@ enum TabOrganizationModel {
                 merged.append(.init(name: existing.name, existingFolderID: existing.id, tabs: group.tabs))
             }
         }
-        groups = merged
 
-        // Tabs still loose get one chance at an existing folder; this is how a single new tab joins one.
-        let grouped = Set(groups.flatMap(\.tabs))
-        let leftover = inputs.filter { !grouped.contains($0.index) }
-        guard !leftover.isEmpty else { return groups }
-        let held = existingFolders.map { $0.sampleTitles.isEmpty ? "- \($0.name)" : "- \($0.name), holding: \($0.sampleTitles.joined(separator: "; "))" }
-        let joined = try await file(
-            leftover, into: existingFolders.map(\.name),
-            session: LanguageModelSession(model: model, instructions: "You file browser tabs into existing folders by topic, never by website. Most tabs fit no folder."),
-            prompt: """
-                Folders:
-                \(held.joined(separator: "\n"))
-                Tabs:
-                \(list(leftover))
-                A tab goes in a folder only when its topic is that folder's topic. Every other tab is \(unrelated).
-                """
-        )
-        for existing in existingFolders {
-            guard let tabs = joined[existing.name], !tabs.isEmpty else { continue }
-            if let index = groups.firstIndex(where: { $0.existingFolderID == existing.id }) {
-                groups[index] = .init(name: existing.name, existingFolderID: existing.id, tabs: (groups[index].tabs + tabs).sorted())
-            } else {
-                groups.append(.init(name: existing.name, existingFolderID: existing.id, tabs: tabs))
-            }
-        }
-        return groups
+        // A single loose tab never joins an existing folder. Every way of asking the model to place
+        // one was tried (folders as filing choices, a leftover pass, a yes/no check on each pick,
+        // regrouping beside the folders' tabs) and each either misfiled tabs or joined nothing.
+        return merged
     }
 
     /// First turn: each tab's topic, then folder names with a sentence on what each holds. The topics
