@@ -6,6 +6,7 @@
 //  Created by Maciek Bagiński on 19/02/2026.
 //
 
+import NookDesign
 import SwiftUI
 
 enum Browsers {
@@ -44,7 +45,7 @@ struct ImportStage: View {
                     .foregroundStyle(selectedBrowser == browser ? .black : .white)
                     .frame(width: 44, height: 44)
                     .background(selectedBrowser == browser ? .white : .white.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
                 Text(name)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.8))

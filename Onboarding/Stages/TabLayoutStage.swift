@@ -7,6 +7,7 @@
 //
 
 import NookSettings
+import NookDesign
 import SwiftUI
 
 struct TabLayoutStage: View {
@@ -34,9 +35,9 @@ struct TabLayoutStage: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 180, height: 140)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 8)
+                        NookDesign.Radius.shape(NookDesign.Radius.md)
                             .stroke(.black.opacity(0.2), lineWidth: selectedLayout == layout ? 4 : 0)
                     }
                     .animation(.easeInOut(duration: 0.1), value: selectedLayout == layout)
