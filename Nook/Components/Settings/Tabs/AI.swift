@@ -14,7 +14,6 @@ struct SettingsAITab: View {
     @Environment(\.nookSettings) var nookSettings
     @Environment(AIConfigService.self) var configService
     @Environment(MCPManager.self) var mcpManager
-    @Environment(TabOrganizerManager.self) var tabOrganizerManager
 
     @State private var openRouterSearch: String = ""
     @State private var testingConnection: Bool = false
@@ -22,7 +21,6 @@ struct SettingsAITab: View {
     @State private var newMCPServerName: String = ""
     @State private var newMCPServerCommand: String = ""
     @State private var newMCPServerArgs: String = ""
-    @State private var showDownloadConfirmation: Bool = false
     @State private var showAddMCPServer: Bool = false
     @State private var showAddCustomProvider: Bool = false
     @State private var customProviderName: String = ""
@@ -36,104 +34,38 @@ struct SettingsAITab: View {
         Form {
             // MARK: - Tab Organizer
             Section {
-                Toggle(isOn: Binding(
-                    get: { nookSettings.tabOrganizerEnabled },
-                    set: { newValue in
-                        if newValue && !nookSettings.tabOrganizerModelDownloaded {
-                            showDownloadConfirmation = true
-                        } else {
-                            nookSettings.tabOrganizerEnabled = newValue
-                        }
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
-                        Text("Tab Organizer")
-                            .font(NookDesign.Font.body)
-                        Text("Uses a small on-device AI model to group, rename, sort, and deduplicate tabs")
-                            .font(NookDesign.Font.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if nookSettings.tabOrganizerEnabled {
-                    if case .downloading(let progress) = tabOrganizerManager.engine.status {
-                        HStack(spacing: NookDesign.Spacing.md) {
-                            ProgressView(value: progress)
-                                .frame(maxWidth: .infinity)
-                            Text("\(Int(progress * 100))%")
-                                .font(NookDesign.Font.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                        }
-                        Text("Downloading model (~350 MB)...")
-                            .font(NookDesign.Font.caption)
-                            .foregroundStyle(.secondary)
-                    } else if case .loading = tabOrganizerManager.engine.status {
-                        HStack(spacing: NookDesign.Spacing.md) {
-                            ProgressView().controlSize(.small)
-                            Text("Loading model...")
-                                .font(NookDesign.Font.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if case .error(let message) = tabOrganizerManager.engine.status {
-                        HStack(spacing: NookDesign.Spacing.md) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                                .font(NookDesign.Font.secondary)
-                            Text(message)
-                                .font(NookDesign.Font.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Button("Retry Download") {
-                            Task { try? await tabOrganizerManager.engine.ensureDownloaded() }
-                        }
+                if let note = TabOrganizationModel.unavailableNote {
+                    Text(note)
                         .font(NookDesign.Font.caption)
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    } else if nookSettings.tabOrganizerModelDownloaded {
-                        HStack(spacing: NookDesign.Spacing.sm) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .font(NookDesign.Font.secondary)
-                            Text("Model ready")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Toggle(isOn: $settings.tabOrganizerEnabled) {
+                        VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                            Text("Tab Organizer")
+                                .font(NookDesign.Font.body)
+                            Text("Uses Apple Intelligence on this Mac to group, rename, sort, and deduplicate tabs")
                                 .font(NookDesign.Font.caption)
                                 .foregroundStyle(.secondary)
-                            Spacer()
-                            Button("Delete Model") {
-                                tabOrganizerManager.engine.unload()
-                                // TODO: delete cached model files
-                                nookSettings.tabOrganizerModelDownloaded = false
-                                nookSettings.tabOrganizerEnabled = false
-                            }
-                            .font(NookDesign.Font.caption)
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                        }
+                    }
+                    Toggle(isOn: $settings.autoRenamePinnedTabs) {
+                        VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                            Text("Rename Pinned Tabs")
+                                .font(NookDesign.Font.body)
+                            Text("Shortens a tab's title when you pin it to a space")
+                                .font(NookDesign.Font.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
             } header: {
                 Text("Tab Organizer")
             } footer: {
-                if nookSettings.tabOrganizerEnabled {
+                if nookSettings.tabOrganizerEnabled, TabOrganizationModel.unavailableNote == nil {
                     Text("Right-click a space or press \u{2318}\u{21E7}\u{2325}O to organize tabs")
                         .font(NookDesign.Font.caption)
                         .foregroundStyle(.tertiary)
                 }
-            }
-            .alert("Download AI Model?", isPresented: $showDownloadConfirmation) {
-                Button("Download") {
-                    nookSettings.tabOrganizerEnabled = true
-                    Task {
-                        do {
-                            try await tabOrganizerManager.engine.ensureDownloaded()
-                            nookSettings.tabOrganizerModelDownloaded = true
-                        } catch {
-                            nookSettings.tabOrganizerEnabled = false
-                        }
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Tab Organizer requires a one-time download of a small AI model (~350 MB). The model runs entirely on your device — no data is sent to any server.")
             }
 
             // MARK: - Providers

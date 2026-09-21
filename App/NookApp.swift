@@ -180,6 +180,10 @@ struct NookApp: App {
         browserManager.keyboardShortcutManager = keyboardShortcutManager
         browserManager.mcpManager = mcpManager
         browserManager.tabOrganizerManager = tabOrganizerManager
+        browserManager.tabs.onTabsPinned = { [weak browserManager, tabOrganizerManager, settingsManager] itemIDs in
+            guard settingsManager.autoRenamePinnedTabs, let tabs = browserManager?.tabs else { return }
+            tabOrganizerManager.autoRename(itemIDs, using: tabs)
+        }
         DevMCPServer.shared.configure(browserManager: browserManager, enabled: settingsManager.browserControlServerEnabled)
 
         // Set up window lifecycle callbacks

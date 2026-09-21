@@ -49,8 +49,7 @@ public final class NookSettingsService {
     private let appearanceModeKey = "settings.appearanceMode"
     private let pinnedExtensionIDsKey = "settings.pinnedExtensionIDs"
     private let tabOrganizerEnabledKey = "settings.tabOrganizerEnabled"
-    private let tabOrganizerModelDownloadedKey = "settings.tabOrganizerModelDownloaded"
-    private let tabOrganizerIdleTimeoutKey = "settings.tabOrganizerIdleTimeout"
+    private let autoRenamePinnedTabsKey = "settings.autoRenamePinnedTabs"
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
@@ -302,23 +301,19 @@ public final class NookSettingsService {
         }
     }
 
+    public var autoRenamePinnedTabs: Bool {
+        didSet {
+            userDefaults.set(autoRenamePinnedTabs, forKey: autoRenamePinnedTabsKey)
+        }
+    }
+
     public var tabOrganizerEnabled: Bool {
         didSet {
             userDefaults.set(tabOrganizerEnabled, forKey: tabOrganizerEnabledKey)
         }
     }
 
-    public var tabOrganizerModelDownloaded: Bool {
-        didSet {
-            userDefaults.set(tabOrganizerModelDownloaded, forKey: tabOrganizerModelDownloadedKey)
-        }
-    }
 
-    public var tabOrganizerIdleTimeout: TimeInterval {
-        didSet {
-            userDefaults.set(tabOrganizerIdleTimeout, forKey: tabOrganizerIdleTimeoutKey)
-        }
-    }
 
     /// Move a playing video into a panel above the sidebar media bar when its tab is left.
     public var autoPictureInPicture: Bool {
@@ -410,8 +405,7 @@ public final class NookSettingsService {
             tabLayoutKey: TabLayout.sidebar.rawValue,
             appearanceModeKey: AppearanceMode.system.rawValue,
             tabOrganizerEnabledKey: false,
-            tabOrganizerModelDownloadedKey: false,
-            tabOrganizerIdleTimeoutKey: 300.0,
+            autoRenamePinnedTabsKey: true,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
         ])
@@ -500,8 +494,7 @@ public final class NookSettingsService {
         self.appearanceMode = AppearanceMode(rawValue: userDefaults.string(forKey: appearanceModeKey) ?? AppearanceMode.system.rawValue) ?? .system
         self.didFinishOnboarding = userDefaults.bool(forKey: didFinishOnboardingKey)
         self.tabOrganizerEnabled = userDefaults.bool(forKey: tabOrganizerEnabledKey)
-        self.tabOrganizerModelDownloaded = userDefaults.bool(forKey: tabOrganizerModelDownloadedKey)
-        self.tabOrganizerIdleTimeout = userDefaults.double(forKey: tabOrganizerIdleTimeoutKey)
+        self.autoRenamePinnedTabs = userDefaults.bool(forKey: autoRenamePinnedTabsKey)
         self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
         self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)
         if let sbData = userDefaults.data(forKey: sponsorBlockCategoryOptionsKey),

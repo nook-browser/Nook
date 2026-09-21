@@ -100,7 +100,11 @@ public struct SpaceTab: View {
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
+                                .id(title)
+                                .transition(.blurReplace)
                         }
+                        // Only a rename animates; a page changing its own title swaps without motion.
+                        .animation(NookDesign.Motion.spring, value: item.customTitle)
                         .mask(titleFade)
                         .textSelection(.disabled)
                 }
