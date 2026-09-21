@@ -31,7 +31,11 @@ enum TabOrganizationModel {
 
     /// Most tabs one run takes. A run holds the tab list, a topic and a folder per tab in one
     /// session, which at 60 tabs does not fit the 4096-token context of macOS 26.
-    static var maxTabs: Int { model.contextSize >= 8192 ? 60 : 40 }
+    /// Keyed on the OS, not `contextSize`: that property needs the 26.4 SDK, and CI does not pin Xcode.
+    static var maxTabs: Int {
+        if #available(macOS 27, *) { return 60 }  // 8192-token context
+        return 40
+    }
 
     /// Observable: views reading this update when Apple Intelligence is turned on or off.
     static var isAvailable: Bool { model.isAvailable }
@@ -53,7 +57,8 @@ enum TabOrganizationModel {
     private static let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
     /// Greedy decoding (temperature 0 alone still varied run to run), with a response cap sized to the entry count as a backstop against a runaway.
     private static func options(for entries: Int) -> GenerationOptions {
-        GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 300 + entries * 40)
+        // `sampling:` is deprecated in the 27 SDK, but its replacement `samplingMode:` exists only there.
+        GenerationOptions(sampling: .greedy, maximumResponseTokens: 300 + entries * 40)
     }
 
     // MARK: - Grouping

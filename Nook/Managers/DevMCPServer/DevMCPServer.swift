@@ -314,6 +314,12 @@ final class DevMCPServer {
         return String(decoding: data, as: UTF8.self)
     }
 
+    /// The server does not enforce the advertised schemas, and `intValue` would turn 1.9 into tab 1.
+    private static func wholeNumber(_ number: NSNumber) -> Int? {
+        let value = number.doubleValue
+        return value == value.rounded() && abs(value) < 1e9 ? Int(value) : nil
+    }
+
     private func callTool(_ rawName: String, _ args: [String: Any]) async -> [String: Any] {
         guard let bm = browserManager, let window else { return text("No browser window", error: true) }
 
@@ -421,8 +427,9 @@ final class DevMCPServer {
                     return text("Removed \(roots.count) items from the regular tabs section")
                 }
                 let order = bm.tabs.displayOrder(in: window)
-                let indices = (args["indices"] as? [NSNumber] ?? []).map(\.intValue)
-                guard !indices.isEmpty, indices.allSatisfy(order.indices.contains) else {
+                let indices = (args["indices"] as? [NSNumber] ?? []).compactMap(Self.wholeNumber)
+                guard !indices.isEmpty, indices.count == (args["indices"] as? [Any])?.count,
+                      indices.allSatisfy(order.indices.contains) else {
                     return text("indices must be positions from getTabList (0-\(order.count - 1))", error: true)
                 }
                 bm.tabs.close(indices.map { order[$0] })
@@ -430,7 +437,7 @@ final class DevMCPServer {
 
             case "pinTab":
                 let order = bm.tabs.displayOrder(in: window)
-                guard let index = (args["index"] as? NSNumber)?.intValue, order.indices.contains(index),
+                guard let index = (args["index"] as? NSNumber).flatMap(Self.wholeNumber), order.indices.contains(index),
                       let spaceID = window.spaceID else { return text("index must be a position from getTabList", error: true) }
                 bm.tabs.pin(order[index], to: .pinned(spaceID: spaceID))
                 return text("Pinned: \(bm.tabs.item(order[index])?.displayTitle ?? "")")
