@@ -24,7 +24,12 @@ public class SearchManager {
 
     private let session = URLSession.shared
     private var searchTask: Task<Void, Never>?
+    private var historyTask: Task<Void, Never>?
     private var autofillTask: Task<Void, Never>?
+    /// The last results each leg produced. Held rather than re-derived from `suggestions`, and
+    /// kept across a keystroke so a leg that is still running does not blank its own rows.
+    private var historyRows: [SearchSuggestion] = []
+    private var webRows: [SearchSuggestion] = []
     private var searchGeneration = UUID()
     private weak var tabs: TabsController?
     private weak var window: BrowserWindowState?
@@ -94,6 +99,7 @@ public class SearchManager {
     
     @MainActor public func searchSuggestions(for query: String) {
         searchTask?.cancel()
+        historyTask?.cancel()
         let generation = UUID()
         searchGeneration = generation
         isLoading = false
@@ -102,6 +108,8 @@ public class SearchManager {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             autofillTask?.cancel()
             autofillHost = nil
+            historyRows = []
+            webRows = []
             updateSuggestionsIfNeeded([])
             return
         }
@@ -120,26 +128,37 @@ public class SearchManager {
         let urlSuggestion: SearchSuggestion? = isLikelyURL(query)
             ? SearchSuggestion(text: query, type: .url) : nil
         let urlRows = urlSuggestion.map { [$0] } ?? []
-        // Keep the previous query's web and history rows until fresh ones arrive, so the
-        // list updates in place instead of collapsing and re-expanding on every keystroke.
-        let carriedWeb = suggestions.filter { if case .search = $0.type { true } else { false } }
-        let carriedHistory = suggestions.filter { if case .history = $0.type { true } else { false } }
-        updateSuggestionsIfNeeded(Array((urlRows + tabs + carriedHistory + carriedWeb).prefix(5)))
+        // Paint what is already known for this keystroke, carrying each leg's last rows.
+        compose(urlRows: urlRows, tabs: tabs)
+
+        // History is a local lookup, so it runs on this keystroke rather than waiting for a pause
+        // in typing. Only the network request is debounced.
+        // ponytail: the scan is bounded at 5k rows; move it behind an index if a large history drags.
+        historyTask = Task { [weak self] in
+            guard let self else { return }
+            let history = Array(await self.searchHistory(for: query).prefix(3))
+            guard !Task.isCancelled, self.searchGeneration == generation,
+                  self.window?.spaceID == space else { return }
+            self.historyRows = history
+            self.compose(urlRows: urlRows, tabs: tabs)
+        }
+
         isLoading = true
         searchTask = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(125)) } catch { return }
             guard let self, !Task.isCancelled else { return }
-            async let web = self.fetchWebSuggestions(for: query)
-            let history = Array(await self.searchHistory(for: query).prefix(3))
+            let webSuggestions = await self.fetchWebSuggestions(for: query)
             guard !Task.isCancelled, self.searchGeneration == generation,
                   self.window?.spaceID == space else { return }
-            self.updateSuggestionsIfNeeded(Array((urlRows + tabs + history + carriedWeb).prefix(5)))
-            let webSuggestions = await web
-            guard !Task.isCancelled, self.searchGeneration == generation,
-                  self.window?.spaceID == space else { return }
-            self.updateSuggestionsIfNeeded(Array((urlRows + tabs + history + webSuggestions).prefix(5)))
+            self.webRows = webSuggestions
+            self.compose(urlRows: urlRows, tabs: tabs)
             self.isLoading = false
         }
+    }
+
+    /// Rebuilds the visible list from the query's local rows plus whatever each leg last returned.
+    @MainActor private func compose(urlRows: [SearchSuggestion], tabs: [SearchSuggestion]) {
+        updateSuggestionsIfNeeded(Array((urlRows + tabs + historyRows + webRows).prefix(5)))
     }
 
     @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
@@ -260,8 +279,11 @@ public class SearchManager {
     
     public func clearSuggestions() {
         searchTask?.cancel()
+        historyTask?.cancel()
         autofillTask?.cancel()
         autofillHost = nil
+        historyRows = []
+        webRows = []
         searchGeneration = UUID()
         if !suggestions.isEmpty {
             withAnimation(.easeInOut(duration: 0.2)) {
