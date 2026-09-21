@@ -12,16 +12,6 @@ import OSLog
 import NookTabsCore
 import NookWeb
 
-// MARK: - AcceptedChanges
-
-/// Which parts of a ``TabOrganizationPlan`` the user has accepted in the preview UI.
-struct AcceptedChanges {
-    var acceptedGroupIds: Set<UUID>
-    var acceptedRenameIds: Set<UUID>
-    var acceptedDuplicateIds: Set<UUID>
-    var applySortOrder: Bool
-}
-
 // MARK: - TabOrganizationApplier
 
 /// Stateless applier that turns a ``TabOrganizationPlan`` into `TabsController` intents and
@@ -36,18 +26,16 @@ enum TabOrganizationApplier {
 
     // MARK: - Apply
 
-    /// Execute accepted changes from the organization plan.
+    /// Execute the organization plan.
     ///
     /// - Parameters:
-    ///   - plan: The parsed LLM organization plan.
-    ///   - accepted: Which plan items were accepted.
+    ///   - plan: The organization plan.
     ///   - tabMapping: 1-based prompt indices to item ids.
     ///   - spaceID: The space whose tabs section is organized.
     ///   - tabs: The controller to run intents on.
     /// - Returns: The combined undo change, for `TabsController.apply(_:)`.
     static func apply(
         plan: TabOrganizationPlan,
-        accepted: AcceptedChanges,
         tabMapping: [Int: UUID],
         spaceID: UUID,
         tabs: TabsController
@@ -55,13 +43,21 @@ enum TabOrganizationApplier {
         let before = tabs.tree
         let section = Parent.tabs(spaceID: spaceID)
 
-        // 1. Groups: folders at the top of the tabs section, in plan order, holding their tabs in order.
+        // 1. Groups: new folders at the top of the tabs section, in plan order; an existing folder
+        // takes its tabs at the end. Folder order and tab order inside a folder are the sort.
         var lastFolder: UUID?
-        for group in plan.groups where accepted.acceptedGroupIds.contains(group.id) {
-            guard let folderID = tabs.createFolder(title: group.name, in: section, after: lastFolder) else { continue }
-            lastFolder = folderID
-            log.debug("Created folder '\(group.name)' for \(group.tabs.count) tabs")
+        for group in plan.groups {
+            let folderID: UUID
             var lastTab: UUID?
+            if let existing = group.existingFolderID, tabs.item(existing) != nil {
+                folderID = existing
+                lastTab = tabs.children(of: .folder(itemID: existing)).last?.id
+            } else {
+                guard let created = tabs.createFolder(title: group.name, in: section, after: lastFolder) else { continue }
+                folderID = created
+                lastFolder = created
+            }
+            log.debug("Filing \(group.tabs.count) tabs into '\(group.name)'")
             for index in group.tabs {
                 guard let itemID = tabMapping[index] else { continue }
                 tabs.move(itemID, to: .folder(itemID: folderID), after: lastTab)
@@ -70,30 +66,16 @@ enum TabOrganizationApplier {
         }
 
         // 2. Renames
-        for rename in plan.renames where accepted.acceptedRenameIds.contains(rename.id) {
-            guard let itemID = tabMapping[rename.tab] else {
-                log.warning("Rename: no tab at index \(rename.tab)")
-                continue
-            }
+        for rename in plan.renames {
+            guard let itemID = tabMapping[rename.tab] else { continue }
             tabs.rename(itemID, rename.name)
         }
 
         // 3. Duplicates
-        for duplicates in plan.duplicates where accepted.acceptedDuplicateIds.contains(duplicates.id) {
-            let ids = duplicates.close.compactMap { tabMapping[$0] }
-            tabs.close(ids)
-            log.debug("Closed \(ids.count) duplicate tabs")
-        }
-
-        // 4. Sort order, only when groups did not already reorder: sorted tabs go to the top in order.
-        if accepted.applySortOrder, let sortOrder = plan.sort, !sortOrder.isEmpty, plan.groups.isEmpty {
-            var previous: UUID?
-            for index in sortOrder {
-                guard let itemID = tabMapping[index], tabs.item(itemID) != nil else { continue }
-                tabs.move(itemID, to: section, after: previous)
-                previous = itemID
-            }
-            log.debug("Applied sort order for \(sortOrder.count) tabs")
+        let duplicates = plan.duplicates.compactMap { tabMapping[$0] }
+        if !duplicates.isEmpty {
+            tabs.close(duplicates)
+            log.debug("Closed \(duplicates.count) duplicate tabs")
         }
 
         return undoChange(from: before, to: tabs.tree)

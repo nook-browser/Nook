@@ -9,6 +9,7 @@
 import AppKit
 import CryptoKit
 import Foundation
+import Network
 import WebKit
 import NookBlocker
 import NookWeb
@@ -99,10 +100,27 @@ final class AuthenticationManager: NSObject {
     }
 
     /// Returns true when the host is a private/local network address (RFC 1918, link-local, loopback).
+    ///
+    /// The host must be an address literal. Splitting on "." and dropping the components that
+    /// are not numbers classified `10.0.0.1.attacker.example` as private, which handed a public
+    /// host the self-signed certificate exception flow. `IPv4Address` parses strictly.
     private static func isPrivateHost(_ host: String) -> Bool {
-        if host == "localhost" || host == "::1" { return true }
-        let parts = host.split(separator: ".").compactMap { UInt8($0) }
-        guard parts.count == 4 else { return false }
+        if host == "localhost" { return true }
+        // URLs carry IPv6 literals in brackets.
+        let bare = host.hasPrefix("[") && host.hasSuffix("]")
+            ? String(host.dropFirst().dropLast())
+            : host
+
+        if let v6 = IPv6Address(bare) {
+            let bytes = Array(v6.rawValue)
+            if v6.isLoopback { return true }                        // ::1
+            if bytes[0] == 0xFE && (bytes[1] & 0xC0) == 0x80 { return true }  // fe80::/10 link-local
+            if (bytes[0] & 0xFE) == 0xFC { return true }            // fc00::/7 unique-local
+            return false
+        }
+
+        guard let v4 = IPv4Address(bare) else { return false }
+        let parts = Array(v4.rawValue)
         switch parts[0] {
         case 10: return true                                       // 10.0.0.0/8
         case 172: return (16...31).contains(parts[1])              // 172.16.0.0/12

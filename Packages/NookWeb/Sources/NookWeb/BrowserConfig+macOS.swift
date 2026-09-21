@@ -11,10 +11,10 @@ import WebKit
 
 extension BrowserConfiguration {
     static func applyPlatformPreferences(to config: WKWebViewConfiguration) {
-        // JavaScript clipboard access (navigator.clipboard, document.execCommand('copy')).
-        // Required for third-party WKWebView apps; Safari enables this by default.
-        config.preferences.setValue(true, forKey: "javaScriptCanAccessClipboard")
-        config.preferences.setValue(true, forKey: "DOMPasteAllowed")
+        // No clipboard overrides here. Setting `javaScriptCanAccessClipboard` and `DOMPasteAllowed`
+        // together makes WebKit's requestDOMPasteAccess return granted before it reaches the
+        // user-gesture check, so any page could read the clipboard silently. Safari does not set
+        // them either. Gesture-driven copy and paste go through WebKit's own path.
         config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
         config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
         // The inspector itself is enabled per web view through isInspectable.
