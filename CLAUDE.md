@@ -76,6 +76,10 @@ the flags on the `xcodebuild` invocation covers everything. Measured on 1.3.0: 8
 - `feature/download-memory` (local only, formerly `fix/download-memory`) is an unfinished WIP branch: URLSession-streamed downloads, based on an old commit; rebase onto `develop` before finishing.
 - **One worktree per concurrent agent or task.** `git worktree add ../Nook-<task> -b feature/<name> develop`, work there, remove it when the branch merges. Sharing the main checkout between two sessions goes wrong in ways neither session can see: the branch changes underneath you mid-task, and uncommitted files belonging to someone else sit in the tree, so a plain `git commit -a` or `git add -A` sweeps up their work. Committing from a shared tree means naming your own files explicitly, or building the commit against `develop` with a temp `GIT_INDEX_FILE` plus `git commit-tree` and `git update-ref`, which leaves HEAD and the tree untouched for whoever else is in them.
 - **A worktree does not isolate the running app.** Every build shares one bundle id, so all of them share `~/Library/Application Support/com.gstudios.nook/` (the `Tabs/*.json` files, the SwiftData store, the dev-mcp-token) and the `com.gstudios.nook` defaults domain. Two copies running at once corrupt each other's tab state. Quit the other one first (`osascript -e 'quit app "Nook"'`), and give each worktree its own `-derivedDataPath` inside that worktree. More worktrees also means more stale `Nook.app` bundles lying around, so confirm which binary is running before concluding a change did not work (see "I don't see my change" in Key Patterns).
+- **Markdown an agent writes is local only.** Reviews, plans, specs, handoffs and notes go under `docs/`, which is gitignored. Do not add one to the repo without asking first. The exception is a file the repo already tracks, such as `CLAUDE.md` or `docs/adblocker-architecture.md`.
+- **Commit when something is finished, not per edit.** A commit is a milestone worth reading in the log, so hold related edits together and expect a handful per PR rather than one per line changed.
+- **Markdown an agent writes is local only.** Reviews, plans, specs, handoffs and notes go under `docs/`, which is gitignored. Ask before adding one to the repo. Files the repo already tracks, such as `CLAUDE.md` or `docs/adblocker-architecture.md`, are fair game to edit.
+- **Commit at milestones.** A commit should read in the log as a finished piece of work. Hold related edits together and expect a handful per PR.
 - AI assistance must be disclosed per CONTRIBUTING.md.
 
 ## Architecture
@@ -180,7 +184,7 @@ Every package targets `.macOS("26.0"), .iOS("26.0")` and Swift language mode 5 a
 | `UI/` | Shared UI components |
 | `Navigation/` | Sidebar structure (header, bottom bar, spaces list, context menus) |
 | `Onboarding/` | 4 stages: Hello → TabLayout → Import (`SafariImportFlow`) → Final. Metal-shader transitions. |
-| `docs/` | `adblocker-architecture.md`. Design specs, implementation plans and handoff notes are kept locally under `docs/superpowers/` and are gitignored; they are never committed. |
+| `docs/` | All of it is gitignored except `adblocker-architecture.md`. Designs, specs, plans, reviews and handoff notes live here locally and are never committed. |
 | `ASSESSMENT.md` | Build and warning audit snapshot from 2026-03-20. Numbers are stale; the category breakdown is still useful. |
 
 ## Design System
