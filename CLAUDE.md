@@ -14,7 +14,7 @@ Nook is a fast, minimal macOS browser with sidebar-first design. Built with Swif
 - **Bundle ID**: `com.gstudios.nook`
 - **Current Version**: 1.1.0 (build 110), released 2026-09-18 as the first release on `nook-browser/Nook` after upstream's 1.0.7 (notarized DMG, appcast item scoped so 1.0.x hosts see a link rather than an install).
 - **NOT sandboxed** — runs with hardened runtime but no App Sandbox.
-- **Passkeys are not supported.** Apple declined the `com.apple.developer.web-browser.public-key-credential` entitlement. It has been removed from the entitlements file. Do not add WebAuthn/passkey code paths that depend on it.
+- **System passkeys are not supported; extension passkeys work.** Apple declined the `com.apple.developer.web-browser.public-key-credential` entitlement, so WebKit will not hand `navigator.credentials` to AuthenticationServices and iCloud Keychain passkeys are unreachable. `BrowserConfig` injects a suppression script that stubs `PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable` to `false` so sites stop offering that path. A password manager extension (Bitwarden, 1Password) replaces `navigator.credentials.create` and `.get` on the page before the site calls them and services the assertion from its own vault, which touches no Apple API and needs no entitlement, so passkey logins do succeed for those users. Do not add WebAuthn code paths that depend on the entitlement, and do not assume the suppression script blocks passkeys: a content script can override it right back.
 
 ## Priorities
 
@@ -315,7 +315,7 @@ Located in `Packages/NookBlocker/Sources/NookBlocker/`. Full description in `doc
 | `automation.apple-events` | AppleScript support |
 | `mach-lookup: com.apple.PIPAgent` | Picture-in-Picture |
 
-The passkey entitlement (`web-browser.public-key-credential`) was requested and declined by Apple; it is not in the file and nothing in the code references WebAuthn.
+The passkey entitlement (`web-browser.public-key-credential`) was requested and declined by Apple; it is not in the file. The only WebAuthn code in the app is the suppression script in `BrowserConfig.swift` described above.
 
 **Hardened runtime exceptions live in build settings.** `RUNTIME_EXCEPTION_*` in `project.pbxproj` become `com.apple.security.cs.*` entitlements at signing, so neither entitlements file shows them; check a built product with `codesign -d --entitlements -`. Release keeps `ALLOW_JIT` only. `ALLOW_DYLD_ENVIRONMENT_VARIABLES` and `DISABLE_LIBRARY_VALIDATION` are NO in Release (they let any local process inject a dylib into Nook and take its Keychain items and TCC grants) and stay YES in Debug for the debugger and previews.
 
