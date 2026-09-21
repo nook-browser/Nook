@@ -293,7 +293,7 @@ private struct SplitPreviewOverlay: View {
                     MagneticCardView(
                         side: .left,
                         icon: "rectangle.lefthalf.filled",
-                        text: "Add left split",
+                        text: splitState.isSplit ? "Replace left split" : "Add left split",
                         isTabHovered: previewSide == .left,
                         dragLocation: dragLocation,
                         cardFrame: CGRect(
@@ -317,7 +317,7 @@ private struct SplitPreviewOverlay: View {
                     MagneticCardView(
                         side: .right,
                         icon: "rectangle.righthalf.filled",
-                        text: "Add right split",
+                        text: splitState.isSplit ? "Replace right split" : "Add right split",
                         isTabHovered: previewSide == .right,
                         dragLocation: dragLocation,
                         cardFrame: CGRect(
