@@ -172,14 +172,15 @@ extension ExtensionManager {
         focusedWindowFor extensionContext: WKWebExtensionContext
     ) -> (any WKWebExtensionWindow)? {
         // nil while a private window is focused.
-        browserManagerRef?.windowRegistry?.activeWindow.flatMap { windowAdapter(for: $0) }
+        if let popup = extensionPopupWindows.first(where: { $0.window.isKeyWindow }) { return popup }
+        return browserManagerRef?.windowRegistry?.activeWindow.flatMap { windowAdapter(for: $0) }
     }
 
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openWindowsFor extensionContext: WKWebExtensionContext
     ) -> [any WKWebExtensionWindow] {
-        openWindowAdapters
+        openWindowAdapters + extensionPopupWindows
     }
 
     // MARK: - Permission prompting helper (invoked by delegate when needed)
@@ -405,6 +406,29 @@ extension ExtensionManager {
         return itemID
     }
 
+    /// One extension page in its own window, for `chrome.windows.create({type: "popup"})`.
+    private func openExtensionPopupWindow(
+        _ url: URL, configuration: WKWebExtension.WindowConfiguration,
+        extensionContext: WKWebExtensionContext, controller: WKWebExtensionController
+    ) -> ExtensionPopupWindow? {
+        guard let webConfig = extensionContext.webViewConfiguration else { return nil }
+        let popup = ExtensionPopupWindow(
+            url: url,
+            frame: configuration.frame,
+            configuration: webConfig,
+            title: extensionContext.webExtension.displayName ?? "Extension",
+            controller: controller,
+            onClose: { [weak self] closed in
+                self?.extensionPopupWindows.removeAll { $0 === closed }
+            })
+        extensionPopupWindows.append(popup)
+        controller.didOpenWindow(popup)
+        controller.didOpenTab(popup.tab)
+        if configuration.shouldBeFocused { popup.show() } else { popup.window.orderFront(nil) }
+        Self.logger.info("Extension opened popup window \(url.lastPathComponent, privacy: .public)")
+        return popup
+    }
+
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openNewWindowUsing configuration: WKWebExtension.WindowConfiguration,
@@ -412,12 +436,25 @@ extension ExtensionManager {
         completionHandler:
             @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void
     ) {
+        // A popup of the extension's own pages gets a real window, so the id the extension holds
+        // is the popout's and not the browser window's: Bitwarden's unlock popout ends with
+        // chrome.windows.remove(id), which used to close the whole browser window.
+        if configuration.windowType == .popup,
+           configuration.tabURLs.count == 1,
+           let url = configuration.tabURLs.first,
+           url.scheme?.lowercased() == extensionContext.baseURL.scheme?.lowercased(),
+           Self.extensionMayOpen(url, for: extensionContext),
+           let popup = openExtensionPopupWindow(url, configuration: configuration, extensionContext: extensionContext, controller: controller) {
+            completionHandler(popup, nil)
+            return
+        }
+
         guard let window = targetWindow(nil) else {
             completionHandler(nil, Self.noWindowError())
             return
         }
 
-        // An extension window opens as tabs in the window's current space. A space owns its website
+        // A non-popup extension window opens as tabs in the window's current space. A space owns its website
         // data store, so giving one to each extension window would hand its pages an empty cookie
         // jar and move the user out of the space they were working in: an OAuth or FIDO2 popout
         // would lose the session of the very page that asked for it.

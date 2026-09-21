@@ -43,6 +43,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     var openedTabIDs: Set<UUID> = []
     /// One adapter per regular window, by BrowserWindowState id.
     var windowAdapters: [UUID: ExtensionWindowAdapter] = [:]
+    /// Live `chrome.windows.create({type: "popup"})` windows; each removes itself when closed.
+    var extensionPopupWindows: [ExtensionPopupWindow] = []
     weak var browserManagerRef: BrowserManager?
     // UI delegate for popup context menus and navigation
     var popupUIDelegate: PopupUIDelegate?
