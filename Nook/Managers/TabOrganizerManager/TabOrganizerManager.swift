@@ -138,6 +138,36 @@ final class TabOrganizerManager {
         isOrganizing = false
     }
 
+    // MARK: - Auto-Rename
+
+    /// Shortens the titles of tabs that were just pinned. Skips titles the user typed and short
+    /// ones, and drops a result when the tab was renamed, moved out or navigated meanwhile.
+    func autoRename(_ itemIDs: [UUID], using tabs: TabsController) {
+        guard isAvailable else { return }
+        var inputs: [TabInput] = []
+        for itemID in itemIDs.prefix(Self.maxTabs) {
+            guard let item = tabs.item(itemID), item.customTitle?.isEmpty != false,
+                  let url = tabs.session(for: itemID)?.url ?? item.url else { continue }
+            let title = tabs.session(for: itemID)?.title ?? item.displayTitle
+            guard title.count > TabOrganizationModel.cleanTitleLength else { continue }
+            inputs.append(TabInput(index: inputs.count + 1, itemID: itemID, title: title, url: url))
+        }
+        guard !inputs.isEmpty else { return }
+        Task {
+            do {
+                for rename in try await TabOrganizationModel.renames(for: inputs) {
+                    let input = inputs[rename.tab - 1]
+                    guard let item = tabs.item(input.itemID), item.customTitle?.isEmpty != false,
+                          case .pinned = tabs.tree.section(of: input.itemID),
+                          (tabs.session(for: input.itemID)?.title ?? item.displayTitle) == input.title else { continue }
+                    tabs.rename(input.itemID, rename.name)
+                }
+            } catch {
+                Self.log.error("Auto-rename failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
     // MARK: - Undo
 
     /// Reverts the last organization: folders it created go away, moved and renamed tabs go back,

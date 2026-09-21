@@ -364,6 +364,9 @@ extension TabsController {
                 guard let page = session(for: id), tree.item(id)?.isFolder == false else { continue }
                 setOpenPage(id, OpenPage(url: page.url, title: page.title))
             }
+            if case .pinned = tree.section(of: itemID) {
+                onTabsPinned?(tree.subtree(of: itemID).filter { tree.item($0)?.isFolder == false })
+            }
         }
         unloadPagesOnWrongDataStore(tree.subtree(of: itemID))
         for window in regularWindows { window.refreshCompositor() }

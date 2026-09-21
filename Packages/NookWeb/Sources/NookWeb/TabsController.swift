@@ -65,6 +65,8 @@ public final class TabsController {
     @ObservationIgnored public weak var sessionDelegate: PageSessionDelegate?
     @ObservationIgnored public weak var tabEvents: TabEventObserver?
     @ObservationIgnored public weak var alerts: AlertPresenter?
+    /// Called with each tab that a move brought into a pinned section from the tabs section.
+    @ObservationIgnored public var onTabsPinned: (([UUID]) -> Void)?
 
     /// Launch argument that redirects tab state, e.g. `-NookStateDir /tmp/bench`.
     /// Read from the argument domain only, never from persisted defaults, so a stray written
