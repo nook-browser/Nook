@@ -681,8 +681,19 @@ public final class PageSession: NSObject, Identifiable {
         }
     }
 
-    /// No cookies, no disk cache: what private pages fetch their favicon with.
-    private static let privateFaviconSession = URLSession(configuration: .ephemeral)
+    /// What private pages fetch their favicon with. An ephemeral config still holds cookies in
+    /// memory for the life of the process, so a favicon endpoint could hand back an identifier
+    /// that links one private window to the next. Turn cookies, credentials and caching off.
+    private static let privateFaviconSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        config.httpCookieStorage = nil
+        config.urlCredentialStorage = nil
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: config)
+    }()
 
     private static func downloadImage(from url: URL, isPrivate: Bool) async -> PlatformImage? {
         do {
