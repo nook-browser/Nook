@@ -261,6 +261,19 @@ final class DevMCPServer {
             ], "required": ["urls"]]
         ),
         AIToolDefinition(
+            name: "closeTabs",
+            description: "Close tabs in the active window. indices: positions from getTabList. Or regular: true to delete every tab and folder in the active space's regular tabs section, leaving favorites and pinned tabs.",
+            parameters: ["type": "object", "properties": [
+                "indices": ["type": "array", "items": ["type": "integer"]],
+                "regular": ["type": "boolean"]
+            ]]
+        ),
+        AIToolDefinition(
+            name: "pinTab",
+            description: "Pin the tab at a getTabList index to the active space's pinned section.",
+            parameters: ["type": "object", "properties": ["index": ["type": "integer"]], "required": ["index"]]
+        ),
+        AIToolDefinition(
             name: "user_scripts",
             description: "User scripts installed in the selected tab: first line, injection time, main frame only, length.",
             parameters: ["type": "object", "properties": [:] as [String: Any]]
@@ -399,6 +412,28 @@ final class DevMCPServer {
                     out[url] = engine.matches(url: url, sourceURL: source, type: type)
                 }
                 return text(json(out))
+
+            case "closeTabs":
+                if args["regular"] as? Bool == true {
+                    guard let spaceID = window.spaceID else { return text("Window has no space", error: true) }
+                    let roots = bm.tabs.children(of: .tabs(spaceID: spaceID))
+                    for item in roots { bm.tabs.remove(item.id) }
+                    return text("Removed \(roots.count) items from the regular tabs section")
+                }
+                let order = bm.tabs.displayOrder(in: window)
+                let indices = (args["indices"] as? [NSNumber] ?? []).map(\.intValue)
+                guard !indices.isEmpty, indices.allSatisfy(order.indices.contains) else {
+                    return text("indices must be positions from getTabList (0-\(order.count - 1))", error: true)
+                }
+                bm.tabs.close(indices.map { order[$0] })
+                return text("Closed \(indices.count) tabs")
+
+            case "pinTab":
+                let order = bm.tabs.displayOrder(in: window)
+                guard let index = (args["index"] as? NSNumber)?.intValue, order.indices.contains(index),
+                      let spaceID = window.spaceID else { return text("index must be a position from getTabList", error: true) }
+                bm.tabs.pin(order[index], to: .pinned(spaceID: spaceID))
+                return text("Pinned: \(bm.tabs.item(order[index])?.displayTitle ?? "")")
 
             case "user_scripts":
                 guard let wv = webView else { return text("No active tab", error: true) }

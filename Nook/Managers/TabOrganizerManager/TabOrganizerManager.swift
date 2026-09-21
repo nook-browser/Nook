@@ -149,10 +149,16 @@ final class TabOrganizerManager {
         guard isAvailable else { return }
         var inputs: [TabInput] = []
         for itemID in itemIDs.prefix(Self.maxTabs) {
-            guard let item = tabs.item(itemID), item.customTitle?.isEmpty != false,
-                  let url = tabs.session(for: itemID)?.url ?? item.url else { continue }
+            guard let item = tabs.item(itemID), let url = tabs.session(for: itemID)?.url ?? item.url else { continue }
             let title = tabs.session(for: itemID)?.title ?? item.displayTitle
-            guard title.count > TabOrganizationModel.cleanTitleLength else { continue }
+            guard item.customTitle?.isEmpty != false else {
+                Self.log.info("Auto-rename skipped: the tab already has a custom title")
+                continue
+            }
+            guard title.count > TabOrganizationModel.cleanTitleLength else {
+                Self.log.info("Auto-rename skipped: title is \(title.count) characters, short enough")
+                continue
+            }
             inputs.append(TabInput(index: inputs.count + 1, itemID: itemID, title: title, url: url))
         }
         guard !inputs.isEmpty else { return }
@@ -164,6 +170,7 @@ final class TabOrganizerManager {
                           case .pinned = tabs.tree.section(of: input.itemID),
                           (tabs.session(for: input.itemID)?.title ?? item.displayTitle) == input.title else { continue }
                     tabs.rename(input.itemID, rename.name)
+                    Self.log.info("Auto-renamed a pinned tab")
                 }
             } catch {
                 Self.log.error("Auto-rename failed: \(error.localizedDescription)")

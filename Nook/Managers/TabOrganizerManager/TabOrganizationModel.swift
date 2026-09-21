@@ -255,10 +255,11 @@ enum TabOrganizationModel {
         for separator in [" | ", " - ", " — ", " – ", ": ", " · "] {
             segments = segments.flatMap { $0.components(separatedBy: separator) }
         }
-        let match = segments.first { segment in
+        // The shortest segment naming the site: a tagline can mention it too ("Learn guitar with JustinGuitar.com").
+        let match = segments.filter { segment in
             let flat = segment.lowercased().filter { $0.isLetter || $0.isNumber }
             return labels.contains { flat.contains($0) }
-        }?.trimmingCharacters(in: .whitespaces)
+        }.min { $0.count < $1.count }?.trimmingCharacters(in: .whitespaces)
         guard let match, !match.isEmpty, match.count < input.title.count else { return nil }
         return match
     }
