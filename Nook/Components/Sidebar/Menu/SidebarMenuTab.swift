@@ -24,18 +24,18 @@ struct SidebarMenuTab: View {
         VStack(spacing: 8) {
             Image(systemName: isActive ? activeImage : image)
                 .font(NookDesign.Font.titleLarge)
-                .foregroundStyle(isActive ? .green : .white)
+                .foregroundStyle(isActive ? .green : .primary)
                 .symbolRenderingMode(.hierarchical)
                 .symbolEffect(.wiggle, value: shouldWiggle)
                 .contentTransition(.symbolEffect(.replace.magic(fallback: .downUp.byLayer), options: .nonRepeating))
 
             Text(title)
                 .font(NookDesign.Font.secondary)
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
         }
         .frame(height: 80)
         .frame(maxWidth: .infinity)
-        .background(isActive ?.white.opacity(0.1) : isHovering ? .white.opacity(0.05) : .clear)
+        .background(isActive ? NookDesign.Surface.fillPressed : isHovering ? NookDesign.Surface.fill : .clear)
         .animation(NookDesign.Motion.quick, value: isHovering)
         .animation(NookDesign.Motion.standard, value: isActive)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
