@@ -55,6 +55,7 @@ public final class NookSettingsService {
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
     private let siteRoutingRulesKey = "settings.siteRoutingRules"
+    private let sitePermissionsKey = "settings.sitePermissions"
     private let youTubeHideShortsKey = "settings.youTubeHideShorts"
     private let youTubeHiddenHomeSectionsKey = "settings.youTubeHiddenHomeSections"
     private let youTubeVideosPerRowKey = "settings.youTubeVideosPerRow"
@@ -79,6 +80,36 @@ public final class NookSettingsService {
             if let data = try? JSONEncoder().encode(customSearchEngines) {
                 userDefaults.set(data, forKey: customSearchEnginesKey)
             }
+        }
+    }
+
+    /// Stored per-site answers for camera and microphone, keyed by `SitePermissionRecord.key(for:)`.
+    public var sitePermissions: [String: SitePermissionRecord] = [:] {
+        didSet {
+            if let data = try? JSONEncoder().encode(sitePermissions) {
+                userDefaults.set(data, forKey: sitePermissionsKey)
+            }
+        }
+    }
+
+    /// The stored answer for `host`, or `.ask` when the site has none.
+    public func permission(_ permission: SitePermission, for host: String) -> SitePermissionPolicy {
+        sitePermissions[SitePermissionRecord.key(for: host)]?.policies[permission] ?? .ask
+    }
+
+    public func setPermission(_ permission: SitePermission, to policy: SitePermissionPolicy, for host: String) {
+        let key = SitePermissionRecord.key(for: host)
+        var record = sitePermissions[key] ?? SitePermissionRecord(host: key)
+        if policy == .ask {
+            record.policies.removeValue(forKey: permission)
+        } else {
+            record.policies[permission] = policy
+        }
+        // Drop the record entirely once it holds nothing, so the store does not grow forever.
+        if record.policies.isEmpty {
+            sitePermissions.removeValue(forKey: key)
+        } else {
+            sitePermissions[key] = record
         }
     }
 
@@ -427,6 +458,13 @@ public final class NookSettingsService {
             self.customSearchEngines = decoded
         } else {
             self.customSearchEngines = []
+        }
+
+        if let spData = userDefaults.data(forKey: sitePermissionsKey),
+           let decodedPermissions = try? JSONDecoder().decode([String: SitePermissionRecord].self, from: spData) {
+            self.sitePermissions = decodedPermissions
+        } else {
+            self.sitePermissions = [:]
         }
 
         if let srData = userDefaults.data(forKey: siteRoutingRulesKey),

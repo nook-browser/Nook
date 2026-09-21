@@ -5,133 +5,43 @@
 //
 
 import SwiftUI
-import AppKit
 import WebKit
-import AVFoundation
 import CoreLocation
 import NookDesign
+import NookSettings
 import NookWeb
 import NookUI
 
-@MainActor
-final class ExtensionLibraryMoreMenuController {
-    private var panel: NSPanel?
-    private var localMonitor: Any?
-
-    private let menuWidth: CGFloat = 260
-
-    var isVisible: Bool { panel?.isVisible ?? false }
-
-    func show(
-        anchorFrame: NSRect,
-        browserManager: BrowserManager,
-        windowState: BrowserWindowState,
-        onDismiss: @escaping () -> Void
-    ) {
-        let panel = self.panel ?? createPanel()
-        self.panel = panel
-
-        let content = MoreMenuView(
-            browserManager: browserManager,
-            windowState: windowState,
-            onDismiss: { [weak self] in
-                self?.dismiss()
-                onDismiss()
-            }
-        )
-
-        let hosting = NSHostingView(
-            rootView: AnyView(
-                content.nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
-            )
-        )
-
-        panel.contentView = hosting
-
-        // Position adjacent to main panel
-        let fittingSize = hosting.fittingSize
-        let panelSize = CGSize(width: menuWidth, height: max(fittingSize.height, 200))
-
-        // Try right side of anchor, fall back to left
-        var origin = CGPoint(
-            x: anchorFrame.maxX + 4,
-            y: anchorFrame.maxY - panelSize.height
-        )
-
-        if let screen = NSScreen.main, origin.x + panelSize.width > screen.visibleFrame.maxX {
-            origin.x = anchorFrame.minX - menuWidth - 4
-        }
-
-        panel.setFrame(NSRect(origin: origin, size: panelSize), display: true)
-        panel.invalidateShadow()
-        panel.alphaValue = 0
-        panel.orderFront(nil)
-
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.12
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().alphaValue = 1
-        }
-
-        installEventMonitor()
-    }
-
-    func dismiss() {
-        guard let panel = panel, panel.isVisible else { return }
-        removeEventMonitor()
-
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.08
-            panel.animator().alphaValue = 0
-        }, completionHandler: {
-            panel.orderOut(nil)
-            panel.alphaValue = 1
-        })
-    }
-
-    private func createPanel() -> NSPanel {
-        let panel = NSPanel(
-            contentRect: NSRect(origin: .zero, size: CGSize(width: menuWidth, height: 300)),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: true
-        )
-        panel.isFloatingPanel = true
-        panel.hidesOnDeactivate = true
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.isReleasedWhenClosed = false
-        panel.level = .floating
-        return panel
-    }
-
-    private func installEventMonitor() {
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self = self, let panel = self.panel, panel.isVisible else { return event }
-            if let eventWindow = event.window, eventWindow == panel { return event }
-            self.dismiss()
-            return event
-        }
-    }
-
-    private func removeEventMonitor() {
-        if let monitor = localMonitor {
-            NSEvent.removeMonitor(monitor)
-            localMonitor = nil
-        }
-    }
-}
-
-// MARK: - More Menu SwiftUI Content
-
-private struct MoreMenuView: View {
+struct MoreMenuView: View {
     let browserManager: BrowserManager
     let windowState: BrowserWindowState
     let onDismiss: () -> Void
 
     @State private var cookieCount: Int?
     @State private var hasSiteData: Bool = false
+    @State private var confirming: Confirmation?
+
+    /// Clearing is destructive and silent otherwise, so it asks first.
+    private enum Confirmation: String, Identifiable {
+        case cookies, siteData, everything
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .cookies: return "Clear cookies for this site?"
+            case .siteData: return "Clear stored data for this site?"
+            case .everything: return "Clear all data for this site?"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .cookies: return "You will be signed out of this site."
+            case .siteData: return "Caches, databases and local storage for this site are removed."
+            case .everything: return "Cookies, caches and stored data for this site are removed, and you will be signed out."
+            }
+        }
+    }
 
     private var currentHost: String? {
         browserManager.tabs.selectedSession(in: windowState)?.url.host
@@ -144,48 +54,51 @@ private struct MoreMenuView: View {
                     icon: "list.bullet.rectangle",
                     iconColor: .orange,
                     label: "Cookies",
-                    detail: cookieCount.map { "\($0)" } ?? "..."
+                    detail: cookieCount.map { "\($0)" } ?? "...",
+                    action: (cookieCount ?? 0) > 0 ? { confirming = .cookies } : nil
                 )
 
                 MoreMenuItem(
                     icon: "folder.fill",
                     iconColor: .purple,
                     label: "Site Data",
-                    detail: hasSiteData ? "Stored" : "None"
+                    detail: hasSiteData ? "Stored" : "None",
+                    action: hasSiteData ? { confirming = .siteData } : nil
                 )
 
+                if let host = currentHost, let settings = browserManager.nookSettings {
+                    MoreMenuItem(icon: "mic.fill", iconColor: .indigo, label: "Microphone") {
+                        SitePermissionPicker(permission: .microphone, host: host, settings: settings)
+                    }
+
+                    MoreMenuItem(icon: "video.fill", iconColor: .cyan, label: "Camera") {
+                        SitePermissionPicker(permission: .camera, host: host, settings: settings)
+                    }
+                }
+
+                // Nook-wide, not per site: WebKit exposes no per-origin delegate for either on
+                // macOS, so these open the System Settings pane that actually governs them
+                // rather than implying this site can be changed here.
                 MoreMenuItem(
                     icon: "bell.fill",
                     iconColor: .red,
                     label: "Notifications",
-                    detail: notificationStatus
+                    detail: "Nook",
+                    action: { openSystemSettings("Notifications") }
                 )
 
                 MoreMenuItem(
                     icon: "location.fill",
                     iconColor: .blue,
                     label: "Location",
-                    detail: locationStatus
-                )
-
-                MoreMenuItem(
-                    icon: "mic.fill",
-                    iconColor: .indigo,
-                    label: "Microphone",
-                    detail: micStatus
-                )
-
-                MoreMenuItem(
-                    icon: "video.fill",
-                    iconColor: .cyan,
-                    label: "Camera",
-                    detail: cameraStatus
+                    detail: locationStatus,
+                    action: { openSystemSettings("Privacy_LocationServices") }
                 )
 
                 Divider().opacity(0.15).padding(.horizontal, 10).padding(.vertical, 4)
 
                 Button {
-                    clearAllSiteData()
+                    confirming = .everything
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "trash.fill")
@@ -211,6 +124,16 @@ private struct MoreMenuView: View {
         }
         .frame(width: 260)
         .onAppear { loadSiteInfo() }
+        .confirmationDialog(
+            confirming?.title ?? "",
+            isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
+            presenting: confirming
+        ) { target in
+            Button("Clear", role: .destructive) { perform(target) }
+            Button("Cancel", role: .cancel) { confirming = nil }
+        } message: { target in
+            Text(target.message)
+        }
     }
 
     private func loadSiteInfo() {
@@ -229,12 +152,8 @@ private struct MoreMenuView: View {
         }
     }
 
-    private var notificationStatus: String {
-        // UNUserNotificationCenter doesn't have a synchronous status check
-        // App-level permission is what we can report
-        return "Check"
-    }
 
+    /// Nook's own Location Services state, not this site's. Labelled as such in the row.
     private var locationStatus: String {
         switch CLLocationManager().authorizationStatus {
         case .authorizedAlways: return "Allowed"
@@ -243,39 +162,43 @@ private struct MoreMenuView: View {
         }
     }
 
-    private var micStatus: String {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: return "Allowed"
-        case .denied, .restricted: return "Blocked"
-        default: return "Ask"
-        }
-    }
 
-    private var cameraStatus: String {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized: return "Allowed"
-        case .denied, .restricted: return "Blocked"
-        default: return "Ask"
-        }
-    }
 
-    private func clearAllSiteData() {
+    private func perform(_ target: Confirmation) {
         guard let host = currentHost else { return }
+        confirming = nil
         Task {
-            await browserManager.cacheManager.clearCacheForDomain(host)
-            await browserManager.cookieManager.deleteCookiesForDomain(host)
+            switch target {
+            case .cookies:
+                await browserManager.cookieManager.deleteCookiesForDomain(host)
+            case .siteData:
+                await browserManager.cacheManager.clearCacheForDomain(host)
+            case .everything:
+                await browserManager.cacheManager.clearCacheForDomain(host)
+                await browserManager.cookieManager.deleteCookiesForDomain(host)
+            }
+            loadSiteInfo()
         }
+        if target == .everything { onDismiss() }
+    }
+
+    /// Opens the pane that actually governs a Nook-wide permission.
+    private func openSystemSettings(_ pane: String) {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")
+        if let url { NSWorkspace.shared.open(url) }
         onDismiss()
     }
 }
 
 // MARK: - More Menu Item
 
-private struct MoreMenuItem: View {
+private struct MoreMenuItem<Trailing: View>: View {
     let icon: String
     let iconColor: Color
     let label: String
-    let detail: String
+    var detail: String? = nil
+    var action: (() -> Void)? = nil
+    @ViewBuilder var trailing: () -> Trailing
 
     @State private var isHovering = false
 
@@ -293,14 +216,50 @@ private struct MoreMenuItem: View {
 
             Spacer()
 
-            Text(detail)
-                .font(NookDesign.Font.caption)
-                .foregroundStyle(.secondary.opacity(0.4))
+            if let detail {
+                Text(detail)
+                    .font(NookDesign.Font.caption)
+                    .foregroundStyle(.secondary)
+            }
+            trailing()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(isHovering ? Color.secondary.opacity(0.07) : Color.clear)
+        .background(isHovering && action != nil ? NookDesign.Surface.fill : Color.clear)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { isHovering = $0 }
+        .onTapGesture { action?() }
+    }
+}
+
+extension MoreMenuItem where Trailing == EmptyView {
+    init(icon: String, iconColor: Color, label: String, detail: String? = nil, action: (() -> Void)? = nil) {
+        self.init(icon: icon, iconColor: iconColor, label: label, detail: detail, action: action) { EmptyView() }
+    }
+}
+
+/// Per-site allow/block/ask for the two capabilities WebKit lets us answer without prompting.
+private struct SitePermissionPicker: View {
+    let permission: SitePermission
+    let host: String
+    let settings: NookSettingsService
+
+    @State private var policy: SitePermissionPolicy = .ask
+
+    var body: some View {
+        Picker("", selection: $policy) {
+            ForEach(SitePermissionPolicy.allCases, id: \.self) { option in
+                Text(option.label).tag(option)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .controlSize(.small)
+        .fixedSize()
+        .onAppear { policy = settings.permission(permission, for: host) }
+        .onChange(of: policy) { _, newValue in
+            settings.setPermission(permission, to: newValue, for: host)
+        }
     }
 }

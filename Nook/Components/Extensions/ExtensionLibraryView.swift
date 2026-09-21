@@ -20,8 +20,8 @@ struct ExtensionLibraryView: View {
     let windowState: BrowserWindowState
     let settings: NookSettingsService
     let onDismiss: () -> Void
+    let onShowMoreMenu: () -> Void
 
-    @State private var moreMenuController = ExtensionLibraryMoreMenuController()
 
     private let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionLibrary")
 
@@ -217,17 +217,7 @@ struct ExtensionLibraryView: View {
             Spacer()
 
             Button {
-                // Find the library panel by looking for our visible NSPanel
-                if let panelWindow = NSApp.windows.first(where: {
-                    $0 is NSPanel && $0.isVisible && $0.level == .floating && $0.styleMask.contains(.nonactivatingPanel)
-                }) {
-                    moreMenuController.show(
-                        anchorFrame: panelWindow.frame,
-                        browserManager: browserManager,
-                        windowState: windowState,
-                        onDismiss: {}
-                    )
-                }
+                onShowMoreMenu()
             } label: {
                 Image(systemName: "ellipsis")
                     .font(NookDesign.Font.body)
@@ -464,7 +454,7 @@ private struct ContentBlockerSiteRow: View {
     var body: some View {
         SiteSettingRow(icon: "shield.checkered", iconColor: .green, title: "Content Blocker", subtitle: subtitle) {
             Toggle("", isOn: $enabled)
-                .toggleStyle(.switch)
+                .toggleStyle(NookSwitchToggleStyle())
         }
     }
 }
