@@ -22,7 +22,7 @@ Use these to settle tradeoffs when a choice is not otherwise specified:
 
 1. **macOS speed**: startup, tab switch, scroll, and sidebar interaction latency.
 2. **Built-in ad blocking**: the content blocker pipeline is a core feature, not an add-on.
-3. **Battery and CPU balance**: no polling timers, no busy observers, prefer notifications and WebKit callbacks. Heavy work (filter list compile, MLX inference) runs off the main actor, is cancellable, and unloads when idle. Extra processing is acceptable when it serves priority 1 or 2.
+3. **Battery and CPU balance**: no polling timers, no busy observers, prefer notifications and WebKit callbacks. Heavy work (filter list compile) runs off the main actor, is cancellable, and unloads when idle. Extra processing is acceptable when it serves priority 1 or 2.
 
 An iOS companion browser is under consideration. Nothing in the project targets iOS today (`SDKROOT = macosx`, AppKit throughout the drag system, windows, pasteboard, and haptics). Keep new model and manager code free of AppKit imports where that costs nothing, and put AppKit-only code in views or clearly named platform files.
 
@@ -39,7 +39,7 @@ xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build
 xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build \
   CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
 
-# Release build (Apple Silicon only; MLX has no x86_64 slice)
+# Release build (Apple Silicon only)
 # The two coverage flags are required: see Code Coverage below.
 xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath build \
   ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO
@@ -49,8 +49,8 @@ xcodebuild -scheme Nook -configuration Release -arch arm64 -derivedDataPath buil
 `ENABLE_CODE_COVERAGE` and `CLANG_COVERAGE_MAPPING` to `YES`, and a plain Release build ships a
 binary carrying live `__llvm_prf_cnts` counters: every basic block increments one at runtime, and
 the counter array is dirty, unshareable memory in each launch. Setting the flags in
-`project.pbxproj` only de-instruments the app target; SPM package targets (MLX, SwiftSoup,
-NookWeb, OrderedCollections) do not inherit project-level settings and stay instrumented. Passing
+`project.pbxproj` only de-instruments the app target; SPM package targets (SwiftSoup,
+NookWeb) do not inherit project-level settings and stay instrumented. Passing
 the flags on the `xcodebuild` invocation covers everything. Measured on 1.3.0: 81.7 MB binary with
 67,242 profiling symbols, versus 54.2 MB and zero with the flags. Verify with
 `nm <binary> | grep -c __llvm_prf` (expect 0) rather than `-showBuildSettings`, which reports
@@ -62,7 +62,7 @@ the flags on the `xcodebuild` invocation covers everything. Measured on 1.3.0: 8
 
 **Metal**: One shader (`Onboarding/Components/ViewTransition.metal`). Xcode 26+ needs the Metal Toolchain component: `xcodebuild -downloadComponent MetalToolchain`.
 
-**No SPM resolve needed**: Xcode resolves packages automatically on open. The `build/` directory holds package checkouts and is large (MLX).
+**No SPM resolve needed**: Xcode resolves packages automatically on open. The `build/` directory holds package checkouts.
 
 **No bridging header.** The one ObjC dependency that needed one, `MuteableWKWebView`, is now a C target (`Sources/MuteableWKWebView`) inside the `NookWeb` package, re-exported as part of the `NookWeb` product. Packages cannot declare a bridging header, so this was the forcing function that removed it.
 
@@ -106,7 +106,7 @@ The app uses ~30 specialized **Managers**, one per feature domain, coordinated t
 | **YouTubeTweaks** | Stateless `YouTubeTweaks.apply` in `decidePolicyFor`: one document-start script in its own content world carrying CSS (hide Shorts, hide home shelves, `--ytd-rich-grid-items-per-row` override) and frame thumbnails (swaps `i.ytimg.com` thumbnails for the video's `hq1-3.jpg` stills). Settings live under Tweaks > YouTube (`SettingsTabs.youTube`, `Packages/NookUI/Sources/NookUI/Settings/YouTube.swift`). Lives in `Packages/NookTweaks/Sources/NookTweaks/`. |
 | **FacebookTweaks** | Tweaks > Social Media > Facebook: hide the Reels carousel and suggested posts. Injects `facebook-feed-prune.js` (page world) with `reels`/`suggested` flags; see Content Blocker System. Lives in `Packages/NookTweaks/Sources/NookTweaks/`. |
 | **SocialImageTweaks** | Download button on photos and videos on any site the user lists in Tweaks > Social Media (`settings.mediaDownloadSites`, seeded from the old per-site toggles and before them the single `settings.socialImageDownload`). Installed on the first visit to a listed site and rebuilt only when the list changes; the script gets the domains as `NOOK_DOWNLOAD_SITES` and suffix-matches the hostname. `social-image-download.js` (isolated world) finds media under the pointer, taking any https image or video, since a listed site may serve from any CDN; `social-video-source.js` (page world) reads MP4 URLs from React data because Facebook and Instagram play blob: URLs. Saves through the `MediaDownloading` seam (`FocusableWKWebView.downloadImage` on the app side). Lives in `Packages/NookTweaks/Sources/NookTweaks/`. |
-| **TabOrganizerManager/** | On-device LLM tab grouping via MLX. `LocalLLMEngine` owns model download, load, idle unload, and memory-pressure response. Apple Silicon only. Stays in `Nook/Managers/TabOrganizerManager/`. |
+| **TabOrganizerManager/** | Tab grouping, renaming and duplicate closing on the system language model (`FoundationModels`, Apple Intelligence). `TabOrganizationModel` runs two schema-constrained turns: name the folders, then file each tab under one of those names or "Unrelated" (`DynamicGenerationSchema` `anyOf`, one entry per tab), so there is no output parsing. Renames are a separate call. Duplicates are a URL comparison, no model. When `SystemLanguageModel` is unavailable the sidebar button and menu item are hidden and Settings > AI shows why. One label per tab was tried and failed: every tab got a different topic. Stays in `Nook/Managers/TabOrganizerManager/`. |
 | **DialogManager/** | Modal dialogs: space creation and editing, basic auth, settings, import, confirmations |
 | **DownloadManager/** | File downloads via `WKDownloadDelegate`. Stays in `Nook/Managers/DownloadManager/`, unchanged by the phase 2 package split; see the ios-port design doc for the planned rewrite on `fix/download-memory`. |
 | **FindManager/** | In-page find/search |
@@ -309,16 +309,15 @@ The passkey entitlement (`web-browser.public-key-credential`) was requested and 
 
 ## Dependencies
 
-**SPM packages (4 direct, resolved automatically):**
+**SPM packages (3 direct, resolved automatically):**
 
 | Package | Product | Purpose | Used by |
 |---------|---------|---------|--------|
 | **Sparkle** | Sparkle | Auto-updates (notarized DMG distribution) | AppDelegate, BrowserManager |
 | **Garnish** | Garnish | Color contrast/mixing utilities | CommandPalette, NookButtonStyle, SidebarAIChat, SidebarMenuHistoryTab |
 | **FaviconFinder** | FaviconFinder | Fetches favicon URLs | PageSession, CommandPalette suggestions, SidebarMenuHistoryTab |
-| **mlx-swift-lm** | MLXLLM | On-device LLM inference (Apple Silicon only) | LocalLLMEngine → TabOrganizerManager |
 
-Transitive: swift-atomics, swift-numerics, swift-collections, swift-transformers, swift-jinja, swift-asn1, swift-crypto, swift-log, SwiftSoup, LRUCache, Chronicle, yyjson, mlx-swift.
+Transitive: swift-atomics, swift-log, SwiftSoup, LRUCache, Chronicle.
 
 **Nook links no GPL-3.0 code it does not own.** SafariConverterLib (AdGuard, GPL-3.0) was removed in September 2026 because a §7 App Store exception can only be granted by a copyright holder. See `LICENSE-EXCEPTION.md`.
 

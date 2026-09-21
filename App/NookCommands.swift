@@ -183,20 +183,22 @@ struct NookCommands: Commands {
                     || !(browserManager.tabs.activeWindowSession.map { $0.hasVideoContent || $0.hasPiPActive } ?? false)
             )
 
-            Divider()
+            if tabOrganizerManager.isAvailable {
+                Divider()
 
-            Button("Organize Tabs") {
-                if let spaceID = windowRegistry.activeWindow?.spaceID {
-                    Task {
-                        await tabOrganizerManager.organizeTabs(in: spaceID, using: browserManager.tabs)
+                Button("Organize Tabs") {
+                    if let spaceID = windowRegistry.activeWindow?.spaceID {
+                        Task {
+                            await tabOrganizerManager.organizeTabs(in: spaceID, using: browserManager.tabs)
+                        }
                     }
                 }
+                .modifier(dynamicShortcut(.organizeTabs))
+                .disabled(
+                    tabOrganizerManager.isOrganizing
+                        || windowRegistry.activeWindow?.spaceID == nil
+                )
             }
-            .modifier(dynamicShortcut(.organizeTabs))
-            .disabled(
-                tabOrganizerManager.isOrganizing
-                    || windowRegistry.activeWindow?.spaceID == nil
-            )
         }
 
         // View commands

@@ -198,7 +198,7 @@ struct SpaceView: View {
             SpaceSeparator(
                 isHovering: $isSidebarHovered,
                 onClear: { tabs.close(looseTabs) },
-                onOrganize: nookSettings.tabOrganizerEnabled ? {
+                onOrganize: nookSettings.tabOrganizerEnabled && tabOrganizerManager.isAvailable ? {
                     Task {
                         await tabOrganizerManager.organizeTabs(in: spaceID, using: tabs)
                     }
