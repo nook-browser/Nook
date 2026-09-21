@@ -150,12 +150,10 @@ public struct SpaceTab: View {
                 if isRenaming {
                     NookDesign.Radius.shape(NookDesign.Radius.md)
                         .strokeBorder(accentColor, lineWidth: NookDesign.Size.hairlineWidth)
-                } else if isCurrentTab {
-                    NookDesign.Radius.shape(NookDesign.Radius.md)
-                        .strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth)
                 }
             }
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+            .nookRowSelection(isCurrentTab)
             .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
         }
         .buttonStyle(PlainButtonStyle())
@@ -195,7 +193,7 @@ public struct SpaceTab: View {
 
     private var backgroundColor: Color {
         if isCurrentTab {
-            return NookDesign.Surface.raised
+            return Color.clear
         } else if isHovering {
             return NookDesign.Surface.fill
         } else {

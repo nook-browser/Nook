@@ -30,14 +30,9 @@ struct SplitTabRow: View {
             SplitHalfTab(item: right, zoneID: zoneID)
         }
         .frame(height: NookDesign.Size.row)
-        .background(isActive ? NookDesign.Surface.raised : Color.clear)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-        .overlay {
-            if isActive {
-                NookDesign.Radius.shape(NookDesign.Radius.md)
-                    .strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth)
-            }
-        }
+        .nookRowSelection(isActive)
+        .nookElevation(isActive ? .raised : .flat)
     }
 }
 
