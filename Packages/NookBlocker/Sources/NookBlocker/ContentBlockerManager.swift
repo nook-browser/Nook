@@ -40,6 +40,7 @@ public final class ContentBlockerManager: NSObject {
 
     /// In-flight activation; startup tab loading waits on it so the first page is protected.
     public private(set) var activationTask: Task<Void, Never>?
+    private var hasActivated = false
 
     private var compiledRuleLists: [WKContentRuleList] = []
     private var updateTimer: Timer?
@@ -147,7 +148,10 @@ public final class ContentBlockerManager: NSObject {
         isCompiling = false
         isEnabled = true
         applyToSharedConfiguration()
-        applyToExistingWebViews()
+        // Later activations are a Settings toggle: those pages were loaded unblocked on purpose.
+        let isFirstActivation = !hasActivated
+        hasActivated = true
+        applyToExistingWebViews(reloadingPagesLoadedWithoutBlocking: isFirstActivation)
         NotificationCenter.default.post(name: .adBlockerStateChanged, object: nil)
         scheduleAutoUpdate()
 
@@ -167,8 +171,9 @@ public final class ContentBlockerManager: NSObject {
     /// Load rules (disk cache, else bundled snapshot), compile rule lists, build the advanced engine.
     private func rebuild() async {
         let loadStart = CFAbsoluteTimeGetCurrent()
+        let enabledFilenames = filterListManager.enabledOptionalFilterListFilenames
         let rules = await Task.detached(priority: .userInitiated) { [filterListManager] in
-            filterListManager.loadAllFilterRulesAsLines()
+            filterListManager.loadAllFilterRulesAsLines(enabledFilenames: enabledFilenames)
         }.value
         cbLog.info("Loaded \(rules.count) filter rules in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - loadStart), privacy: .public)s")
 
@@ -241,7 +246,7 @@ public final class ContentBlockerManager: NSObject {
     private func strippedTrackingParams(for url: URL, exempt: Bool) -> URL? {
         guard isEnabled, !exempt else { return nil }
         guard let stripped = trackingParamStripper.strip(url) else { return nil }
-        cbLog.info("removeparam \(url.host ?? "-", privacy: .public): \(url.query?.count ?? 0, privacy: .public) -> \(stripped.query?.count ?? 0, privacy: .public) query chars")
+        cbLog.info("removeparam \(url.host ?? "-", privacy: .private(mask: .hash)): \(url.query?.count ?? 0, privacy: .public) -> \(stripped.query?.count ?? 0, privacy: .public) query chars")
         return stripped
     }
 
@@ -256,7 +261,7 @@ public final class ContentBlockerManager: NSObject {
         reconcile(webView, exempt: exempt)
         let config = exempt ? nil : advancedRulesEngine.configUserScript(for: url)
         replaceConfigScript(in: webView.configuration.userContentController, with: config)
-        cbLog.info("main frame \(url.host ?? "-", privacy: .public): exempt=\(exempt) config=\(config?.source.count ?? 0, privacy: .public)B ruleLists=\(self.compiledRuleLists.count)")
+        cbLog.info("main frame \(url.host ?? "-", privacy: .private(mask: .hash)): exempt=\(exempt) config=\(config?.source.count ?? 0, privacy: .public)B ruleLists=\(self.compiledRuleLists.count)")
     }
 
     /// Swap the main-frame configuration script. It must precede the runtime script, so it goes first.
@@ -332,10 +337,16 @@ public final class ContentBlockerManager: NSObject {
         exemptedWebViews.add(webView)
     }
 
-    private func applyToExistingWebViews() {
+    /// A page that committed before blocking was ready can only be fixed by reloading it:
+    /// rule lists are evaluated at navigation time and document-start scripts have already run.
+    private func applyToExistingWebViews(reloadingPagesLoadedWithoutBlocking reloading: Bool = false) {
         for session in self.host?.blockablePages ?? [] {
             guard let wv = session.webView else { continue }
-            if shouldApplyBlocking(to: session) { applyBlocking(to: wv) } else { removeBlocking(from: wv) }
+            // Exempt pages (allowlist, per-tab off, OAuth) loaded as intended; never reload them.
+            guard shouldApplyBlocking(to: session) else { removeBlocking(from: wv); continue }
+            applyBlocking(to: wv)
+            guard reloading, let url = wv.url, url.scheme != "about" else { continue }
+            wv.reload()
         }
     }
 
@@ -393,7 +404,7 @@ extension ContentBlockerManager: WKScriptMessageHandlerWithReply {
         }
 
         let conf = advancedRulesEngine.configuration(for: pageUrl, topUrl: message.frameInfo.isMainFrame ? nil : topUrl)
-        cbLog.info("frame lookup \(pageUrl.host ?? "-", privacy: .public) main=\(message.frameInfo.isMainFrame) rules=\(conf == nil ? 0 : 1, privacy: .public)")
+        cbLog.info("frame lookup \(pageUrl.host ?? "-", privacy: .private(mask: .hash)) main=\(message.frameInfo.isMainFrame) rules=\(conf == nil ? 0 : 1, privacy: .public)")
         replyHandler(conf, nil)
     }
 }

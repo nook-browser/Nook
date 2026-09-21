@@ -42,6 +42,15 @@ public struct TabContextMenu: View {
         if let item = tabs.item(itemID) {
             let section = tabs.section(of: itemID)
             Group {
+                if let windowState, let split = windowState.split,
+                   split.leftItemID == itemID || split.rightItemID == itemID {
+                    Button {
+                        actions?.separateSplit(in: windowState)
+                    } label: {
+                        Label("Separate Tabs", systemImage: "rectangle.split.2x1.slash")
+                    }
+                    Divider()
+                }
                 placementSection(item, section: section)
                 Divider()
                 editSection(item, section: section)

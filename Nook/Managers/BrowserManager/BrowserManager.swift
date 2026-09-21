@@ -464,7 +464,6 @@ class BrowserManager: ObservableObject {
         self.compositorManager.browserManager = self
         self.splitManager.browserManager = self
         self.windowRegistry = windowRegistry
-        self.splitManager.windowRegistry = windowRegistry
         // Note: settingsManager will be injected later, so we skip initialization here
         self.tabs.history = self.historyManager
         self.tabs.webViews = self
@@ -944,6 +943,7 @@ class BrowserManager: ObservableObject {
         windowState.isSidebarVisible = isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
+        windowState.sidebarPiPController = SidebarPiPController()
         // NSWindow reference is set by WindowFocusBridge.attach in ContentView
         windowState.urlBarFrame = urlBarFrame
 
@@ -971,6 +971,7 @@ class BrowserManager: ObservableObject {
         isCommandPaletteVisible = windowState.isCommandPaletteVisible
         // The newly active window's space is the app's login context.
         windowSpaceChanged(windowState)
+        moveSidebarPiP(to: windowState)
     }
 
     // MARK: - Window-Aware Tab Operations

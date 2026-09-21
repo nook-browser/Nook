@@ -76,10 +76,6 @@ extension BrowserManager: PageSessionDelegate {
             challenge, for: session, completionHandler: completionHandler)
     }
 
-    func beginIdentityFlow(_ request: IdentityRequest, from session: PageSession) {
-        authenticationManager.beginIdentityFlow(request, from: session)
-    }
-
     func loadZoom(for itemID: UUID) { loadZoomForTab(itemID) }
 
     func cleanupZoom(for itemID: UUID) { cleanupZoomForTab(itemID) }
@@ -144,10 +140,14 @@ extension BrowserManager: TabEventObserver {
         // The loaded-page budget was only ever reached from startup warming and split view, so
         // opening tabs by hand never checked it and no cap could bind.
         compositorManager.pageActivated(session.itemID)
+        updateSidebarPiP(new: session, previous: previous)
     }
 
     func tabClosed(itemID: UUID) {
         ExtensionManager.shared.notifyTabClosed(itemID: itemID)
+        for window in windowRegistry?.windows.values ?? [:].values {
+            window.sidebarPiPController?.exitIfShowing(itemID)
+        }
     }
 
     func tabMoved(itemID: UUID, from oldIndex: Int?, in oldWindow: BrowserWindowState?, pinnedChanged: Bool) {
@@ -167,6 +167,57 @@ extension BrowserManager: TabEventObserver {
         ExtensionManager.shared.wakeBackgroundWorkers()
     }
 
+    /// Leaving a playing video moves it into the sidebar panel; coming back puts it inline again.
+    /// Runs before the compositor refreshes, so the outgoing web view is still mounted.
+    private func updateSidebarPiP(new session: PageSession, previous: PageSession?) {
+        guard let windowState = windowRegistry?.activeWindow else { return }
+        // Any window may hold it: the video follows focus, the tab can be reached from anywhere.
+        for window in windowRegistry?.windows.values ?? [:].values {
+            window.sidebarPiPController?.exitIfShowing(session.itemID)
+        }
+
+        guard nookSettings?.autoPictureInPicture == true,
+            let previous, previous.hasPlayingVideo, !previous.isPrivate,
+            // Another window or the other split pane may still be showing it.
+            !tabs.isVisibleInAnyWindow(previous.itemID),
+            SidebarPiPController.allows(previous.url),
+            // A video already playing keeps the spot, whether it is in the sidebar or in its tab.
+            !tabs.sessions.contains(where: { $0 !== previous && $0 !== session && $0.hasPlayingVideo })
+        else { return }
+
+        guard let webView = getWebView(for: previous.itemID, in: windowState.id) ?? previous.assignedWebView
+        else { return }
+
+        // No sidebar means nothing to anchor to, so fall back to the system PiP window.
+        guard windowState.isSidebarVisible, let controller = windowState.sidebarPiPController else {
+            PiPManager.shared.requestPiP(for: previous, webView: webView)
+            return
+        }
+        controller.enter(session: previous, webView: webView) {
+            PiPManager.shared.requestPiP(for: previous, webView: webView)
+        }
+    }
+
+    /// The video follows the focused window, docked or floating, so its drop zone is always here.
+    func moveSidebarPiP(to windowState: BrowserWindowState) {
+        guard !windowState.isIncognito, let target = windowState.sidebarPiPController, !target.isShowing,
+            let source = windowRegistry?.windows.values.compactMap(\.sidebarPiPController)
+                .first(where: { $0 !== target && $0.isShowing }),
+            source.isFloating || windowState.isSidebarVisible
+        else { return }
+        target.adopt(from: source)
+    }
+
+    /// A closing window takes its pages' views with it, so no controller may keep showing one.
+    func sidebarPiPWindowClosing(_ windowId: UUID) {
+        for window in windowRegistry?.windows.values ?? [:].values {
+            guard let controller = window.sidebarPiPController, let itemID = controller.itemID,
+                window.id == windowId || getWebView(for: itemID, in: windowId) != nil
+            else { continue }
+            controller.exit()
+        }
+    }
+
     var nativeController: WKWebExtensionController? {
         ExtensionManager.shared.nativeController
     }
@@ -181,39 +232,60 @@ extension BrowserManager: TabEventObserver {
 // MARK: - AlertPresenter
 
 extension BrowserManager: AlertPresenter {
-    func presentAlert(message: String, over webView: WKWebView, completion: @escaping () -> Void) {
+    /// A page dialog named for the frame that asked, so an iframe cannot speak as the site
+    /// around it. `suppressible` adds the checkbox that ends an endless run of them.
+    private func pageDialog(host: String, fallbackTitle: String, message: String, suppressible: Bool) -> NSAlert {
         let alert = NSAlert()
-        alert.messageText = "JavaScript Alert"
+        alert.messageText = host.isEmpty ? fallbackTitle : "\(host) says"
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
-        guard let window = webView.window else { return completion() }
-        alert.beginSheetModal(for: window) { _ in completion() }
+        if suppressible {
+            alert.showsSuppressionButton = true
+            alert.suppressionButton?.title = "Don't allow more dialogs from this page"
+        }
+        return alert
     }
 
-    func presentConfirm(message: String, over webView: WKWebView, completion: @escaping (Bool) -> Void) {
-        let alert = NSAlert()
-        alert.messageText = "JavaScript Confirm"
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
+    func presentAlert(
+        message: String, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping () -> Void
+    ) {
+        let alert = pageDialog(
+            host: host, fallbackTitle: "JavaScript Alert", message: message, suppressible: onSuppress != nil)
+        guard let window = webView.window else { return completion() }
+        alert.beginSheetModal(for: window) { _ in
+            if alert.suppressionButton?.state == .on { onSuppress?() }
+            completion()
+        }
+    }
+
+    func presentConfirm(
+        message: String, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping (Bool) -> Void
+    ) {
+        let alert = pageDialog(
+            host: host, fallbackTitle: "JavaScript Confirm", message: message, suppressible: onSuppress != nil)
         alert.addButton(withTitle: "Cancel")
         guard let window = webView.window else { return completion(false) }
-        alert.beginSheetModal(for: window) { completion($0 == .alertFirstButtonReturn) }
+        alert.beginSheetModal(for: window) {
+            if alert.suppressionButton?.state == .on { onSuppress?() }
+            completion($0 == .alertFirstButtonReturn)
+        }
     }
 
     func presentPrompt(
-        prompt: String, defaultText: String?, over webView: WKWebView,
-        completion: @escaping (String?) -> Void
+        prompt: String, defaultText: String?, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping (String?) -> Void
     ) {
-        let alert = NSAlert()
-        alert.messageText = "JavaScript Prompt"
-        alert.informativeText = prompt
-        alert.addButton(withTitle: "OK")
+        let alert = pageDialog(
+            host: host, fallbackTitle: "JavaScript Prompt", message: prompt, suppressible: onSuppress != nil)
         alert.addButton(withTitle: "Cancel")
         let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         textField.stringValue = defaultText ?? ""
         alert.accessoryView = textField
         guard let window = webView.window else { return completion(nil) }
         alert.beginSheetModal(for: window) {
+            if alert.suppressionButton?.state == .on { onSuppress?() }
             completion($0 == .alertFirstButtonReturn ? textField.stringValue : nil)
         }
     }

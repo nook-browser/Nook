@@ -319,13 +319,8 @@ extension MiniWindowWebView.Coordinator: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         decisionHandler: @escaping (WKPermissionDecision) -> Void
     ) {
-
-        let knownOAuthDomains = [
-            "accounts.google.com", "login.microsoftonline.com", "github.com",
-            "appleid.apple.com", "auth0.com", "okta.com", "auth.cloudflare.com"
-        ]
-        let isKnownOAuth = knownOAuthDomains.contains { origin.host.contains($0) }
-        decisionHandler(isKnownOAuth ? .grant : .deny)
+        // WebKit asks the user per origin. No host allowlist: a sign-in page gets no quieter path.
+        decisionHandler(.prompt)
     }
 
     // MARK: - File Upload Support

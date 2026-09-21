@@ -68,9 +68,15 @@ struct MediaControlsView: View {
         return activeMediaTab?.isAudioMuted == true
     }
 
+    /// The video showing above carries its own controls, so the bar stands down while it is up.
+    /// Read here rather than by the sidebar so this view's own body tracks the change.
+    private var isVideoShowing: Bool {
+        windowState.sidebarPiPController?.isShowing == true
+    }
+
     var body: some View {
         Group {
-            if hasActiveMedia, let tab = activeMediaTab {
+            if hasActiveMedia, !isVideoShowing, let tab = activeMediaTab {
                 VStack(spacing: 8) {
                     // Tab name (shows on hover)
                     if isHovering {
@@ -167,6 +173,19 @@ struct MediaControlsView: View {
                         .buttonStyle(NookIconButtonStyle(size: 24))
                         .foregroundStyle(Color.white)
                         .help(isMuted ? "Unmute" : "Mute")
+
+                        // Bring the video itself back into the sidebar above this bar.
+                        if tab.hasVideoContent || tab.hasPlayingVideo {
+                            Spacer()
+
+                            Button("Maximize", systemImage: "arrow.up.left.and.arrow.down.right") {
+                                maximize(tab)
+                            }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(NookIconButtonStyle(size: 24))
+                            .foregroundStyle(Color.white)
+                            .help("Show video in the sidebar")
+                        }
                     }
                 }
                 .padding(.horizontal, 10)
@@ -211,6 +230,10 @@ struct MediaControlsView: View {
         .onChange(of: windowState.selectedItemID) { _, _ in
             updateMediaState()
         }
+        // Minimising hands the bar a different page than it was last showing.
+        .onChange(of: windowState.sidebarPiPController?.itemID) { _, _ in
+            updateMediaState()
+        }
         // Trigger when app becomes active (user switches back to app)
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -221,6 +244,20 @@ struct MediaControlsView: View {
         .onChange(of: windowState.sidebarWidth) { _, _ in
             // SwiftUI automatically recomputes shouldShowFavicon and shouldShowPreviousButton
             // when windowState.sidebarWidth changes, so no explicit update needed
+        }
+    }
+
+    /// The counterpart of the video's minimise button. Falls back to system picture-in-picture
+    /// on a page whose video cannot be measured, exactly as leaving the tab does.
+    private func maximize(_ tab: PageSession) {
+        guard let controller = windowState.sidebarPiPController else { return }
+        guard let webView = browserManager.getWebView(for: tab.itemID, in: windowState.id)
+            ?? tab.assignedWebView
+        else { return }
+        withAnimation(NookDesign.Motion.standard) {
+            controller.enter(session: tab, webView: webView) {
+                PiPManager.shared.requestPiP(for: tab, webView: webView)
+            }
         }
     }
 
@@ -245,7 +282,10 @@ struct MediaControlsView: View {
             guard let manager = mediaControlsManager else {
                 return
             }
-            let foundTab = manager.findActiveMediaTab()
+            // A page the sidebar video was just minimised from wins over the manager's own
+            // search, which matches on "is playing" and so skips a paused video and leaves the
+            // previously played one showing.
+            let foundTab = windowState.sidebarPiPController?.barSession ?? manager.findActiveMediaTab()
 
             var resolvedTab: PageSession? = foundTab
 

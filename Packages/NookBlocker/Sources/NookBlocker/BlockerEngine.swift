@@ -41,7 +41,13 @@ public final class BlockerEngine {
         let start = CFAbsoluteTimeGetCurrent()
         let text = rules.joined(separator: "\n")
         let built = await Task.detached(priority: .userInitiated) { () -> UnsafeMutableRawPointer? in
-            text.withCString { nook_adblock_engine_from_rules($0, strlen($0)) }
+            // Pass the byte count, not strlen: a NUL in one list would otherwise
+            // cut off every list after it.
+            var utf8 = text
+            return utf8.withUTF8 { buf in
+                nook_adblock_engine_from_rules(
+                    UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count)
+            }
         }.value
 
         clear()

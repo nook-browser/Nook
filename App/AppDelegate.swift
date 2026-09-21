@@ -197,7 +197,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
     /// Handles URLs opened from external sources (e.g., Finder, other apps)
     func application(_ application: NSApplication, open urls: [URL]) {
-        urls.forEach { handleIncoming(url: $0) }
+        // Same guard as handleGetURLEvent, plus file: for documents opened from Finder.
+        urls.filter { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }
+            .forEach { handleIncoming(url: $0) }
     }
 
     // MARK: - Application Termination
@@ -262,7 +264,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// queues the URL and drains it once `browserManager` is set.
     private func handleIncoming(url: URL) {
         guard let manager = browserManager else {
-            AppDelegate.log.info("Queuing URL for deferred open: \(url.absoluteString, privacy: .public)")
+            AppDelegate.log.info("Queuing URL for deferred open: \(url.host ?? "", privacy: .public)")
             pendingURLs.append(url)
             return
         }

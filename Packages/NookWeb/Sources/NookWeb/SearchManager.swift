@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import NookSettings
 import Observation
 import SwiftUI
 
@@ -15,11 +16,15 @@ import SwiftUI
 public class SearchManager {
     public var suggestions: [SearchSuggestion] = []
     public var isLoading: Bool = false
+    /// Bare host the omnibox completes to inline, e.g. `facebook.com`. Only set when history has one
+    /// worth offering; the palette re-checks that it still prefixes the typed text before showing it.
+    public var autofillHost: String?
     
     public init() {}
 
     private let session = URLSession.shared
     private var searchTask: Task<Void, Never>?
+    private var autofillTask: Task<Void, Never>?
     private var searchGeneration = UUID()
     private weak var tabs: TabsController?
     private weak var window: BrowserWindowState?
@@ -95,8 +100,20 @@ public class SearchManager {
         updateSpaceContext()
         let space = currentSpaceId
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            autofillTask?.cancel()
+            autofillHost = nil
             updateSuggestionsIfNeeded([])
             return
+        }
+
+        // Runs outside searchTask's debounce: the inline completion has to keep pace with typing.
+        autofillTask?.cancel()
+        autofillTask = Task { [weak self] in
+            guard let self, let historyManager = self.historyManager else { return }
+            let host = await historyManager.autofillHost(prefix: query.trimmingCharacters(in: .whitespacesAndNewlines))
+            guard !Task.isCancelled, self.searchGeneration == generation,
+                  self.window?.spaceID == space else { return }
+            self.autofillHost = host
         }
 
         let tabs = Array(searchTabs(for: query).prefix(2))
@@ -113,7 +130,7 @@ public class SearchManager {
             do { try await Task.sleep(for: .milliseconds(125)) } catch { return }
             guard let self, !Task.isCancelled else { return }
             async let web = self.fetchWebSuggestions(for: query)
-            let history = Array(await self.searchHistory(for: query).prefix(2))
+            let history = Array(await self.searchHistory(for: query).prefix(3))
             guard !Task.isCancelled, self.searchGeneration == generation,
                   self.window?.spaceID == space else { return }
             self.updateSuggestionsIfNeeded(Array((urlRows + tabs + history + carriedWeb).prefix(5)))
@@ -186,6 +203,11 @@ public class SearchManager {
     }
     
     private func fetchWebSuggestions(for query: String) async -> [SearchSuggestion] {
+        // Every keystroke goes to the endpoint, so a private window sends none, and Google
+        // only hears from people who chose Google. Unknown window or settings: send nothing.
+        // ponytail: Google's endpoint only. Add per-engine endpoints if other engines want suggestions.
+        guard let window, !window.isIncognito,
+              tabs?.settings.searchEngineId == SearchProvider.google.rawValue else { return [] }
         var components = URLComponents(string: "https://suggestqueries.google.com/complete/search")!
         components.queryItems = [URLQueryItem(name: "client", value: "firefox"), URLQueryItem(name: "q", value: query)]
         guard let url = components.url else { return [] }
@@ -238,6 +260,8 @@ public class SearchManager {
     
     public func clearSuggestions() {
         searchTask?.cancel()
+        autofillTask?.cancel()
+        autofillHost = nil
         searchGeneration = UUID()
         if !suggestions.isEmpty {
             withAnimation(.easeInOut(duration: 0.2)) {

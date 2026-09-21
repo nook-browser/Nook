@@ -51,6 +51,7 @@ public final class NookSettingsService {
     private let tabOrganizerEnabledKey = "settings.tabOrganizerEnabled"
     private let tabOrganizerModelDownloadedKey = "settings.tabOrganizerModelDownloaded"
     private let tabOrganizerIdleTimeoutKey = "settings.tabOrganizerIdleTimeout"
+    private let autoPictureInPictureKey = "settings.autoPictureInPicture"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
     private let siteRoutingRulesKey = "settings.siteRoutingRules"
@@ -319,6 +320,13 @@ public final class NookSettingsService {
         }
     }
 
+    /// Move a playing video into a panel above the sidebar media bar when its tab is left.
+    public var autoPictureInPicture: Bool {
+        didSet {
+            userDefaults.set(autoPictureInPicture, forKey: autoPictureInPictureKey)
+        }
+    }
+
     public var sponsorBlockEnabled: Bool {
         didSet {
             userDefaults.set(sponsorBlockEnabled, forKey: sponsorBlockEnabledKey)
@@ -405,6 +413,7 @@ public final class NookSettingsService {
             tabOrganizerModelDownloadedKey: false,
             tabOrganizerIdleTimeoutKey: 300.0,
             sponsorBlockEnabledKey: false,
+            autoPictureInPictureKey: false,
         ])
 
         // Initialize properties from UserDefaults
@@ -493,6 +502,7 @@ public final class NookSettingsService {
         self.tabOrganizerEnabled = userDefaults.bool(forKey: tabOrganizerEnabledKey)
         self.tabOrganizerModelDownloaded = userDefaults.bool(forKey: tabOrganizerModelDownloadedKey)
         self.tabOrganizerIdleTimeout = userDefaults.double(forKey: tabOrganizerIdleTimeoutKey)
+        self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
         self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)
         if let sbData = userDefaults.data(forKey: sponsorBlockCategoryOptionsKey),
            let sbDecoded = try? JSONDecoder().decode([String: String].self, from: sbData) {

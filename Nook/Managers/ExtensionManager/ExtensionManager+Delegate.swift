@@ -332,6 +332,28 @@ extension ExtensionManager {
         NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No browser window available"])
     }
 
+    /// Where an extension may send a tab: web pages, a blank page, and its own pages. A `file:`
+    /// URL would load with read access to its whole parent directory, and another extension's
+    /// pages are not this one's to open.
+    static func extensionMayOpen(_ url: URL, for extensionContext: WKWebExtensionContext) -> Bool {
+        switch url.scheme?.lowercased() {
+        case "http", "https":
+            return true
+        case "about":
+            return url.absoluteString.lowercased() == "about:blank"
+        case let scheme?:
+            let base = extensionContext.baseURL
+            guard let host = base.host?.lowercased() else { return false }
+            return scheme == base.scheme?.lowercased() && url.host?.lowercased() == host
+        case nil:
+            return false
+        }
+    }
+
+    private static func disallowedURLError(_ url: URL) -> NSError {
+        NSError(domain: "ExtensionManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Extensions cannot open \(url.scheme ?? "this") URLs"])
+    }
+
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openNewTabUsing configuration: WKWebExtension.TabConfiguration,
@@ -346,6 +368,10 @@ extension ExtensionManager {
             return
         }
         let url = configuration.url ?? TabsController.homeURL
+        guard Self.extensionMayOpen(url, for: extensionContext) else {
+            completionHandler(nil, Self.disallowedURLError(url))
+            return
+        }
         let parent: Parent? = configuration.shouldBePinned ? .pinned(spaceID: spaceID) : nil
         guard let itemID = openExtensionTab(
             url, in: window, placement: configuration.shouldBeActive ? .newTab : .background,
@@ -396,6 +422,10 @@ extension ExtensionManager {
         // jar and move the user out of the space they were working in: an OAuth or FIDO2 popout
         // would lose the session of the very page that asked for it.
         let urls = configuration.tabURLs.isEmpty ? [TabsController.homeURL] : configuration.tabURLs
+        if let refused = urls.first(where: { !Self.extensionMayOpen($0, for: extensionContext) }) {
+            completionHandler(nil, Self.disallowedURLError(refused))
+            return
+        }
         // Each tab opens at the top, so open in reverse and select the first URL last.
         for url in urls.dropFirst().reversed() {
             openExtensionTab(url, in: window, placement: .background, controller: controller)
@@ -567,7 +597,7 @@ extension ExtensionManager {
     ) {
         // Resolve a registered handler for this application identifier
         let registeredHandler: (any InternalNativePortHandler)? =
-            applicationId.flatMap { internalHandler(for: $0) }
+            applicationId.flatMap { internalHandler(for: $0, context: extensionContext) }
 
         // The handler is (message, error); earlier code read the error slot as the message.
         port.messageHandler = { [weak self] message, error in

@@ -90,6 +90,19 @@ fn cancels_another_rule(parsed: &ParsedLine) -> bool {
     }
 }
 
+/// WebKit matches `if-domain`/`unless-domain` exactly unless the entry starts with `*`.
+/// The crate prefixes network rule domains but not cosmetic ones.
+fn widen_domains_to_subdomains(rule: &mut CbRule) {
+    for list in [&mut rule.trigger.if_domain, &mut rule.trigger.unless_domain] {
+        let Some(domains) = list else { continue };
+        for domain in domains.iter_mut() {
+            if !domain.starts_with('*') {
+                domain.insert(0, '*');
+            }
+        }
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct Conversion {
     pub rules: Vec<CbRule>,
@@ -123,7 +136,10 @@ fn convert_text(text: &str) -> Conversion {
                     continue;
                 }
                 match CbRuleEquivalent::try_from(parsed) {
-                    Ok(equivalent) => c.rules.extend(equivalent.into_iter()),
+                    Ok(equivalent) => c.rules.extend(equivalent.into_iter().map(|mut r| {
+                        widen_domains_to_subdomains(&mut r);
+                        r
+                    })),
                     Err(_) => c.unconverted += 1,
                 }
             }
@@ -168,6 +184,24 @@ mod tests {
         assert_eq!(out.len(), 1);
         assert_eq!(out[0]["action"]["type"], "css-display-none");
         assert_eq!(out[0]["action"]["selector"], ".sponsored");
+    }
+
+    /// WebKit needs the `*` prefix or the rule only fires on the bare apex, so
+    /// reddit.com##... never applied on www.reddit.com.
+    #[test]
+    fn cosmetic_domains_cover_subdomains() {
+        let out = convert("reddit.com##shreddit-ad-post");
+        assert_eq!(out[0]["trigger"]["if-domain"][0], "*reddit.com");
+
+        let out = convert("~old.reddit.com##.x");
+        assert_eq!(out[0]["trigger"]["unless-domain"][0], "*old.reddit.com");
+    }
+
+    /// Network rules already arrive prefixed; widening must not double it.
+    #[test]
+    fn network_domains_are_not_double_prefixed() {
+        let out = convert("||ads.example.com^$domain=reddit.com");
+        assert_eq!(out[0]["trigger"]["if-domain"][0], "*reddit.com");
     }
 
     #[test]

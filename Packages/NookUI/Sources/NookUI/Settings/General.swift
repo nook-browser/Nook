@@ -43,6 +43,12 @@ public struct SettingsGeneralTab: View {
                 Toggle("Automatically update Nook", isOn: .constant(true))
                     .disabled(true)
             }
+
+            Section {
+                Toggle("Keep videos playing in the sidebar", isOn: $settings.autoPictureInPicture)
+            } footer: {
+                Text("Leaving a tab with a playing video moves it into a small window above the sidebar media controls.")
+            }
             #endif
 
             Section {

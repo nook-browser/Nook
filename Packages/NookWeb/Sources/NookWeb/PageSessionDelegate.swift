@@ -11,69 +11,6 @@
 import Combine
 import WebKit
 
-/// A request from a page's `chrome.identity`-style sign-in flow.
-public struct IdentityRequest {
-    public let requestId: String
-    public let url: URL
-    public let interactive: Bool
-    public let prefersEphemeralSession: Bool
-    public let explicitCallbackScheme: String?
-
-    public init(
-        requestId: String, url: URL, interactive: Bool,
-        prefersEphemeralSession: Bool, explicitCallbackScheme: String?
-    ) {
-        self.requestId = requestId
-        self.url = url
-        self.interactive = interactive
-        self.prefersEphemeralSession = prefersEphemeralSession
-        self.explicitCallbackScheme = explicitCallbackScheme
-    }
-}
-
-public enum IdentityFailure: Equatable {
-    case interactionRequired
-    case missingCallbackHandler
-    case unableToStart
-    case fallbackUnavailable
-    case fallbackCancelled
-    case underlying(String)
-
-    public var code: String {
-        switch self {
-        case .interactionRequired: return "interaction_required"
-        case .missingCallbackHandler: return "missing_callback_handler"
-        case .unableToStart: return "unable_to_start"
-        case .fallbackUnavailable: return "fallback_unavailable"
-        case .fallbackCancelled: return "fallback_cancelled"
-        case .underlying: return "error"
-        }
-    }
-
-    public var message: String {
-        switch self {
-        case .interactionRequired:
-            return "User interaction is required to complete this authentication flow."
-        case .missingCallbackHandler:
-            return "Could not determine an appropriate callback handler for this authentication flow."
-        case .unableToStart:
-            return "The authentication session could not be started."
-        case .fallbackUnavailable:
-            return "Unable to present a fallback authentication window."
-        case .fallbackCancelled:
-            return "Authentication window was closed before completion."
-        case .underlying(let message):
-            return message
-        }
-    }
-}
-
-public enum IdentityFlowResult {
-    case success(URL)
-    case cancelled
-    case failure(IdentityFailure)
-}
-
 @MainActor
 public protocol PageSessionDelegate: AnyObject {
     // MARK: Profile
@@ -107,7 +44,6 @@ public protocol PageSessionDelegate: AnyObject {
         for session: PageSession,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) -> Bool
-    func beginIdentityFlow(_ request: IdentityRequest, from session: PageSession)
 
     // MARK: Per-page chrome
 

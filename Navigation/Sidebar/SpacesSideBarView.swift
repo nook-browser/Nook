@@ -104,7 +104,12 @@ struct SpacesSideBarView: View {
                 .padding(.horizontal, NookDesign.Spacing.sidebarInset)
                 .padding(.bottom, NookDesign.Spacing.sidebarInset)
 
-            // Media controls
+            // Video left playing in another tab, directly above the media controls
+            SidebarPiPView()
+                .environmentObject(browserManager)
+                .environment(windowState)
+
+            // Media controls. Hides itself while the video is showing above it.
             MediaControlsView()
                 .environmentObject(browserManager)
                 .environment(windowState)

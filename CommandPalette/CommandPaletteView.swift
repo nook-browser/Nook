@@ -98,13 +98,8 @@ struct CommandPaletteView: View {
                     VStack {
                         VStack(alignment: .center,spacing: 6) {
                             HStack(spacing: 15) {
-                                Image(
-                                    systemName: activeSiteSearch != nil
-                                        ? "magnifyingglass"
-                                        : isLikelyURL(text)
-                                            ? "globe" : "magnifyingglass"
-                                )
-                                .id(activeSiteSearch != nil ? "magnifyingglass" : isLikelyURL(text) ? "globe" : "magnifyingglass")
+                                Image(systemName: leadingIconName)
+                                .id(leadingIconName)
                                 .transition(.blur(intensity: 2, scale: 0.6).animation(NookDesign.Motion.standard))
                                 .font(NookDesign.Font.bodyRegular)
                                 .foregroundStyle(Color.primary)
@@ -455,6 +450,9 @@ struct CommandPaletteView: View {
         {
             let suggestion = visibleSuggestions[selectedSuggestionIndex]
             selectSuggestion(suggestion)
+        } else if let host = autofillTarget {
+            // The inline completion is showing, so Return takes the host it shows, not a search.
+            selectSuggestion(SearchManager.SearchSuggestion(text: host, type: .url))
         } else {
             let newSuggestion = SearchManager.SearchSuggestion(
                 text: text,
@@ -536,19 +534,28 @@ struct CommandPaletteView: View {
         }
     }
 
-    private var inlineCompletionSuffix: String? {
-        guard text == userTypedText,
+    /// Globe once Return would navigate, which includes the case where only the inline
+    /// completion makes it a URL.
+    private var leadingIconName: String {
+        guard activeSiteSearch == nil else { return "magnifyingglass" }
+        return isLikelyURL(text) || autofillTarget != nil ? "globe" : "magnifyingglass"
+    }
+
+    /// Host the field completes to inline, once it still prefixes what was typed. Nil while a
+    /// suggestion is selected by hand, since the field then holds that row's text instead.
+    private var autofillTarget: String? {
+        guard activeSiteSearch == nil,
               !text.isEmpty,
-              selectedSuggestionIndex >= 0,
-              selectedSuggestionIndex < visibleSuggestions.count else { return nil }
+              selectedSuggestionIndex == -1,
+              text == userTypedText,
+              let host = searchManager.autofillHost,
+              host.count > text.count,
+              host.lowercased().hasPrefix(text.lowercased()) else { return nil }
+        return host
+    }
 
-        let suggestion = visibleSuggestions[selectedSuggestionIndex]
-        let target = suggestion.text
-
-        guard target.lowercased().hasPrefix(text.lowercased()),
-              target.count > text.count else { return nil }
-
-        return String(target.dropFirst(text.count))
+    private var inlineCompletionSuffix: String? {
+        autofillTarget.map { String($0.dropFirst(text.count)) }
     }
 
     private func iconForSuggestion(_ suggestion: SearchManager.SearchSuggestion)

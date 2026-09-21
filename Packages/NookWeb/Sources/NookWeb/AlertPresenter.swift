@@ -10,11 +10,18 @@ import WebKit
 
 @MainActor
 public protocol AlertPresenter: AnyObject {
-    func presentAlert(message: String, over webView: WKWebView, completion: @escaping () -> Void)
-    func presentConfirm(message: String, over webView: WKWebView, completion: @escaping (Bool) -> Void)
+    // `host` is the frame that asked, so an iframe cannot speak as the page embedding it. A
+    // non-nil `onSuppress` means offer "no more dialogs" and call it, before `completion`, if
+    // the user takes it.
+    func presentAlert(
+        message: String, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping () -> Void)
+    func presentConfirm(
+        message: String, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping (Bool) -> Void)
     func presentPrompt(
-        prompt: String, defaultText: String?, over webView: WKWebView,
-        completion: @escaping (String?) -> Void)
+        prompt: String, defaultText: String?, host: String, over webView: WKWebView,
+        onSuppress: (() -> Void)?, completion: @escaping (String?) -> Void)
     func presentOpenPanel(
         allowsMultipleSelection: Bool, allowsDirectories: Bool, over webView: WKWebView,
         completion: @escaping ([URL]?) -> Void)

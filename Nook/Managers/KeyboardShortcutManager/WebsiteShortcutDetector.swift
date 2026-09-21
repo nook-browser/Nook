@@ -31,8 +31,10 @@ class WebsiteShortcutDetector {
     /// Pending shortcut presses waiting for a second press (windowId -> pending info)
     private var pendingShortcuts: [UUID: PendingShortcut] = [:]
     
-    /// Cache of detected shortcuts from JS injection (URL -> Set of lookup keys)
+    /// Cache of detected shortcuts from JS injection (host -> Set of lookup keys)
     private var jsDetectedShortcuts: [String: Set<String>] = [:]
+    /// Hosts in the order they were first cached, so the cache can drop its oldest entry.
+    private var jsDetectedHostOrder: [String] = []
     
     /// The timeout duration for double-press detection (1 second as specified)
     let conflictTimeout: TimeInterval = 1.0
@@ -57,6 +59,7 @@ class WebsiteShortcutDetector {
                 guard enabled != self.detectionEnabled else { return }
                 self.detectionEnabled = enabled
                 self.jsDetectedShortcuts.removeAll()
+                self.jsDetectedHostOrder.removeAll()
                 self.clearAllPendingShortcuts()
                 for webView in self.instrumentedWebViews.allObjects {
                     self.configure(webView: webView)
@@ -95,7 +98,8 @@ class WebsiteShortcutDetector {
     
     /// Check if a key combination is a known website shortcut
     /// Returns the website shortcut info if found, nil otherwise
-    func isKnownWebsiteShortcut(_ keyCombination: KeyCombination) -> WebsiteShortcut? {
+    /// `allowPageReports` is false for shortcuts a page's own report must not claim.
+    func isKnownWebsiteShortcut(_ keyCombination: KeyCombination, allowPageReports: Bool = true) -> WebsiteShortcut? {
         guard WebsiteShortcutProfile.isFeatureEnabled else { 
             return nil 
         }
@@ -108,8 +112,9 @@ class WebsiteShortcutDetector {
         }
         
         // Check JS-detected shortcuts
-        if let urlKey = currentURL?.absoluteString,
-           let detectedKeys = jsDetectedShortcuts[urlKey],
+        if allowPageReports,
+           let host = currentURL?.host,
+           let detectedKeys = jsDetectedShortcuts[host],
            detectedKeys.contains(keyCombination.lookupKey) {
             // Return a generic detected shortcut
             return WebsiteShortcut(key: keyCombination.key, modifiers: keyCombination.modifiers, description: nil)
@@ -124,13 +129,14 @@ class WebsiteShortcutDetector {
     func shouldPassToWebsite(
         _ keyCombination: KeyCombination,
         windowId: UUID,
-        nookActionName: String
+        nookActionName: String,
+        allowPageReports: Bool
     ) -> Bool {
         guard WebsiteShortcutProfile.isFeatureEnabled else {
             return false
         }
 
-        guard let websiteShortcut = isKnownWebsiteShortcut(keyCombination) else {
+        guard let websiteShortcut = isKnownWebsiteShortcut(keyCombination, allowPageReports: allowPageReports) else {
             return false
         }
 
@@ -187,10 +193,17 @@ class WebsiteShortcutDetector {
         pendingShortcuts.removeAll()
     }
     
-    /// Update JS-detected shortcuts for a URL
+    /// Update JS-detected shortcuts for a URL's host
     /// Called from Tab when JS injection reports detected listeners
     func updateJSDetectedShortcuts(for url: String, shortcuts: Set<String>) {
-        jsDetectedShortcuts[url] = shortcuts
+        guard let host = URL(string: url)?.host else { return }
+        // Keyed by host and capped: a single-page app reports under a new URL on every route.
+        if jsDetectedShortcuts.updateValue(shortcuts, forKey: host) == nil {
+            jsDetectedHostOrder.append(host)
+            if jsDetectedHostOrder.count > 200 {
+                jsDetectedShortcuts.removeValue(forKey: jsDetectedHostOrder.removeFirst())
+            }
+        }
     }
     
     // MARK: - Private Methods

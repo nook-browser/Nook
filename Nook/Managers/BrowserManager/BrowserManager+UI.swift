@@ -19,6 +19,10 @@ extension BrowserManager: TabActions {
         splitManager.enterSplit(with: itemID, placeOn: placeOnRight ? .right : .left, in: window)
     }
 
+    func separateSplit(in window: BrowserWindowState) {
+        splitManager.separate(in: window)
+    }
+
     func editPinnedURL(url: URL, title: String, onSave: @escaping (URL) -> Void) {
         dialogManager.showDialog(
             EditPinnedURLDialog(
