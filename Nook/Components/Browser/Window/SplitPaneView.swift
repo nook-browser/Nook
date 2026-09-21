@@ -3,7 +3,7 @@
 //  SplitPaneView.swift
 //  Nook
 //
-//  One pane of the split view: a header strip above the page. The compositor keeps
+//  One pane of the split view: the page, with glass controls floating over it. The compositor keeps
 //  panes across refreshes so a web view never leaves its superview while the pair holds.
 //
 
@@ -17,37 +17,48 @@ import NookWeb
 final class SplitPaneView: NSView {
     let side: SplitViewManager.Side
     let itemID: UUID
-    /// The page view's parent, below the header.
+    /// The page view's parent. It fills the pane; the controls float over it.
     let content = NSView()
-    private let header: NSView
     private let maskLayer = CAShapeLayer()
-    private let borderLayer = CAShapeLayer()
 
     init(frame: NSRect, side: SplitViewManager.Side, itemID: UUID, browserManager: BrowserManager, windowState: BrowserWindowState) {
         self.side = side
         self.itemID = itemID
-        header = NSHostingView(rootView: SplitPaneHeader(itemID: itemID)
-            .environment(browserManager.tabs)
-            .environment(windowState)
-            .environment(\.tabActions, browserManager))
         super.init(frame: frame)
         wantsLayer = true
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         layer?.mask = maskLayer
-        borderLayer.fillColor = NSColor.clear.cgColor
-        borderLayer.lineWidth = 1
-        borderLayer.zPosition = 1
-        layer?.addSublayer(borderLayer)
+        content.frame = bounds
+        content.autoresizingMask = [.width, .height]
         addSubview(content)
-        addSubview(header)
-        layoutPane()
+
+        // Each control is its own hosting view sized to its content, so the rest of the pane
+        // passes clicks to the page.
+        func host(_ view: some View) -> NSView {
+            let host = NSHostingView(rootView: view
+                .environment(browserManager.tabs)
+                .environment(windowState)
+                .environment(\.tabActions, browserManager))
+            host.translatesAutoresizingMaskIntoConstraints = false
+            host.safeAreaRegions = []
+            addSubview(host)
+            return host
+        }
+        let title = host(SplitPaneTitle(itemID: itemID))
+        let buttons = host(SplitPaneButtons(itemID: itemID))
+        let inset = NookDesign.Spacing.md
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        NSLayoutConstraint.activate([
+            title.topAnchor.constraint(equalTo: topAnchor, constant: inset),
+            title.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
+            title.trailingAnchor.constraint(lessThanOrEqualTo: buttons.leadingAnchor, constant: -inset),
+            buttons.topAnchor.constraint(equalTo: topAnchor, constant: inset),
+            buttons.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -inset),
+        ])
+        updateMask()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    func setActive(_ isActive: Bool, accent: NSColor) {
-        borderLayer.strokeColor = isActive ? accent.withAlphaComponent(0.9).cgColor : NSColor.clear.cgColor
-    }
 
     /// Puts `view` in the pane, leaving it alone when it is already there.
     func show(_ view: NSView) {
@@ -62,28 +73,50 @@ final class SplitPaneView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        layoutPane()
+        updateMask()
     }
 
-    private func layoutPane() {
-        let headerHeight = NookDesign.Size.navRow
-        header.frame = NSRect(x: 0, y: bounds.height - headerHeight, width: bounds.width, height: headerHeight)
-        content.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(0, bounds.height - headerHeight))
+    private func updateMask() {
         let radius = NookDesign.Radius.md
-        let path = TabCompositorWrapper.createUnevenRoundedRectPath(
+        maskLayer.path = TabCompositorWrapper.createUnevenRoundedRectPath(
             rect: bounds,
             topLeadingRadius: side == .left ? 0 : radius,
             bottomLeadingRadius: radius,
             bottomTrailingRadius: radius,
             topTrailingRadius: side == .right ? 0 : radius
         )
-        maskLayer.path = path
-        borderLayer.path = path
     }
 }
 
-/// The strip above a split pane: what the pane shows, plus separate and close.
-private struct SplitPaneHeader: View {
+/// What the pane shows, floating at its top leading corner.
+private struct SplitPaneTitle: View {
+    let itemID: UUID
+
+    @Environment(TabsController.self) private var tabs
+    @Environment(BrowserWindowState.self) private var windowState
+
+    var body: some View {
+        if let item = tabs.item(itemID) {
+            HStack(spacing: NookDesign.Spacing.sm) {
+                ItemFavicon(item: item, session: tabs.session(for: itemID))
+                    .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
+                Text(tabs.title(for: item))
+                    .font(NookDesign.Font.secondary)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, NookDesign.Spacing.rowPadding)
+            .frame(height: NookDesign.Size.navRow)
+            .contentShape(Capsule())
+            .onTapGesture { tabs.select(itemID, in: windowState) }
+            .nookGlassEffect(in: Capsule())
+        }
+    }
+}
+
+/// Separate and close, floating at the pane's top trailing corner in one glass capsule.
+private struct SplitPaneButtons: View {
     let itemID: UUID
 
     @Environment(TabsController.self) private var tabs
@@ -91,17 +124,7 @@ private struct SplitPaneHeader: View {
     @Environment(\.tabActions) private var actions
 
     var body: some View {
-        HStack(spacing: NookDesign.Spacing.sm) {
-            if let item = tabs.item(itemID) {
-                ItemFavicon(item: item, session: tabs.session(for: itemID))
-                    .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
-                Text(tabs.title(for: item))
-                    .font(NookDesign.Font.secondary)
-                    .foregroundStyle(isActive ? .primary : .secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: NookDesign.Spacing.xs)
+        HStack(spacing: NookDesign.Spacing.xxs) {
             SplitPaneButton(systemImage: "rectangle.split.2x1.slash", help: "Separate Tabs") {
                 actions?.separateSplit(in: windowState)
             }
@@ -109,15 +132,9 @@ private struct SplitPaneHeader: View {
                 tabs.close(itemID)
             }
         }
-        .padding(.horizontal, NookDesign.Spacing.rowPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(isActive ? NookDesign.Surface.raised : NookDesign.Surface.fill)
-        .contentShape(Rectangle())
-        .onTapGesture { tabs.select(itemID, in: windowState) }
-    }
-
-    private var isActive: Bool {
-        tabs.selectedItemID(in: windowState) == itemID
+        .padding(.horizontal, NookDesign.Spacing.xs)
+        .frame(height: NookDesign.Size.navRow)
+        .nookGlassEffect(in: Capsule())
     }
 }
 

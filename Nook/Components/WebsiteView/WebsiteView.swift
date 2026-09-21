@@ -608,7 +608,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                                        width: max(1, total.width - leftWidth - gap/2), height: total.height)
 
                 // Panes stay while the pair holds: taking a WKWebView out of its superview
-                // drops its video surface, so a selection change only moves the border.
+                // drops its video surface, so a selection change leaves the panes alone.
                 var panes = contentSubviews.compactMap { $0 as? SplitPaneView }
                 if panes.map(\.itemID) == [leftId, rightId] {
                     removeContentViews(contentSubviews.filter { !($0 is SplitPaneView) })
@@ -620,11 +620,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
                     panes.forEach { containerView.addSubview($0) }
                 }
 
-                let activeSide = split.activeSide(for: windowState.id)
-                let accent = browserManager.gradientColorManager.accentNSColor
                 for (pane, session, rect) in [(panes[0], leftSession, leftRect), (panes[1], rightSession, rightRect)] {
                     pane.frame = rect
-                    pane.setActive(pane.side == activeSide, accent: accent)
                     pane.show(pageView(for: session, reusing: pane.content.subviews))
                 }
             } else {

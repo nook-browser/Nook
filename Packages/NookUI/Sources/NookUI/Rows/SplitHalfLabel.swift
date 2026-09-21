@@ -70,26 +70,6 @@ public struct SplitHalfLabel: View {
                 .environment(tabs)
                 .environment(\.tabActions, actions)
         }
-        .background(backgroundColor)
-        .overlay {
-            if isActive {
-                NookDesign.Radius.shape(NookDesign.Radius.md)
-                    .strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth)
-            }
-        }
-    }
-
-    private var isActive: Bool {
-        tabs.selectedItemID(in: windowState) == item.id
-    }
-
-    private var backgroundColor: Color {
-        if isActive {
-            return NookDesign.Surface.raised
-        } else if isHovering {
-            return NookDesign.Surface.fill
-        } else {
-            return Color.clear
-        }
+        .background(isHovering ? NookDesign.Surface.fill : Color.clear)
     }
 }

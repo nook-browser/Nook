@@ -13,6 +13,13 @@ struct SplitTabRow: View {
     /// The drop zone the halves drag from.
     let zoneID: DropZoneID
 
+    @Environment(BrowserWindowState.self) private var windowState
+
+    /// The whole row is the selection while the window shows the pair.
+    private var isActive: Bool {
+        windowState.selectedItemID == left.id || windowState.selectedItemID == right.id
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             SplitHalfTab(item: left, zoneID: zoneID)
@@ -23,7 +30,14 @@ struct SplitTabRow: View {
             SplitHalfTab(item: right, zoneID: zoneID)
         }
         .frame(height: NookDesign.Size.row)
+        .background(isActive ? NookDesign.Surface.raised : Color.clear)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        .overlay {
+            if isActive {
+                NookDesign.Radius.shape(NookDesign.Radius.md)
+                    .strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth)
+            }
+        }
     }
 }
 
