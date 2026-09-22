@@ -315,15 +315,17 @@ private final class FullScreenToolbarView: NSView {
         let buttons = buttons
         observers = [
             // Before entry, so the band AppKit builds for the hover reveal is the bare title bar.
-            center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { _ in
-                window.toolbar?.isVisible = false
+            // Weak: NotificationCenter holds these blocks, and a strong window here would keep
+            // every closed window alive.
+            center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { [weak window] _ in
+                window?.toolbar?.isVisible = false
             },
-            center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { _ in
-                buttons.forEach { window.standardWindowButton($0)?.isHidden = true }
+            center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak window] _ in
+                buttons.forEach { window?.standardWindowButton($0)?.isHidden = true }
             },
-            center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main) { _ in
-                window.toolbar?.isVisible = true
-                buttons.forEach { window.standardWindowButton($0)?.isHidden = false }
+            center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main) { [weak window] _ in
+                window?.toolbar?.isVisible = true
+                buttons.forEach { window?.standardWindowButton($0)?.isHidden = false }
             },
         ]
     }
