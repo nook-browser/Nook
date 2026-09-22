@@ -44,7 +44,8 @@ struct SpaceSwitcherTitle: View {
                     .menuStyle(.button)
                     .buttonStyle(.plain)
                     .menuIndicator(.hidden)
-                    .fixedSize()
+                    // Width may shrink so a long name truncates beside the history buttons.
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -52,10 +53,24 @@ struct SpaceSwitcherTitle: View {
 
     private func label(_ space: SpaceRecord) -> some View {
         let isDropTarget = dragSession.isDragging && dragSession.activeZone == .target(.pinned(spaceID: space.id))
-        return Text(space.name)
+        let title = Text(space.name)
             .font(NookDesign.Font.label)
             .foregroundStyle(.primary)
             .lineLimit(1)
+            .fixedSize()
+        // A name too long for the title row fades out, the way a tab row's title does.
+        return ViewThatFits(in: .horizontal) {
+            title
+            title
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                .mask {
+                    HStack(spacing: 0) {
+                        Color.black
+                        LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                            .frame(width: NookDesign.Spacing.titleFade)
+                    }
+                }
+        }
         .padding(.horizontal, NookDesign.Spacing.sm)
         .frame(height: NookDesign.Size.row)
         .background(

@@ -29,28 +29,34 @@ public extension View {
         self.glassEffect(.regular.tint(tint), in: .circle)
     }
 
-    /// The selected sidebar row: the one glass layer inside the sidebar. Branch-free
-    /// (`.identity` when idle) so view identity is stable and the change animates.
+    /// The selected sidebar row. Branch-free (`.identity` when idle) so view identity is stable
+    /// and the change animates.
     func nookRowSelection(_ isSelected: Bool) -> some View {
-        modifier(RowSelection(isSelected: isSelected))
+        modifier(SidebarGlass(isOn: isSelected, shape: NookDesign.Radius.shape(NookDesign.Radius.md)))
+    }
+
+    /// A button group in the sidebar's title row (back, forward, reload).
+    func nookControlGlass<S: InsettableShape>(in shape: S) -> some View {
+        modifier(SidebarGlass(isOn: true, shape: shape))
     }
 }
 
-private struct RowSelection: ViewModifier {
-    let isSelected: Bool
+/// Glass inside the sidebar, which is not itself glass.
+private struct SidebarGlass<S: InsettableShape>: ViewModifier {
+    let isOn: Bool
+    let shape: S
     @Environment(\.nookInsideGlass) private var insideGlass
 
     func body(content: Content) -> some View {
-        let shape = NookDesign.Radius.shape(NookDesign.Radius.md)
         content
-            // Never glass on glass: inside the hover overlay the row keeps its raised fill.
+            // Never glass on glass: inside the hover overlay it keeps a raised fill.
             .background {
-                if isSelected && insideGlass {
+                if isOn && insideGlass {
                     shape.fill(NookDesign.Surface.raised)
                         .overlay(shape.strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth))
                 }
             }
-            .glassEffect(isSelected && !insideGlass ? .regular : .identity, in: shape)
+            .glassEffect(isOn && !insideGlass ? .regular : .identity, in: shape)
     }
 }
 

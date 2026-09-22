@@ -11,29 +11,21 @@ import NookDesign
 import NookWeb
 import NookUI
 
-/// Header section of the sidebar (window controls, navigation buttons, URL bar)
+/// Header section of the sidebar (window controls, URL bar). Back, forward and reload sit in the
+/// title row above it.
 struct SidebarHeader: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) var nookSettings
     let isSidebarHovered: Bool
-    @State private var sidebarWidth: CGFloat = 0
 
     var body: some View {
         VStack(spacing: NookDesign.Spacing.sectionGap) {
-            if nookSettings.topBarAddressView {
-                windowControls
-            }
+            windowControls
 
             if !nookSettings.topBarAddressView {
-                navigationButtons
                 urlBar
             }
-        }
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-        } action: { newWidth in
-            sidebarWidth = newWidth
         }
     }
 
@@ -44,21 +36,13 @@ struct SidebarHeader: View {
             .padding(.horizontal, NookDesign.Spacing.sidebarInset)
     }
 
-    private var navigationButtons: some View {
-        HStack(spacing: NookDesign.Spacing.xxs) {
-            NavButtonsView(effectiveSidebarWidth: sidebarWidth)
-        }
-        .padding(.horizontal, NookDesign.Spacing.sidebarInset)
-        .frame(height: NookDesign.Size.navRow)
-    }
-
     private var urlBar: some View {
         URLBarView(isSidebarHovered: isSidebarHovered)
             .padding(.horizontal, NookDesign.Spacing.sidebarInset)
     }
 }
 
-// MARK: - Sidebar Window Controls (Top Bar Mode)
+// MARK: - Sidebar Window Controls
 struct SidebarWindowControlsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
@@ -85,5 +69,6 @@ struct SidebarWindowControlsView: View {
             Spacer()
         }
         .frame(height: NookDesign.Size.navRow)
+        .background(DoubleClickView { NSApp.keyWindow?.performZoom(nil) })
     }
 }

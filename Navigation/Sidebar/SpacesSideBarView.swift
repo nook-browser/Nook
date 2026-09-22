@@ -68,8 +68,7 @@ struct SpacesSideBarView: View {
         return VStack(spacing: NookDesign.Spacing.sectionGap) {
             // Space title: shares the traffic-light row on the left, its own row on the right.
             if nookSettings.sidebarPosition != .left {
-                spaceSwitcherTitle
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                titleRow
                     .padding(.horizontal, NookDesign.Spacing.sidebarInset)
             }
 
@@ -134,9 +133,10 @@ struct SpacesSideBarView: View {
         .padding(.top, nookSettings.sidebarPosition == .left ? NookDesign.Spacing.sidebarTop : NookDesign.Spacing.sidebarInset)
         .overlay(alignment: .topLeading) {
             if nookSettings.sidebarPosition == .left {
-                spaceSwitcherTitle
+                titleRow
                     .frame(height: NookDesign.Spacing.sidebarTop)
                     .padding(.leading, NookDesign.Spacing.trafficLights)
+                    .padding(.trailing, NookDesign.Spacing.sidebarInset)
             }
         }
         .padding(.bottom, NookDesign.Spacing.sidebarInset)
@@ -358,6 +358,20 @@ struct SpacesSideBarView: View {
             .environmentObject(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
             Spacer()
+        }
+    }
+
+    /// The space name, then back, forward and reload unless the URL bar mode has them.
+    private var titleRow: some View {
+        HStack(spacing: 0) {
+            spaceSwitcherTitle
+                .layoutPriority(1)
+            Spacer(minLength: 0)
+            if !nookSettings.topBarAddressView {
+                SidebarHistoryButtons()
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+            }
         }
     }
 
