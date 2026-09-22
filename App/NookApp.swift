@@ -188,6 +188,14 @@ struct NookApp: App {
         }
         DevMCPServer.shared.configure(browserManager: browserManager, enabled: settingsManager.browserControlServerEnabled)
 
+        // A fresh install has no stored version and shows nothing.
+        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+            if let seen = settingsManager.lastSeenVersion, seen != version {
+                browserManager.whatsNewVersion = version
+            }
+            settingsManager.lastSeenVersion = version
+        }
+
         // Set up window lifecycle callbacks
         windowRegistry.onWindowRegister = { [weak browserManager] windowState in
             browserManager?.setupWindowState(windowState)

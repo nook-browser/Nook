@@ -104,6 +104,12 @@ struct SpacesSideBarView: View {
                 .padding(.horizontal, NookDesign.Spacing.sidebarInset)
                 .padding(.bottom, NookDesign.Spacing.sidebarInset)
 
+            SidebarWhatsNewCard()
+                .environmentObject(browserManager)
+                .environment(windowState)
+                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                .padding(.bottom, NookDesign.Spacing.sidebarInset)
+
             // Video left playing in another tab, directly above the media controls
             SidebarPiPView()
                 .environmentObject(browserManager)

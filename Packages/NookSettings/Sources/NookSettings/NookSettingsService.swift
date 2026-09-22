@@ -24,6 +24,7 @@ public final class NookSettingsService {
     private let adBlockerWhitelistKey = "settings.adBlockerWhitelist"
     private let adBlockerLastUpdateKey = "settings.adBlockerLastUpdate"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
+    private let lastSeenVersionKey = "settings.lastSeenVersion"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
     private let sidebarPositionKey = "settings.sidebarPosition"
     private let topBarAddressViewKey = "settings.topBarAddressView"
@@ -221,6 +222,13 @@ public final class NookSettingsService {
     public var debugToggleUpdateNotification: Bool {
         didSet {
             userDefaults.set(debugToggleUpdateNotification, forKey: debugToggleUpdateNotificationKey)
+        }
+    }
+
+    /// The marketing version that last ran; nil on a fresh install. Drives the what's-new card.
+    public var lastSeenVersion: String? {
+        didSet {
+            userDefaults.set(lastSeenVersion, forKey: lastSeenVersionKey)
         }
     }
 
@@ -507,6 +515,7 @@ public final class NookSettingsService {
             self.enabledOptionalFilterLists = []
         }
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
+        self.lastSeenVersion = userDefaults.string(forKey: lastSeenVersionKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
         self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
