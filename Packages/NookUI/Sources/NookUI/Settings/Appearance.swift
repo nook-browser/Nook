@@ -37,6 +37,7 @@ public struct SettingsAppearanceTab: View {
                 }
                 Toggle("Show URL bar in the web view", isOn: $settings.topBarAddressView)
                 Toggle("Preview link URL on hover", isOn: $settings.showLinkStatusBar)
+                Toggle("Hide border", isOn: $settings.hideWebContentBorder)
             }
             #endif
         }

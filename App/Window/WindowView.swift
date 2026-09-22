@@ -209,7 +209,8 @@ struct WindowView: View {
         let sidebarVisible = windowState.isSidebarVisible
         let sidebarOnRight = nookSettings.sidebarPosition == .right
         let sidebarOnLeft = nookSettings.sidebarPosition == .left
-        
+        let bordered = !nookSettings.hideWebContentBorder
+
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
                 SpacesSidebar()
@@ -227,8 +228,8 @@ struct WindowView: View {
         }
         // Apply padding similar to regular sidebar: remove padding when sidebar/AI is visible on that side
         // When sidebar is on left, AI appears on right (trailing); when sidebar is on right, AI appears on left (leading)
-        .padding(.trailing, (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : 8)
-        .padding(.leading, (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : 8)
+        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : 8)
+        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : 8)
     }
 
     @ViewBuilder
@@ -258,28 +259,29 @@ struct WindowView: View {
         }()
         
         let hasTopBar = nookSettings.topBarAddressView
-        
+        let bordered = !nookSettings.hideWebContentBorder
+
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
-                if hasTopBar {
+                if bordered {
                     WebsiteLoadingIndicator()
                         .zIndex(3000)
-                    
+                }
+
+                if hasTopBar {
                     TopBarView()
                         .environmentObject(browserManager)
                         .environment(windowState)
                         .zIndex(2500)
-                } else {
-                    WebsiteLoadingIndicator()
                 }
-                
+
                 WebsiteView()
                     .zIndex(2000)
             }
-            
+
             // Shadow shape positioned behind both top bar and webview
             // The webview will block the bottom shadow, leaving only top/left/right shadows visible
-            if hasTopBar {
+            if hasTopBar && bordered {
                 UnevenRoundedRectangle(
                     topLeadingRadius: cornerRadius + 1,
                     bottomLeadingRadius: 0,
@@ -294,6 +296,12 @@ struct WindowView: View {
                 .allowsHitTesting(false)
                 .zIndex(-1)
             }
+
+            // No inset to sit in, so it floats over the page's top edge.
+            if !bordered {
+                WebsiteLoadingIndicator()
+                    .allowsHitTesting(false)
+            }
         }
         .overlay {
             if aiService.isExecutingTools {
@@ -302,7 +310,7 @@ struct WindowView: View {
                     .allowsHitTesting(false)
             }
         }
-        .padding(.bottom, 8)
+        .padding(.bottom, bordered ? 8 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

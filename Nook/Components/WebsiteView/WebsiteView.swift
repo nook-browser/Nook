@@ -179,7 +179,7 @@ struct WebsiteView: View {
     private let dragCoordinateSpace = "splitPreview"
 
     private var cornerRadius: CGFloat {
-        return NookDesign.Radius.md
+        nookSettings.hideWebContentBorder ? 0 : NookDesign.Radius.md
     }
 
     private var webViewClipShape: AnyShape {
@@ -225,7 +225,7 @@ struct WebsiteView: View {
                         // computed from a flattened bitmap rather than recompositing the
                         // WKWebView's live GPU video layer, which caused black flashes.
                         .compositingGroup()
-                        .nookElevation(.raised)
+                        .nookElevation(nookSettings.hideWebContentBorder ? .flat : .raised)
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
                         // This allows right-clicks to pass through to the underlying NSView (WKWebView)
                         .allowsHitTesting(!browserManager.dialogManager.isVisible)

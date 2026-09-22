@@ -28,7 +28,7 @@ struct TopBarView: View {
     @State private var previousTabId: UUID? = nil
 
     var body: some View {
-        let cornerRadius: CGFloat = NookDesign.Radius.md
+        let cornerRadius: CGFloat = nookSettings.hideWebContentBorder ? 0 : NookDesign.Radius.md
 
         let currentTab = browserManager.tabs.selectedSession(in: windowState)
         let hasPiPControl =

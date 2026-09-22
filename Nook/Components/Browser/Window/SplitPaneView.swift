@@ -10,6 +10,7 @@
 import AppKit
 import SwiftUI
 import NookDesign
+import NookSettings
 import NookTabsCore
 import NookUI
 import NookWeb
@@ -20,10 +21,12 @@ final class SplitPaneView: NSView {
     /// The page view's parent. It fills the pane; the controls float over it.
     let content = NSView()
     private let maskLayer = CAShapeLayer()
+    private weak var settings: NookSettingsService?
 
     init(frame: NSRect, side: SplitViewManager.Side, itemID: UUID, browserManager: BrowserManager, windowState: BrowserWindowState) {
         self.side = side
         self.itemID = itemID
+        self.settings = browserManager.nookSettings
         super.init(frame: frame)
         wantsLayer = true
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
@@ -78,11 +81,13 @@ final class SplitPaneView: NSView {
 
     private func updateMask() {
         let radius = NookDesign.Radius.md
+        // Toggling the border resizes the pane, so this reruns through setFrameSize.
+        let outer = settings?.hideWebContentBorder == true ? 0 : radius
         maskLayer.path = TabCompositorWrapper.createUnevenRoundedRectPath(
             rect: bounds,
             topLeadingRadius: side == .left ? 0 : radius,
-            bottomLeadingRadius: radius,
-            bottomTrailingRadius: radius,
+            bottomLeadingRadius: side == .left ? outer : radius,
+            bottomTrailingRadius: side == .right ? outer : radius,
             topTrailingRadius: side == .right ? 0 : radius
         )
     }

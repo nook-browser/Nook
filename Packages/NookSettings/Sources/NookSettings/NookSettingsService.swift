@@ -43,6 +43,7 @@ public final class NookSettingsService {
     private let webSearchMaxResultsKey = "settings.webSearchMaxResults"
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
+    private let hideWebContentBorderKey = "settings.hideWebContentBorder"
     private let siteSearchEntriesKey = "settings.siteSearchEntries"
     private let didFinishOnboardingKey = "settings.didFinishOnboarding"
     private let tabLayoutKey = "settings.tabLayout"
@@ -311,6 +312,13 @@ public final class NookSettingsService {
             userDefaults.set(showLinkStatusBar, forKey: showLinkStatusBarKey)
         }
     }
+
+    /// The inset, rounded corners and shadow around the web view.
+    public var hideWebContentBorder: Bool {
+        didSet {
+            userDefaults.set(hideWebContentBorder, forKey: hideWebContentBorderKey)
+        }
+    }
     
     public var siteSearchEntries: [SiteSearchEntry] {
         didSet {
@@ -436,6 +444,7 @@ public final class NookSettingsService {
             webSearchMaxResultsKey: 5,
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
+            hideWebContentBorderKey: false,
             didFinishOnboardingKey: false,
             tabLayoutKey: TabLayout.sidebar.rawValue,
             appearanceModeKey: AppearanceMode.system.rawValue,
@@ -533,6 +542,7 @@ public final class NookSettingsService {
         self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
+        self.hideWebContentBorder = userDefaults.bool(forKey: hideWebContentBorderKey)
         self.tabLayout = TabLayout(rawValue: userDefaults.string(forKey: tabLayoutKey) ?? TabLayout.sidebar.rawValue) ?? .sidebar
         self.appearanceMode = AppearanceMode(rawValue: userDefaults.string(forKey: appearanceModeKey) ?? AppearanceMode.system.rawValue) ?? .system
         self.didFinishOnboarding = userDefaults.bool(forKey: didFinishOnboardingKey)
