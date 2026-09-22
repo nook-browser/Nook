@@ -7,6 +7,7 @@
 //  Updated by Aether Aurelia on 15/11/2025.
 //
 
+import AppKit
 import SwiftUI
 import NookDesign
 import NookWeb
@@ -55,6 +56,8 @@ struct WindowView: View {
                 .zIndex(10000)
 
         }
+        // The window buttons sit in the sidebar's header, so they come and go with it.
+        .background(TrafficLights(visible: windowState.isSidebarVisible || hoverSidebarManager.isOverlayVisible))
         // In-window so the menus get the key window's active glass; see ExtensionLibraryOverlay.
         .overlayPreferenceValue(ExtensionLibraryAnchorKey.self) { anchor in
             ExtensionLibraryOverlay(anchor: anchor)
@@ -350,3 +353,51 @@ struct WindowView: View {
     }
 }
 
+private struct TrafficLights: NSViewRepresentable {
+    let visible: Bool
+
+    func makeNSView(context: Context) -> TrafficLightsView { TrafficLightsView() }
+    func updateNSView(_ view: TrafficLightsView, context: Context) { view.visible = visible }
+}
+
+/// The only code that shows or hides the window buttons. Leaving full screen paints a frame with
+/// them at the bare inset before the toolbar is back, so they stay hidden until the exit ends.
+private final class TrafficLightsView: NSView {
+    var visible = true {
+        didSet { if visible != oldValue { apply() } }
+    }
+    private var exitingFullScreen = false
+    private var observers: [any NSObjectProtocol] = []
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
+        guard let window else { return }
+        let center = NotificationCenter.default
+        observers = [
+            center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setExiting(true) }
+            },
+            center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setExiting(false) }
+            },
+        ]
+        apply()
+    }
+
+    deinit {
+        observers.forEach(NotificationCenter.default.removeObserver)
+    }
+
+    private func setExiting(_ exiting: Bool) {
+        exitingFullScreen = exiting
+        apply()
+    }
+
+    private func apply() {
+        for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            window?.standardWindowButton(type)?.isHidden = !visible || exitingFullScreen
+        }
+    }
+}
