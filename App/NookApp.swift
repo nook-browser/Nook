@@ -254,7 +254,7 @@ private func applyAppearanceMode(_ mode: AppearanceMode) {
 /// - Enables full-size content view for edge-to-edge content
 struct BackgroundWindowModifier: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
-        let view = NSView()
+        let view = FullScreenToolbarView()
         DispatchQueue.main.async {
             if let window = view.window {
                 // An empty unified toolbar is what puts the traffic lights where Apple's own
@@ -295,6 +295,41 @@ struct BackgroundWindowModifier: NSViewRepresentable {
         guard !window.titlebarAppearsTransparent else { return }
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
+    }
+}
+
+/// Fullscreen keeps the empty toolbar as a white band, on screen or on hover at the top, so it is
+/// hidden for the stay. AppKit ignores a re-show until the exit has finished, and the window
+/// paints one frame with the lights at the bare inset before it. The lights are hidden across
+/// the exit and come back once the toolbar has moved them, so they appear rather than shift.
+private final class FullScreenToolbarView: NSView {
+    private var observers: [any NSObjectProtocol] = []
+    private let buttons: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
+        guard let window else { return }
+        let center = NotificationCenter.default
+        let buttons = buttons
+        observers = [
+            // Before entry, so the band AppKit builds for the hover reveal is the bare title bar.
+            center.addObserver(forName: NSWindow.willEnterFullScreenNotification, object: window, queue: .main) { _ in
+                window.toolbar?.isVisible = false
+            },
+            center.addObserver(forName: NSWindow.willExitFullScreenNotification, object: window, queue: .main) { _ in
+                buttons.forEach { window.standardWindowButton($0)?.isHidden = true }
+            },
+            center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: window, queue: .main) { _ in
+                window.toolbar?.isVisible = true
+                buttons.forEach { window.standardWindowButton($0)?.isHidden = false }
+            },
+        ]
+    }
+
+    deinit {
+        observers.forEach(NotificationCenter.default.removeObserver)
     }
 }
 

@@ -69,7 +69,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             // Always hide titlebar text immediately to prevent flash during transitions
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
-            window.toolbar?.isVisible = false
 
             if !didFinishOnboarding {
                 window.setContentSize(NSSize(width: 1200, height: 720))

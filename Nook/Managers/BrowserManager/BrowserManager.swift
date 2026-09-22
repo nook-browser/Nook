@@ -1025,8 +1025,6 @@ class BrowserManager: ObservableObject {
         window.title = title
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.toolbar = NSToolbar()
-        window.toolbarStyle = .unified
         window.backgroundColor = .clear
         window.minSize = NSSize(width: 470, height: 382)
         window.contentMinSize = NSSize(width: 470, height: 382)
