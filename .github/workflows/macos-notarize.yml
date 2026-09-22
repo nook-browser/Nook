@@ -198,7 +198,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create the release (or update if it already exists). Betas are prereleases
-          # and say so at the top of their notes.
+          # and say so at the top of their notes. The body is the version's section of
+          # CHANGELOG.md; without one, GitHub's generated notes fill in.
           if [ "$IS_BETA" = "true" ]; then
             PRERELEASE="--prerelease"
             printf 'This is a beta build. Use it, and report what breaks in Issues.\n\n' > notes.md
@@ -206,10 +207,19 @@ jobs:
             PRERELEASE=""
             : > notes.md
           fi
+          awk -v v="$SHORT_VERSION" '
+            /^## / { on = ($2 == v) ; next }
+            on { print }
+          ' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' >> notes.md
+          if [ "$(tr -d '[:space:]' < notes.md | wc -c)" -gt 0 ]; then
+            GENERATE=""
+          else
+            GENERATE="--generate-notes"
+          fi
           gh release create "$VERSION" \
             --title "$VERSION" \
             --notes-file notes.md \
-            --generate-notes \
+            $GENERATE \
             $PRERELEASE \
             "Nook-${VERSION}.dmg" \
           || gh release upload "$VERSION" "Nook-${VERSION}.dmg" --clobber

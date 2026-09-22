@@ -4,8 +4,7 @@
 //  Nook
 //
 //  Converts ABP/uBlock filter rules into WKContentRuleList JSON via
-//  adblock-rust (MPL-2.0). Replaces AdGuard's SafariConverterLib, which is
-//  GPL-3.0 and so cannot carry Nook's App Store exception.
+//  adblock-rust (MPL-2.0). Replaced AdGuard's SafariConverterLib in September 2026.
 //
 //  Foundation only; nothing here is AppKit-specific.
 //
