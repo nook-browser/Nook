@@ -86,6 +86,6 @@ struct SidebarMenu: View {
         .padding(8)
         .frame(width: 110)
         .frame(maxHeight: .infinity)
-        .background(.black.opacity(0.2))
+        .background(NookDesign.Surface.fill)
     }
 }

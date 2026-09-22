@@ -274,8 +274,6 @@ struct CommandPaletteView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .frame(width: effectiveCommandPaletteWidth)
-                        .background(Color(.windowBackgroundColor).opacity(0.35))
-                        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xxl))
                         .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
                         .animation(
                             NookDesign.Motion.quick,
@@ -377,7 +375,7 @@ struct CommandPaletteView: View {
                             NookDesign.Radius.shape(NookDesign.Radius.sm)
                         )
                         .font(NookDesign.Font.label)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(selectedIndex == index ? .white : .primary)
                         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                         .onHoverTracking { hovering in
                             withAnimation(NookDesign.Motion.quick) {

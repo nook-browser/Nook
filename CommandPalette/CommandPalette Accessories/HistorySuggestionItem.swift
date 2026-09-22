@@ -124,10 +124,10 @@ private struct ColorConfig {
     }
     
     var faviconColor: Color {
-        return .white.opacity(0.5)
+        return isSelected ? .white.opacity(0.7) : .secondary
     }
     
     var faviconBackground: Color {
-        return isSelected ? .white : .clear
+        return isSelected ? .white : NookDesign.Surface.fill
     }
 }

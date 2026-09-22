@@ -693,28 +693,11 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Extension Library Panel
 
-    /// Toggles the extension library panel for the active window via keyboard shortcut.
+    /// Toggles the extension library for the active window via keyboard shortcut. The overlay in
+    /// WindowView watches this flag; there is no panel to drive.
     func toggleExtensionLibrary() {
-        guard let windowState = windowRegistry?.activeWindow,
-              let window = windowState.window,
-              let settings = nookSettings else { return }
-
-        // Lazily create the panel controller if needed
-        if windowState.extensionLibraryPanelController == nil {
-            windowState.extensionLibraryPanelController = ExtensionLibraryPanelController()
-        }
-        guard let panelController = windowState.extensionLibraryPanelController else { return }
-
-        let willShow = !panelController.isVisible
-        windowState.isExtensionLibraryVisible = willShow
-
-        panelController.toggle(
-            anchorFrame: windowState.urlBarFrame,
-            in: window,
-            browserManager: self,
-            windowState: windowState,
-            settings: settings
-        )
+        guard let windowState = windowRegistry?.activeWindow else { return }
+        windowState.isExtensionLibraryVisible.toggle()
     }
 
     // MARK: - Sidebar width access for overlays

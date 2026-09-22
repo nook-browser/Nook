@@ -25,11 +25,11 @@ struct TabSuggestionItem: View {
                     tab.favicon
                         .resizable()
                         .scaledToFit()
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.secondary)
                         .frame(width: 14, height: 14)
                 }
                 .frame(width: 24, height: 24)
-                .background(isSelected ? .white : .clear)
+                .background(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(NookDesign.Surface.fill))
                 .clipShape(
                     NookDesign.Radius.shape(NookDesign.Radius.xs)
                 )

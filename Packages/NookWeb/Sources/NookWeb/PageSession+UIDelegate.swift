@@ -9,6 +9,7 @@
 import SwiftUI
 import WebKit
 import NookBlocker
+import NookSettings
 import NookTweaks
 extension PageSession {
     func isLikelyOAuthOrExternalWindow(url: URL, windowFeatures: WKWindowFeatures) -> Bool {
@@ -278,7 +279,27 @@ extension PageSession: WKUIDelegate {
         decisionHandler: @escaping (WKPermissionDecision) -> Void
     ) {
 
-        // WebKit asks the user per origin; a page never gets capture on its own say-so.
-        decisionHandler(.prompt)
+        // A stored answer for this host short-circuits the prompt; otherwise WebKit asks, and a
+        // page never gets capture on its own say-so.
+        let needed: [SitePermission]
+        switch type {
+        case .camera: needed = [.camera]
+        case .microphone: needed = [.microphone]
+        case .cameraAndMicrophone: needed = [.camera, .microphone]
+        @unknown default: needed = [.camera, .microphone]
+        }
+        guard let settings = controller?.settings else {
+            decisionHandler(.prompt)
+            return
+        }
+        let policies = needed.map { settings.permission($0, for: origin.host) }
+        // A combined request needs every part allowed, and one block denies the whole thing.
+        if policies.contains(.block) {
+            decisionHandler(.deny)
+        } else if policies.allSatisfy({ $0 == .allow }) {
+            decisionHandler(.grant)
+        } else {
+            decisionHandler(.prompt)
+        }
     }
 }

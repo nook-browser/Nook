@@ -36,14 +36,14 @@ public struct ShortcutConflictToast: View {
                 // Keyboard icon
                 Image(systemName: "keyboard")
                     .font(NookDesign.Font.body)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 18, height: 18)
                     .padding(5)
-                    .background(Color.white.opacity(0.2))
+                    .background(NookDesign.Surface.fill)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
                     .overlay {
                         NookDesign.Radius.shape(NookDesign.Radius.md)
-                            .stroke(.white.opacity(0.4), lineWidth: 1)
+                            .stroke(NookDesign.Surface.hairline, lineWidth: 1)
                     }
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -51,23 +51,23 @@ public struct ShortcutConflictToast: View {
                     HStack(spacing: 4) {
                         Text(shortcut)
                             .font(NookDesign.Font.secondary)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         Text("used by")
                             .font(NookDesign.Font.caption)
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(.secondary)
                         Text(websiteName)
                             .font(NookDesign.Font.secondary)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                     
                     // Subtitle: press again for Nook
                     HStack(spacing: 4) {
                         Text("Press again for")
                             .font(NookDesign.Font.caption)
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.secondary)
                         Text(nookActionName)
                             .font(NookDesign.Font.caption)
-                            .foregroundStyle(.white.opacity(0.9))
+                            .foregroundStyle(.primary)
                     }
                 }
             }

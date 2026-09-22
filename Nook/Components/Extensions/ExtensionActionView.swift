@@ -56,7 +56,7 @@ struct ExtensionActionButton: View {
                             .scaledToFit()
                     } else {
                         Image(systemName: "puzzlepiece.extension")
-                            .foregroundColor(.white)
+                            .foregroundStyle(.primary)
                     }
                 }
                 .frame(width: 16, height: 16)
@@ -64,7 +64,7 @@ struct ExtensionActionButton: View {
                 if let badge = badgeText, !badge.isEmpty {
                     Text(badge)
                         .font(NookDesign.Font.micro)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .padding(.horizontal, 3)
                         .padding(.vertical, 1)
                         .background(Color.red)
@@ -72,8 +72,8 @@ struct ExtensionActionButton: View {
                         .offset(x: 6, y: -4)
                 }
             }
-            .padding(6)
-            .background(isHovering ? .white.opacity(0.1) : .clear)
+            .frame(width: NookDesign.Size.iconButton, height: NookDesign.Size.iconButton)
+            .background(isHovering ? NookDesign.Surface.fillPressed : .clear)
             .background(ActionAnchorView(extensionId: ext.id))
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
         }

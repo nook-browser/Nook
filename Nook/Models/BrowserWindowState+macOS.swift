@@ -34,11 +34,6 @@ extension BrowserWindowState {
         set { windowHandle = newValue }
     }
 
-    var extensionLibraryPanelController: ExtensionLibraryPanelController? {
-        get { extensionLibraryPanelStorage as? ExtensionLibraryPanelController }
-        set { extensionLibraryPanelStorage = newValue }
-    }
-
     var sidebarPiPController: SidebarPiPController? {
         get { sidebarPiPStorage as? SidebarPiPController }
         set { sidebarPiPStorage = newValue }

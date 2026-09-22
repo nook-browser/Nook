@@ -21,24 +21,24 @@ public struct TabClosureToast: View {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.counterclockwise")
                     .font(NookDesign.Font.secondary)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 14, height: 14)
                     .padding(4)
-                    .background(Color.white.opacity(0.2))
+                    .background(NookDesign.Surface.fill)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                     .overlay {
                         NookDesign.Radius.shape(NookDesign.Radius.sm)
-                            .stroke(.white.opacity(0.4), lineWidth: 1)
+                            .stroke(NookDesign.Surface.hairline, lineWidth: 1)
                     }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(count) tab\(count > 1 ? "s" : "") closed")
                         .font(NookDesign.Font.secondary)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
 
                     Text("Press ⌘Z to undo")
                         .font(NookDesign.Font.caption)
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(.secondary)
                 }
             }
         }

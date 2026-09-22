@@ -28,7 +28,7 @@ struct CommandPaletteSuggestionView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 14, height: 14)
-                .foregroundStyle(.white.opacity(0.2))
+                .foregroundStyle(.tertiary)
             if let secondary = secondaryText, !secondary.isEmpty {
                 HStack(spacing: 6) {
                     Text(text)
@@ -37,10 +37,10 @@ struct CommandPaletteSuggestionView: View {
                         .truncationMode(.tail)
                     Text("-")
                         .font(NookDesign.Font.body)
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(.tertiary)
                     Text(secondary)
                         .font(NookDesign.Font.body)
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -57,11 +57,11 @@ struct CommandPaletteSuggestionView: View {
                 HStack(spacing: 6) {
                     Text("Switch to Tab")
                         .font(NookDesign.Font.secondary)
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.secondary)
                     
                     Image(systemName: "arrow.right")
                         .font(NookDesign.Font.caption)
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -84,9 +84,9 @@ struct CommandPaletteSuggestionView: View {
     
     private var backgroundColor: Color {
         if isSelected {
-            return Color.white.opacity(0.25)
+            return NookDesign.Surface.fillPressed
         } else if isHovered {
-            return Color.white.opacity(0.15)
+            return NookDesign.Surface.fill
         } else {
             return Color.clear
         }

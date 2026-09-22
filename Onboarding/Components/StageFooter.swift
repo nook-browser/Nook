@@ -6,6 +6,7 @@
 //  Created by Maciek Bagiński on 17/02/2026.
 //
 
+import NookDesign
 import SwiftUI
 
 struct StageFooter: View {
@@ -62,7 +63,7 @@ struct StageFooter: View {
                 .padding(.vertical, 12)
                 .padding(.horizontal, 24)
                 .background(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(isLoading)

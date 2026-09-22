@@ -55,6 +55,11 @@ struct WindowView: View {
                 .zIndex(10000)
 
         }
+        // In-window so the menus get the key window's active glass; see ExtensionLibraryOverlay.
+        .overlayPreferenceValue(ExtensionLibraryAnchorKey.self) { anchor in
+            ExtensionLibraryOverlay(anchor: anchor)
+                .zIndex(9000)
+        }
         // System notification toasts - top trailing corner
         .overlay(alignment: .topTrailing) {
             VStack(spacing: 8) {

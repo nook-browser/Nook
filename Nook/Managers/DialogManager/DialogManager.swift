@@ -8,6 +8,7 @@
 
 import Observation
 import SwiftUI
+import Garnish
 import NookDesign
 
 @MainActor
@@ -380,6 +381,7 @@ enum DialogButtonStyleVariant {
 }
 
 struct DialogButtonStyle: ButtonStyle {
+    @EnvironmentObject var gradientColorManager: GradientColorManager
     var variant: DialogButtonStyleVariant = .primary
     var icon: AnyView?
     var iconPosition: IconPosition = .trailing
@@ -398,16 +400,18 @@ struct DialogButtonStyle: ButtonStyle {
 
     private var backgroundColor: Color {
         switch variant {
-        case .primary: return Color(hex: "DDDDDD")
-        case .secondary: return .white.opacity(0.07)
-        case .danger: return Color(hex: "F60000")
+        // A fixed light fill with black text read as white on white in dark mode. The accent
+        // carries the primary action, and the secondary sits on the same fill rows use.
+        case .primary: return gradientColorManager.accentColor
+        case .secondary: return NookDesign.Surface.fill
+        case .danger: return NookDesign.Surface.danger
         }
     }
 
     private var foregroundColor: Color {
         switch variant {
-        case .primary: return .black
-        case .secondary: return AppColors.textPrimary
+        case .primary: return Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+        case .secondary: return .primary
         case .danger: return .white
         }
     }
@@ -449,7 +453,7 @@ struct KeycapLabel: View {
             .fontDesign(.rounded)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
-            .background(.white.opacity(0.12))
+            .background(NookDesign.Surface.fill)
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
     }
 }

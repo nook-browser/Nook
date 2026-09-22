@@ -20,8 +20,8 @@ struct ExtensionLibraryView: View {
     let windowState: BrowserWindowState
     let settings: NookSettingsService
     let onDismiss: () -> Void
+    let onShowMoreMenu: () -> Void
 
-    @State private var moreMenuController = ExtensionLibraryMoreMenuController()
 
     private let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionLibrary")
 
@@ -173,7 +173,7 @@ struct ExtensionLibraryView: View {
                             Image(systemName: "minus")
                                 .font(NookDesign.Font.captionStrong)
                                 .frame(width: 22, height: 22)
-                                .background(.secondary.opacity(0.1))
+                                .background(NookDesign.Surface.fill)
                                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                         }
                         .buttonStyle(.plain)
@@ -190,7 +190,7 @@ struct ExtensionLibraryView: View {
                             Image(systemName: "plus")
                                 .font(NookDesign.Font.captionStrong)
                                 .frame(width: 22, height: 22)
-                                .background(.secondary.opacity(0.1))
+                                .background(NookDesign.Surface.fill)
                                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                         }
                         .buttonStyle(.plain)
@@ -208,39 +208,26 @@ struct ExtensionLibraryView: View {
             HStack(spacing: 5) {
                 Image(systemName: currentTab?.url.scheme == "https" ? "lock.fill" : "lock.open.fill")
                     .font(NookDesign.Font.caption)
-                    .foregroundStyle(.secondary.opacity(0.5))
+                    .foregroundStyle(.secondary)
                 Text(currentHost ?? "No site loaded")
                     .font(NookDesign.Font.secondary)
-                    .foregroundStyle(.secondary.opacity(0.5))
+                    .foregroundStyle(.primary)
             }
 
             Spacer()
 
             Button {
-                // Find the library panel by looking for our visible NSPanel
-                if let panelWindow = NSApp.windows.first(where: {
-                    $0 is NSPanel && $0.isVisible && $0.level == .floating && $0.styleMask.contains(.nonactivatingPanel)
-                }) {
-                    moreMenuController.show(
-                        anchorFrame: panelWindow.frame,
-                        browserManager: browserManager,
-                        windowState: windowState,
-                        onDismiss: {}
-                    )
-                }
+                onShowMoreMenu()
             } label: {
                 Image(systemName: "ellipsis")
                     .font(NookDesign.Font.body)
-                    .foregroundStyle(.secondary.opacity(0.5))
-                    .frame(width: 26, height: 26)
-                    .background(.secondary.opacity(0.08))
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(NookIconButtonStyle(size: NookDesign.Size.iconButton, radius: NookDesign.Radius.sm))
+            .foregroundStyle(.primary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(.black.opacity(0.08))
+        .background(NookDesign.Surface.fill)
     }
 
     // MARK: - Zoom Helpers
@@ -281,7 +268,7 @@ private struct MuteButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(isHovering ? Color.secondary.opacity(0.12) : Color.secondary.opacity(0.06))
+            .background(isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
         .buttonStyle(.plain)
@@ -329,7 +316,7 @@ private struct CopyButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(isHovering ? Color.secondary.opacity(0.12) : Color.secondary.opacity(0.06))
+            .background(isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
         .buttonStyle(.plain)
@@ -374,7 +361,7 @@ private struct ExtensionGridItem: View {
                         }
                     }
                     .frame(width: 34, height: 34)
-                    .background(.secondary.opacity(0.08))
+                    .background(NookDesign.Surface.fill)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
 
                     if let badge = badgeText, !badge.isEmpty {
@@ -400,7 +387,7 @@ private struct ExtensionGridItem: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity)
-            .background(isHovering ? Color.secondary.opacity(0.08) : Color.clear)
+            .background(isHovering ? NookDesign.Surface.fill : Color.clear)
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
             .overlay(alignment: .topTrailing) {
                 if isPinned {
@@ -467,8 +454,7 @@ private struct ContentBlockerSiteRow: View {
     var body: some View {
         SiteSettingRow(icon: "shield.checkered", iconColor: .green, title: "Content Blocker", subtitle: subtitle) {
             Toggle("", isOn: $enabled)
-                .toggleStyle(.switch)
-                .controlSize(.mini)
+                .toggleStyle(NookSwitchToggleStyle())
         }
     }
 }
@@ -507,7 +493,7 @@ private struct SiteSettingRow<Control: View>: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 7)
-        .background(isHovering ? Color.secondary.opacity(0.06) : Color.clear)
+        .background(isHovering ? NookDesign.Surface.fill : Color.clear)
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { isHovering = $0 }
     }

@@ -130,10 +130,7 @@ struct FindBarView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    // Pill-shaped liquid glass styling
-                    .background(Color(.windowBackgroundColor).opacity(0.35))
-                    .clipShape(Capsule())
-                    .nookGlassEffect(in: Capsule())
+                    .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
                     .padding(.trailing, 16)
                 }
                 .padding(.top, 12)
