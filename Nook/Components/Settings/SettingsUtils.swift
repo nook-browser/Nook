@@ -56,6 +56,31 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         }
     }
 
+    /// Extra search terms, so a pane is findable by what it holds rather than only its name.
+    var searchKeywords: [String] {
+        switch self {
+        case .general: return ["startup", "search engine", "tabs", "quit", "update"]
+        case .appearance: return ["theme", "dark", "light", "sidebar"]
+        case .ai: return ["gemini", "openrouter", "ollama", "mcp", "browser control"]
+        case .privacy: return ["cookies", "cache", "tracking", "website data"]
+        case .adBlocker: return ["ads", "filters", "blocking", "allowlist", "whitelist"]
+        case .youTube: return ["shorts", "thumbnails", "sponsorblock"]
+        case .socialMedia: return ["facebook", "instagram", "reels", "download"]
+        case .airTrafficControl: return ["routing", "rules", "domains"]
+        case .spaces: return ["accent", "colour", "color", "rename"]
+        case .shortcuts: return ["keyboard", "keys", "hotkeys"]
+        case .extensions: return ["web extensions", "chrome", "add-ons"]
+        case .advanced: return ["developer", "debug", "experimental"]
+        }
+    }
+
+    func matches(_ query: String) -> Bool {
+        let term = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !term.isEmpty else { return true }
+        return name.lowercased().contains(term)
+            || searchKeywords.contains { $0.contains(term) }
+    }
+
     var iconColor: Color {
         switch self {
         case .general: return .gray

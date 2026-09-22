@@ -17,8 +17,6 @@ struct PrivacySettingsView: View {
     @Environment(\.nookSettings) var nookSettings
     @StateObject private var cookieManager = CookieManager()
     @StateObject private var cacheManager = CacheManager()
-    @State private var showingCookieManager = false
-    @State private var showingCacheManager = false
     @State private var isClearing = false
 
     var body: some View {
@@ -28,12 +26,9 @@ struct PrivacySettingsView: View {
             Section("Cookie Management") {
                 cookieStatsView
 
-                HStack {
-                    Button("Manage Cookies") {
-                        showingCookieManager = true
-                    }
-                    .buttonStyle(.bordered)
+                NavigationLink("Manage Cookies", value: SettingsSubPane.cookies)
 
+                HStack {
                     Menu("Clear Data") {
                         Button("Clear Expired Cookies") {
                             clearExpiredCookies()
@@ -69,12 +64,9 @@ struct PrivacySettingsView: View {
             Section("Cache Management") {
                 cacheStatsView
 
-                HStack {
-                    Button("Manage Cache") {
-                        showingCacheManager = true
-                    }
-                    .buttonStyle(.bordered)
+                NavigationLink("Manage Cache", value: SettingsSubPane.cache)
 
+                HStack {
                     Menu("Clear Cache") {
                         Button("Clear Stale Cache") {
                             clearStaleCache()
@@ -129,12 +121,6 @@ struct PrivacySettingsView: View {
                 await cookieManager.loadCookies()
                 await cacheManager.loadCacheData()
             }
-        }
-        .sheet(isPresented: $showingCookieManager) {
-            CookieManagementView()
-        }
-        .sheet(isPresented: $showingCacheManager) {
-            CacheManagementView()
         }
     }
     

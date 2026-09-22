@@ -105,7 +105,9 @@ struct NookApp: App {
                 .environment(mcpManager)
                 .environment(tabOrganizerManager)
         }
-        .windowResizability(.contentSize)
+        // contentMinSize lets the window grow past the content's ideal size,
+        // which .contentSize pinned it to.
+        .windowResizability(.contentMinSize)
     }
 
     // MARK: - Application Lifecycle Setup
@@ -255,7 +257,10 @@ struct BackgroundWindowModifier: NSViewRepresentable {
         let view = NSView()
         DispatchQueue.main.async {
             if let window = view.window {
-                window.toolbar?.isVisible = false
+                // An empty unified toolbar is what puts the traffic lights where Apple's own
+                // apps have them (26pt in from the corner rather than 16). Nothing draws in it.
+                if window.toolbar == nil { window.toolbar = NSToolbar() }
+                window.toolbarStyle = .unified
                 window.titlebarAppearsTransparent = true
                 window.backgroundColor = .clear
                 window.titleVisibility = .hidden

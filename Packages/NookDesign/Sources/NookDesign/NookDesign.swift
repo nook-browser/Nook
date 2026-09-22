@@ -54,8 +54,8 @@ public enum NookDesign {
         #else
         public static let folderIndent: CGFloat = 20
         #endif
-        public static let sidebarTop: CGFloat = 34     // clears the traffic lights when the sidebar is on the left
-        public static let trafficLights: CGFloat = 78  // leading space the traffic lights take in the title row
+        public static let sidebarTop: CGFloat = 52     // the unified title band; the lights sit centred in it
+        public static let trafficLights: CGFloat = 88  // leading space the traffic lights take in the title row
         public static let titleFade: CGFloat = 20      // trailing fade on long row titles
     }
 

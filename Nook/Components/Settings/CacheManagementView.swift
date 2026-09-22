@@ -18,14 +18,13 @@ struct CacheManagementView: View {
     @State private var selectedCache: CacheInfo?
     @State private var showingCacheDetails: Bool = false
     @State private var viewMode: ViewMode = .domain
-    @Environment(\.dismiss) private var dismiss
-    
+
     enum ViewMode: String, CaseIterable {
         case domain = "By Domain"
         case list = "All Cache"
     }
 
-    /// Minimum height for the entry list; the sheet grows from it.
+    /// Minimum height for the entry list; the pane grows from it.
     private let entryListMinHeight: CGFloat = 260
     
     var body: some View {
@@ -47,10 +46,7 @@ struct CacheManagementView: View {
 
             actionBar
         }
-        .frame(
-            minWidth: NookDesign.Size.sheetLargeWidth,
-            minHeight: NookDesign.Size.sheetLargeHeight
-        )
+        .navigationTitle("Cache Management")
         .onAppear {
             Task {
                 await cacheManager.loadCacheData()
@@ -226,12 +222,6 @@ struct CacheManagementView: View {
             .fixedSize()
 
             Spacer()
-
-            Button("Close") {
-                dismiss()
-            }
-            .buttonStyle(.bordered)
-            .keyboardShortcut(.escape)
         }
         .padding(NookDesign.Spacing.xl)
     }

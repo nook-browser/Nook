@@ -7,29 +7,40 @@
 //
 
 import SwiftUI
+import NookDesign
 import NookSettings
 
 public struct SettingsSocialMediaTab: View {
     @Environment(NookSettingsService.self) var nookSettings
     @State private var newSite = ""
+    @State private var showingAddSite = false
 
     public init() {}
 
     public var body: some View {
         @Bindable var settings = nookSettings
         Form {
+            // Same rows as Site Search in General.
             Section {
-                if settings.mediaDownloadSites.isEmpty {
-                    Text("No sites added.")
-                        .foregroundStyle(.tertiary)
-                } else {
-                    ForEach(settings.mediaDownloadSites, id: \.self) { site in
+                ForEach(settings.mediaDownloadSites, id: \.self) { site in
+                    LabeledContent {
+                        Button {
+                            settings.mediaDownloadSites.removeAll { $0 == site }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                    } label: {
                         Text(site)
                     }
-                    .onDelete { settings.mediaDownloadSites.remove(atOffsets: $0) }
                 }
-                TextField("Add a site (e.g. instagram.com)", text: $newSite)
-                    .onSubmit(add)
+
+                Button {
+                    showingAddSite = true
+                } label: {
+                    Label("Add Site", systemImage: "plus")
+                }
             } header: {
                 Text("Download Button")
             } footer: {
@@ -46,6 +57,12 @@ public struct SettingsSocialMediaTab: View {
             }
         }
         .formStyle(.grouped)
+        .alert("Add Site", isPresented: $showingAddSite) {
+            TextField("Add a site (e.g. instagram.com)", text: $newSite)
+            Button("Add", action: add)
+                .disabled(SiteRoutingRule.normalizeDomain(newSite).isEmpty)
+            Button("Cancel", role: .cancel) { newSite = "" }
+        }
     }
 
     private func add() {

@@ -18,14 +18,13 @@ struct CookieManagementView: View {
     @State private var selectedCookie: CookieInfo?
     @State private var showingCookieDetails: Bool = false
     @State private var viewMode: ViewMode = .domain
-    @Environment(\.dismiss) private var dismiss
-    
+
     enum ViewMode: String, CaseIterable {
         case domain = "By Domain"
         case list = "All Cookies"
     }
 
-    /// Minimum height for the entry list; the sheet grows from it.
+    /// Minimum height for the entry list; the pane grows from it.
     private let entryListMinHeight: CGFloat = 260
 
     var body: some View {
@@ -47,10 +46,7 @@ struct CookieManagementView: View {
 
             actionBar
         }
-        .frame(
-            minWidth: NookDesign.Size.sheetLargeWidth,
-            minHeight: NookDesign.Size.sheetLargeHeight
-        )
+        .navigationTitle("Cookie Management")
         .onAppear {
             Task {
                 await cookieManager.loadCookies()
@@ -204,12 +200,6 @@ struct CookieManagementView: View {
             .fixedSize()
 
             Spacer()
-
-            Button("Close") {
-                dismiss()
-            }
-            .buttonStyle(.bordered)
-            .keyboardShortcut(.escape)
         }
         .padding(NookDesign.Spacing.xl)
     }

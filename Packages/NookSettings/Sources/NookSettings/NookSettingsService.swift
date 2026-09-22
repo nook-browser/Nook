@@ -59,10 +59,6 @@ public final class NookSettingsService {
     private let youTubeVideosPerRowKey = "settings.youTubeVideosPerRow"
     private let youTubeFrameThumbnailsKey = "settings.youTubeFrameThumbnails"
     private let youTubeNoHoverPreviewKey = "settings.youTubeNoHoverPreview"
-    private let legacySocialImageDownloadKey = "settings.socialImageDownload"
-    private let instagramDownloadKey = "settings.instagramDownload"
-    private let facebookDownloadKey = "settings.facebookDownload"
-    private let vscoDownloadKey = "settings.vscoDownload"
     private let mediaDownloadSitesKey = "settings.mediaDownloadSites"
     private let facebookHideReelsKey = "settings.facebookHideReels"
     private let facebookHideSuggestedKey = "settings.facebookHideSuggested"
@@ -508,21 +504,7 @@ public final class NookSettingsService {
         self.youTubeVideosPerRow = userDefaults.integer(forKey: youTubeVideosPerRowKey)
         self.youTubeFrameThumbnails = userDefaults.bool(forKey: youTubeFrameThumbnailsKey)
         self.youTubeNoHoverPreview = userDefaults.bool(forKey: youTubeNoHoverPreviewKey)
-        // One setting covered all three sites, then three per-site ones; both seed the site list.
-        if let sites = userDefaults.stringArray(forKey: mediaDownloadSitesKey) {
-            self.mediaDownloadSites = sites
-        } else {
-            let defaults = userDefaults
-            let legacyDownload = defaults.bool(forKey: legacySocialImageDownloadKey)
-            let legacy = [
-                (instagramDownloadKey, "instagram.com"),
-                (facebookDownloadKey, "facebook.com"),
-                (vscoDownloadKey, "vsco.co")
-            ]
-            self.mediaDownloadSites = legacy
-                .filter { defaults.object(forKey: $0.0) as? Bool ?? legacyDownload }
-                .map(\.1)
-        }
+        self.mediaDownloadSites = userDefaults.stringArray(forKey: mediaDownloadSitesKey) ?? []
         self.facebookHideReels = userDefaults.bool(forKey: facebookHideReelsKey)
         self.facebookHideSuggested = userDefaults.bool(forKey: facebookHideSuggestedKey)
 
