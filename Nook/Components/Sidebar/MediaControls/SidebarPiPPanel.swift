@@ -22,8 +22,10 @@ import NookWeb
 /// makes the video fill it.
 @MainActor
 @Observable
-final class SidebarPiPController {
+final class SidebarPiPController: PictureInPictureHolder {
     private static let logger = Logger(subsystem: "com.gstudios.nook", category: "SidebarPiP")
+    /// Every PiP script runs here, out of the page's reach.
+    static let world = WKContentWorld.world(name: "NookPiP")
 
     private(set) var isFloating = false
     /// While the float panel is being dragged the sidebar shows its drop zone.
@@ -32,14 +34,21 @@ final class SidebarPiPController {
     @ObservationIgnored private var floatWindow: NSPanel?
     @ObservationIgnored weak var dockZoneView: NSView?
     @ObservationIgnored private static var lastFloatWidth: CGFloat = 420
+    /// Bumped on every enter and exit, so a late script reply for an earlier video is dropped.
+    @ObservationIgnored private var generation = 0
+    /// Only the newest `next()` wait may act.
+    @ObservationIgnored private var followToken = 0
+
+    @ObservationIgnored private weak var windowState: BrowserWindowState?
 
     private(set) var itemID: UUID?
     private(set) var webView: WKWebView?
-    private(set) var aspect: CGFloat = 16 / 9
     private(set) var session: PageSession?
+    /// False until the isolated video has been presented, so no frame from before is ever shown.
+    private(set) var isReady = false
 
-    /// Where the video sits inside the page, in CSS points, relative to the viewport. The host
-    /// crops and scales to exactly this rect.
+    /// Where the video is painted, in view points relative to the web view. The host crops and
+    /// scales to exactly this rect.
     private(set) var videoRect: CGRect = .zero
 
     /// The page the sidebar media surface is about, kept after minimising so the bar describes
@@ -47,68 +56,145 @@ final class SidebarPiPController {
     /// a tab by "is playing", which skips a paused video and leaves the previous one on screen.
     private(set) var barSession: PageSession?
 
-
     var isShowing: Bool { itemID != nil }
-
-    /// Feeds that autoplay whatever scrolls past: leaving one is not leaving a video.
-    private static let excludedHosts = ["instagram.com"]
-
-    static func allows(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return true }
-        return !excludedHosts.contains { host == $0 || host.hasSuffix("." + $0) }
-    }
     var isDocked: Bool { isShowing && !isFloating }
+    var pictureInPictureItemID: UUID? { itemID }
+    var aspect: CGFloat { videoRect.height > 1 ? max(videoRect.width / videoRect.height, 0.1) : 16 / 9 }
+
+    init(windowState: BrowserWindowState) {
+        self.windowState = windowState
+    }
+
+    /// Feeds play whatever scrolls past. Facebook serves long videos under /reel/ too, so its
+    /// reels are told apart by the page script's portrait check.
+    static func allowsAutomatic(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return true }
+        func on(_ domain: String) -> Bool { host == domain || host.hasSuffix("." + domain) }
+        if on("instagram.com") || on("tiktok.com") { return false }
+        return !(on("youtube.com") && url.path.lowercased().hasPrefix("/shorts"))
+    }
 
     // MARK: - Enter
 
-    /// Isolates the page's video and takes its live web view. `onFailure` runs when the page has
-    /// no video to isolate, so the caller can fall back to system picture-in-picture.
-    func enter(session: PageSession, webView: WKWebView, onFailure: @escaping () -> Void) {
+    /// Moves the live view into the sidebar and isolates its video; `automatic` refuses paused,
+    /// muted, looping or portrait video. `onFailure` lets the caller fall back to system PiP.
+    func enter(session: PageSession, webView: WKWebView, automatic: Bool, onFailure: @escaping () -> Void) {
+        // Only Nook's own view class stops the pointer and restores the page on the way back.
+        guard webView is FocusableWKWebView else { return onFailure() }
         exit()
-        // The view keeps the size it already had. Resizing it would reflow the page, which both
-        // flashes white and invalidates the rect being measured in the same breath.
-        webView.evaluateJavaScript(Self.measureScript) { [weak self] result, error in
-            guard let self else { return }
-            guard let rect = Self.rect(from: result), rect.width > 1, rect.height > 1 else {
-                Self.logger.info("no measurable video: \(String(describing: error), privacy: .public)")
-                onFailure()
+        generation += 1
+        // Published before the compositor's pass, so the view moves between containers in one
+        // update and the page never goes hidden. The slot stays clear until the video is ready.
+        withAnimation(NookDesign.Motion.spring) {
+            self.session = session
+            barSession = session
+            self.webView = webView
+            itemID = session.itemID
+        }
+        if webView.window?.firstResponder === webView { webView.window?.makeFirstResponder(nil) }
+        isolate(webView, automatic: automatic, onFailure: onFailure)
+        followNavigation(of: session, generation: generation)
+    }
+
+    private func isolate(_ webView: WKWebView, automatic: Bool, onFailure: @escaping () -> Void) {
+        let generation = generation
+        // Before the script, so a reply dropped by a quick return still leaves a restore behind.
+        (webView as? FocusableWKWebView)?.isPictureInPictureIsolated = true
+        webView.callAsyncJavaScript(
+            Self.pageScript + "return __nookPiP.isolate(zoom, automatic);",
+            arguments: ["zoom": Double(webView.pageZoom), "automatic": automatic],
+            in: nil, in: Self.world
+        ) { [weak self] result in
+            guard let self, self.generation == generation, self.webView === webView else { return }
+            let info = (try? result.get()) as? [String: Any]
+            guard let rect = Self.rect(from: info) else {
+                Self.logger.notice("no video to isolate: \(String(describing: info), privacy: .public)")
+                self.exit()
+                if info?["skip"] as? Bool != true { onFailure() }
                 return
             }
-            self.videoRect = rect
-            self.aspect = max(rect.width / rect.height, 0.1)
-            self.session = session
-            self.barSession = session
-            self.webView = webView
-            self.itemID = session.itemID
+            self.setCrop(rect)
+            guard !self.isReady else { return self.follow(webView) }
+            Self.afterNextPresentation(of: webView) { [weak self] in
+                guard let self, self.generation == generation else { return }
+                withAnimation(NookDesign.Motion.spring) { self.isReady = true }
+                self.follow(webView)
+            }
         }
     }
 
-    /// Re-measures after the page may have moved the video, e.g. a single-page navigation to the
-    /// next video. Cheap enough to run whenever the host re-lays out.
-    func remeasure() {
-        guard let webView, itemID != nil else { return }
-        webView.evaluateJavaScript(Self.measureScript) { [weak self] result, _ in
-            guard let self, let rect = Self.rect(from: result), rect.width > 1, rect.height > 1,
-                rect != self.videoRect
+    /// Keeps the crop on the video as the page changes: the next video, an ad, a resize.
+    private func follow(_ webView: WKWebView) {
+        followToken += 1
+        let token = followToken, generation = generation
+        webView.callAsyncJavaScript("return await __nookPiP.next();", arguments: [:], in: nil, in: Self.world) {
+            [weak self] result in
+            guard let self, self.generation == generation, self.followToken == token, self.webView === webView
             else { return }
-            Self.logger.notice("crop drifted: \(String(describing: self.videoRect), privacy: .public) -> \(String(describing: rect), privacy: .public)")
-            self.videoRect = rect
-            self.aspect = max(rect.width / rect.height, 0.1)
+            let info = (try? result.get()) as? [String: Any]
+            if let rect = Self.rect(from: info) {
+                self.setCrop(rect)
+                self.follow(webView)
+            } else if info?["ended"] as? Bool != true {
+                // The document changed or the video left it: pick again, or end.
+                self.refresh()
+            }
         }
     }
 
-    private static func rect(from result: Any?) -> CGRect? {
-        guard let info = result as? [String: Any], info["ok"] as? Bool == true,
+    /// A navigation, even a single-page one to the next video, can replace the player.
+    private func followNavigation(of session: PageSession, generation: Int) {
+        withObservationTracking { _ = session.url } onChange: { [weak self, weak session] in
+            DispatchQueue.main.async {
+                guard let self, let session, self.generation == generation else { return }
+                self.refresh()
+                self.followNavigation(of: session, generation: generation)
+            }
+        }
+    }
+
+    private func refresh() {
+        guard let webView else { return }
+        isolate(webView, automatic: false) {}
+    }
+
+    private func setCrop(_ rect: CGRect) {
+        guard rect != videoRect else { return }
+        videoRect = rect
+        guard let floatWindow, let root = floatWindow.contentView as? FloatRootView else { return }
+        root.container.crop = rect
+        floatWindow.contentAspectRatio = rect.size
+        var frame = floatWindow.frame
+        frame.size.height = frame.width / aspect
+        floatWindow.setFrame(frame, display: true)
+    }
+
+    private static func rect(from info: [String: Any]?) -> CGRect? {
+        guard let info, info["ok"] as? Bool == true,
             let x = info["x"] as? Double, let y = info["y"] as? Double,
-            let width = info["w"] as? Double, let height = info["h"] as? Double
+            let width = info["w"] as? Double, let height = info["h"] as? Double,
+            width > 1, height > 1
         else { return nil }
         return CGRect(x: x, y: y, width: width, height: height)
     }
 
+    /// Runs `body` once WebKit has put the page's latest frame on screen, or after a short wait
+    /// for a page that is not presenting (an occluded window).
+    private static func afterNextPresentation(of webView: WKWebView, _ body: @escaping () -> Void) {
+        var done = false
+        let once = { if !done { done = true; body() } }
+        let selector = NSSelectorFromString("_doAfterNextPresentationUpdate:")
+        if webView.responds(to: selector) {
+            typealias Call = @convention(c) (AnyObject, Selector, @escaping @convention(block) () -> Void) -> Void
+            unsafeBitCast(webView.method(for: selector), to: Call.self)(webView, selector) { once() }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { once() }
+    }
+
     // MARK: - Exit
 
-    /// Nothing on the page was ever changed, so there is nothing to undo: the crop lived entirely
-    /// in the host's layer. The compositor resizes the view when it takes it back.
+    /// The page is restored when its view next lands outside a crop, in its tab or a split pane;
+    /// minimising leaves it isolated off screen until then.
     func exit() {
         guard itemID != nil else { return }
         closeFloat()
@@ -116,7 +202,9 @@ final class SidebarPiPController {
     }
 
     private func clear() {
+        generation += 1
         isFloating = false
+        isReady = false
         itemID = nil
         webView = nil
         session = nil
@@ -135,7 +223,7 @@ final class SidebarPiPController {
 
     /// Called mid-drag from the sidebar: the panel appears under the pointer and keeps following.
     func popOut() {
-        guard let webView, !isFloating else { return }
+        guard let webView, isReady, !isFloating else { return }
         let size = CGSize(width: Self.lastFloatWidth, height: Self.lastFloatWidth / aspect)
         let mouse = NSEvent.mouseLocation
         let origin = CGPoint(x: mouse.x - size.width / 2, y: mouse.y - size.height / 2)
@@ -149,7 +237,6 @@ final class SidebarPiPController {
 
         // Set before the move: the docked host must see it and leave the view alone.
         isFloating = true
-        webView.removeFromSuperview()
         webView.autoresizingMask = []
         root.container.addSubview(webView)
         panel.orderFrontRegardless()
@@ -157,9 +244,10 @@ final class SidebarPiPController {
         DispatchQueue.main.async { self.trackDrag() }
     }
 
-    /// Back into the sidebar: the docked host adopts the view once it is orphaned.
+    /// Back into the sidebar: the docked host adopts the view once it is orphaned. A hidden
+    /// sidebar has no host, so the video stays afloat.
     func dock() {
-        guard isFloating else { return }
+        guard isFloating, windowState?.isSidebarVisible == true else { return }
         closeFloat()
         isFloating = false
     }
@@ -204,7 +292,6 @@ final class SidebarPiPController {
     /// Takes over another window's video, docked or floating, when this window gains focus.
     func adopt(from other: SidebarPiPController) {
         videoRect = other.videoRect
-        aspect = other.aspect
         session = other.session
         barSession = other.barSession
         webView = other.webView
@@ -212,65 +299,256 @@ final class SidebarPiPController {
         (floatWindow?.contentView as? FloatRootView)?.controller = self
         isFloating = other.isFloating
         itemID = other.itemID
+        let ready = other.isReady
         other.floatWindow = nil
         other.barSession = nil
         other.clear()
+        generation += 1
+        isReady = ready
+        if ready, let webView { follow(webView) }
+        if let session { followNavigation(of: session, generation: generation) }
     }
 
     func togglePlay() {
         webView?.evaluateJavaScript(
-            "(function(){const v=document.querySelector('video'); if(v){v.paused ? v.play() : v.pause();}})();")
-    }
-
-    // MARK: - Measurement
-
-    /// Scrolls the video into view, then reports where it sits in the viewport so the host can
-    /// crop to it. Nothing on the page is styled, hidden or moved: every previous
-    /// attempt to isolate the video with CSS was defeated by the site's own stacking contexts.
-    static let measureScript = """
-    (function() {
-        const video = document.querySelector('video');
-        if (!video) return { ok: false };
-        video.scrollIntoView({ block: 'center', inline: 'center' });
-        const r = video.getBoundingClientRect();
-        let x = r.x, y = r.y, w = r.width, h = r.height;
-        // The element's box is the player's box: a video letterboxes its frame inside it, since
-        // object-fit defaults to contain. Cropping to the element would keep those bars, so
-        // narrow to the area the frame is actually painted in.
-        const fit = getComputedStyle(video).objectFit || 'contain';
-        if (video.videoWidth > 0 && video.videoHeight > 0
-            && (fit === 'contain' || fit === 'scale-down' || fit === 'none')) {
-            const scale = Math.min(w / video.videoWidth, h / video.videoHeight);
-            const paintedWidth = video.videoWidth * scale;
-            const paintedHeight = video.videoHeight * scale;
-            x += (w - paintedWidth) / 2;
-            y += (h - paintedHeight) / 2;
-            w = paintedWidth;
-            h = paintedHeight;
-        }
-        // A page reduced to its video must not hold text focus: a focused search box drops its
-        // suggestions over the video.
-        const a = document.activeElement;
-        if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) a.blur();
-        return { ok: true, x: x, y: y, w: w, h: h };
-    })();
-    """
-
-    /// Seeking has no equivalent on `MediaControlsManager`, whose next/previous change track.
-    static func seekScript(_ seconds: Int) -> String {
-        """
-        (function() {
-            const v = document.querySelector('video');
-            if (!v) return false;
-            v.currentTime = Math.max(0, Math.min(v.duration || Infinity, v.currentTime + (\(seconds))));
-            return true;
-        })();
-        """
+            "(() => { const v = window.__nookPiP?.video(); if (v) v.paused ? v.play() : v.pause(); })();",
+            in: nil, in: Self.world)
     }
 
     func seek(_ seconds: Int) {
-        webView?.evaluateJavaScript(Self.seekScript(seconds))
+        webView?.evaluateJavaScript(
+            "(() => { const v = window.__nookPiP?.video(); if (v) v.currentTime = Math.max(0, Math.min(v.duration || Infinity, v.currentTime + (\(seconds)))); })();",
+            in: nil, in: Self.world)
     }
+
+    /// Undoes `pageScript` in a page whose view has left the crop.
+    static func restorePage(in webView: WKWebView) {
+        webView.evaluateJavaScript("window.__nookPiP?.restore(true);", in: nil, in: world)
+    }
+
+    // MARK: - Page script
+
+    /// Picks the video a person is watching: in system PiP, then playing, audible, largest.
+    /// Shared with `PiPManager`, which runs it in the page's world.
+    static let pickerScript = """
+    const nookPlaying = v => !v.paused && !v.ended && v.readyState >= 2;
+    // Feed autoplay, shorts and reels: nobody chose to watch these.
+    const nookRefusesAutomatic = v => !nookPlaying(v) || v.muted || v.volume === 0 || v.loop
+        || v.videoHeight > v.videoWidth;
+    function nookPickVideo() {
+        const playing = nookPlaying;
+        const area = v => { const r = v.getBoundingClientRect(); return r.width * r.height; };
+        const found = [...document.querySelectorAll('video')];
+        if (!found.some(playing)) {
+            // Some players keep the video in an open shadow root.
+            const roots = [document];
+            while (roots.length) {
+                for (const el of roots.pop().querySelectorAll('*')) {
+                    if (!el.shadowRoot) continue;
+                    roots.push(el.shadowRoot);
+                    found.push(...el.shadowRoot.querySelectorAll('video'));
+                }
+            }
+        }
+        const score = v => (v.webkitPresentationMode === 'picture-in-picture' ? 8 : 0)
+            + (playing(v) ? 4 : 0) + (!v.muted && v.volume > 0 ? 2 : 0);
+        return found.filter(v => area(v) > 1 || v.webkitPresentationMode === 'picture-in-picture')
+            .sort((a, b) => score(b) - score(a) || area(b) - area(a))[0] || null;
+    }
+    """
+
+    /// Defines `__nookPiP`: hides the rest of the player and anything over the video, in place.
+    /// Visibility is used because a descendant can override it and stacking contexts cannot.
+    static let pageScript = """
+    if (!window.__nookPiP) window.__nookPiP = (() => {
+        \(pickerScript)
+        const S = { styles: [], covers: [] };
+        const css = '[data-nook-pip-root] *, [data-nook-pip-root]::before, [data-nook-pip-root]::after, '
+            + '[data-nook-pip-cover] { visibility: hidden !important; } '
+            + '[data-nook-pip-video] { visibility: visible !important; }';
+        const parentOf = n => n.parentElement || (n.parentNode && n.parentNode.host) || null;
+
+        // The video's painted frame in CSS pixels, which letterboxing makes smaller than its box.
+        function painted(v) {
+            const cs = getComputedStyle(v), r = v.getBoundingClientRect();
+            const px = k => parseFloat(cs[k]) || 0;
+            let x = r.x + px('borderLeftWidth') + px('paddingLeft');
+            let y = r.y + px('borderTopWidth') + px('paddingTop');
+            let w = r.width - px('borderLeftWidth') - px('borderRightWidth') - px('paddingLeft') - px('paddingRight');
+            let h = r.height - px('borderTopWidth') - px('borderBottomWidth') - px('paddingTop') - px('paddingBottom');
+            const vw = v.videoWidth, vh = v.videoHeight;
+            const s = { contain: Math.min(w / vw, h / vh), 'scale-down': Math.min(1, w / vw, h / vh), none: 1 }[cs.objectFit];
+            if (vw > 0 && vh > 0 && s) {
+                const [ox, oy] = (cs.objectPosition || '').split(' ');
+                const offset = (t, free) => t && t.endsWith('%') ? free * parseFloat(t) / 100
+                    : t && t.endsWith('px') ? parseFloat(t) : free / 2;
+                x += offset(ox, w - vw * s);
+                y += offset(oy, h - vh * s);
+                w = vw * s;
+                h = vh * s;
+            }
+            return { x, y, w, h };
+        }
+
+        // Only what is inside the viewport is drawn.
+        function clip(p) {
+            const x = Math.max(p.x, 0), y = Math.max(p.y, 0);
+            return { x, y, w: Math.min(p.x + p.w, innerWidth) - x, h: Math.min(p.y + p.h, innerHeight) - y };
+        }
+
+        function rect() {
+            if (!S.video || !S.video.isConnected) return { ok: false };
+            const p = clip(painted(S.video)), vv = visualViewport, k = S.zoom * (vv ? vv.scale : 1);
+            const ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
+            return { ok: true, x: (p.x - ox) * k, y: (p.y - oy) * k, w: p.w * k, h: p.h * k };
+        }
+
+        // Scrolls only when the video is mostly out of view, and remembers where the page was.
+        function bringIntoView(v) {
+            const p = painted(v), c = clip(p);
+            if (Math.max(0, c.w) * Math.max(0, c.h) >= 0.9 * p.w * p.h) return;
+            // Every scroller the scroll may move, not only the window.
+            if (!S.scroll) {
+                S.scroll = { url: location.href, at: [] };
+                for (let n = parentOf(v); n; n = parentOf(n)) S.scroll.at.push([n, n.scrollLeft, n.scrollTop]);
+            }
+            v.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+        }
+
+        // The highest ancestor that is still about the video's size: the player.
+        function playerRoot(v) {
+            const box = v.getBoundingClientRect();
+            let root = v;
+            for (let n = parentOf(v); n && n !== document.body && n !== document.documentElement; n = parentOf(n)) {
+                const r = n.getBoundingClientRect();
+                if (r.width > box.width * 1.25 + 8 || r.height > box.height * 1.5 + 8) break;
+                root = n;
+            }
+            return root;
+        }
+
+        // Anything outside the player painted over the video: a sticky header, a banner.
+        function markCovers() {
+            const p = clip(painted(S.video)), stop = new Set();
+            for (let n = S.root; n; n = parentOf(n)) stop.add(n);
+            for (const fx of [0.02, 0.5, 0.98]) for (const fy of [0.02, 0.5, 0.98]) {
+                for (const el of document.elementsFromPoint(p.x + p.w * fx, p.y + p.h * fy)) {
+                    if (stop.has(el) || S.root.contains(el)) break;
+                    if (el.hasAttribute('data-nook-pip-cover')) continue;
+                    el.setAttribute('data-nook-pip-cover', '');
+                    S.covers.push(el);
+                }
+            }
+        }
+
+        function isolate(zoom, automatic) {
+            restore(false);
+            const v = nookPickVideo();
+            if (!v) return { ok: false };
+            if (automatic && nookRefusesAutomatic(v)) return { ok: false, skip: true };
+            S.zoom = zoom;
+            S.video = v;
+            bringIntoView(v);
+            S.root = playerRoot(v);
+            S.root.setAttribute('data-nook-pip-root', '');
+            v.setAttribute('data-nook-pip-video', '');
+            for (const node of new Set([document, S.root.getRootNode(), v.getRootNode()])) {
+                const style = document.createElement('style');
+                style.textContent = css;
+                (node.head || node.documentElement || node).appendChild(style);
+                S.styles.push(style);
+            }
+            if (v.controls) { S.controls = true; v.controls = false; }
+            markCovers();
+            // A page reduced to its video must not hold text focus: a focused search box drops
+            // its suggestions over the video.
+            const a = document.activeElement;
+            if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) a.blur();
+            watch();
+            return rect();
+        }
+
+        // Reports the next change to the video's rect, re-isolating when the page swaps the
+        // element out. Event driven: nothing runs while the page is still.
+        function watch() {
+            const bump = () => {
+                if (S.queued) return;
+                S.queued = true;
+                requestAnimationFrame(() => {
+                    S.queued = false;
+                    if (!S.video) return;
+                    if (!S.video.isConnected) {
+                        isolate(S.zoom, false);
+                    } else {
+                        for (const el of S.covers) el.removeAttribute('data-nook-pip-cover');
+                        S.covers = [];
+                        markCovers();
+                    }
+                    S.dirty = true;
+                    flush();
+                });
+            };
+            const observer = new ResizeObserver(bump);
+            observer.observe(S.video);
+            const video = S.video;
+            const events = ['resize', 'loadedmetadata', 'emptied'];
+            events.forEach(e => video.addEventListener(e, bump));
+            // Only scrollers that carry the video: a chat scrolling beside it moves nothing.
+            const scrolled = e => {
+                for (let n = video; n; n = parentOf(n)) if (n === e.target) return bump();
+                if (e.target === document) bump();
+            };
+            addEventListener('resize', bump);
+            addEventListener('scroll', scrolled, { capture: true, passive: true });
+            S.unwatch = () => {
+                observer.disconnect();
+                events.forEach(e => video.removeEventListener(e, bump));
+                removeEventListener('resize', bump);
+                removeEventListener('scroll', scrolled, { capture: true });
+            };
+        }
+
+        function flush() {
+            if (!S.dirty || !S.waiter) return;
+            S.dirty = false;
+            const r = rect(), key = JSON.stringify(r);
+            if (r.ok && key === S.sent) return;
+            S.sent = key;
+            const waiter = S.waiter;
+            S.waiter = null;
+            waiter(r);
+        }
+
+        function next() {
+            if (S.waiter) S.waiter({ ok: false, ended: true });
+            return new Promise(resolve => { S.waiter = resolve; flush(); });
+        }
+
+        function restore(finished) {
+            if (S.unwatch) S.unwatch();
+            if (S.root) S.root.removeAttribute('data-nook-pip-root');
+            if (S.video) {
+                S.video.removeAttribute('data-nook-pip-video');
+                if (S.controls) S.video.controls = true;
+            }
+            for (const el of S.covers) el.removeAttribute('data-nook-pip-cover');
+            for (const el of S.styles) el.remove();
+            Object.assign(S, { root: null, video: null, controls: false, covers: [], styles: [], unwatch: null, sent: null });
+            if (!finished) return;
+            if (S.scroll && S.scroll.url === location.href) {
+                for (const [n, x, y] of S.scroll.at) n.scrollTo({ left: x, top: y, behavior: 'instant' });
+            }
+            S.scroll = null;
+            if (S.waiter) {
+                const waiter = S.waiter;
+                S.waiter = null;
+                waiter({ ok: false, ended: true });
+            }
+        }
+
+        return { isolate, next, restore, video: () => S.video };
+    })();
+    """
 }
 
 // MARK: - View
@@ -278,7 +556,6 @@ final class SidebarPiPController {
 /// The video itself, sized to the real aspect ratio of the media so nothing letterboxes, sitting
 /// directly above `MediaControlsView`.
 struct SidebarPiPView: View {
-    @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) var windowState
 
     @State private var isHovering = false
@@ -286,29 +563,28 @@ struct SidebarPiPView: View {
     private var controller: SidebarPiPController? { windowState.sidebarPiPController }
 
     var body: some View {
-        Group {
-            if let controller, controller.isDocked, let webView = controller.webView {
-                SidebarPiPWebViewHost(controller: controller, webView: webView, videoRect: controller.videoRect)
-                    .aspectRatio(controller.aspect, contentMode: .fit)
-                    .onAppear { controller.remeasure() }
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-                    .nookElevation(.raised)
-                    .overlay {
-                        if isHovering { controls(controller) }
-                    }
-                    .onHoverTracking { hovering in
-                        withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
-                        if hovering { controller.remeasure() }
-                    }
-                    .gesture(DragGesture(minimumDistance: NookDesign.Spacing.md)
-                        .onChanged { _ in controller.popOut() })
-                    .padding(.horizontal, 8)
-                    .transition(.collapseIntoBar)
-            } else if let controller, controller.isFloating, controller.isDragging {
-                dropZone(controller)
-            }
+        if let controller, controller.isDocked, let webView = controller.webView {
+            SidebarPiPWebViewHost(controller: controller, webView: webView, videoRect: controller.videoRect)
+                .aspectRatio(controller.aspect, contentMode: .fit)
+                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+                .nookElevation(.raised)
+                .overlay {
+                    if isHovering, controller.isReady { controls(controller) }
+                }
+                .onHoverTracking { hovering in
+                    withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
+                }
+                .gesture(DragGesture(minimumDistance: NookDesign.Spacing.md)
+                    .onChanged { _ in controller.popOut() })
+                // The view is hosted from the start so the page never leaves the window; the video
+                // rises out of the bar once its isolated frame is on screen.
+                .modifier(CollapseModifier(heightScale: controller.isReady ? 1 : CollapseModifier.collapsed))
+                .opacity(controller.isReady ? 1 : 0)
+                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                .transition(.asymmetric(insertion: .identity, removal: .collapseIntoBar))
+        } else if let controller, controller.isFloating, controller.isDragging {
+            dropZone(controller)
         }
-        .animation(NookDesign.Motion.spring, value: controller?.itemID)
     }
 
     private func dropZone(_ controller: SidebarPiPController) -> some View {
@@ -318,7 +594,7 @@ struct SidebarPiPView: View {
             .foregroundStyle(controller.isOverDock ? .primary : .tertiary)
             .aspectRatio(controller.aspect, contentMode: .fit)
             .background(DockZoneReporter(controller: controller))
-            .padding(.horizontal, 8)
+            .padding(.horizontal, NookDesign.Spacing.sidebarInset)
     }
 
     @ViewBuilder
@@ -329,8 +605,7 @@ struct SidebarPiPView: View {
             HStack(spacing: NookDesign.Spacing.xl) {
                 Button("Rewind", systemImage: "gobackward.10") { controller.seek(-10) }
                 Button(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill") {
-                    guard let session = controller.session else { return }
-                    Task { _ = await mediaControls().playPause(tab: session) }
+                    controller.togglePlay()
                 }
                 Button("Forward", systemImage: "goforward.10") { controller.seek(10) }
             }
@@ -340,7 +615,10 @@ struct SidebarPiPView: View {
 
             // Sending the video back to its tab, still playing, is a minimise rather than a close.
             Button("Minimize", systemImage: "minus") {
-                withAnimation(NookDesign.Motion.quick) { controller.exit() }
+                withAnimation(NookDesign.Motion.quick) {
+                    isHovering = false
+                    controller.exit()
+                }
             }
             .labelStyle(.iconOnly)
             .buttonStyle(NookIconButtonStyle(size: 20))
@@ -357,54 +635,52 @@ struct SidebarPiPView: View {
         guard let session = controller?.session else { return false }
         return session.hasPlayingVideo || session.hasPlayingAudio
     }
-
-    private func mediaControls() -> MediaControlsManager {
-        let manager = MediaControlsManager(browserManager: browserManager, windowState: windowState)
-        manager.windowRegistry = browserManager.windowRegistry
-        return manager
-    }
 }
 
 // MARK: - Web view host
 
 /// Crops the web view down to the video's rectangle. The page lays out at a normal desktop size
-/// and renders untouched; a layer transform on the clipping container scales the video's rect to
-/// fill the sidebar slot. Nothing is injected, so no site's CSS can defeat it.
+/// and keeps it; a layer transform on the clipping container scales the video's rect to fill the
+/// sidebar slot.
 private struct SidebarPiPWebViewHost: NSViewRepresentable {
     let controller: SidebarPiPController
     let webView: WKWebView
     let videoRect: CGRect
 
-    func makeNSView(context: Context) -> NSView {
-        let container = CropContainerView(frame: .zero)
-        container.wantsLayer = true
-        container.layer?.masksToBounds = true
-        container.layer?.backgroundColor = NSColor.black.cgColor
-        return container
+    func makeNSView(context: Context) -> SidebarPiPCropView {
+        SidebarPiPCropView(frame: .zero)
     }
 
-    func updateNSView(_ container: NSView, context: Context) {
+    func updateNSView(_ container: SidebarPiPCropView, context: Context) {
         // A host on its way out still gets updates; it must not take back a view that floated.
         guard !controller.isFloating, controller.webView === webView else { return }
         if webView.superview !== container {
-            webView.removeFromSuperview()
             // No autoresizing and no frame change: the page must keep the layout it was measured
             // in. Cropping needs no particular size, and reflowing costs a white repaint.
             webView.autoresizingMask = []
             container.addSubview(webView)
         }
-        (container as? CropContainerView)?.crop = videoRect
-        container.needsLayout = true
+        container.crop = videoRect
     }
 
-    static func dismantleNSView(_ container: NSView, coordinator: ()) {
+    static func dismantleNSView(_ container: SidebarPiPCropView, coordinator: ()) {
         container.subviews.forEach { $0.removeFromSuperview() }
     }
 }
 
-/// Flipped so its coordinates match CSS pixels, which is what the measured rect is in.
-private final class CropContainerView: NSView {
+/// Flipped so its coordinates match the page's. A web view inside one ignores the pointer
+/// (`FocusableWKWebView`), since AppKit would map it without the crop's transform.
+final class SidebarPiPCropView: NSView {
     var crop: CGRect = .zero { didSet { needsLayout = true } }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        layer?.backgroundColor = NSColor.black.cgColor
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
@@ -417,12 +693,15 @@ private final class CropContainerView: NSView {
 
     override func layout() {
         super.layout()
-        guard crop.width > 1, crop.height > 1, bounds.width > 1, let layer else { return }
-        let scale = bounds.width / crop.width
-        // Scale about the top-left, then bring the video's origin to the container's origin.
+        guard crop.width > 1, crop.height > 1, bounds.width > 1, bounds.height > 1, let layer else { return }
+        // Fill on both axes, centred, so a rect whose aspect lags the slot trims video rather
+        // than showing page around it.
+        let scale = max(bounds.width / crop.width, bounds.height / crop.height)
+        let inset = CGPoint(x: (bounds.width - crop.width * scale) / 2, y: (bounds.height - crop.height * scale) / 2)
         layer.sublayerTransform = CATransform3DConcat(
-            CATransform3DMakeTranslation(-crop.minX, -crop.minY, 0),
-            CATransform3DMakeScale(scale, scale, 1))
+            CATransform3DConcat(CATransform3DMakeTranslation(-crop.minX, -crop.minY, 0),
+                                CATransform3DMakeScale(scale, scale, 1)),
+            CATransform3DMakeTranslation(inset.x, inset.y, 0))
     }
 }
 
@@ -456,7 +735,9 @@ private final class SidebarPiPFloatPanel: NSPanel {
 /// The panel's content: the cropped video, hover controls, and the mouse-down that starts a drag.
 private final class FloatRootView: NSView {
     weak var controller: SidebarPiPController? { didSet { trackPlayState() } }
-    let container = CropContainerView(frame: .zero)
+    let container = SidebarPiPCropView(frame: .zero)
+    /// Only the newest observation re-arms, so handing the panel between windows adds no chains.
+    private var playStateToken = 0
     private let controls = NSView()
     private var playButton: NSButton?
     /// Same target as the media bar's buttons.
@@ -471,8 +752,6 @@ private final class FloatRootView: NSView {
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
 
-        container.wantsLayer = true
-        container.layer?.masksToBounds = true
         controls.wantsLayer = true
         controls.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.35).cgColor
         controls.isHidden = true
@@ -510,10 +789,15 @@ private final class FloatRootView: NSView {
 
     /// Re-arms itself on each change, so the icon follows the session without a timer.
     private func trackPlayState() {
+        playStateToken += 1
+        let token = playStateToken
         let playing = withObservationTracking {
             controller?.session?.hasPlayingVideo == true
         } onChange: { [weak self] in
-            DispatchQueue.main.async { self?.trackPlayState() }
+            DispatchQueue.main.async {
+                guard let self, self.playStateToken == token else { return }
+                self.trackPlayState()
+            }
         }
         playButton?.image = NSImage(systemSymbolName: playing ? "pause.fill" : "play.fill",
                                     accessibilityDescription: playing ? "Pause" : "Play")
@@ -556,7 +840,6 @@ private final class FloatRootView: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         controls.isHidden = false
-        controller?.remeasure()
     }
 
     override func mouseExited(with event: NSEvent) { controls.isHidden = true }
@@ -571,6 +854,8 @@ private final class ClosureButton: NSButton {
 // MARK: - Transition
 
 private struct CollapseModifier: ViewModifier {
+    /// The bar's height as a share of the video's: where the video rises from and returns to.
+    static let collapsed: CGFloat = 0.04
     let heightScale: CGFloat
 
     func body(content: Content) -> some View {
@@ -584,7 +869,7 @@ private struct CollapseModifier: ViewModifier {
 extension AnyTransition {
     /// The video collapsing into the media bar that takes its place.
     static var collapseIntoBar: AnyTransition {
-        .modifier(active: CollapseModifier(heightScale: 0.04),
+        .modifier(active: CollapseModifier(heightScale: CollapseModifier.collapsed),
                   identity: CollapseModifier(heightScale: 1))
     }
 }

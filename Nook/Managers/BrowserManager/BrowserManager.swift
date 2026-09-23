@@ -665,6 +665,7 @@ class BrowserManager: ObservableObject {
             windowState.isSidebarVisible.toggle()
             // Width stays the same whether visible or hidden
         }
+        if !windowState.isSidebarVisible { sidebarPiPSidebarHidden(in: windowState) }
         if windowRegistry?.activeWindow?.id == windowState.id {
             isSidebarVisible = windowState.isSidebarVisible
             sidebarWidth = windowState.sidebarWidth
@@ -929,7 +930,7 @@ class BrowserManager: ObservableObject {
         windowState.isSidebarVisible = isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
-        windowState.sidebarPiPController = SidebarPiPController()
+        windowState.sidebarPiPController = SidebarPiPController(windowState: windowState)
         // NSWindow reference is set by WindowFocusBridge.attach in ContentView
         windowState.urlBarFrame = urlBarFrame
 

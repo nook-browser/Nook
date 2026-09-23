@@ -13,7 +13,7 @@ import NookTweaks
 extension PageSession {
     /// Script message handler names this session registers on each of its web views.
     var messageHandlerNames: [String] {
-        ["linkHover", "commandHover", "pipStateChange",
+        ["linkHover", "commandHover",
          "mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
          "historyStateDidChange", "nookShortcutDetect",
          "nookSponsorBlock"]
@@ -218,55 +218,31 @@ extension PageSession {
         }
     }
 
+    /// The PiP state listener and its handler live here: the state decides unloading and auto
+    /// PiP, so a page must not be able to post it.
+    public static let pipStateWorld = WKContentWorld.world(name: "NookPiPState")
+
     func injectPiPStateListener(to webView: WKWebView) {
+        // Capture on the document sees every video, including ones added later, and reports the
+        // page's state rather than one video's, so leaving on one cannot clear another.
         let pipStateScript = """
             (function() {
-                function notifyPiPStateChange(isActive) {
-                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pipStateChange) {
-                        window.webkit.messageHandlers.pipStateChange.postMessage({ active: isActive });
-                    }
+                if (window.__nookPiPState) return;
+                window.__nookPiPState = true;
+                function report() {
+                    const active = !!document.pictureInPictureElement || [...document.querySelectorAll('video')]
+                        .some(v => v.webkitPresentationMode === 'picture-in-picture');
+                    window.webkit?.messageHandlers?.pipStateChange?.postMessage({ active: active });
                 }
-
-                document.addEventListener('enterpictureinpicture', function() {
-                    notifyPiPStateChange(true);
-                });
-
-                document.addEventListener('leavepictureinpicture', function() {
-                    notifyPiPStateChange(false);
-                });
-
-                const videos = document.querySelectorAll('video');
-                videos.forEach(video => {
-                    if (video.webkitSupportsPresentationMode) {
-                        video.addEventListener('webkitpresentationmodechanged', function() {
-                            const isInPiP = video.webkitPresentationMode === 'picture-in-picture';
-                            notifyPiPStateChange(isInPiP);
-                        });
-                    }
-                });
-
-                const observer = new MutationObserver(function(mutations) {
-                    mutations.forEach(function(mutation) {
-                        mutation.addedNodes.forEach(function(node) {
-                            if (node.tagName === 'VIDEO' && node.webkitSupportsPresentationMode) {
-                                node.addEventListener('webkitpresentationmodechanged', function() {
-                                    const isInPiP = node.webkitPresentationMode === 'picture-in-picture';
-                                    notifyPiPStateChange(isInPiP);
-                                });
-                            }
-                        });
-                    });
-                });
-
-                observer.observe(document.body, { childList: true, subtree: true });
+                for (const type of ['webkitpresentationmodechanged', 'enterpictureinpicture', 'leavepictureinpicture']) {
+                    document.addEventListener(type, report, true);
+                }
+                // A new document is never in PiP; this clears a state the last one left behind.
+                report();
             })();
             """
 
-        webView.evaluateJavaScript(pipStateScript) { result, error in
-            if let error = error {
-            } else {
-            }
-        }
+        webView.evaluateJavaScript(pipStateScript, in: nil, in: Self.pipStateWorld)
     }
     
     func injectShortcutDetection(to webView: WKWebView) {

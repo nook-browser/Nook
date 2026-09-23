@@ -53,7 +53,6 @@ public protocol PageSessionDelegate: AnyObject {
     func cleanupZoom(for itemID: UUID)
     func setMuteState(_ muted: Bool, for itemID: UUID)
     func requestPictureInPicture(for session: PageSession, webView: WKWebView?)
-    func isPictureInPictureActive(for session: PageSession) -> Bool
 
     // MARK: Website keyboard shortcuts
 
@@ -67,4 +66,11 @@ public protocol PageSessionDelegate: AnyObject {
     /// retain for the life of the page, or nil when the URL is not a store page.
     func installWebStoreScript(in webView: WKWebView) -> AnyObject?
     func removeWebStoreHandler(from controller: WKUserContentController)
+}
+
+/// What a window's picture-in-picture (`BrowserWindowState.sidebarPiPStorage`) shows, so the tab
+/// model counts that page as on screen.
+@MainActor
+public protocol PictureInPictureHolder: AnyObject {
+    var pictureInPictureItemID: UUID? { get }
 }

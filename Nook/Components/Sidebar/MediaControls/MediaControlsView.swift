@@ -76,7 +76,8 @@ struct MediaControlsView: View {
 
     var body: some View {
         Group {
-            if hasActiveMedia, !isVideoShowing, let tab = activeMediaTab {
+            // The tab just returned to is in view; its bar would pop back for one debounce.
+            if hasActiveMedia, !isVideoShowing, let tab = activeMediaTab, tab.itemID != windowState.selectedItemID {
                 VStack(spacing: 8) {
                     // Tab name (shows on hover)
                     if isHovering {
@@ -248,16 +249,17 @@ struct MediaControlsView: View {
     }
 
     /// The counterpart of the video's minimise button. Falls back to system picture-in-picture
-    /// on a page whose video cannot be measured, exactly as leaving the tab does.
+    /// when the video cannot be isolated, or the sidebar is only the hover overlay.
     private func maximize(_ tab: PageSession) {
-        guard let controller = windowState.sidebarPiPController else { return }
-        guard let webView = browserManager.getWebView(for: tab.itemID, in: windowState.id)
-            ?? tab.assignedWebView
+        // Private tabs never report leaving, and another window's tab or PiP would lose its view.
+        guard let controller = windowState.sidebarPiPController, !tab.isPrivate,
+            !browserManager.tabs.isOnScreen(tab.itemID),
+            let webView = browserManager.getWebView(for: tab.itemID, in: windowState.id) ?? tab.assignedWebView
         else { return }
-        withAnimation(NookDesign.Motion.standard) {
-            controller.enter(session: tab, webView: webView) {
-                PiPManager.shared.requestPiP(for: tab, webView: webView)
-            }
+        guard windowState.isSidebarVisible else { return PiPManager.shared.setPiP(true, for: tab, webView: webView) }
+        if tab.hasPiPActive { PiPManager.shared.setPiP(false, for: tab, webView: webView) }
+        controller.enter(session: tab, webView: webView, automatic: false) {
+            PiPManager.shared.setPiP(true, for: tab, webView: webView)
         }
     }
 

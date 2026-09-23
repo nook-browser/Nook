@@ -109,7 +109,6 @@ extension BrowserModel: PageSessionDelegate {
     func cleanupZoom(for itemID: UUID) {}
     func setMuteState(_ muted: Bool, for itemID: UUID) {}
     func requestPictureInPicture(for session: PageSession, webView: WKWebView?) {}
-    func isPictureInPictureActive(for session: PageSession) -> Bool { false }
     func configureShortcutDetection(in webView: WKWebView) {}
     func shortcutDetectorDidNavigate(to url: URL) {}
     func updateDetectedShortcuts(for url: String, shortcuts: Set<String>) {}

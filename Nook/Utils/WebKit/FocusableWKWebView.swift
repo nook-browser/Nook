@@ -49,6 +49,30 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// Set when sidebar PiP asks to isolate the page; undone when the view next lands in a tab.
+    var isPictureInPictureIsolated = false
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        guard let superview else { return }
+        let cropped = superview is SidebarPiPCropView
+        // A cropped page would get the pointer at the wrong place: AppKit maps it without the
+        // crop's transform, and wakes the player's controls under the video.
+        setIgnoresNonWheelEvents(cropped)
+        if !cropped, isPictureInPictureIsolated {
+            isPictureInPictureIsolated = false
+            SidebarPiPController.restorePage(in: self)
+        }
+    }
+
+    /// `_setIgnoresNonWheelEvents:`, private; also stops WebKit's post-scroll fake mouse moves.
+    private func setIgnoresNonWheelEvents(_ ignores: Bool) {
+        let selector = NSSelectorFromString("_setIgnoresNonWheelEvents:")
+        guard responds(to: selector) else { return }
+        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method(for: selector), to: Setter.self)(self, selector, ignores)
+    }
+
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
         owningSession?.pointerMovedOverPage()

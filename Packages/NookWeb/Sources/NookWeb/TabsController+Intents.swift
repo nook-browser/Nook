@@ -97,6 +97,11 @@ extension TabsController {
     // MARK: - Selection
 
     public func select(_ itemID: UUID, in window: BrowserWindowState) {
+        select(itemID, in: window, leaving: selectedSession(in: window))
+    }
+
+    /// `previous` is what the window showed before; a space switch has already moved on from it.
+    private func select(_ itemID: UUID, in window: BrowserWindowState, leaving previous: PageSession?) {
         let owner = owner(of: window)
         let source = tree(owner)
         guard let item = source.item(itemID) else { return }
@@ -104,7 +109,6 @@ extension TabsController {
             toggleFolder(itemID)
             return
         }
-        let previous = selectedSession(in: window)
         let movedSpace = source.spaceID(of: itemID).map { $0 != window.spaceID } ?? false
         if let spaceID = source.spaceID(of: itemID) {
             window.spaceID = spaceID
@@ -164,14 +168,15 @@ extension TabsController {
     public func setSpace(_ spaceID: UUID, in window: BrowserWindowState) {
         let source = tree(owner(of: window))
         guard source.space(spaceID) != nil else { return }
+        let previous = selectedSession(in: window)
         let changed = window.spaceID != spaceID
         window.spaceID = spaceID
         if changed { sessionDelegate?.windowSpaceChanged(window) }
         let order = displayOrder(in: window)
         if let remembered = window.selectedItemBySpace[spaceID], order.contains(remembered) {
-            select(remembered, in: window)
+            select(remembered, in: window, leaving: previous)
         } else if !window.emptiedSpaces.contains(spaceID), let first = order.first {
-            select(first, in: window)
+            select(first, in: window, leaving: previous)
         } else {
             window.selectedItemBySpace[spaceID] = nil
             mirror(window)
@@ -559,7 +564,7 @@ extension TabsController {
 
     /// Unloads every page no window shows, except pages playing audio or in picture-in-picture.
     public func unloadAllHidden() {
-        for page in sessions where !page.isUnloaded && !isVisibleInAnyWindow(page.itemID)
+        for page in sessions where !page.isUnloaded && !isOnScreen(page.itemID)
             && !page.hasPlayingAudio && !page.hasPiPActive {
             page.unload()
         }

@@ -383,6 +383,13 @@ public final class TabsController {
         }
     }
 
+    /// Visible somewhere, including a window's picture-in-picture, so not a candidate to unload.
+    public func isOnScreen(_ itemID: UUID) -> Bool {
+        isVisibleInAnyWindow(itemID) || allWindows.contains {
+            ($0.sidebarPiPStorage as? PictureInPictureHolder)?.pictureInPictureItemID == itemID
+        }
+    }
+
     /// The session for an item, created when missing. A synced item opens its saved open page,
     /// else its home URL.
     public func ensureSession(for itemID: UUID) -> PageSession? {

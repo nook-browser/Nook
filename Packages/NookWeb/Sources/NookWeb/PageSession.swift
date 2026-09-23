@@ -357,6 +357,8 @@ public final class PageSession: NSObject, Identifiable {
             controller.removeScriptMessageHandler(forName: name)
             controller.add(self, name: name)
         }
+        controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
+        controller.add(self, contentWorld: Self.pipStateWorld, name: "pipStateChange")
         webView.customUserAgent = PlatformUserAgent.custom
         // Let the web content control its own background so extension styles (like Dark
         // Reader) can paint dark backgrounds. The themed background shows only while loading.
@@ -449,6 +451,7 @@ public final class PageSession: NSObject, Identifiable {
         for handlerName in messageHandlerNames {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
+        controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
         self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
         controller.removeScriptMessageHandler(
             forName: AdvancedRulesEngine.messageHandlerName, contentWorld: .page)

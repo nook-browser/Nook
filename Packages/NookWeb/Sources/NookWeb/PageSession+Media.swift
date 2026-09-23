@@ -398,16 +398,4 @@ extension PageSession {
         let activeWebView = activeWindowID.flatMap { controller?.webViews?.webView(for: self.itemID, in: $0) }
         controller?.sessionDelegate?.requestPictureInPicture(for: self, webView: activeWebView)
     }
-
-    public func pause() {
-        if !hasPiPActive && controller?.sessionDelegate?.isPictureInPictureActive(for: self) != true {
-            primaryWebView?.evaluateJavaScript(
-                "document.querySelectorAll('video, audio').forEach(el => el.pause());",
-                completionHandler: nil
-            )
-        }
-
-        hasPlayingVideo = false
-        hasPlayingAudio = false
-    }
 }

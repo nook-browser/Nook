@@ -98,10 +98,15 @@ final class SplitViewManager: ObservableObject {
         tabs.select(current, in: window)
     }
 
+    /// A pane shows its page, so the sidebar gives it back first.
     private func loadPanes(of window: BrowserWindowState) {
         guard let bm = browserManager, let split = window.split else { return }
         for id in [split.leftItemID, split.rightItemID] {
-            if let session = bm.tabs.ensureSession(for: id) { bm.compositorManager.load(session) }
+            bm.exitSidebarPiP(showing: id)
+            if let session = bm.tabs.ensureSession(for: id) {
+                PiPManager.shared.leaveAutomatic(session)
+                bm.compositorManager.load(session)
+            }
         }
     }
 

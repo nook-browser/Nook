@@ -63,7 +63,8 @@ public class BrowserWindowState {
     // one window state carries them. Observed storage keeps views that read the typed accessor
     // updating; `@ObservationIgnored` storage is for references nothing renders from.
 
-    @ObservationIgnored public var sidebarPiPStorage: Any?
+    /// Read inside the sidebar's PiP view body, so it stays observed.
+    public var sidebarPiPStorage: Any?
     @ObservationIgnored public weak var commandPaletteStorage: AnyObject?
     /// Read inside the toast view body, so it stays observed.
     public var shortcutConflictStorage: Any?

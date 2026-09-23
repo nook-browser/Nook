@@ -176,7 +176,7 @@ class TabCompositorManager: ObservableObject {
     /// Shared eligibility for automatic eviction and bulk hidden-page unloading. A user
     /// unloading one page deliberately bypasses this policy.
     func canUnloadInactive(_ session: PageSession) -> Bool {
-        guard let tabs, !session.isUnloaded, !tabs.isVisibleInAnyWindow(session.itemID) else { return false }
+        guard let tabs, !session.isUnloaded, !tabs.isOnScreen(session.itemID) else { return false }
         if session.hasPiPActive || session.hasPlayingVideo || session.hasPlayingAudio || session.hasAudioContent {
             return false
         }
@@ -191,7 +191,7 @@ class TabCompositorManager: ObservableObject {
     /// Higher keeps the page longer.
     private func importance(_ session: PageSession) -> Int {
         var score = 0
-        if tabs?.isVisibleInAnyWindow(session.itemID) == true { score += 1000 }
+        if tabs?.isOnScreen(session.itemID) == true { score += 1000 }
         if session.hasPlayingVideo || session.hasPlayingAudio || session.hasAudioContent { score += 500 }
         if isPinned(session.itemID) { score += 200 }
         if let lastAccess = lastAccessTimes[session.itemID] {
