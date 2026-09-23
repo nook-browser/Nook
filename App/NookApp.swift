@@ -285,6 +285,9 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 }
                 window.styleMask = mask
 
+                // The toolbar makes the title band 66pt tall, most of it over the page.
+                TitlebarDragRegion.letAppKitViewsBlockDrags(in: window)
+
                 window.minSize = NSSize(width: 470, height: 382)
                 window.contentMinSize = NSSize(width: 470, height: 382)
 
