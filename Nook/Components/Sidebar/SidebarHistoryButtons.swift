@@ -37,10 +37,8 @@ struct SidebarHistoryButtons: View {
             }
         }
         // Dividers take any height offered; the group is the buttons' height.
-        .frame(height: NookDesign.Size.iconButton)
-        .labelStyle(.iconOnly)
-        .buttonStyle(NookIconButtonStyle(radius: NookDesign.Size.iconButton / 2))
-        .nookControlGlass(in: Capsule())
+        .frame(height: NookDesign.Size.glassControl)
+        .nookGlassControls(in: Capsule())
     }
 
     private var divider: some View {

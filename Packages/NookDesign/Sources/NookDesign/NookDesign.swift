@@ -89,8 +89,9 @@ public enum NookDesign {
         public static let waveLength: CGFloat = 56     // one full cycle of that wave
         public static let dropTail: CGFloat = 100      // empty drop target height below the last row
         public static let dialogMaxWidth: CGFloat = 500
-        // Narrowest sidebar: the lights (88), a faded name (32), the history pill (86), the inset (8).
-        public static let sidebarMin: CGFloat = 214
+        public static let glassControl: CGFloat = 36   // sidebar glass controls, the size of a macOS 26 toolbar button
+        // Narrowest sidebar: the lights (88), the history pill (110), the inset (8).
+        public static let sidebarMin: CGFloat = 206
 
         // Settings
         public static let settingsChip: CGFloat = 22           // tinted icon chip in the settings sidebar

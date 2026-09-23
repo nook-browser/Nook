@@ -48,10 +48,7 @@ struct SidebarBottomBar: View {
             Button("Menu", systemImage: "archivebox") {
                 onMenuTap()
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(NookIconButtonStyle(radius: NookDesign.Size.iconButton / 2))
-            .foregroundStyle(Color.primary)
-            .nookControlGlass(in: Circle())
+            .nookGlassControls(in: Circle())
             .onHoverTracking { isHovered in
                 isMenuButtonHovered = isHovered
                 onMenuHover(isHovered)
@@ -81,11 +78,8 @@ struct SidebarBottomBar: View {
             }
         } label:{
             Label("Actions", systemImage: "plus")
-                .labelStyle(.iconOnly)
         }
         .menuStyle(.button)
-        .buttonStyle(NookIconButtonStyle(radius: NookDesign.Size.iconButton / 2))
-        .foregroundStyle(Color.primary)
-        .nookControlGlass(in: Circle())
+        .nookGlassControls(in: Circle())
     }
 }

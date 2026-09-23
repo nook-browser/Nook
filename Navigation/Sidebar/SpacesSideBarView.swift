@@ -66,14 +66,14 @@ struct SpacesSideBarView: View {
 
     private var mainSidebarContent: some View {
         return VStack(spacing: NookDesign.Spacing.sectionGap) {
-            // Space title: shares the traffic-light row on the left, its own row on the right.
-            if nookSettings.sidebarPosition != .left {
+            // History buttons: share the traffic-light row on the left, their own row on the right.
+            if nookSettings.sidebarPosition != .left && !nookSettings.topBarAddressView {
                 titleRow
                     .padding(.horizontal, NookDesign.Spacing.sidebarInset)
             }
 
             // Header (window controls, nav buttons, URL bar)
-            SidebarHeader(isSidebarHovered: isSidebarHovered)
+            SidebarHeader(isSidebarHovered: isSidebarHovered, onNewSpace: showSpaceCreationDialog)
                 .environmentObject(browserManager)
                 .environment(windowState)
 
@@ -361,11 +361,9 @@ struct SpacesSideBarView: View {
         }
     }
 
-    /// The space name, then back, forward and reload unless the URL bar mode has them.
+    /// Back, forward and reload at the trailing edge, unless the URL bar mode has them.
     private var titleRow: some View {
         HStack(spacing: 0) {
-            spaceSwitcherTitle
-                .layoutPriority(1)
             Spacer(minLength: 0)
             if !nookSettings.topBarAddressView {
                 SidebarHistoryButtons()
@@ -373,12 +371,6 @@ struct SpacesSideBarView: View {
                     .environment(windowState)
             }
         }
-    }
-
-    private var spaceSwitcherTitle: some View {
-        SpaceSwitcherTitle(onNewSpace: showSpaceCreationDialog)
-            .environmentObject(browserManager)
-            .environment(windowState)
     }
 
     // MARK: - Dialogs
