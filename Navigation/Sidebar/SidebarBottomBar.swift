@@ -49,8 +49,9 @@ struct SidebarBottomBar: View {
                 onMenuTap()
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NookIconButtonStyle())
+            .buttonStyle(NookIconButtonStyle(radius: NookDesign.Size.iconButton / 2))
             .foregroundStyle(Color.primary)
+            .nookControlGlass(in: Circle())
             .onHoverTracking { isHovered in
                 isMenuButtonHovered = isHovered
                 onMenuHover(isHovered)
@@ -83,7 +84,8 @@ struct SidebarBottomBar: View {
                 .labelStyle(.iconOnly)
         }
         .menuStyle(.button)
-        .buttonStyle(NookIconButtonStyle())
+        .buttonStyle(NookIconButtonStyle(radius: NookDesign.Size.iconButton / 2))
         .foregroundStyle(Color.primary)
+        .nookControlGlass(in: Circle())
     }
 }

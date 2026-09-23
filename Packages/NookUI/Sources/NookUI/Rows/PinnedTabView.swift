@@ -52,11 +52,6 @@ public struct PinnedTabView<Icon: View>: View {
                 tabIcon
                     .frame(height: NookDesign.Size.essentialsFavicon)
                     .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
-
-                if isActive {
-                    NookDesign.Radius.shape(NookDesign.Radius.lg)
-                        .strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth)
-                }
             }
             .overlay(alignment: .topTrailing) {
                 if hasLeftPinnedURL && isHovered {
@@ -76,6 +71,7 @@ public struct PinnedTabView<Icon: View>: View {
             .frame(height: NookDesign.Size.essentialsTile)
             .frame(minWidth: NookDesign.Size.essentialsTile)
             .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+            .nookRowSelection(isActive, radius: NookDesign.Radius.lg)
             .nookElevation(isActive ? .raised : .flat)
         }
         .buttonStyle(.plain)
@@ -85,7 +81,8 @@ public struct PinnedTabView<Icon: View>: View {
     }
 
     //MARK: - Colors
+    /// Clear when selected: the glass is the surface, and a fill in front of it would flatten it.
     private var backgroundColor: Color {
-        isActive ? NookDesign.Surface.raised : (isHovered ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
+        isActive ? .clear : (isHovered ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
     }
 }

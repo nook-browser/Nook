@@ -29,13 +29,13 @@ public extension View {
         self.glassEffect(.regular.tint(tint), in: .circle)
     }
 
-    /// The selected sidebar row. Branch-free (`.identity` when idle) so view identity is stable
-    /// and the change animates.
-    func nookRowSelection(_ isSelected: Bool) -> some View {
-        modifier(SidebarGlass(isOn: isSelected, shape: NookDesign.Radius.shape(NookDesign.Radius.md)))
+    /// The selected sidebar row or pinned tile. Branch-free (`.identity` when idle) so view
+    /// identity is stable and the change animates.
+    func nookRowSelection(_ isSelected: Bool, radius: CGFloat = NookDesign.Radius.md) -> some View {
+        modifier(SidebarGlass(isOn: isSelected, shape: NookDesign.Radius.shape(radius)))
     }
 
-    /// A button group in the sidebar's title row (back, forward, reload).
+    /// A sidebar chrome control or group: history, sidebar and AI toggles, bottom bar buttons.
     func nookControlGlass<S: InsettableShape>(in shape: S) -> some View {
         modifier(SidebarGlass(isOn: true, shape: shape))
     }

@@ -49,22 +49,23 @@ struct SidebarWindowControlsView: View {
     @Environment(\.nookSettings) var nookSettings
 
     var body: some View {
-        HStack(spacing: NookDesign.Spacing.md) {
-            Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
-                browserManager.toggleSidebar(for: windowState)
+        HStack(spacing: 0) {
+            // One glass pill, the way the system groups neighbouring toolbar buttons.
+            HStack(spacing: 0) {
+                Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
+                    browserManager.toggleSidebar(for: windowState)
+                }
+
+                if nookSettings.showAIAssistant {
+                    Button("Toggle AI Assistant", systemImage: "sparkle") {
+                        browserManager.toggleAISidebar(for: windowState)
+                    }
+                }
             }
             .labelStyle(.iconOnly)
-            .buttonStyle(NookIconButtonStyle())
+            .buttonStyle(NookIconButtonStyle(radius: NookDesign.Size.iconButton / 2))
             .foregroundStyle(Color.primary)
-
-            if nookSettings.showAIAssistant {
-                Button("Toggle AI Assistant", systemImage: "sparkle") {
-                    browserManager.toggleAISidebar(for: windowState)
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(NookIconButtonStyle())
-                .foregroundStyle(Color.primary)
-            }
+            .nookControlGlass(in: Capsule())
 
             Spacer()
         }

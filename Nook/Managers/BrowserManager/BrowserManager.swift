@@ -15,6 +15,7 @@ import SwiftData
 import SwiftUI
 import WebKit
 import NookBlocker
+import NookDesign
 import NookSettings
 import NookTweaks
 import NookWeb
@@ -805,8 +806,9 @@ class BrowserManager: ObservableObject {
         let isFirstLaunch = savedWidth == 0
 
         if savedWidth > 0 {
-            savedSidebarWidth = savedWidth
-            sidebarWidth = savedVisibility ? savedWidth : 0
+            // A width saved under an older, smaller minimum would hide the history buttons.
+            savedSidebarWidth = max(savedWidth, NookDesign.Size.sidebarMin)
+            sidebarWidth = savedVisibility ? savedSidebarWidth : 0
         } else {
             // First launch: ensure sidebar is visible with default width
             savedSidebarWidth = 250

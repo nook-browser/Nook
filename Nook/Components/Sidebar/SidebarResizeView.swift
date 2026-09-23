@@ -23,7 +23,7 @@ struct SidebarResizeView: View {
     @State private var dragSessionID: String = UUID().uuidString
     @State private var hoverTask: Task<Void, Never>?
 
-    private let minWidth: CGFloat = 180
+    private let minWidth = NookDesign.Size.sidebarMin
     private let maxWidth: CGFloat = 520
     private let defaultWidth: CGFloat = 250
 
