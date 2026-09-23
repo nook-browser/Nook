@@ -20,8 +20,23 @@ struct SidebarMenuTab: View {
     @State private var isHovering: Bool = false
     @State private var shouldWiggle: Bool = false
 
+    private let height: CGFloat = 80
+
     var body: some View {
-        VStack(spacing: 8) {
+        Button {
+            action()
+            shouldWiggle.toggle()
+        } label: {
+            label
+        }
+        .buttonStyle(.plain)
+        .onHoverTracking { state in
+            isHovering = state
+        }
+    }
+
+    private var label: some View {
+        VStack(spacing: NookDesign.Spacing.md) {
             Image(systemName: isActive ? activeImage : image)
                 .font(NookDesign.Font.titleLarge)
                 .foregroundStyle(isActive ? .green : .primary)
@@ -33,18 +48,13 @@ struct SidebarMenuTab: View {
                 .font(NookDesign.Font.secondary)
                 .foregroundStyle(.primary)
         }
-        .frame(height: 80)
+        .frame(height: height)
         .frame(maxWidth: .infinity)
-        .background(isActive ? NookDesign.Surface.fillPressed : isHovering ? NookDesign.Surface.fill : .clear)
+        // The chosen tab is glass, like the selected sidebar row, so it takes no fill of its own.
+        .background(!isActive && isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.xl))
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
+        .nookRowSelection(isActive, radius: NookDesign.Radius.xl)
         .animation(NookDesign.Motion.quick, value: isHovering)
         .animation(NookDesign.Motion.standard, value: isActive)
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
-        .onHoverTracking { state in
-            isHovering = state
-        }
-        .onTapGesture {
-            action()
-            shouldWiggle.toggle()
-        }
     }
 }

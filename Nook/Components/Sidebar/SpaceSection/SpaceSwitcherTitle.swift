@@ -63,13 +63,7 @@ struct SpaceSwitcherTitle: View {
             title
             title
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                .mask {
-                    HStack(spacing: 0) {
-                        Color.black
-                        LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
-                            .frame(width: NookDesign.Spacing.titleFade)
-                    }
-                }
+                .nookTrailingFade()
         }
         .padding(.horizontal, NookDesign.Spacing.sm)
         .frame(height: NookDesign.Size.row)

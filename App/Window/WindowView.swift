@@ -58,6 +58,10 @@ struct WindowView: View {
         }
         // The window buttons sit in the sidebar's header, so they come and go with it.
         .background(TrafficLights(visible: windowState.isSidebarVisible || hoverSidebarManager.isOverlayVisible))
+        .overlayPreferenceValue(DownloadsButtonAnchorKey.self) { anchor in
+            DownloadFlightOverlay(target: anchor)
+                .zIndex(8000)
+        }
         // In-window so the menus get the key window's active glass; see ExtensionLibraryOverlay.
         .overlayPreferenceValue(ExtensionLibraryAnchorKey.self) { anchor in
             ExtensionLibraryOverlay(anchor: anchor)

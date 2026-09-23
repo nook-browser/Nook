@@ -11,12 +11,12 @@ import NookDesign
 import NookWeb
 import NookUI
 
-typealias Tabs = SidebarMenuTab
-
 struct SidebarMenu: View {
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.nookSettings) var nookSettings
+
+    private let tabColumnWidth: CGFloat = 110
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
@@ -44,7 +44,7 @@ struct SidebarMenu: View {
         VStack {
 
             Spacer()
-            VStack(spacing: 20) {
+            VStack(spacing: NookDesign.Spacing.xxl) {
                 SidebarMenuTab(
                     image: "clock",
                     activeImage: "clock.fill",
@@ -75,16 +75,14 @@ struct SidebarMenu: View {
                         windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
                     }
                 }
-                .labelStyle(.iconOnly)
-                .buttonStyle(NookIconButtonStyle())
-                .foregroundStyle(Color.primary)
+                .nookGlassControls(in: Circle())
                 Spacer()
             }
-            .padding(.leading, 8)
-            .padding(.bottom, 8)
+            .padding(.leading, NookDesign.Spacing.md)
+            .padding(.bottom, NookDesign.Spacing.md)
         }
-        .padding(8)
-        .frame(width: 110)
+        .padding(NookDesign.Spacing.md)
+        .frame(width: tabColumnWidth)
         .frame(maxHeight: .infinity)
         .background(NookDesign.Surface.fill)
     }

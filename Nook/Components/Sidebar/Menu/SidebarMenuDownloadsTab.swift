@@ -9,14 +9,11 @@
 import AppKit
 import SwiftUI
 import NookDesign
-import UniformTypeIdentifiers
 import NookUI
 
 struct SidebarMenuDownloadsTab: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @State private var isHovering: Bool = false
     @State private var text: String = ""
-    @FocusState private var isSearchFocused: Bool
 
     private var filteredDownloads: [Download] {
         if text.isEmpty {
@@ -30,105 +27,69 @@ struct SidebarMenuDownloadsTab: View {
     }
 
     var body: some View {
-        VStack {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .font(NookDesign.Font.title)
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 16, height: 16)
-                TextField("Search downloads...", text: $text)
-                    .textFieldStyle(.plain)
-                    .font(NookDesign.Font.secondary)
-                    .foregroundStyle(.tertiary)
-                    .focused($isSearchFocused)
-
-                if !text.isEmpty {
-                    Button(action: {
-                        text = ""
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
+        // Once per render: every access sorts the whole list.
+        let downloads = filteredDownloads
+        ScrollView {
+            LazyVStack(spacing: NookDesign.Spacing.rowGap) {
+                if downloads.isEmpty && !text.isEmpty {
+                    VStack(spacing: NookDesign.Spacing.md) {
+                        Image(systemName: "magnifyingglass")
+                            .font(NookDesign.Font.titleLarge)
+                            .foregroundStyle(.tertiary)
+                        Text("No downloads found")
+                            .font(NookDesign.Font.body)
+                            .foregroundStyle(.secondary)
+                        Text("Try searching with a different term")
                             .font(NookDesign.Font.secondary)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.tertiary)
                     }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(height: 38)
-            .frame(maxWidth: .infinity)
-            .background(isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
-            .animation(NookDesign.Motion.quick, value: isHovering)
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
-            .onHoverTracking { state in
-                isHovering = state
-            }
-            .onTapGesture {
-                isSearchFocused = true
-            }
-
-            ScrollView {
-                VStack(spacing: 8) {
-                    if filteredDownloads.isEmpty && !text.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(NookDesign.Font.titleLarge)
-                                .foregroundColor(.secondary)
-                            Text("No downloads found")
-                                .font(NookDesign.Font.body)
-                                .foregroundColor(.secondary)
-                            Text("Try searching with a different term")
-                                .font(NookDesign.Font.secondary)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 40)
-                    } else {
-                        ForEach(filteredDownloads.indices, id: \.self) { index in
-                            let entry = filteredDownloads[index]
-                            DownloadItem(download: entry)
-                        }
+                    .padding(.vertical, NookDesign.Spacing.xxxl)
+                } else {
+                    ForEach(downloads) { download in
+                        DownloadItem(download: download)
                     }
                 }
             }
+            .padding(.horizontal, NookDesign.Spacing.md)
+            .padding(.bottom, NookDesign.Spacing.md)
         }
-        .padding(8)
+        // Rows scroll under the floating search field, as in the history tab.
+        .safeAreaBar(edge: .top, spacing: 0) {
+            SidebarMenuSearchField(prompt: "Search downloads...", text: $text)
+                .padding(NookDesign.Spacing.md)
+        }
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 }
 
 struct DownloadItem: View {
     @State private var isHovering: Bool = false
-    @State private var isIconHovered: Bool = false
     var download: Download
 
-    private var canDrag: Bool {
-        guard download.state == .completed,
-              let destinationURL = download.destinationURL
-        else {
-            return false
-        }
-        return FileManager.default.fileExists(atPath: destinationURL.path)
-    }
+    private let iconSize: CGFloat = 24
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(nsImage: download.downloadThumbnail ?? download.icon!)
+        HStack(spacing: NookDesign.Spacing.md) {
+            Image(nsImage: download.downloadThumbnail ?? download.icon)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 24, height: 24)
-            VStack(alignment: .leading, spacing: 1) {
+                .frame(width: iconSize, height: iconSize)
+
+            VStack(alignment: .leading, spacing: 0) {
                 Text(download.suggestedFilename)
                     .font(NookDesign.Font.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .truncationMode(.tail)
+                    .truncationMode(.middle)
 
                 Text(download.originalURL.absoluteString)
                     .font(NookDesign.Font.secondary)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            Spacer()
+
+            Spacer(minLength: 0)
 
             if isHovering {
                 Menu {
@@ -142,102 +103,57 @@ struct DownloadItem: View {
                         Label("Show in Finder", systemImage: "folder")
                     }
                     Divider()
-                    Button(action: showInFinder) {
+                    Button(action: moveToTrash) {
                         Label("Move to Trash", systemImage: "trash")
                     }
                 } label: {
-                    Button {} label: {
-                        Image(systemName: "ellipsis")
-                            .font(NookDesign.Font.label)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 16, height: 16)
-                    }
-                    .padding(8)
-                    .background(isIconHovered ? NookDesign.Surface.fillPressed : .clear)
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-                    .buttonStyle(PlainButtonStyle())
+                    Image(systemName: "ellipsis")
                 }
-                .buttonStyle(.plain)
-                .transition(.scale.combined(with: .opacity))
-                .onHoverTracking { state in
-                    isIconHovered = state
-                }
+                .menuStyle(.button)
+                .menuIndicator(.hidden)
+                .buttonStyle(NookIconButtonStyle())
+                .transition(.opacity)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(isHovering ? NookDesign.Surface.fillPressed : .clear)
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
-        .animation(NookDesign.Motion.quick, value: isHovering)
+        .padding(.horizontal, NookDesign.Spacing.rowPadding)
+        .padding(.vertical, NookDesign.Spacing.sm)
+        .background(isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { state in
-            isHovering = state
+            withAnimation(NookDesign.Motion.quick) {
+                isHovering = state
+            }
         }
         .onTapGesture {
             openFile()
         }
         .onDrag {
-            guard canDrag,
-                  let destinationURL = download.destinationURL,
-                  FileManager.default.fileExists(atPath: destinationURL.path)
-            else {
-                return NSItemProvider()
-            }
-
-            let provider = NSItemProvider(contentsOf: destinationURL)
-
-            if let fileData = try? Data(contentsOf: destinationURL) {
-                let fileExtension = destinationURL.pathExtension.lowercased()
-
-                if let utType = UTType(filenameExtension: fileExtension) {
-                    provider?.registerDataRepresentation(
-                        forTypeIdentifier: utType.identifier,
-                        visibility: .all
-                    ) { completion in
-                        Task { @MainActor in completion(fileData, nil) }
-                        return nil
-                    }
-                }
-            }
-
-            return provider ?? NSItemProvider()
+            download.dragItemProvider()
         }
     }
 
     private func openFile() {
-        guard let destinationURL = download.destinationURL else {
-            return
-        }
-
-        guard FileManager.default.fileExists(atPath: destinationURL.path) else {
-            return
-        }
-
-        NSWorkspace.shared.open(destinationURL)
+        guard let file = download.completedFile else { return }
+        NSWorkspace.shared.open(file)
     }
 
     private func copyFile() {
-        guard let destinationURL = download.destinationURL else {
-            return
-        }
-
-        guard FileManager.default.fileExists(atPath: destinationURL.path) else {
-            return
-        }
-
+        guard let file = download.completedFile else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.writeObjects([destinationURL as NSURL])
+        pasteboard.writeObjects([file as NSURL])
     }
 
+    /// Any file on disk, finished or not, the way Finder's own downloads stack behaves.
     private func showInFinder() {
-        guard let destinationURL = download.destinationURL else {
-            return
-        }
-
-        guard FileManager.default.fileExists(atPath: destinationURL.path) else {
-            return
-        }
-
+        guard let destinationURL = download.destinationURL,
+              FileManager.default.fileExists(atPath: destinationURL.path) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
+    }
+
+    /// This item used to call Show in Finder. The row stays, as it does in Safari.
+    private func moveToTrash() {
+        guard let file = download.completedFile else { return }
+        NSWorkspace.shared.recycle([file])
     }
 }

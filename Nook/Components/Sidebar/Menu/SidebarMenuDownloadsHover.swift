@@ -8,72 +8,35 @@
 
 import SwiftUI
 import NookDesign
-import UniformTypeIdentifiers
 import NookUI
 
 struct SidebarMenuHoverDownloads: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var itemsVisible: [Bool] = []
     let isVisible: Bool
-    private var prioritizedDownloads: [Download] {
-        let activeDownloads = browserManager.downloadManager.activeDownloads
-            .sorted { $0.startDate > $1.startDate }
-        let completedDownloads = browserManager.downloadManager
-            .completedDownloads.sorted { $0.startDate > $1.startDate }
-        let failedDownloads = browserManager.downloadManager.failedDownloads
-            .sorted { $0.startDate > $1.startDate }
 
-        var result: [Download] = []
-
-        result.append(contentsOf: activeDownloads.prefix(4))
-
-        if result.count < 4 {
-            let remaining = 4 - result.count
-            result.append(contentsOf: completedDownloads.prefix(remaining))
-        }
-
-        if result.count < 4 {
-            let remaining = 4 - result.count
-            result.append(contentsOf: failedDownloads.prefix(remaining))
-        }
-
-        return Array(result.prefix(4))
-    }
-
+    /// Shown only while there is something to list; the sidebar leaves it out otherwise.
     var body: some View {
-        VStack(spacing: 4) {
-            ForEach(Array(prioritizedDownloads.enumerated()), id: \.element.id) { index, download in
-                SidebarMenuHoverDownloadItem(download: download, index: index)
-                    .offset(
-                        y: (index < itemsVisible.count && itemsVisible[index])
-                            ? 0 : 50
-                    )
-                    .opacity(
-                        (index < itemsVisible.count && itemsVisible[index])
-                            ? 1 : 0
-                    )
+        // Once per render: it sorts, and the rows used to ask per row.
+        let downloads = browserManager.downloadManager.recentDownloads
+        VStack(spacing: NookDesign.Spacing.rowGap) {
+            ForEach(Array(downloads.enumerated()), id: \.element.id) { index, download in
+                let shown = index < itemsVisible.count && itemsVisible[index]
+                SidebarMenuHoverDownloadItem(download: download)
+                    .offset(y: shown ? 0 : 50)
+                    .opacity(shown ? 1 : 0)
                     .animation(
-                        NookDesign.Motion.quick
-                            .delay(
-                                Double(prioritizedDownloads.count - index)
-                                    * 0.01
-                            ),
-                        value: index < itemsVisible.count
-                            ? itemsVisible[index] : false
+                        NookDesign.Motion.quick.delay(Double(downloads.count - index) * 0.01),
+                        value: shown
                     )
-            }
-
-            if prioritizedDownloads.isEmpty {
-                Text("No downloads")
-                    .font(NookDesign.Font.secondary)
-                    .foregroundColor(.secondary)
-                    .padding(.vertical, 20)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(NookDesign.Spacing.xs)
+        // The recent downloads card that opens above the bottom bar on hover.
+        .nookControlGlass(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .padding(.horizontal, NookDesign.Spacing.sidebarInset)
         .onAppear {
-            updateItemsVisible()
+            updateItemsVisible(count: downloads.count)
             if isVisible {
                 show()
             } else {
@@ -81,20 +44,19 @@ struct SidebarMenuHoverDownloads: View {
             }
         }
         .onChange(of: isVisible) { _, newValue in
-            updateItemsVisible()
+            updateItemsVisible(count: downloads.count)
             if newValue {
                 show()
             } else {
                 hide()
             }
         }
-        .onChange(of: prioritizedDownloads.count) { _, _ in
-            updateItemsVisible()
+        .onChange(of: downloads.count) { _, count in
+            updateItemsVisible(count: count)
         }
     }
 
-    private func updateItemsVisible() {
-        let count = prioritizedDownloads.count
+    private func updateItemsVisible(count: Int) {
         if itemsVisible.count != count {
             itemsVisible = Array(repeating: false, count: count)
         }
@@ -128,7 +90,8 @@ struct SidebarMenuHoverDownloads: View {
 struct SidebarMenuHoverDownloadItem: View {
     @State private var isHovering: Bool = false
     let download: Download
-    let index: Int
+
+    private let iconSize: CGFloat = 32
 
     private var timeAgoText: String {
         let now = Date()
@@ -163,109 +126,59 @@ struct SidebarMenuHoverDownloadItem: View {
         }
     }
 
-    private var canDrag: Bool {
-        guard download.state == .completed,
-              let destinationURL = download.destinationURL
-        else {
-            return false
-        }
-        return FileManager.default.fileExists(atPath: destinationURL.path)
-    }
-
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if download.state == .downloading {
-                CircularProgressView(progress: download.progress)
-                    .frame(width: 16, height: 16)
-                    .padding(.horizontal, 8)
-            } else if download.state == .completed
-                && download.downloadThumbnail != nil
-            {
-                Image(nsImage: download.downloadThumbnail!)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 32, height: 32)
-            } else if let icon = download.icon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 32, height: 32)
-                    .foregroundColor(.primary)
-            } else {
-                Image(systemName: "doc")
-                    .font(NookDesign.Font.titleLarge)
-                    .frame(width: 32, height: 32)
-                    .foregroundColor(.primary)
+        HStack(alignment: .center, spacing: NookDesign.Spacing.md) {
+            Group {
+                if download.state == .downloading {
+                    CircularProgressView(progress: download.progress)
+                } else {
+                    Image(nsImage: download.downloadThumbnail ?? download.icon)
+                        .resizable()
+                        .scaledToFit()
+                }
             }
+            .frame(width: iconSize, height: iconSize)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(download.suggestedFilename)
                     .font(NookDesign.Font.label)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                HStack(spacing: 4) {
-                    if download.state != .completed {
+                // Bytes while they are moving; otherwise the state in a word.
+                Group {
+                    if download.state == .downloading {
                         Text(
                             "\(download.formattedDownloadedSize)/\(download.formattedFileSize) • \(download.formattedTimeRemaining)"
                         )
-                        .font(NookDesign.Font.secondary)
-                        .foregroundStyle(.secondary)
                     } else {
                         Text(statusText)
-                            .font(NookDesign.Font.secondary)
-                            .foregroundStyle(.secondary)
                     }
-
-                    Spacer()
                 }
+                .font(NookDesign.Font.secondary)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
 
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(isHovering ? NookDesign.Surface.fillPressed : .clear)
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .padding(.horizontal, NookDesign.Spacing.rowPadding)
+        .padding(.vertical, NookDesign.Spacing.sm)
+        .background(isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .animation(NookDesign.Motion.quick, value: isHovering)
         .onHoverTracking { state in
             isHovering = state
         }
         .onTapGesture {
-            if let destinationURL = download.destinationURL,
-               download.state == .completed,
-               FileManager.default.fileExists(atPath: destinationURL.path)
-            {
-                NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
+            if let file = download.completedFile {
+                NSWorkspace.shared.activateFileViewerSelecting([file])
             }
         }
         .onDrag {
-            guard canDrag,
-                  let destinationURL = download.destinationURL,
-                  FileManager.default.fileExists(atPath: destinationURL.path)
-            else {
-                return NSItemProvider()
-            }
-
-            let provider = NSItemProvider(contentsOf: destinationURL)
-
-            if let fileData = try? Data(contentsOf: destinationURL) {
-                let fileExtension = destinationURL.pathExtension.lowercased()
-
-                if let utType = UTType(filenameExtension: fileExtension) {
-                    provider?.registerDataRepresentation(
-                        forTypeIdentifier: utType.identifier,
-                        visibility: .all
-                    ) { completion in
-                        Task { @MainActor in completion(fileData, nil) }
-                        return nil
-                    }
-                }
-            }
-
-            return provider ?? NSItemProvider()
+            download.dragItemProvider()
         }
     }
 }

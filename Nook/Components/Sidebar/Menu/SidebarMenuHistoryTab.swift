@@ -8,14 +8,13 @@
 
 import AppKit
 import FaviconFinder
-import Garnish
 import SwiftUI
 import NookDesign
 import NookWeb
 import NookUI
 
 struct HistorySection: Identifiable {
-    let id = UUID()
+    var id: String { title }
     let title: String
     let entries: [HistoryEntry]
 }
@@ -31,226 +30,162 @@ enum TimeRange: String, CaseIterable {
         case .today: return 1
         case .week: return 7
         case .month: return 30
-        case .all: return 100
+        case .all: return HistoryManager.retentionDays
         }
     }
 }
 
 struct SidebarMenuHistoryTab: View {
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var gradientColorManager: GradientColorManager
-    @State private var isHovering: Bool = false
     @State private var text: String = ""
-    @FocusState private var isSearchFocused: Bool
 
     @State private var historyEntries: [HistoryEntry] = []
     @State private var groupedHistoryEntries: [HistorySection] = []
     @State private var selectedTimeRange: TimeRange = .week
     @State private var isLoading: Bool = false
-    @State private var currentPage: Int = 0
-    @State private var hasMoreResults: Bool = true
+    @State private var hasMoreResults: Bool = false
     @State private var isLoadingMore: Bool = false
     @State private var isShowingFilters: Bool = false
+    @State private var isFiltersHovered: Bool = false
 
     @State private var historyTask: Task<Void, Never>?
     @State private var requestID = UUID()
 
     private let pageSize: Int = 50
-    private let maxResults: Int = 1000
-
-    private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
-    }
-
-    private var contrastTextSecondary: Color {
-        contrastText.opacity(0.7)
-    }
-
-    private var contrastTextTertiary: Color {
-        contrastText.opacity(0.5)
-    }
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 3) {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .font(NookDesign.Font.title)
-                        .foregroundStyle(contrastTextTertiary)
-                        .frame(width: 16, height: 16)
-                    TextField("Search history...", text: $text)
-                        .textFieldStyle(.plain)
-                        .font(NookDesign.Font.secondary)
-                        .foregroundColor(contrastTextTertiary)
-                        .focused($isSearchFocused)
-                        .onChange(of: text) { _, _ in
-                            searchHistory()
-                        }
-
-                    if !text.isEmpty {
-                        Button(action: {
-                            text = ""
-                            loadHistory()
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(NookDesign.Font.secondary)
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .frame(height: 38)
-                .frame(maxWidth: .infinity)
-                .background(
-                    isHovering ? contrastText.opacity(0.08) : contrastText.opacity(0.05)
-                )
-                .animation(NookDesign.Motion.quick, value: isHovering)
-                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
-                .onHoverTracking { state in
-                    isHovering = state
-                }
-                .onTapGesture {
-                    isSearchFocused = true
-                }
-
-                Button {
-                    isShowingFilters.toggle()
-                } label: {
-                    HStack(alignment: .center, spacing: 4) {
-                        Image(systemName: "line.horizontal.3.decrease.circle")
-                            .font(NookDesign.Font.title)
-                            .foregroundStyle(
-                                isShowingFilters
-                                    ? Color(hex: "1E1E1E") : contrastTextSecondary
-                            )
-                        Text("Filters")
-                            .font(NookDesign.Font.body)
-                            .foregroundStyle(
-                                isShowingFilters
-                                    ? Color(hex: "1E1E1E") : contrastTextSecondary
-                            )
-                    }
-                    .padding(10)
-                    .background(
-                        isShowingFilters
-                            ? contrastText.opacity(0.6) : contrastText.opacity(0.05)
-                    )
-                    .animation(
-                        NookDesign.Motion.quick,
-                        value: isShowingFilters
-                    )
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            if isShowingFilters {
-                FiltersSelectView(selectedTimeRange: $selectedTimeRange)
-            }
-
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    if isLoading {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Loading history...")
-                                .font(NookDesign.Font.secondary)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding()
-                    } else if groupedHistoryEntries.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "clock")
-                                .font(NookDesign.Font.titleLarge)
-                                .foregroundColor(AppColors.textTertiary)
-
-                            Text(
-                                text.isEmpty
-                                    ? "No history yet" : "No results found"
-                            )
-                            .font(NookDesign.Font.body)
-                            .foregroundColor(AppColors.textSecondary)
-
-                            if text.isEmpty {
-                                Text(
-                                    "Visit some websites to see your history here"
-                                )
-                                .font(NookDesign.Font.secondary)
-                                .foregroundColor(AppColors.textTertiary)
-                                .multilineTextAlignment(.center)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding()
-                    } else {
-                        ForEach(groupedHistoryEntries) { section in
-                            VStack(alignment: .leading, spacing: 0) {
-                                // Section Header
-                                HStack {
-                                    Text(section.title)
-                                        .font(
-                                            .system(size: 13, weight: .semibold)
-                                        )
-                                        .foregroundColor(
-                                            AppColors.textPrimary.opacity(0.7)
-                                        )
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-
-                                // Section Entries
-                                ForEach(section.entries.indices, id: \.self) {
-                                    index in
-                                    let entry = section.entries[index]
-                                    HistoryRowView(
-                                        entry: entry,
-                                        onTap: { openInCurrentTab(entry.url) },
-                                        onOpenInNewTab: { openInNewTab(entry.url) },
-                                        onDelete: { deleteEntry(entry) }
-                                    )
-                                    .onAppear {
-                                        // Load more when approaching the end of the last section
-                                        if section.id
-                                            == groupedHistoryEntries.last?.id
-                                            && index == section.entries.count
-                                            - 5
-                                            && hasMoreResults && !isLoadingMore
-                                        {
-                                            loadMoreHistory()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Load more indicator
-                        if isLoadingMore {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Loading more...")
-                                    .font(NookDesign.Font.secondary)
-                                    .foregroundColor(AppColors.textSecondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                        }
-                    }
-                }
-            }
+        ScrollView {
+            list
+                .padding(.horizontal, NookDesign.Spacing.md)
+                .padding(.bottom, NookDesign.Spacing.md)
         }
-        .padding(8)
+        // The rows scroll under the search field and filters, which float as glass with the
+        // system's soft blur at the edge behind them, the way a macOS 26 toolbar does.
+        .safeAreaBar(edge: .top, spacing: 0) {
+            header
+                .padding(NookDesign.Spacing.md)
+        }
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .onAppear {
+            loadHistory()
+        }
+        .onChange(of: selectedTimeRange) { _, _ in
             loadHistory()
         }
         .onChange(of: browserManager.historyManager.currentProfileId) { _, _ in
             loadHistory()
         }
         .onDisappear { historyTask?.cancel() }
+    }
+
+    private var header: some View {
+        VStack(spacing: NookDesign.Spacing.md) {
+            HStack(spacing: NookDesign.Spacing.xs) {
+                SidebarMenuSearchField(prompt: "Search history...", text: $text)
+                    .onChange(of: text) { _, _ in loadHistory() }
+
+                Button {
+                    isShowingFilters.toggle()
+                } label: {
+                    // Always glass, like the search field beside it: both float over the list.
+                    HStack(spacing: NookDesign.Spacing.xs) {
+                        Image(systemName: isShowingFilters ? "line.horizontal.3.decrease.circle.fill" : "line.horizontal.3.decrease.circle")
+                            .font(NookDesign.Font.title)
+                        Text("Filters")
+                            .font(NookDesign.Font.body)
+                    }
+                    .foregroundStyle(isShowingFilters || isFiltersHovered ? .primary : .secondary)
+                    .padding(.horizontal, NookDesign.Spacing.lg)
+                    .frame(height: NookDesign.Size.glassControl)
+                    .contentShape(Capsule())
+                    .nookControlGlass(in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .animation(NookDesign.Motion.quick, value: isShowingFilters)
+                .animation(NookDesign.Motion.quick, value: isFiltersHovered)
+                .onHoverTracking { isFiltersHovered = $0 }
+            }
+            if isShowingFilters {
+                FiltersSelectView(selectedTimeRange: $selectedTimeRange)
+            }
+        }
+    }
+
+    private var list: some View {
+        LazyVStack(spacing: NookDesign.Spacing.rowGap) {
+            // A reload keeps the list on screen; only a first load shows the spinner.
+            if isLoading && groupedHistoryEntries.isEmpty {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading history...")
+                        .font(NookDesign.Font.secondary)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+            } else if groupedHistoryEntries.isEmpty {
+                VStack(spacing: NookDesign.Spacing.md) {
+                    Image(systemName: "clock")
+                        .font(NookDesign.Font.titleLarge)
+                        .foregroundStyle(.tertiary)
+
+                    Text(
+                        text.isEmpty
+                            ? "No history yet" : "No results found"
+                    )
+                    .font(NookDesign.Font.body)
+                    .foregroundStyle(.secondary)
+
+                    if text.isEmpty {
+                        Text(
+                            "Visit some websites to see your history here"
+                        )
+                        .font(NookDesign.Font.secondary)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+            } else {
+                ForEach(groupedHistoryEntries) { section in
+                    Text(section.title)
+                        .font(NookDesign.Font.captionStrong)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, NookDesign.Spacing.rowPadding)
+                        .padding(.top, NookDesign.Spacing.md)
+                        .padding(.bottom, NookDesign.Spacing.xs)
+
+                    ForEach(section.entries) { entry in
+                        HistoryRowView(
+                            entry: entry,
+                            onTap: { openInCurrentTab(entry.url) },
+                            onOpenInNewTab: { openInNewTab(entry.url) },
+                            onDelete: { deleteEntry(entry) }
+                        )
+                    }
+                }
+
+                // Loads the next page when it scrolls into view, however short the last
+                // section is. A new identity per page means a page that leaves it on
+                // screen asks again, and one that pushes it off screen waits.
+                if hasMoreResults {
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading more...")
+                            .font(NookDesign.Font.secondary)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, NookDesign.Spacing.md)
+                    .id(historyEntries.count)
+                    .onAppear { loadMoreHistory() }
+                }
+            }
+        }
     }
 
     // MARK: Functions
@@ -264,17 +199,13 @@ struct SidebarMenuHistoryTab: View {
         requestHistory(reset: false)
     }
 
-    private func searchHistory() {
-        requestHistory(reset: true)
-    }
-
     private func requestHistory(reset: Bool) {
         historyTask?.cancel()
         let id = UUID()
         requestID = id
         let query = text
         let days = selectedTimeRange.days
-        let page = reset ? 0 : currentPage + 1
+        let offset = reset ? 0 : historyEntries.count
         let profile = browserManager.historyManager.currentProfileId
         isLoading = reset
         isLoadingMore = !reset
@@ -284,16 +215,15 @@ struct SidebarMenuHistoryTab: View {
             }
             let result: (entries: [HistoryEntry], hasMore: Bool)
             if query.isEmpty {
-                result = await browserManager.historyManager.getHistory(days: days, page: page, pageSize: pageSize)
+                result = await browserManager.historyManager.getHistory(days: days, offset: offset, limit: pageSize)
             } else {
-                result = await browserManager.historyManager.searchHistory(query: query, page: page, pageSize: pageSize)
+                result = await browserManager.historyManager.searchHistory(query: query, offset: offset, limit: pageSize)
             }
             guard !Task.isCancelled, requestID == id,
                   browserManager.historyManager.currentProfileId == profile else { return }
             withAnimation(NookDesign.Motion.standard) {
                 historyEntries = reset ? result.entries : historyEntries + result.entries
                 groupedHistoryEntries = groupHistoryEntries(historyEntries)
-                currentPage = page
                 hasMoreResults = result.hasMore
                 isLoading = false
                 isLoadingMore = false
@@ -301,20 +231,18 @@ struct SidebarMenuHistoryTab: View {
         }
     }
 
+    /// Sections ordered by their newest visit, which is the order the labels describe.
     private func groupHistoryEntries(_ entries: [HistoryEntry])
         -> [HistorySection]
     {
         let calendar = Calendar.current
         let now = Date()
+        let nowComponents = calendar.dateComponents([.year, .month, .weekOfYear], from: now)
 
         let grouped = Dictionary(grouping: entries) { entry in
             let components = calendar.dateComponents(
-                [.year, .month, .weekOfYear, .day],
+                [.year, .month, .weekOfYear],
                 from: entry.lastVisited
-            )
-            let nowComponents = calendar.dateComponents(
-                [.year, .month, .weekOfYear, .day],
-                from: now
             )
 
             if calendar.isDate(entry.lastVisited, inSameDayAs: now) {
@@ -330,7 +258,8 @@ struct SidebarMenuHistoryTab: View {
                 from: entry.lastVisited,
                 to: now
             ).weekOfYear {
-                if weekDiff == 1 {
+                // Under seven days but in an earlier calendar week counts 0 whole weeks.
+                if weekDiff <= 1 {
                     return "Last Week"
                 } else if weekDiff <= 4 {
                     return "\(weekDiff) weeks ago"
@@ -365,37 +294,11 @@ struct SidebarMenuHistoryTab: View {
             }
         }
 
-        let sortedKeys = grouped.keys.sorted { key1, key2 in
-            let priority: [String: Int] = [
-                "Today": 0,
-                "Yesterday": 1,
-                "This Week": 2,
-                "Last Week": 3,
-                "This Month": 4,
-                "Last Month": 5,
-            ]
-
-            if let p1 = priority[key1], let p2 = priority[key2] {
-                return p1 < p2
-            } else if priority[key1] != nil {
-                return true
-            } else if priority[key2] != nil {
-                return false
-            } else {
-                return key1 < key2
-            }
-        }
-
-        return sortedKeys.compactMap { (key: String) -> HistorySection? in
-            guard let entries = grouped[key], !entries.isEmpty else {
-                return nil
-            }
-            let sortedEntries = entries.sorted {
-                (entry1: HistoryEntry, entry2: HistoryEntry) in
-                entry1.lastVisited > entry2.lastVisited
-            }
-            return HistorySection(title: key, entries: sortedEntries)
-        }
+        // Newest first inside each section, and sections by their newest entry: sorting the
+        // titles put "10 months ago" above "2 months ago" and "2 months ago" above "2 weeks ago".
+        return grouped
+            .map { HistorySection(title: $0.key, entries: $0.value.sorted { $0.lastVisited > $1.lastVisited }) }
+            .sorted { $0.entries[0].lastVisited > $1.entries[0].lastVisited }
     }
 
     private func openInCurrentTab(_ url: URL) {
@@ -408,27 +311,13 @@ struct SidebarMenuHistoryTab: View {
         browserManager.tabs.open(url: url, in: window, placement: .newTab)
     }
 
+    /// Paging is by offset from what is on screen, so dropping the row here keeps the next page
+    /// lined up with the store; reloading from the top lost every page past the first.
     private func deleteEntry(_ entry: HistoryEntry) {
         browserManager.historyManager.deleteHistoryEntry(entry.id)
-        historyEntries.removeAll { $0.id == entry.id }
-        groupedHistoryEntries = groupHistoryEntries(historyEntries)
-        requestHistory(reset: true)
-    }
-
-    private func clearHistory() {
-        let alert = NSAlert()
-        alert.messageText = "Clear History"
-        alert.informativeText =
-            "Are you sure you want to clear your browsing history? This action cannot be undone."
-        alert.addButton(withTitle: "Clear")
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            browserManager.historyManager.clearHistory()
-            historyEntries.removeAll()
-            groupedHistoryEntries.removeAll()
-            requestHistory(reset: true)
+        withAnimation(NookDesign.Motion.standard) {
+            historyEntries.removeAll { $0.id == entry.id }
+            groupedHistoryEntries = groupHistoryEntries(historyEntries)
         }
     }
 }
@@ -439,109 +328,74 @@ struct HistoryRowView: View {
     let onOpenInNewTab: () -> Void
     let onDelete: () -> Void
 
-    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var isHovered: Bool = false
-    @State private var isTrashIconHovered: Bool = false
-    @State private var isArrowIconHovered: Bool = false
-    @State private var favicon: SwiftUI.Image = Image(systemName: "globe")
-
-    private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
-    }
+    @State private var favicon: SwiftUI.Image?
 
     var body: some View {
-        HStack(spacing: 8) {
-            NookDesign.Radius.shape(NookDesign.Radius.xs)
-                .fill(.clear)
-                .frame(width: 16, height: 16)
-                .overlay(
-                    favicon
-                        .resizable()
-                        .interpolation(.high)
-                        .antialiased(true)
-                        .scaledToFit()
-                        .frame(width: 12, height: 12)
-                        .foregroundColor(contrastText)
-                )
+        HStack(spacing: NookDesign.Spacing.md) {
+            (favicon ?? SwiftUI.Image(systemName: "globe"))
+                .resizable()
+                .scaledToFit()
+                .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
+                .foregroundStyle(.secondary)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(entry.displayTitle)
                     .font(NookDesign.Font.body)
-                    .foregroundColor(contrastText.opacity(0.7))
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .truncationMode(.tail)
-                    .minimumScaleFactor(0.85)
+                    .fixedSize()
 
                 Text(entry.url.host ?? "")
                     .font(NookDesign.Font.secondary)
-                    .foregroundColor(contrastText.opacity(0.55))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .truncationMode(.middle)
-                    .minimumScaleFactor(0.8)
+                    .fixedSize()
             }
-
-            Spacer(minLength: 0)
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            .nookTrailingFade()
 
             if isHovered {
-                HStack(spacing: 2) {
+                HStack(spacing: 0) {
                     Button(action: onDelete) {
                         Image(systemName: "trash")
-                            .font(NookDesign.Font.label)
-                            .foregroundColor(contrastText.opacity(0.6))
-                            .frame(width: 16, height: 16)
                     }
-                    .padding(8)
-                    .background(
-                        isTrashIconHovered ? contrastText.opacity(0.1) : .clear
-                    )
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-                    .buttonStyle(PlainButtonStyle())
                     .help("Remove from history")
-                    .transition(.scale.combined(with: .opacity))
-                    .onHoverTracking { state in
-                        isTrashIconHovered = state
-                    }
-                    // Open in a new tab
-                    Button(action: onDelete) {
+
+                    Button(action: onOpenInNewTab) {
                         Image(systemName: "arrow.uturn.backward")
-                            .font(NookDesign.Font.label)
-                            .foregroundColor(contrastText.opacity(0.6))
-                            .frame(width: 16, height: 16)
                     }
-                    .padding(8)
-                    .background(
-                        isArrowIconHovered ? contrastText.opacity(0.1) : .clear
-                    )
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-                    .buttonStyle(PlainButtonStyle())
                     .help("Open in a new tab")
-                    .transition(.scale.combined(with: .opacity))
-                    .onHoverTracking { state in
-                        isArrowIconHovered = state
-                    }
                 }
+                .font(NookDesign.Font.caption)
+                .buttonStyle(NookIconButtonStyle())
+                .transition(.opacity)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-        .background(
-            NookDesign.Radius.shape(NookDesign.Radius.xl)
-                .fill(isHovered ? contrastText.opacity(0.1) : .clear)
-        )
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
-        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .padding(.horizontal, NookDesign.Spacing.rowPadding)
+        .padding(.vertical, NookDesign.Spacing.sm)
+        .background(isHovered ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { hovered in
-            withAnimation(NookDesign.Motion.standard) {
+            withAnimation(NookDesign.Motion.quick) {
                 isHovered = hovered
             }
         }
         .onTapGesture {
             onTap()
         }
-        .onAppear {
-            Task {
-                await fetchFavicon()
+        // Cancelled when the row scrolls away; the old onAppear Task kept fetching for rows long gone.
+        .task(id: entry.url.host) {
+            guard entry.url.scheme == "http" || entry.url.scheme == "https",
+                  let host = entry.url.host else { return }
+            if let cached = await FaviconCache.shared.cachedImage(for: host) {
+                favicon = SwiftUI.Image(nsImage: cached)
+                return
             }
+            guard let image = try? await FaviconFinder(url: entry.url).fetchFaviconURLs().download().largest().image?.image,
+                  !Task.isCancelled else { return }
+            FaviconCache.shared.store(image, for: host)
+            favicon = SwiftUI.Image(nsImage: image)
         }
         .contextMenu {
             Button("Open") { onTap() }
@@ -552,74 +406,19 @@ struct HistoryRowView: View {
             Button("Remove from History") { onDelete() }
         }
     }
-
-    private func fetchFavicon() async {
-        let defaultFavicon = SwiftUI.Image(systemName: "globe")
-
-        guard entry.url.scheme == "http" || entry.url.scheme == "https",
-              entry.url.host != nil
-        else {
-            await MainActor.run {
-                self.favicon = defaultFavicon
-            }
-            return
-        }
-
-        let cacheKey = entry.url.host ?? entry.url.absoluteString
-        if let cachedFavicon = await FaviconCache.shared.cachedImage(for: cacheKey).map(SwiftUI.Image.init(nsImage:)) {
-            await MainActor.run {
-                self.favicon = cachedFavicon
-            }
-            return
-        }
-
-        do {
-            let favicon = try await FaviconFinder(url: entry.url)
-                .fetchFaviconURLs()
-                .download()
-                .largest()
-
-            if let faviconImage = favicon.image {
-                let nsImage = faviconImage.image
-                let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
-
-                FaviconCache.shared.store(nsImage, for: cacheKey)
-
-                await MainActor.run {
-                    self.favicon = swiftUIImage
-                }
-            } else {
-                await MainActor.run {
-                    self.favicon = defaultFavicon
-                }
-            }
-        } catch {
-            await MainActor.run {
-                self.favicon = defaultFavicon
-            }
-        }
-    }
 }
 
 struct FiltersSelectView: View {
     @Binding var selectedTimeRange: TimeRange
-    @EnvironmentObject var gradientColorManager: GradientColorManager
-
-    private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
-    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("When was the tab closed?")
-                    .font(NookDesign.Font.secondary)
-                    .foregroundStyle(contrastText.opacity(0.6))
-                Spacer()
-            }
+        VStack(alignment: .leading, spacing: NookDesign.Spacing.md) {
+            Text("When was the tab closed?")
+                .font(NookDesign.Font.secondary)
+                .foregroundStyle(.secondary)
 
-            VStack(spacing: 8) {
-                HStack {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.sm) {
+                HStack(spacing: NookDesign.Spacing.sm) {
                     FiltersSelectButton(
                         text: "All time",
                         isActive: selectedTimeRange == .all
@@ -638,24 +437,21 @@ struct FiltersSelectView: View {
                     ) {
                         selectedTimeRange = .week
                     }
-
-                    Spacer()
                 }
-                HStack {
-                    FiltersSelectButton(
-                        text: "This month",
-                        isActive: selectedTimeRange == .month
-                    ) {
-                        selectedTimeRange = .month
-                    }
-                    Spacer()
+                FiltersSelectButton(
+                    text: "This month",
+                    isActive: selectedTimeRange == .month
+                ) {
+                    selectedTimeRange = .month
                 }
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
+/// A filter chip. Every chip is glass, since the row floats over the list; the chosen one is
+/// tinted with the space's accent.
 struct FiltersSelectButton: View {
     var text: String
     var isActive: Bool
@@ -664,33 +460,22 @@ struct FiltersSelectButton: View {
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var isHovering: Bool = false
 
-    private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
-    }
-
     var body: some View {
         Button {
             action()
         } label: {
             Text(text)
                 .font(NookDesign.Font.body)
-                .foregroundStyle(
-                    isActive ? Color(hex: "1E1E1E") : contrastText.opacity(0.5)
-                )
+                .foregroundStyle(isActive || isHovering ? .primary : .secondary)
                 .lineLimit(1)
-                .padding(.vertical, 10)
-                .padding(.horizontal, 12)
-                .background(
-                    isActive
-                        ? contrastText.opacity(0.6)
-                        : isHovering
-                        ? contrastText.opacity(0.08) : contrastText.opacity(0.05)
-                )
-                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+                .padding(.horizontal, NookDesign.Spacing.lg)
+                .frame(height: NookDesign.Size.iconButton)
+                .contentShape(Capsule())
+                .nookControlGlass(tint: isActive ? gradientColorManager.accentColor : nil, in: Capsule())
         }
         .buttonStyle(.plain)
         .animation(NookDesign.Motion.quick, value: isHovering)
-        .animation(NookDesign.Motion.quick, value: isActive)
+        .animation(NookDesign.Motion.standard, value: isActive)
         .onHoverTracking { state in
             isHovering = state
         }

@@ -29,17 +29,6 @@ public struct SpaceTab: View {
     private var isRenaming: Bool { renameState.itemID == item.id }
     private var isUnloaded: Bool { session?.isUnloaded ?? true }
 
-    /// Fades the trailing edge of the title instead of truncating with an ellipsis.
-    /// On hover the clear region grows so the text ends before the close button.
-    private var titleFade: some View {
-        HStack(spacing: 0) {
-            Color.black
-            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
-                .frame(width: NookDesign.Spacing.titleFade)
-            Color.clear
-                .frame(width: isHovering ? NookDesign.Size.row : 0)
-        }
-    }
 
     public init(
         item: Item,
@@ -105,7 +94,8 @@ public struct SpaceTab: View {
                         }
                         // Only a rename animates; a page changing its own title swaps without motion.
                         .animation(NookDesign.Motion.spring, value: item.customTitle)
-                        .mask(titleFade)
+                        // On hover the text ends before the close button.
+                        .nookTrailingFade(reserving: isHovering ? NookDesign.Size.row : 0)
                         .textSelection(.disabled)
                 }
 

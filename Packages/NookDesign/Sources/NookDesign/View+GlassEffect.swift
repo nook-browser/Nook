@@ -35,15 +35,18 @@ public extension View {
         modifier(SidebarGlass(isOn: isSelected, shape: NookDesign.Radius.shape(radius)))
     }
 
-    /// A sidebar chrome control or group: history, sidebar and AI toggles, bottom bar buttons.
-    func nookControlGlass<S: InsettableShape>(in shape: S) -> some View {
-        modifier(SidebarGlass(isOn: true, shape: shape))
+    /// A sidebar chrome control or group: history, sidebar and AI toggles, bottom bar buttons,
+    /// search fields, filter chips. `tint` marks the chosen one of a set, the way prominent
+    /// glass buttons are tinted, rather than leaving the others without glass.
+    func nookControlGlass<S: InsettableShape>(_ isOn: Bool = true, tint: Color? = nil, in shape: S) -> some View {
+        modifier(SidebarGlass(isOn: isOn, tint: tint, shape: shape))
     }
 }
 
 /// Glass inside the sidebar, which is not itself glass.
 private struct SidebarGlass<S: InsettableShape>: ViewModifier {
     let isOn: Bool
+    var tint: Color? = nil
     let shape: S
     @Environment(\.nookInsideGlass) private var insideGlass
 
@@ -56,7 +59,7 @@ private struct SidebarGlass<S: InsettableShape>: ViewModifier {
                         .overlay(shape.strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth))
                 }
             }
-            .glassEffect(isOn && !insideGlass ? .regular : .identity, in: shape)
+            .glassEffect(isOn && !insideGlass ? .regular.tint(tint) : .identity, in: shape)
     }
 }
 

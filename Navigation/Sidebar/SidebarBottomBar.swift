@@ -48,7 +48,10 @@ struct SidebarBottomBar: View {
             Button("Menu", systemImage: "archivebox") {
                 onMenuTap()
             }
+            // A finished download bounces the button its icon flew into.
+            .symbolEffect(.bounce, value: browserManager.downloadManager.completedCount)
             .nookGlassControls(in: Circle())
+            .anchorPreference(key: DownloadsButtonAnchorKey.self, value: .bounds) { $0 }
             .onHoverTracking { isHovered in
                 isMenuButtonHovered = isHovered
                 onMenuHover(isHovered)

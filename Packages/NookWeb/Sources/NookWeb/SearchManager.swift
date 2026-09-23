@@ -189,7 +189,7 @@ public class SearchManager {
         guard let historyManager = historyManager else { return [] }
         
         let lowercaseQuery = query.lowercased()
-        let historyEntries = await historyManager.searchHistory(query: query, page: 0, pageSize: 20)
+        let historyEntries = await historyManager.searchHistory(query: query, offset: 0, limit: 20)
         
         let matchingHistory = historyEntries.entries.map {
             SearchSuggestion(text: $0.displayTitle, type: .history($0))

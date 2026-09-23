@@ -12,8 +12,10 @@ import NookDesign
 struct DownloadIndicator: View {
     @EnvironmentObject var browserManager: BrowserManager
 
+    /// The newest active download. `.first` was whichever the dictionary yielded, so with two
+    /// running the ring could jump between them.
     var currentDownload: Download? {
-        browserManager.downloadManager.activeDownloads.first
+        browserManager.downloadManager.activeDownloads.max { $0.startDate < $1.startDate }
     }
 
     var body: some View {

@@ -133,6 +133,7 @@ public enum NookDesign {
         public static let standard = Animation.smooth(duration: 0.22)    // selection, reveal, fold
         public static let settle = Animation.smooth(duration: 0.6)       // the separator wave rising and flattening
         public static let wavePeriod: TimeInterval = 1.6                 // seconds for the wave to travel one cycle
+        public static let flight = Animation.easeIn(duration: 0.6)       // a download flying from the page to its button
         public static let spring = Animation.snappy(duration: 0.3)      // palette, dialog, toast, drag reorder, gesture-tracked motion
     }
 

@@ -27,13 +27,16 @@ public final class HistoryManager {
     @ObservationIgnored private let storeTask: Task<HistoryStore, Never>
     @ObservationIgnored private var pendingWrite: Task<Void, Never>?
     public var currentProfileId: UUID?
+    /// Visits older than this are pruned at launch, so "All time" in the history panel means this.
+    nonisolated public static let retentionDays = 100
 
     public init(context: ModelContext, profileId: UUID? = nil) {
         currentProfileId = profileId
         let container = context.container
         // Construct the model executor off the main actor as well as calling it there.
         storeTask = Task.detached { HistoryStore(modelContainer: container) }
-        clearHistory(olderThan: 100)
+        // Every space's rows, not only the launch space's.
+        enqueue { await $0.clear(days: Self.retentionDays, profile: nil) }
     }
 
     public func switchProfile(_ profileId: UUID?) { currentProfileId = profileId }
@@ -56,25 +59,22 @@ public final class HistoryManager {
         enqueue { await $0.addVisits(visits) }
     }
 
-    public func getHistory(days: Int = 7) async -> [HistoryEntry] {
-        await getHistory(days: days, page: 0, pageSize: 1000).entries
-    }
-
-    public func getHistory(days: Int = 7, page: Int = 0, pageSize: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
+    /// Paged by offset, so a caller that deleted rows it already shows asks for exactly the next ones.
+    public func getHistory(days: Int = 7, offset: Int = 0, limit: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
         let profile = currentProfileId
         await pendingWrite?.value
-        return await storeTask.value.history(days: days, profile: profile, page: page, pageSize: pageSize)
+        return await storeTask.value.history(days: days, profile: profile, offset: offset, limit: limit)
     }
 
     public func searchHistory(query: String) async -> [HistoryEntry] {
-        await searchHistory(query: query, page: 0, pageSize: 1000).entries
+        await searchHistory(query: query, offset: 0, limit: 1000).entries
     }
 
-    public func searchHistory(query: String, page: Int = 0, pageSize: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
+    public func searchHistory(query: String, offset: Int = 0, limit: Int = 50) async -> (entries: [HistoryEntry], hasMore: Bool) {
         let profile = currentProfileId
         await pendingWrite?.value
         guard !Task.isCancelled else { return ([], false) }
-        return await storeTask.value.search(query: query, profile: profile, page: page, pageSize: pageSize)
+        return await storeTask.value.search(query: query, profile: profile, offset: offset, limit: limit)
     }
 
     /// Bare host for omnibox inline autofill, e.g. `facebo` -> `facebook.com`. Nil when nothing qualifies.
@@ -86,12 +86,6 @@ public final class HistoryManager {
         return await storeTask.value.autofillHost(prefix: prefix, profile: profile, minVisits: minVisits)
     }
 
-    public func getMostVisited(limit: Int = 10) async -> [HistoryEntry] {
-        let profile = currentProfileId
-        await pendingWrite?.value
-        return await storeTask.value.mostVisited(profile: profile, limit: limit)
-    }
-
     public func clearHistory(olderThan days: Int = 0, profileId: UUID? = nil) {
         let profile = profileId ?? currentProfileId
         enqueue { await $0.clear(days: days, profile: profile) }
@@ -99,12 +93,6 @@ public final class HistoryManager {
 
     public func deleteHistoryEntry(_ entryId: UUID) {
         enqueue { await $0.delete(entryId) }
-    }
-
-    public func getHistoryStats(for profileId: UUID?) async -> (count: Int, uniqueHosts: Int) {
-        let profile = profileId ?? currentProfileId
-        await pendingWrite?.value
-        return await storeTask.value.stats(profile: profile)
     }
 }
 
@@ -181,8 +169,8 @@ actor HistoryStore {
         }
     }
 
-    func history(days: Int, profile: UUID?, page: Int, pageSize: Int) -> (entries: [HistoryEntry], hasMore: Bool) {
-        guard page >= 0, pageSize > 0 else { return ([], false) }
+    func history(days: Int, profile: UUID?, offset: Int, limit: Int) -> (entries: [HistoryEntry], hasMore: Bool) {
+        guard offset >= 0, limit > 0 else { return ([], false) }
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
         let predicate: Predicate<HistoryEntity>
         if let profile {
@@ -191,20 +179,21 @@ actor HistoryStore {
             predicate = #Predicate { $0.lastVisited >= cutoff }
         }
         var descriptor = FetchDescriptor<HistoryEntity>(predicate: predicate, sortBy: [SortDescriptor(\.lastVisited, order: .reverse)])
-        descriptor.fetchOffset = page * pageSize
-        descriptor.fetchLimit = pageSize + 1
+        descriptor.fetchOffset = offset
+        descriptor.fetchLimit = limit + 1
         let entries = (try? modelContext.fetch(descriptor)) ?? []
-        return (entries.prefix(pageSize).map(HistoryEntry.init), entries.count > pageSize)
+        return (entries.prefix(limit).map(HistoryEntry.init), entries.count > limit)
     }
 
-    func search(query: String, profile: UUID?, page: Int, pageSize: Int) -> (entries: [HistoryEntry], hasMore: Bool) {
-        if query.isEmpty { return history(days: 7, profile: profile, page: page, pageSize: pageSize) }
+    func search(query: String, profile: UUID?, offset: Int, limit: Int) -> (entries: [HistoryEntry], hasMore: Bool) {
+        if query.isEmpty { return history(days: 7, profile: profile, offset: offset, limit: limit) }
         let interval = BrowserPerformance.signposter.beginInterval("HistorySearch")
         defer { BrowserPerformance.signposter.endInterval("HistorySearch", interval) }
-        guard page >= 0, pageSize > 0 else { return ([], false) }
+        guard offset >= 0, limit > 0 else { return ([], false) }
         // Keep Foundation's localized matching semantics. Scan bounded chunks off-main,
         // stopping once this page plus its lookahead is satisfied.
-        let start = page * pageSize
+        let start = offset
+        let pageSize = limit
         var matches: [HistoryEntry] = []
         var descriptor = FetchDescriptor<HistoryEntity>(predicate: visible(to: profile), sortBy: [SortDescriptor(\.lastVisited, order: .reverse)])
         descriptor.fetchLimit = 128
@@ -263,13 +252,6 @@ actor HistoryStore {
         return hosts
     }
 
-    func mostVisited(profile: UUID?, limit: Int) -> [HistoryEntry] {
-        guard limit > 0 else { return [] }
-        var descriptor = FetchDescriptor<HistoryEntity>(predicate: visible(to: profile), sortBy: [SortDescriptor(\.visitCount, order: .reverse), SortDescriptor(\.lastVisited, order: .reverse)])
-        descriptor.fetchLimit = limit
-        return ((try? modelContext.fetch(descriptor)) ?? []).map(HistoryEntry.init)
-    }
-
     func clear(days: Int, profile: UUID?) {
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
         do {
@@ -291,11 +273,6 @@ actor HistoryStore {
             try modelContext.save()
             autofillCache = nil
         } catch { Self.logger.error("History deletion failed: \(error.localizedDescription, privacy: .public)") }
-    }
-
-    func stats(profile: UUID?) -> (count: Int, uniqueHosts: Int) {
-        let entries = (try? modelContext.fetch(FetchDescriptor<HistoryEntity>(predicate: visible(to: profile)))) ?? []
-        return (entries.count, Set(entries.compactMap { URL(string: $0.url)?.host }).count)
     }
 }
 
@@ -326,11 +303,5 @@ public struct HistoryEntry: Identifiable, Hashable, Sendable {
     
     public var displayURL: String {
         return url.absoluteString
-    }
-    
-    public var timeAgo: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.dateTimeStyle = .named
-        return formatter.localizedString(for: lastVisited, relativeTo: Date())
     }
 }
