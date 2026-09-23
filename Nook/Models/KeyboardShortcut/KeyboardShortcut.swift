@@ -86,6 +86,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
     case toggleAIAssistant = "toggle_ai_assistant"             // Cmd+Shift+A
     case togglePictureInPicture = "toggle_pip"                 // Cmd+Shift+P
     case copyCurrentURL = "copy_current_url"                   // Cmd+Shift+C
+    case printPage = "print_page"                              // Cmd+P
     case hardReload = "hard_reload"                            // Cmd+Shift+R
     case muteUnmuteAudio = "mute_unmute_audio"                 // Cmd+M
     case installExtension = "install_extension"                // Cmd+Shift+E
@@ -134,6 +135,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .toggleAIAssistant: return "Toggle AI Assistant"
         case .togglePictureInPicture: return "Toggle Picture in Picture"
         case .copyCurrentURL: return "Copy Current URL"
+        case .printPage: return "Print"
         case .hardReload: return "Hard Reload"
         case .muteUnmuteAudio: return "Mute/Unmute Audio"
         case .installExtension: return "Install Extension"
@@ -164,7 +166,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
             return .tools
         case .togglePictureInPicture:
             return .tools
-        case .copyCurrentURL:
+        case .copyCurrentURL, .printPage:
             return .tools
         case .hardReload:
             return .navigation
@@ -350,6 +352,7 @@ extension KeyboardShortcut {
             KeyboardShortcut(action: .toggleAIAssistant, keyCombination: KeyCombination(key: "a", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .togglePictureInPicture, keyCombination: KeyCombination(key: "p", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .copyCurrentURL, keyCombination: KeyCombination(key: "c", modifiers: [.command, .shift])),
+            KeyboardShortcut(action: .printPage, keyCombination: KeyCombination(key: "p", modifiers: [.command])),
             KeyboardShortcut(action: .hardReload, keyCombination: KeyCombination(key: "r", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .muteUnmuteAudio, keyCombination: KeyCombination(key: "m", modifiers: [.command])),
             KeyboardShortcut(action: .installExtension, keyCombination: KeyCombination(key: "e", modifiers: [.command, .shift])),

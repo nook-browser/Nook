@@ -30,6 +30,8 @@ public protocol PageSessionDelegate: AnyObject {
     // MARK: Downloads and panels
 
     func addDownload(_ download: WKDownload, originalURL: URL, suggestedFilename: String)
+    /// Bytes WebKit already holds, such as the PDF the viewer shows, written to Downloads.
+    func saveFile(_ data: Data, suggestedFilename: String, originalURL: URL, from webView: WKWebView)
     /// Enters or leaves full screen for the window showing `webView`. Returns false when
     /// `webView` has no window, so the caller can fail its completion handler.
     func toggleFullScreen(for webView: WKWebView) -> Bool

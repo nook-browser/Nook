@@ -18,7 +18,7 @@ class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
-    private let currentVersion = 5 // Increment when adding new shortcuts
+    private let currentVersion = 6 // Increment when adding new shortcuts; 6 added Print (Cmd+P)
 
     /// Hash-based storage for O(1) lookup: ["cmd+t": KeyboardShortcut]
     private var shortcutMap: [String: KeyboardShortcut] = [:]
@@ -93,7 +93,9 @@ class KeyboardShortcutManager {
         for defaultShortcut in defaultShortcuts {
             // Check if this shortcut already exists (by action)
             if !shortcutMap.values.contains(where: { $0.action == defaultShortcut.action }) {
-                // Add missing shortcut
+                // The map is keyed by key combination, so a new default on a key the user gave
+                // another action would silently replace theirs. Theirs wins.
+                guard shortcutMap[defaultShortcut.lookupKey] == nil else { continue }
                 shortcutMap[defaultShortcut.lookupKey] = defaultShortcut
                 needsUpdate = true
             }
@@ -548,6 +550,8 @@ class KeyboardShortcutManager {
                 tabs.activeWindowSession?.requestPictureInPicture()
             case .copyCurrentURL:
                 browserManager.copyCurrentURL()
+            case .printPage:
+                browserManager.printCurrentPage()
             case .hardReload:
                 browserManager.hardReloadCurrentPage()
             case .muteUnmuteAudio:

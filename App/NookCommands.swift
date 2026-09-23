@@ -159,6 +159,13 @@ struct NookCommands: Commands {
             }
             .modifier(dynamicShortcut(.copyCurrentURL))
             .disabled(browserManager.tabs.activeWindowSession == nil)
+
+            Divider()
+            Button("Print…") {
+                browserManager.printCurrentPage()
+            }
+            .modifier(dynamicShortcut(.printPage))
+            .disabled(browserManager.tabs.activeWindowSession == nil)
         }
 
         // Sidebar commands

@@ -183,6 +183,17 @@ extension BrowserManager {
         alert.runModal()
     }
 
+    // MARK: - Printing
+
+    /// The print panel for the active window's page, a PDF included.
+    func printCurrentPage() {
+        guard let windowState = windowRegistry?.activeWindow,
+              let session = tabs.controllableSession(in: windowState),
+              let webView = getWebView(for: session.itemID, in: windowState.id)
+        else { return }
+        webView.nookPrint()
+    }
+
     // MARK: - Zoom Management
 
     /// Zoom in for the current tab

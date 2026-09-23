@@ -253,6 +253,18 @@ struct WebsiteView: View {
                 
             }
             
+            // WebKit's PDF bar is off (BrowserConfiguration.hidePDFHUD); these replace it.
+            if !shouldShowSplit,
+               let session = browserManager.tabs.controllableSession(in: windowState),
+               session.isDisplayingPDF,
+               let webView = browserManager.getWebView(for: session.itemID, in: windowState.id) {
+                VStack {
+                    Spacer()
+                    PDFControlsView(session: session, webView: webView)
+                        .padding(.bottom, NookDesign.Spacing.xxxl)
+                }
+            }
+
             // Split preview overlay - shows cards during drag operations
             if splitManager.getSplitState(for: windowState.id).isPreviewActive {
                 SplitPreviewOverlay()

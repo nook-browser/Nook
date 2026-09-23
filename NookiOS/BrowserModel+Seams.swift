@@ -91,6 +91,9 @@ extension BrowserModel: PageSessionDelegate {
         download.delegate = handler
     }
 
+    /// Only the macOS PDF controls call this; iOS keeps WebKit's own PDF viewer.
+    func saveFile(_ data: Data, suggestedFilename: String, originalURL: URL, from webView: WKWebView) {}
+
     func toggleFullScreen(for webView: WKWebView) -> Bool { false }
 
     func presentPeek(url: URL, from session: PageSession) { session.navigate(to: url.absoluteString) }
