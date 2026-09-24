@@ -743,8 +743,7 @@ public final class PageSession: NSObject, Identifiable {
     public func openInNewTab(_ url: URL) {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
         guard let tabs = controller, let window = tabs.window(for: self) else { return }
-        let parent = tabs.spaceID(of: itemID).map { Parent.tabs(spaceID: $0) }
-        tabs.open(url: url, in: window, placement: .background, parent: parent)
+        tabs.open(url: url, in: window, placement: .background, below: itemID)
     }
 
     // MARK: - Equality

@@ -71,10 +71,10 @@ struct PeekOverlayView: View {
                         .id(page.itemID)
                 }
 
-                // Action buttons positioned outside main content but within scaled area
+                // Action buttons in the margin left of the card, within the scaled area
                 actionButtons
                     .position(
-                        x: frame.width + 30,
+                        x: -30,
                         y: 80
                     )
             }
@@ -167,20 +167,19 @@ struct PeekOverlayView: View {
 
     private func calculateLayout(geometry: GeometryProxy) -> (frame: CGRect, cornerRadius: CGFloat) {
         let windowSize = geometry.size
-        let isSplit = browserManager.splitManager.isSplit(for: windowState.id)
         let sidebarPosition = nookSettings.sidebarPosition
 
         // Compute the visible web content area by excluding the sidebar width
         let sidebarWidth: CGFloat = windowState.isSidebarVisible ? windowState.sidebarWidth : 0
         let webAreaWidth = max(0, windowSize.width - sidebarWidth)
 
-        let webViewHeight = windowSize.height - 10 // Full height PLUS 10pts
+        // 80% of the web area wide and 90% of the window tall, so the page behind stays in view.
+        let webViewHeight = windowSize.height * 0.9
         let cornerRadius: CGFloat = NookDesign.Radius.xl
 
-        // Center within the web area (excluding sidebar) with 60pt margins
-        let horizontalMargin: CGFloat = 60
-        let peekWidth = max(0, webAreaWidth - (horizontalMargin * 2))
-        let peekXWithinWebArea = (webAreaWidth - peekWidth) / 2 // equals horizontalMargin
+        // Center within the web area (excluding sidebar)
+        let peekWidth = webAreaWidth * 0.8
+        let peekXWithinWebArea = (webAreaWidth - peekWidth) / 2
 
         // Calculate peek X position based on sidebar position
         let peekX: CGFloat
@@ -192,8 +191,6 @@ struct PeekOverlayView: View {
             peekX = peekXWithinWebArea
         }
 
-        // If split view, behavior remains the same as single; centering is relative to web area
-        _ = isSplit // currently unused but kept for future adjustments
 
         return (
             frame: CGRect(

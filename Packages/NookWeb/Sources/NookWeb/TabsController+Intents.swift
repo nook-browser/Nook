@@ -13,24 +13,38 @@ import WebKit
 extension TabsController {
     // MARK: - Open
 
-    /// Creates a tab for `url` at the top of `parent` (default: the window's tabs section).
-    /// `.newTab` selects it, `.background` leaves selection alone and loads nothing,
-    /// `.replaceCurrent` loads `url` in the selected page.
+    /// Creates a tab for `url`: at the top of `parent` when one is given, else right below
+    /// `anchor`, the window's selected tab by default (`newTabPosition`). `.newTab` selects it,
+    /// `.background` leaves selection alone and loads nothing, `.replaceCurrent` loads `url` in
+    /// the selected page.
     @discardableResult
-    public func open(url: URL, in window: BrowserWindowState, placement: Placement, parent: Parent? = nil) -> UUID? {
+    public func open(url: URL, in window: BrowserWindowState, placement: Placement, parent: Parent? = nil, below anchor: UUID? = nil) -> UUID? {
         if placement == .replaceCurrent, let selected = window.selectedItemID, let session = ensureSession(for: selected) {
             session.load(url)
             select(selected, in: window)
             return selected
         }
-        guard let target = parent ?? window.spaceID.map({ Parent.tabs(spaceID: $0) }) else { return nil }
+        guard let position = parent.map({ ($0, UUID?.none) }) ?? newTabPosition(in: window, after: anchor ?? window.selectedItemID)
+        else { return nil }
         let id = UUID()
         let created = perform(owner(of: window), "open") {
-            try $0.createTab(id: id, url: url, title: url.host ?? url.absoluteString, in: target, after: nil)
+            try $0.createTab(id: id, url: url, title: url.host ?? url.absoluteString, in: position.0, after: position.1)
         }
         guard created != nil else { return nil }
         if placement != .background { select(id, in: window) }
         return id
+    }
+
+    /// Where a new tab goes: right below `anchor` when it is a tab in the window's tabs section,
+    /// else the top of that section. A pinned tab or favorite keeps its section to itself.
+    func newTabPosition(in window: BrowserWindowState, after anchor: UUID?) -> (Parent, UUID?)? {
+        guard let spaceID = window.spaceID else { return nil }
+        let source = tree(owner(of: window))
+        if let anchor, let item = source.item(anchor), !item.isFolder,
+           source.scope(of: anchor) == .device, source.spaceID(of: anchor) == spaceID {
+            return (item.parent, anchor)
+        }
+        return (.tabs(spaceID: spaceID), nil)
     }
 
     // MARK: - Detached Pages
@@ -69,9 +83,10 @@ extension TabsController {
     public func adopt(_ session: PageSession, in window: BrowserWindowState) -> UUID? {
         guard session.isDetached else { return nil }
         let store = window.privateTree != nil ? window.ephemeralProfile : window.spaceID.flatMap { profile(forSpace: $0) }
-        guard store === session.detachedProfile, let spaceID = window.spaceID,
+        guard store === session.detachedProfile,
+              let position = newTabPosition(in: window, after: window.selectedItemID),
               perform(owner(of: window), "adopt", {
-                  try $0.createTab(id: session.itemID, url: session.url, title: session.title, in: .tabs(spaceID: spaceID), after: nil)
+                  try $0.createTab(id: session.itemID, url: session.url, title: session.title, in: position.0, after: position.1)
               }) != nil
         else {
             let id = open(url: session.url, in: window, placement: .newTab)
@@ -99,11 +114,12 @@ extension TabsController {
     /// session owns `webView`. WebKit drives the popup's first navigation.
     @discardableResult
     func adoptPopup(webView: WKWebView, url: URL?, opener: PageSession) -> UUID? {
-        guard let window = window(for: opener), let spaceID = window.spaceID else { return nil }
+        guard let window = window(for: opener), let position = newTabPosition(in: window, after: opener.itemID)
+        else { return nil }
         let id = UUID()
         let pageURL = url ?? URL(string: "about:blank")!
         guard perform(owner(of: window), "popup", {
-            try $0.createTab(id: id, url: pageURL, title: "New Tab", in: .tabs(spaceID: spaceID), after: nil)
+            try $0.createTab(id: id, url: pageURL, title: "New Tab", in: position.0, after: position.1)
         }) != nil else { return nil }
         let session = PageSession(
             itemID: id, url: pageURL, title: "New Tab", isPrivate: window.privateTree != nil,
