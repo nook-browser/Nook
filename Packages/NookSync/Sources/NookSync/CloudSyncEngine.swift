@@ -65,6 +65,12 @@ public final class CloudSyncEngine: CKSyncEngineDelegate {
 
     // MARK: - Lifecycle
 
+    /// True when the user is signed into iCloud. Callers gate the one-time
+    /// offer on this; `start()` checks it again itself.
+    public static func accountAvailable(containerID: String) async -> Bool {
+        (try? await CKContainer(identifier: containerID).accountStatus()) == .available
+    }
+
     public func start() {
         guard engine == nil, !starting else { return }
         starting = true
