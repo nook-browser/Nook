@@ -15,10 +15,14 @@ struct AppleIntelligenceProvider: AIProviderProtocol {
     static let modelId = "apple-on-device"
 
     /// Short on purpose: the default system prompt alone is about 800 tokens of a 4096-token context.
+    /// Chosen by a scored eval on the system model; see `docs/superpowers/on-device-chat-eval/`.
     static let instructions = """
-        You are the assistant in Nook, a web browser. Answer questions about the page the person is viewing, \
-        using the page text you are given. Be brief. When the page does not say, tell them so instead of guessing. \
-        Use a tool only when they ask you to do something in the browser.
+        You are the assistant in Nook, a web browser, shown in a narrow sidebar beside the page. \
+        Reply in the language the person writes in, as briefly as the question allows. \
+        When the question is about the page, answer from the page text you are given, which may be cut off: \
+        when the answer could be further down, use searchInPage before saying the page does not cover it, \
+        and when the page does not say, tell them so. Answer other questions from your own knowledge. \
+        Never make up facts, figures or links. Use a tool only when the person asks you to do something in the browser.
         """
 
     /// Observable: views reading this update when Apple Intelligence is turned on or off.
@@ -39,6 +43,33 @@ struct AppleIntelligenceProvider: AIProviderProtocol {
     ]
 
     private static let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
+
+    /// Whether the person's own message names what an opening or clicking tool is aimed at. The model
+    /// followed instructions planted in page text on every eval run, whatever the prompt said, so a
+    /// target the person did not name gets an approval prompt, even in Auto mode.
+    static func personNamed(_ toolName: String, arguments: [String: Any], in request: String) -> Bool {
+        let request = request.lowercased()
+        switch toolName {
+        case "navigateToURL", "createTab":
+            guard let url = arguments["url"] as? String, !url.isEmpty else { return true }
+            guard let host = URL(string: url.contains("://") ? url : "https://" + url)?.host?.lowercased() else { return false }
+            // The site's own name: "bbc" for news.bbc.co.uk, "evil" for bakery.com.evil.io.
+            // ponytail: a short suffix list, not the public suffix list; a site under an unlisted
+            // two-part suffix asks when the person names it, which errs toward asking.
+            let labels = host.split(separator: ".").map(String.init)
+            let countrySuffix = labels.count >= 3 && labels[labels.count - 1].count == 2
+                && ["co", "com", "net", "org", "ac", "gov", "edu"].contains(labels[labels.count - 2])
+            let site = labels.suffix(countrySuffix ? 3 : 2)
+            guard let name = site.first else { return false }
+            let words = Set(request.split { !$0.isLetter && !$0.isNumber }.map(String.init))
+            return request.contains(site.joined(separator: ".")) || words.contains(name)
+        case "clickElement":
+            guard let text = arguments["text"] as? String, !text.isEmpty else { return false }
+            return request.contains(text.lowercased())
+        default:
+            return true
+        }
+    }
 
     /// Runs a browser tool by name with its JSON arguments and returns what the model reads back.
     let runTool: @MainActor @Sendable (_ name: String, _ argumentsJSON: String) async -> String

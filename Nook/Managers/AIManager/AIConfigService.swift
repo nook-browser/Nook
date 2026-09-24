@@ -6,6 +6,7 @@
 //  Manages AI configuration persistence via JSON file
 //
 
+import CryptoKit
 import Foundation
 import NookSettings
 import OSLog
@@ -75,6 +76,7 @@ class AIConfigService {
         // Migrate from UserDefaults if this is a fresh config
         migrateFromUserDefaultsIfNeeded()
         addOnDeviceProvider()
+        replaceUneditedSystemPrompt()
     }
 
     // MARK: - Persistence
@@ -371,6 +373,17 @@ class AIConfigService {
             changed = true
         }
         if changed { save() }
+    }
+
+    /// SHA-256 of the default system prompt before September 2026. A saved prompt that still matches
+    /// it was never edited, so it moves to the current default; an edited one is left alone.
+    private static let previousDefaultPromptHash = "711d0701b5580efd395aa9c85e233349b9d50e4ef3b60b937d6eef722ab978b9"
+
+    private func replaceUneditedSystemPrompt() {
+        let hash = SHA256.hash(data: Data(config.generationConfig.systemPrompt.utf8)).map { String(format: "%02x", $0) }.joined()
+        guard hash == Self.previousDefaultPromptHash else { return }
+        config.generationConfig.systemPrompt = AIGenerationConfig.defaultSystemPrompt
+        save()
     }
 
     // MARK: - Migration from UserDefaults

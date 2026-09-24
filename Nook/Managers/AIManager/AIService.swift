@@ -67,13 +67,13 @@ class AIService {
 
     // MARK: - Provider Factory
 
-    private func createProvider(contextTag: String) -> AIProviderProtocol? {
+    private func createProvider(contextTag: String, request: String) -> AIProviderProtocol? {
         guard let providerConfig = configService.activeProvider else { return nil }
 
         switch providerConfig.providerType {
         case .appleIntelligence:
             return AppleIntelligenceProvider { [weak self] name, argumentsJSON in
-                await self?.runOnDeviceTool(name, argumentsJSON: argumentsJSON, tag: contextTag) ?? ""
+                await self?.runOnDeviceTool(name, argumentsJSON: argumentsJSON, tag: contextTag, request: request) ?? ""
             }
         case .gemini:
             return GeminiProvider(apiKey: providerConfig.apiKey, baseURL: providerConfig.baseURL)
@@ -119,14 +119,18 @@ class AIService {
             // The wrapper tag carries a random suffix per request, so page text cannot close it
             let contextTag = "page_context_" + UUID().uuidString.prefix(8).lowercased()
 
+            // Collect available tools
+            let tools = isPrivate ? [] : collectAvailableTools()
+
             // Extract page context
             let onDevice = configService.activeProviderType == .appleIntelligence
             let pageContext = isPrivate ? "" : await extractPageContext(
-                windowState: windowState, tag: contextTag, maxTokens: onDevice ? AppleIntelligenceProvider.pageTokens : nil
+                windowState: windowState, tag: contextTag, maxTokens: onDevice ? AppleIntelligenceProvider.pageTokens : nil,
+                canSearch: tools.contains { $0.name == BrowserTools.searchInPage.name }
             )
             let fullPrompt = pageContext + text
 
-            guard let provider = createProvider(contextTag: contextTag) else {
+            guard let provider = createProvider(contextTag: contextTag, request: text) else {
                 throw AIProviderError.invalidAPIKey
             }
 
@@ -150,9 +154,6 @@ class AIService {
 
             // Add current user message with page context
             aiMessages.append(AIMessage(role: .user, content: fullPrompt))
-
-            // Collect available tools
-            let tools = isPrivate ? [] : collectAvailableTools()
 
             // Agentic loop
             var response = try await provider.sendMessage(
@@ -282,7 +283,7 @@ class AIService {
 
     // MARK: - Tool Execution
 
-    private func executeToolCall(_ toolCall: AIToolCall) async -> AIToolResult {
+    private func executeToolCall(_ toolCall: AIToolCall, approved: Bool = false) async -> AIToolResult {
         // No tools are advertised in a private window; refuse a call the model made anyway
         if browserToolExecutor?.windowState?.isIncognito == true {
             return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Tools are not available in a private window.", isError: true)
@@ -308,7 +309,7 @@ class AIService {
 
             // executeJavaScript is left to the confirmation handler below, which prompts on every call
             if executionMode == .askBeforeExecuting && Self.mutatingTools.contains(toolCall.name)
-                && toolCall.name != "executeJavaScript" && !autoApprovedThisChat {
+                && toolCall.name != "executeJavaScript" && !autoApprovedThisChat && !approved {
                 let approval = await requestToolApproval(toolName: toolCall.name, args: toolCall.arguments)
                 switch approval {
                 case .allow:
@@ -375,7 +376,7 @@ class AIService {
 
     /// A tool call the on-device model makes mid-response. It goes through the same approval and
     /// switches as any other call; the output is cut to what the model's context can take.
-    private func runOnDeviceTool(_ name: String, argumentsJSON: String, tag: String) async -> String {
+    private func runOnDeviceTool(_ name: String, argumentsJSON: String, tag: String, request: String) async -> String {
         let arguments = (try? JSONSerialization.jsonObject(with: Data(argumentsJSON.utf8))) as? [String: Any] ?? [:]
         currentToolName = name
         isExecutingTools = true
@@ -383,7 +384,18 @@ class AIService {
             currentToolName = nil
             isExecutingTools = false
         }
-        let result = await executeToolCall(AIToolCall(name: name, arguments: arguments))
+        // A target the person did not name may come from the page, so it always asks
+        var approved = false
+        if !AppleIntelligenceProvider.personNamed(name, arguments: arguments, in: request),
+           configService.browserToolsConfig.executionMode != .disabled,
+           configService.browserToolsConfig.enabledTools.contains(name),
+           browserToolExecutor?.windowState?.isIncognito != true {
+            guard await requestToolApproval(toolName: name, args: arguments, offerAllowAll: false) != .deny else {
+                return wrapUntrusted("The person declined \(name).", tag: tag)
+            }
+            approved = true
+        }
+        let result = await executeToolCall(AIToolCall(name: name, arguments: arguments), approved: approved)
         return wrapUntrusted(AppleIntelligenceProvider.fitted(result.content, tokens: AppleIntelligenceProvider.toolOutputTokens), tag: tag)
     }
 
@@ -452,7 +464,7 @@ class AIService {
         "<\(tag)>\n\(text.replacingOccurrences(of: tag, with: ""))\n</\(tag)>"
     }
 
-    func extractPageContext(windowState: BrowserWindowState, tag: String, maxTokens: Int? = nil) async -> String {
+    func extractPageContext(windowState: BrowserWindowState, tag: String, maxTokens: Int? = nil, canSearch: Bool = false) async -> String {
         guard let browserManager = browserManager,
               let itemID = windowState.selectedItemID,
               let webView = browserManager.getWebView(for: itemID, in: windowState.id) else {
@@ -464,6 +476,8 @@ class AIService {
             const title = document.title;
             const url = window.location.href;
 
+            const selection = String(window.getSelection() || '').trim().substring(0, 2000);
+
             const clone = document.body.cloneNode(true);
             const scripts = clone.querySelectorAll('script, style, noscript');
             scripts.forEach(el => el.remove());
@@ -471,14 +485,17 @@ class AIService {
             let text = clone.innerText || clone.textContent || '';
             text = text.replace(/\\s+/g, ' ').trim();
 
-            if (text.length > 8000) {
+            const truncated = text.length > 8000;
+            if (truncated) {
                 text = text.substring(0, 8000) + '...';
             }
 
             return {
                 title: title,
                 url: url,
-                content: text
+                content: text,
+                selection: selection,
+                truncated: truncated
             };
         })();
         """
@@ -490,13 +507,19 @@ class AIService {
                let title = dict["title"] as? String,
                let url = dict["url"] as? String,
                let content = dict["content"] as? String {
+                let fitted = maxTokens.map { AppleIntelligenceProvider.fitted(content, tokens: $0) } ?? content
+                let truncated = dict["truncated"] as? Bool == true || fitted != content
+                var selection = dict["selection"] as? String ?? ""
+                if maxTokens != nil { selection = AppleIntelligenceProvider.fitted(selection, tokens: AppleIntelligenceProvider.toolOutputTokens) }
+                // The model only searched past a cut when told the text stops early, whatever its instructions said
+                let note = truncated && canSearch ? "\n\nThe page text above is only the start of the page. Use searchInPage to look for anything further down." : ""
                 return wrapUntrusted("""
                 <title>\(title)</title>
                 <url>\(url)</url>
                 <content>
-                \(maxTokens.map { AppleIntelligenceProvider.fitted(content, tokens: $0) } ?? content)
+                \(fitted)
                 </content>
-                """, tag: tag) + "\n\nUser Question: "
+                """ + (selection.isEmpty ? "" : "\n<selected_text>\n\(selection)\n</selected_text>"), tag: tag) + note + "\n\nUser Question: "
             }
         } catch {
             Self.log.error("Failed to extract page content: \(error.localizedDescription)")
