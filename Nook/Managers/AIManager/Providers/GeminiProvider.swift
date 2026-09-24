@@ -64,12 +64,14 @@ struct GeminiProvider: AIProviderProtocol {
                         parts.append(["text": message.content])
                     }
                     for toolCall in message.toolCalls {
-                        parts.append([
+                        var part: [String: Any] = [
                             "functionCall": [
                                 "name": toolCall.name,
                                 "args": toolCall.arguments
                             ]
-                        ])
+                        ]
+                        part["thoughtSignature"] = toolCall.thoughtSignature
+                        parts.append(part)
                     }
                     contents.append(["role": "model", "parts": parts])
                 } else {
@@ -79,18 +81,19 @@ struct GeminiProvider: AIProviderProtocol {
                     ])
                 }
             case .tool:
-                for result in message.toolResults {
-                    contents.append([
-                        "role": "function",
-                        "parts": [[
+                // Every response to one step goes back in a single user turn, after all its calls
+                contents.append([
+                    "role": "user",
+                    "parts": message.toolResults.map { result in
+                        [
                             "functionResponse": [
                                 "id": result.toolCallId,
                                 "name": result.toolName,
                                 "response": ["content": result.content]
                             ]
-                        ]]
-                    ])
-                }
+                        ]
+                    }
+                ])
             case .system:
                 break
             }
@@ -163,7 +166,7 @@ struct GeminiProvider: AIProviderProtocol {
                 let args = functionCall["args"] as? [String: Any] ?? [:]
                 // Extract Gemini's unique call ID for proper FunctionResponse correlation
                 let callId = functionCall["id"] as? String ?? UUID().uuidString
-                toolCalls.append(AIToolCall(id: callId, name: name, arguments: args))
+                toolCalls.append(AIToolCall(id: callId, name: name, arguments: args, thoughtSignature: part["thoughtSignature"] as? String))
             }
         }
 

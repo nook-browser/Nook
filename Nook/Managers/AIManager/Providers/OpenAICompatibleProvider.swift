@@ -106,23 +106,48 @@ struct OpenAICompatibleProvider: AIProviderProtocol {
             body["tools"] = tools.map { $0.toOpenAIFormat() }
         }
 
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        while true {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AIProviderError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            if httpResponse.statusCode == 429 {
-                throw AIProviderError.rateLimited
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AIProviderError.invalidResponse
             }
-            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw AIProviderError.httpError(httpResponse.statusCode, errorBody)
-        }
 
-        return try parseResponse(data)
+            // Each fix removes a key, so this resends at most twice
+            if httpResponse.statusCode == 400, let fixed = Self.body(body, fixingRejectionIn: data) {
+                body = fixed
+                continue
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                if httpResponse.statusCode == 429 {
+                    throw AIProviderError.rateLimited
+                }
+                let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+                throw AIProviderError.httpError(httpResponse.statusCode, errorBody)
+            }
+
+            return try parseResponse(data)
+        }
+    }
+
+    /// OpenAI's reasoning models (GPT-5, o-series) reject `max_tokens` and any temperature but the
+    /// default, and name the parameter in the error. Returns the body with it fixed, or nil.
+    static func body(_ body: [String: Any], fixingRejectionIn data: Data) -> [String: Any]? {
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        var body = body
+        switch (json?["error"] as? [String: Any])?["param"] as? String {
+        case "max_tokens":
+            guard let limit = body.removeValue(forKey: "max_tokens") else { return nil }
+            body["max_completion_tokens"] = limit
+        case "temperature":
+            guard body.removeValue(forKey: "temperature") != nil else { return nil }
+        default:
+            return nil
+        }
+        return body
     }
 
     private func parseResponse(_ data: Data) throws -> AIResponse {
