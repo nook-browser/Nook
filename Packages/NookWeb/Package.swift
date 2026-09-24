@@ -13,6 +13,7 @@ let package = Package(
         .package(path: "../NookSettings"),
         .package(path: "../NookBlocker"),
         .package(path: "../NookTweaks"),
+        .package(path: "../NookSync"),
         .package(url: "https://github.com/will-lumley/FaviconFinder.git", from: "5.1.5"),
     ],
     targets: [
@@ -26,6 +27,7 @@ let package = Package(
                 .product(name: "NookSettings", package: "NookSettings"),
                 .product(name: "NookBlocker", package: "NookBlocker"),
                 .product(name: "NookTweaks", package: "NookTweaks"),
+                .product(name: "NookSync", package: "NookSync"),
                 .product(name: "FaviconFinder", package: "FaviconFinder"),
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]
