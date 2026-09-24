@@ -15,13 +15,21 @@ extension BrowserConfiguration {
         // together makes WebKit's requestDOMPasteAccess return granted before it reaches the
         // user-gesture check, so any page could read the clipboard silently. Safari does not set
         // them either. Gesture-driven copy and paste go through WebKit's own path.
-        config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        config.preferences.setValue(true, forKey: "allowsInlineMediaPlayback")
+        setPrivatePreference("allowsPictureInPictureMediaPlayback", in: config.preferences)
+        setPrivatePreference("allowsInlineMediaPlayback", in: config.preferences)
         // The inspector itself is enabled per web view through isInspectable.
         #if DEBUG
-        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        setPrivatePreference("developerExtrasEnabled", in: config.preferences)
         #endif
         hidePDFHUD(in: config.preferences)
+    }
+
+    /// KVC on a key WebKit has dropped throws NSUndefinedKeyException and would take down every
+    /// new web view, so a missing private setter is skipped.
+    private static func setPrivatePreference(_ key: String, in preferences: WKPreferences) {
+        let setter = "_set\(key.prefix(1).uppercased())\(key.dropFirst()):"
+        guard preferences.responds(to: NSSelectorFromString(setter)) else { return }
+        preferences.setValue(true, forKey: key)
     }
 
     /// WebKit's PDF viewer draws its own zoom/save bar over the page. Nook draws glass controls
