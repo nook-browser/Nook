@@ -33,7 +33,8 @@ extension PageSession {
     // MARK: - Peek Detection
 
     /// Option always peeks. Otherwise only a favorite or pinned tab peeks, for a link to another
-    /// site, so the page it keeps in the sidebar stays put; a regular tab opens a new tab.
+    /// site, whether it loads in place or asks for a new window, so the page it keeps in the
+    /// sidebar stays put; a regular tab follows the link or opens a new tab.
     func shouldRedirectToPeek(url: URL) -> Bool {
         if isOptionKeyDown { return true }
         guard controller?.isSynced(itemID) == true, let from = self.url.host, let to = Self.destinationHost(of: url)
