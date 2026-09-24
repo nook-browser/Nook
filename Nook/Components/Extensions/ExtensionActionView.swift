@@ -146,17 +146,22 @@ struct ExtensionActionButton: View {
         // MV3 workers auto-terminate after ~5 min; if the popup opens before the
         // worker is alive, chrome.runtime.sendMessage hangs and the popup shows
         // a spinner for several seconds.
+        // A broken background never calls back, so the popup opens after 2 s regardless.
         if extensionContext.webExtension.hasBackgroundContent {
-            Task { @MainActor in
-                do {
-                    try await extensionContext.loadBackgroundContent()
-                    Self.logger.debug("Background worker alive for '\(self.ext.name, privacy: .public)'")
-                } catch {
-                    Self.logger.error("Background wake failed: \(error.localizedDescription, privacy: .public)")
-                }
+            var opened = false
+            let open = {
+                guard !opened else { return }
+                opened = true
                 Self.logger.info("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
                 extensionContext.performAction(for: adapter)
             }
+            extensionContext.loadBackgroundContent { error in
+                if let error {
+                    Self.logger.error("Background wake failed: \(error.localizedDescription, privacy: .public)")
+                }
+                open()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: open)
         } else {
             Self.logger.info("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
             extensionContext.performAction(for: adapter)

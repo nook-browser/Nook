@@ -39,7 +39,9 @@ class DialogManager {
 
         isVisible = false
         removeTabKeyMonitor()
+        // A dialog shown during the fade (a second extension prompt) must not be cleared with it.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard self?.isVisible == false else { return }
             self?.activeDialog = nil
         }
     }
