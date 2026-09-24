@@ -17,8 +17,15 @@ extension ExtensionManager {
     // MARK: - Adapters
 
     /// Adapter for a tab item extensions may see; nil for folders, unknown ids and private items.
-    func adapter(for itemID: UUID) -> ExtensionTabAdapter? {
+    /// A detached page (Peek, mini window) has no item, so it is passed in.
+    func adapter(for itemID: UUID, page: PageSession? = nil) -> ExtensionTabAdapter? {
         if let existing = tabAdapters[itemID] { return existing }
+        if let page, page.isDetached {
+            guard !page.isPrivate, let bm = browserManagerRef else { return nil }
+            let created = ExtensionTabAdapter(itemID: itemID, browserManager: bm, detachedPage: page)
+            tabAdapters[itemID] = created
+            return created
+        }
         guard let bm = browserManagerRef, let item = bm.tabs.item(itemID), !item.isFolder,
               bm.tabs.session(for: itemID)?.isPrivate != true,
               !(bm.windowRegistry?.allWindows ?? []).contains(where: { $0.privateTree?.item(itemID) != nil })
@@ -45,6 +52,11 @@ extension ExtensionManager {
         windowAdapters[window.id] = created
         extensionController?.didOpenWindow(created)
         return created
+    }
+
+    /// Detached pages extensions were told about whose window is `window`, in opening order.
+    func detachedAdapters(in window: BrowserWindowState) -> [ExtensionTabAdapter] {
+        detachedAdapters.filter { $0.hostWindow === window }
     }
 
     /// Regular windows, focused first.

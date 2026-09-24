@@ -46,7 +46,9 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
 
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
         guard let state else { return [] }
-        return browserManager.tabs.displayOrder(in: state).compactMap { ExtensionManager.shared.adapter(for: $0) }
+        let manager = ExtensionManager.shared
+        return browserManager.tabs.displayOrder(in: state).compactMap { manager.adapter(for: $0) }
+            + manager.detachedAdapters(in: state)
     }
 
     func frame(for extensionContext: WKWebExtensionContext) -> CGRect {
@@ -139,13 +141,19 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
 
 /// One tab item, keyed by item id. The page session is resolved on each call, so an unloaded
 /// tab keeps the same adapter, and a reopened tab (same id) compares equal to its old adapter.
+/// A Peek or mini window page has no item; its adapter holds the page and the window it is
+/// listed in, and keeps its id when the page becomes a tab.
 final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     let itemID: UUID
     private unowned let browserManager: BrowserManager
+    private weak var detachedPage: PageSession?
+    private(set) weak var detachedWindow: BrowserWindowState?
 
-    init(itemID: UUID, browserManager: BrowserManager) {
+    init(itemID: UUID, browserManager: BrowserManager, detachedPage: PageSession? = nil) {
         self.itemID = itemID
         self.browserManager = browserManager
+        self.detachedPage = detachedPage
+        self.detachedWindow = detachedPage?.detachedWindow
         super.init()
     }
 
@@ -158,14 +166,17 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     override var hash: Int { itemID.hashValue }
 
     private var tabs: TabsController { browserManager.tabs }
-    private var session: PageSession? { tabs.session(for: itemID) }
+    private var session: PageSession? { tabs.session(for: itemID) ?? detachedPage }
+    /// A Peek or mini window page that has not become a tab.
+    var isDetached: Bool { detachedPage?.isDetached == true }
 
-    /// The window this tab belongs to: the focused window when it shows the tab, else any
-    /// regular window that shows it, else the focused regular window.
+    /// The window this tab belongs to: a detached page's own window, else the focused window
+    /// when it shows the tab, else any regular window that shows it, else the focused regular window.
     var hostWindow: BrowserWindowState? {
         let registry = browserManager.windowRegistry
         let regular = (registry?.allWindows ?? []).filter { $0.privateTree == nil }
         let active = registry?.activeWindow.flatMap { $0.privateTree == nil ? $0 : nil }
+        if isDetached, let window = detachedWindow, window.privateTree == nil { return window }
         let candidates = (active.map { [$0] } ?? []) + regular.filter { $0 !== active }
         return candidates.first { tabs.displayOrder(in: $0).contains(itemID) } ?? active ?? regular.first
     }
@@ -192,7 +203,12 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
 
     func indexInWindow(for extensionContext: WKWebExtensionContext) -> Int {
         guard let window = hostWindow else { return 0 }
-        return tabs.displayOrder(in: window).firstIndex(of: itemID) ?? 0
+        let order = tabs.displayOrder(in: window)
+        if isDetached {
+            let listed = ExtensionManager.shared.detachedAdapters(in: window)
+            return order.count + (listed.firstIndex(of: self) ?? 0)
+        }
+        return order.firstIndex(of: itemID) ?? 0
     }
 
     func isLoadingComplete(for extensionContext: WKWebExtensionContext) -> Bool {
@@ -235,14 +251,20 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func close(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
-        tabs.close(itemID)
+        // A detached page closes the way its own window.close() does: Peek dismisses, a mini
+        // window closes.
+        if isDetached, let page = detachedPage {
+            if let onClose = page.onClose { onClose() } else { tabs.endDetached(page) }
+        } else {
+            tabs.close(itemID)
+        }
         completionHandler(nil)
     }
 
     func reload(fromOrigin: Bool, for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
         // An unloaded page reloads by loading its saved URL, without selecting the tab.
         guard let webView = session?.webView else {
-            guard let page = tabs.ensureSession(for: itemID) else {
+            guard !isDetached, let page = tabs.ensureSession(for: itemID) else {
                 completionHandler(error(1, "No webview"))
                 return
             }
@@ -264,7 +286,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
             return
         }
         // An unloaded tab gets a page (not selected) that loads `url` directly.
-        guard let page = tabs.ensureSession(for: itemID) else {
+        guard let page = session ?? tabs.ensureSession(for: itemID) else {
             completionHandler(error(3, "Tab is not loaded"))
             return
         }

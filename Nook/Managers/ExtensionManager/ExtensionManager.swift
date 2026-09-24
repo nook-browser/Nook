@@ -41,6 +41,9 @@ final class ExtensionManager: NSObject, ObservableObject,
     /// Items the controller has been told about via didOpenTab. Other tab events are only
     /// forwarded for these, so private and never-loaded pages stay invisible to extensions.
     var openedTabIDs: Set<UUID> = []
+    /// Announced Peek and mini window pages, in opening order. Each is listed after its window's
+    /// own tabs and never reported active, the way Crest does it.
+    var detachedAdapters: [ExtensionTabAdapter] = []
     /// One adapter per regular window, by BrowserWindowState id.
     var windowAdapters: [UUID: ExtensionWindowAdapter] = [:]
     /// Live `chrome.windows.create({type: "popup"})` windows; each removes itself when closed.

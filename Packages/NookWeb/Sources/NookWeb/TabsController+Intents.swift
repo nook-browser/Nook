@@ -121,7 +121,7 @@ extension TabsController {
         session.detachedWindow = nil
         session.onClose = nil
         register(session, in: window)
-        // Extensions could not see the page while it had no item.
+        // Extensions knew the page as a detached tab; this moves it into the window's list.
         if !session.isPrivate { tabEvents?.tabOpened(session) }
         select(session.itemID, in: window)
         return session.itemID
@@ -132,6 +132,7 @@ extension TabsController {
         guard session.isDetached else { return }
         session.onClose = nil
         session.tearDown()
+        if !session.isPrivate { tabEvents?.tabClosed(itemID: session.itemID) }
     }
 
     /// A WebKit-created popup from `opener`: a new selected tab in the opener's window whose

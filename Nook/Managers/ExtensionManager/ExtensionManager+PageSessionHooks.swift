@@ -4,7 +4,8 @@
 //  Nook
 //
 //  Extension notifications TabsController and PageSession call. Adapters are keyed by item
-//  id (ExtensionManager+TabNotifications.swift). Private sessions are never reported.
+//  id (ExtensionManager+TabNotifications.swift). Private sessions are never reported. Peek and
+//  mini window pages are reported as tabs of their window, listed after its own and never active.
 //
 
 import Foundation
@@ -13,14 +14,27 @@ import NookWeb
 
 extension ExtensionManager {
     /// Called once a session has a web view, before it loads, so content scripts can resolve it.
+    /// A Peek or mini window page counts as a tab of the window it opened from.
     func notifyTabOpened(_ session: PageSession) {
-        guard !session.isPrivate, let controller = extensionController,
-              !openedTabIDs.contains(session.itemID),
-              let adapter = adapter(for: session.itemID)
-        else { return }
+        guard !session.isPrivate, let controller = extensionController else { return }
+        if openedTabIDs.contains(session.itemID) {
+            // A detached page that became a tab keeps its id and adapter, which now resolve
+            // through the tree: the page moves from the end of its window's list to its row.
+            guard !session.isDetached,
+                  let listed = detachedAdapters.firstIndex(where: { $0.itemID == session.itemID })
+            else { return }
+            let adapter = detachedAdapters.remove(at: listed)
+            guard let oldWindow = adapter.detachedWindow, let bm = browserManagerRef else { return }
+            let earlier = detachedAdapters[..<listed].filter { $0.hostWindow === oldWindow }.count
+            let oldIndex = bm.tabs.displayOrder(in: oldWindow).filter { $0 != adapter.itemID }.count + earlier
+            controller.didMoveTab(adapter, from: oldIndex, in: windowAdapter(for: oldWindow))
+            return
+        }
+        guard let adapter = adapter(for: session.itemID, page: session) else { return }
         // The window must be known to the controller before its tab.
         _ = adapter.hostWindow.flatMap { windowAdapter(for: $0) }
         openedTabIDs.insert(session.itemID)
+        if session.isDetached { detachedAdapters.append(adapter) }
         controller.didOpenTab(adapter)
     }
 
@@ -52,6 +66,7 @@ extension ExtensionManager {
         defer {
             tabAdapters[itemID] = nil
             openedTabIDs.remove(itemID)
+            detachedAdapters.removeAll { $0.itemID == itemID }
         }
         guard let controller = extensionController, let adapter = openedAdapter(for: itemID) else { return }
         controller.didCloseTab(adapter, windowIsClosing: false)
