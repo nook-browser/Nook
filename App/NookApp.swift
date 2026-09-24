@@ -10,13 +10,23 @@
 import AppKit
 import Carbon
 import OSLog
+import Security
 import Sparkle
 import SwiftUI
 import NookSettings
+import NookSync
 import NookUI
 import NookWeb
 
 struct NookApp: App {
+    /// Whether this build was signed with the iCloud container entitlement.
+    /// Unsigned compile-check builds and ad-hoc builds have none, and touching
+    /// CKContainer without it raises an ObjC exception rather than an error.
+    static var hasICloudEntitlement: Bool {
+        guard let task = SecTaskCreateFromSelf(nil) else { return false }
+        return SecTaskCopyValueForEntitlement(task, "com.apple.developer.icloud-container-identifiers" as CFString, nil) != nil
+    }
+
     @State private var windowRegistry: WindowRegistry
     @State private var webViewCoordinator = WebViewCoordinator()
     @State private var settingsManager: NookSettingsService
@@ -187,6 +197,32 @@ struct NookApp: App {
             tabOrganizerManager.autoRename(itemIDs, using: tabs)
         }
         DevMCPServer.shared.configure(browserManager: browserManager, enabled: settingsManager.browserControlServerEnabled)
+
+        // iCloud sync. The engine exists whenever the session can write and the
+        // build carries the iCloud entitlement (CKContainer raises an ObjC
+        // exception without it, and unsigned local builds have none).
+        if !browserManager.tabs.isReadOnly && Self.hasICloudEntitlement {
+            let syncDirectory = TabsController.defaultDirectory
+                .deletingLastPathComponent()
+                .appendingPathComponent("Sync", isDirectory: true)
+            let engine = CloudSyncEngine(
+                directory: syncDirectory,
+                containerID: "iCloud.com.gstudios.nook",
+                deviceID: settingsManager.syncDeviceID,
+                deviceName: Host.current().localizedName ?? "Mac"
+            )
+            browserManager.tabs.attachSyncEngine(engine)
+            if settingsManager.syncEnabled {
+                engine.start()
+            } else if !settingsManager.syncOfferShown {
+                Task { @MainActor [weak browserManager, weak settingsManager] in
+                    guard await CloudSyncEngine.accountAvailable(containerID: "iCloud.com.gstudios.nook"),
+                          let browserManager, let settingsManager else { return }
+                    settingsManager.syncOfferShown = true
+                    browserManager.showSyncOfferToast = true
+                }
+            }
+        }
 
         // A fresh install has no stored version and shows nothing.
         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {

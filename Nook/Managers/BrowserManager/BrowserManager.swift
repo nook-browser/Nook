@@ -365,6 +365,7 @@ class BrowserManager: ObservableObject {
     private var transitionEndTask: Task<Void, Never>?
     // Tab closure undo notification
     @Published var showTabClosureToast: Bool = false
+    @Published var showSyncOfferToast: Bool = false
     @Published var tabClosureToastCount: Int = 0
     @Published var updateAvailability: UpdateAvailability?
     /// Set on the first launch after an update; the sidebar shows a what's-new card until acted on.

@@ -51,6 +51,9 @@ public final class NookSettingsService {
     private let appearanceModeKey = "settings.appearanceMode"
     private let pinnedExtensionIDsKey = "settings.pinnedExtensionIDs"
     private let tabOrganizerEnabledKey = "settings.tabOrganizerEnabled"
+    private let syncEnabledKey = "settings.syncEnabled"
+    private let syncOfferShownKey = "settings.syncOfferShown"
+    private let syncDeviceIDKey = "settings.syncDeviceID"
     private let autoRenamePinnedTabsKey = "settings.autoRenamePinnedTabs"
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
@@ -356,6 +359,29 @@ public final class NookSettingsService {
         }
     }
 
+    public var syncEnabled: Bool {
+        didSet {
+            userDefaults.set(syncEnabled, forKey: syncEnabledKey)
+        }
+    }
+
+    public var syncOfferShown: Bool {
+        didSet {
+            userDefaults.set(syncOfferShown, forKey: syncOfferShownKey)
+        }
+    }
+
+    /// Stable identity for this Mac's Device record, created on first read and
+    /// never synced.
+    public var syncDeviceID: UUID {
+        if let raw = userDefaults.string(forKey: syncDeviceIDKey), let id = UUID(uuidString: raw) {
+            return id
+        }
+        let id = UUID()
+        userDefaults.set(id.uuidString, forKey: syncDeviceIDKey)
+        return id
+    }
+
 
 
     /// Move a playing video into a panel above the sidebar media bar when its tab is left.
@@ -449,6 +475,8 @@ public final class NookSettingsService {
             tabLayoutKey: TabLayout.sidebar.rawValue,
             appearanceModeKey: AppearanceMode.system.rawValue,
             tabOrganizerEnabledKey: false,
+            syncEnabledKey: false,
+            syncOfferShownKey: false,
             autoRenamePinnedTabsKey: true,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
@@ -547,6 +575,8 @@ public final class NookSettingsService {
         self.appearanceMode = AppearanceMode(rawValue: userDefaults.string(forKey: appearanceModeKey) ?? AppearanceMode.system.rawValue) ?? .system
         self.didFinishOnboarding = userDefaults.bool(forKey: didFinishOnboardingKey)
         self.tabOrganizerEnabled = userDefaults.bool(forKey: tabOrganizerEnabledKey)
+        self.syncEnabled = userDefaults.bool(forKey: syncEnabledKey)
+        self.syncOfferShown = userDefaults.bool(forKey: syncOfferShownKey)
         self.autoRenamePinnedTabs = userDefaults.bool(forKey: autoRenamePinnedTabsKey)
         self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
         self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)

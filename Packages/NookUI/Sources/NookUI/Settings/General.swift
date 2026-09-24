@@ -9,6 +9,7 @@
 import SwiftUI
 import NookDesign
 import NookSettings
+import NookSync
 import NookWeb
 
 public struct SettingsGeneralTab: View {
@@ -16,6 +17,19 @@ public struct SettingsGeneralTab: View {
     @Environment(NookSettingsService.self) var nookSettings
     @State private var showingAddSite = false
     @State private var showingAddEngine = false
+    @State private var showingDeleteSyncData = false
+
+    private var syncStatusText: String {
+        guard nookSettings.syncEnabled, let engine = tabs.syncEngine else { return "Off" }
+        switch engine.status {
+        case .off: return "Off"
+        case .noAccount: return "No iCloud account"
+        case .syncing: return "Syncing…"
+        case .synced: return "Synced"
+        case .quotaExceeded: return "iCloud storage is full"
+        case .error(let message): return message
+        }
+    }
 
     public init() {}
 
@@ -50,6 +64,42 @@ public struct SettingsGeneralTab: View {
                 Text("Leaving a tab with a playing video moves it into a small window above the sidebar media controls.")
             }
             #endif
+
+            Section {
+                Toggle("Sync spaces and pinned tabs with iCloud", isOn: Binding(
+                    get: { nookSettings.syncEnabled },
+                    set: { enabled in
+                        nookSettings.syncEnabled = enabled
+                        if enabled {
+                            tabs.syncEngine?.start()
+                        } else {
+                            tabs.syncEngine?.stop(discardState: false)
+                        }
+                    }
+                ))
+                LabeledContent("Status") {
+                    Text(syncStatusText)
+                        .foregroundStyle(.secondary)
+                }
+                Button("Delete iCloud Data…", role: .destructive) {
+                    showingDeleteSyncData = true
+                }
+            } header: {
+                Text("iCloud Sync")
+            } footer: {
+                Text("Favorites, pinned tabs and spaces stay the same on every Mac signed into your iCloud account. Regular tabs stay on the Mac they were opened on.")
+            }
+            .confirmationDialog(
+                "Delete all Nook data from iCloud?",
+                isPresented: $showingDeleteSyncData
+            ) {
+                Button("Delete iCloud Data", role: .destructive) {
+                    nookSettings.syncEnabled = false
+                    Task { await tabs.syncEngine?.deleteCloudData() }
+                }
+            } message: {
+                Text("Sync turns off and every synced space and tab is removed from your iCloud account. Nothing on this Mac is deleted.")
+            }
 
             Section {
                 Picker("Tab Management", selection: Binding(

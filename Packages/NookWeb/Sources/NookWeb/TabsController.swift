@@ -32,7 +32,7 @@ public final class TabsController {
     public private(set) var device: DeviceState
     public let loadOutcome: LoadOutcome
     public let directory: URL
-    var isReadOnly: Bool {
+    public var isReadOnly: Bool {
         if case .readOnly = loadOutcome { return true }
         return false
     }

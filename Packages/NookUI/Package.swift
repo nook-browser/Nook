@@ -15,6 +15,7 @@ let package = Package(
         .package(path: "../NookTabsCore"),
         .package(path: "../NookTweaks"),
         .package(path: "../NookWeb"),
+        .package(path: "../NookSync"),
     ],
     targets: [
         .target(
@@ -26,6 +27,7 @@ let package = Package(
                 .product(name: "NookTabsCore", package: "NookTabsCore"),
                 .product(name: "NookTweaks", package: "NookTweaks"),
                 .product(name: "NookWeb", package: "NookWeb"),
+                .product(name: "NookSync", package: "NookSync"),
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),

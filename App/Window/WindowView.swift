@@ -75,6 +75,18 @@ struct WindowView: View {
                     TabClosureToast()
                 }
 
+                // One-time iCloud sync offer
+                if browserManager.showSyncOfferToast {
+                    SyncOfferToast(
+                        onTurnOn: {
+                            browserManager.nookSettings?.syncEnabled = true
+                            browserManager.tabs.syncEngine?.start()
+                            browserManager.showSyncOfferToast = false
+                        },
+                        onDismiss: { browserManager.showSyncOfferToast = false }
+                    )
+                }
+
                 // Copy URL toast
                 if windowState.isShowingCopyURLToast {
                     CopyURLToast()
@@ -96,6 +108,7 @@ struct WindowView: View {
             .padding(10)
             // Animate toast insertions/removals
             .animation(.smooth(duration: 0.25), value: browserManager.showTabClosureToast)
+            .animation(.smooth(duration: 0.25), value: browserManager.showSyncOfferToast)
             .animation(.smooth(duration: 0.25), value: windowState.isShowingCopyURLToast)
             .animation(.smooth(duration: 0.25), value: windowState.isShowingShortcutConflictToast)
         }
