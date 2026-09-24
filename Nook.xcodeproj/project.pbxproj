@@ -66,6 +66,7 @@
 				"CommandPalette Accessories/CommandPaletteSuggestionView.swift",
 				"CommandPalette Accessories/GenericSuggestionItem.swift",
 				"CommandPalette Accessories/HistorySuggestionItem.swift",
+				"CommandPalette Accessories/RemoteTabSuggestionItem.swift",
 				"CommandPalette Accessories/TabSuggestionItem.swift",
 				CommandPalette.swift,
 				CommandPaletteView.swift,

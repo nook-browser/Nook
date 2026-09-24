@@ -160,10 +160,11 @@ public class BrowserWindowState {
     }
 }
 
-/// The sidebar menu's two tabs. The app aliases its own `Tabs` to this.
+/// The sidebar menu's tabs. The app aliases its own `Tabs` to this.
 public enum SidebarMenuTab: Hashable, Sendable {
     case history
     case downloads
+    case devices
 }
 
 /// Toast information specific to a window

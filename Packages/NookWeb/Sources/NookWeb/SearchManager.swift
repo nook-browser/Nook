@@ -29,7 +29,9 @@ public class SearchManager {
     /// The last results each leg produced. Held rather than re-derived from `suggestions`, and
     /// kept across a keystroke so a leg that is still running does not blank its own rows.
     private var historyRows: [SearchSuggestion] = []
+    private var remoteRows: [SearchSuggestion] = []
     private var webRows: [SearchSuggestion] = []
+    private var remoteTabsProvider: (() -> [RemoteTabMatch])?
     private var searchGeneration = UUID()
     private weak var tabs: TabsController?
     private weak var window: BrowserWindowState?
@@ -51,6 +53,18 @@ public class SearchManager {
         }
     }
 
+    public struct RemoteTabMatch: Equatable {
+        public let url: URL
+        public let title: String
+        public let deviceName: String
+
+        public init(url: URL, title: String, deviceName: String) {
+            self.url = url
+            self.title = title
+            self.deviceName = deviceName
+        }
+    }
+
     public struct SearchSuggestion: Identifiable, Equatable {
         public let id = UUID()
         public let text: String
@@ -66,6 +80,7 @@ public class SearchManager {
             case url
             case tab(TabMatch)
             case history(HistoryEntry)
+            case remoteTab(RemoteTabMatch)
         }
         
         public static func == (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool {
@@ -76,6 +91,8 @@ public class SearchManager {
                 return lhs.text == rhs.text && lhsTab.itemID == rhsTab.itemID
             case (.history(let lhsHistory), .history(let rhsHistory)):
                 return lhs.text == rhs.text && lhsHistory.id == rhsHistory.id
+            case (.remoteTab(let lhsRemote), .remoteTab(let rhsRemote)):
+                return lhsRemote == rhsRemote
             default:
                 return false
             }
@@ -91,6 +108,11 @@ public class SearchManager {
     
     public func setHistoryManager(_ historyManager: HistoryManager?) {
         self.historyManager = historyManager
+    }
+
+    /// Tabs published by the user's other devices, matched like local tabs.
+    public func setRemoteTabs(_ provider: (() -> [RemoteTabMatch])?) {
+        remoteTabsProvider = provider
     }
 
     @MainActor public func updateSpaceContext() {
@@ -109,6 +131,7 @@ public class SearchManager {
             autofillTask?.cancel()
             autofillHost = nil
             historyRows = []
+            remoteRows = []
             webRows = []
             updateSuggestionsIfNeeded([])
             return
@@ -125,6 +148,7 @@ public class SearchManager {
         }
 
         let tabs = Array(searchTabs(for: query).prefix(2))
+        remoteRows = Array(searchRemoteTabs(for: query).prefix(2))
         let urlSuggestion: SearchSuggestion? = isLikelyURL(query)
             ? SearchSuggestion(text: query, type: .url) : nil
         let urlRows = urlSuggestion.map { [$0] } ?? []
@@ -158,7 +182,7 @@ public class SearchManager {
 
     /// Rebuilds the visible list from the query's local rows plus whatever each leg last returned.
     @MainActor private func compose(urlRows: [SearchSuggestion], tabs: [SearchSuggestion]) {
-        updateSuggestionsIfNeeded(Array((urlRows + tabs + historyRows + webRows).prefix(5)))
+        updateSuggestionsIfNeeded(Array((urlRows + tabs + remoteRows + historyRows + webRows).prefix(5)))
     }
 
     @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
@@ -183,6 +207,17 @@ public class SearchManager {
             return lhs.title.count < rhs.title.count
         }
         return sorted.prefix(3).map { SearchSuggestion(text: $0.title, type: .tab($0)) }
+    }
+
+    @MainActor private func searchRemoteTabs(for query: String) -> [SearchSuggestion] {
+        guard let matches = remoteTabsProvider?(), !matches.isEmpty else { return [] }
+        let lowercaseQuery = query.lowercased()
+        return matches
+            .filter {
+                $0.title.lowercased().contains(lowercaseQuery)
+                    || $0.url.absoluteString.lowercased().contains(lowercaseQuery)
+            }
+            .map { SearchSuggestion(text: $0.title, type: .remoteTab($0)) }
     }
 
     @MainActor private func searchHistory(for query: String) async -> [SearchSuggestion] {
@@ -283,6 +318,7 @@ public class SearchManager {
         autofillTask?.cancel()
         autofillHost = nil
         historyRows = []
+        remoteRows = []
         webRows = []
         searchGeneration = UUID()
         if !suggestions.isEmpty {

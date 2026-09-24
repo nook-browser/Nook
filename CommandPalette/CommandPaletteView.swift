@@ -298,6 +298,14 @@ struct CommandPaletteView: View {
             if newVisible {
                 searchManager.setTabs(browserManager.tabs, window: windowState)
                 searchManager.setHistoryManager(browserManager.historyManager)
+                searchManager.setRemoteTabs { [weak browserManager] in
+                    guard let devices = browserManager?.tabs.syncEngine?.otherDevices else { return [] }
+                    return devices.flatMap { device in
+                        device.tabs.map {
+                            SearchManager.RemoteTabMatch(url: $0.url, title: $0.title, deviceName: device.name)
+                        }
+                    }
+                }
                 searchManager.updateSpaceContext()
 
                 text = commandPalette.prefilledText
@@ -399,6 +407,8 @@ struct CommandPaletteView: View {
             switch suggestion.type {
             case .tab(let tab):
                 TabSuggestionItem(tab: tab, isSelected: isSelected)
+            case .remoteTab(let remote):
+                RemoteTabSuggestionItem(tab: remote, isSelected: isSelected)
             case .history(let entry):
                 HistorySuggestionItem(entry: entry, isSelected: isSelected)
             case .url:
@@ -465,6 +475,8 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let match):
             browserManager.tabs.select(match.itemID, in: windowState)
+        case .remoteTab(let remote):
+            open(remote.url)
         case .history(let historyEntry):
             open(historyEntry.url)
         case .url, .search:
@@ -525,6 +537,8 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let tab):
             return stripScheme(tab.url.absoluteString)
+        case .remoteTab(let remote):
+            return stripScheme(remote.url.absoluteString)
         case .history(let entry):
             return stripScheme(entry.url.absoluteString)
         case .url, .search:
@@ -562,6 +576,8 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let tab):
             return tab.favicon
+        case .remoteTab:
+            return Image(systemName: "laptopcomputer")
         case .history:
             return Image(systemName: "globe")
         case .url:
@@ -579,6 +595,9 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab(let tab):
             TabSuggestionItem(tab: tab, isSelected: isSelected)
+                .foregroundStyle(AppColors.textPrimary)
+        case .remoteTab(let remote):
+            RemoteTabSuggestionItem(tab: remote, isSelected: isSelected)
                 .foregroundStyle(AppColors.textPrimary)
         case .history(let entry):
             HistorySuggestionItem(entry: entry, isSelected: isSelected)
@@ -606,6 +625,8 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .history(let entry):
             return entry.url
+        case .remoteTab(let remote):
+            return remote.url
         default:
             return nil
         }
@@ -617,7 +638,7 @@ struct CommandPaletteView: View {
         switch suggestion.type {
         case .tab:
             return true
-        case .search, .url, .history:
+        case .search, .url, .history, .remoteTab:
             return false
         }
     }

@@ -29,6 +29,8 @@ struct SidebarMenu: View {
                     SidebarMenuHistoryTab()
                 case .downloads:
                     SidebarMenuDownloadsTab()
+                case .devices:
+                    SidebarMenuDevicesTab()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -63,6 +65,17 @@ struct SidebarMenu: View {
                         windowState.sidebarMenuSelectedTab = .downloads
                     }
                 )
+                if browserManager.tabs.syncEngine != nil {
+                    SidebarMenuTab(
+                        image: "laptopcomputer.and.iphone",
+                        activeImage: "laptopcomputer.and.iphone",
+                        title: "Devices",
+                        isActive: windowState.sidebarMenuSelectedTab == .devices,
+                        action: {
+                            windowState.sidebarMenuSelectedTab = .devices
+                        }
+                    )
+                }
             }
             
             Spacer()
