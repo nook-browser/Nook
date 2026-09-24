@@ -36,8 +36,20 @@ extension PageSession {
     /// site, so the page it keeps in the sidebar stays put; a regular tab opens a new tab.
     func shouldRedirectToPeek(url: URL) -> Bool {
         if isOptionKeyDown { return true }
-        guard controller?.isSynced(itemID) == true, let from = self.url.host, let to = url.host else { return false }
+        guard controller?.isSynced(itemID) == true, let from = self.url.host, let to = Self.destinationHost(of: url)
+        else { return false }
         return !Self.isSameSite(from, to)
+    }
+
+    /// Where a link really goes. A site's own redirector (l.facebook.com/l.php?u=,
+    /// youtube.com/redirect?q=) carries the destination in its query; judge the link by that.
+    /// ponytail: the u, q and url parameters only; add a redirector's own name if one is missed.
+    static func destinationHost(of url: URL) -> String? {
+        let carried = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { ["u", "q", "url"].contains($0.name) }?.value
+            .flatMap(URL.init(string:))
+        guard let carried, carried.scheme == "http" || carried.scheme == "https" else { return url.host }
+        return carried.host
     }
 
     // No public suffix list: hosts match when one equals or contains the other, so a page on a

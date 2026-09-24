@@ -16,6 +16,11 @@ public enum OAuthDetector {
     /// Well-known OAuth/OIDC/SSO provider host suffixes.
     /// Matched with `host == known || host.hasSuffix(".\(known)")` to avoid
     /// false positives from substring matching (e.g. "mygithub.com" ≠ "github.com").
+    ///
+    /// Only hosts that serve sign-in and nothing else. A whole site (facebook.com, github.com,
+    /// notion.so) sent every link to it into the sign-in window, including every Facebook
+    /// outbound link through l.facebook.com. Those sites' OAuth pages still match below, by
+    /// their `/oauth` path or the `client_id` every authorization request carries.
     static let knownProviderHosts: [String] = [
         // Google
         "accounts.google.com",
@@ -31,11 +36,6 @@ public enum OAuthDetector {
         // Apple
         "appleid.apple.com",
         "idmsa.apple.com",
-
-        // GitHub / GitLab / Bitbucket
-        "github.com",
-        "gitlab.com",
-        "bitbucket.org",
 
         // Auth0 (also *.auth0.com custom domains)
         "auth0.com",
@@ -58,44 +58,19 @@ public enum OAuthDetector {
         // Cloudflare Access
         "cloudflareaccess.com",
 
-        // Slack
-        "slack.com",
-
-        // Zoom
-        "zoom.us",
-
-        // Facebook / Meta
-        "facebook.com",
-        "m.facebook.com",
-
         // Amazon / AWS
         "signin.aws.amazon.com",
         "auth.aws.amazon.com",
         "amazoncognito.com",                // AWS Cognito hosted UI
 
-        // LinkedIn
-        "linkedin.com",
-        "www.linkedin.com",
-
         // Twitter / X
-        "twitter.com",
         "api.twitter.com",
-        "x.com",
-
-        // Discord
-        "discord.com",
 
         // Twitch
         "id.twitch.tv",
 
-        // Dropbox
-        "dropbox.com",
-
         // Spotify
         "accounts.spotify.com",
-
-        // Reddit
-        "reddit.com",
 
         // Yahoo
         "login.yahoo.com",
@@ -106,9 +81,6 @@ public enum OAuthDetector {
         // Salesforce
         "login.salesforce.com",
         "test.salesforce.com",
-
-        // HubSpot
-        "app.hubspot.com",
 
         // Box
         "account.box.com",
@@ -122,12 +94,6 @@ public enum OAuthDetector {
 
         // Stripe Connect
         "connect.stripe.com",
-
-        // Notion
-        "www.notion.so",
-
-        // Figma
-        "www.figma.com",
 
         // Shopify
         "accounts.shopify.com",
