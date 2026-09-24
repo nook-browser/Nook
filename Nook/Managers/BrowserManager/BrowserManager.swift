@@ -376,6 +376,9 @@ class BrowserManager: ObservableObject {
 
     /// Reference to the app delegate for Sparkle integration
     weak var appDelegate: AppDelegate?
+    /// SwiftUI's action for the Settings scene, handed over by `WindowView`. The old
+    /// `showSettingsWindow:` selector no longer opens a SwiftUI Settings scene.
+    var openSettingsAction: OpenSettingsAction?
 
     var modelContext: ModelContext
     /// The tab model: tree, device state, window selection and live pages.
@@ -779,8 +782,12 @@ class BrowserManager: ObservableObject {
             }
             return
         }
-        SettingsNavigation.shared.currentSettingsTab = .spaces
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        openSettings(tab: .spaces)
+    }
+
+    func openSettings(tab: SettingsTabs) {
+        SettingsNavigation.shared.currentSettingsTab = tab
+        openSettingsAction?.callAsFunction()
     }
 
     func closeDialog() {

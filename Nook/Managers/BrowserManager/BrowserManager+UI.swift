@@ -65,8 +65,7 @@ extension BrowserManager: TabActions {
     }
 
     func openSpaceSettings() {
-        SettingsNavigation.shared.currentSettingsTab = .spaces
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        openSettings(tab: .spaces)
     }
 
     var accentColor: Color {

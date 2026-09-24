@@ -119,6 +119,7 @@ struct WindowView: View {
         }
         // Lifecycle management
         .onAppear {
+            browserManager.openSettingsAction = openSettings
             hoverSidebarManager.attach(browserManager: browserManager)
             hoverSidebarManager.windowRegistry = windowRegistry
             hoverSidebarManager.nookSettings = nookSettings

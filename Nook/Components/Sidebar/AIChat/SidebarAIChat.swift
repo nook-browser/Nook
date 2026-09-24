@@ -8,7 +8,6 @@
 
 import SwiftUI
 import AppKit
-import Garnish
 import NookDesign
 import NookWeb
 import NookUI
@@ -51,7 +50,6 @@ struct URLCitation: Identifiable, Equatable, Codable {
 struct SidebarAIChat: View {
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var browserManager: BrowserManager
-    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.nookSettings) var nookSettings
     @Environment(AIService.self) var aiService
     @Environment(AIConfigService.self) var configService
@@ -62,10 +60,6 @@ struct SidebarAIChat: View {
     @FocusState private var isTextFieldFocused: Bool
 
     private let streamingBubbleID = "streaming"
-
-    private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -149,33 +143,29 @@ struct SidebarAIChat: View {
                     windowState.isSidebarAIChatVisible = false
                 }
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(NookIconButtonStyle())
-            .foregroundStyle(Color.primary)
+            .nookGlassControls(in: Circle())
 
             if !aiService.messages.isEmpty {
                 Text("Ask Nook")
                     .font(NookDesign.Font.title)
-                    .foregroundStyle(contrastText.opacity(0.9))
+                    .foregroundStyle(.primary)
                     .transition(.blur.animation(NookDesign.Motion.standard))
             }
 
             Spacer()
 
-            Button("Settings", systemImage: "gearshape") {
-                showSettingsDialog()
+            HStack(spacing: 0) {
+                Button("Settings", systemImage: "gearshape") {
+                    showSettings()
+                }
+                Divider().padding(.vertical, NookDesign.Spacing.sm)
+                Button("Clear Messages", systemImage: "trash") {
+                    showClearMessagesDialog()
+                }
+                .disabled(aiService.messages.isEmpty)
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(NookIconButtonStyle())
-            .foregroundStyle(Color.primary)
-
-            Button("Clear Messages", systemImage: "trash") {
-                showClearMessagesDialog()
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(NookIconButtonStyle())
-            .foregroundStyle(Color.primary)
-            .disabled(aiService.messages.isEmpty)
+            .frame(height: NookDesign.Size.glassControl)
+            .nookGlassControls(in: Capsule())
         }
         .padding(.horizontal, 8)
     }
@@ -187,7 +177,7 @@ struct SidebarAIChat: View {
             TextField("Ask about this page...", text: $messageText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(NookDesign.Font.body)
-                .foregroundColor(contrastText.opacity(0.9))
+                .foregroundStyle(.primary)
                 .lineLimit(1...4)
                 .focused($isTextFieldFocused)
                 .onSubmit { sendMessage() }
@@ -207,7 +197,7 @@ struct SidebarAIChat: View {
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(NookDesign.Font.titleLarge)
-                        .foregroundStyle(messageText.isEmpty ? contrastText.opacity(0.3) : contrastText.opacity(0.9))
+                        .foregroundStyle(messageText.isEmpty ? HierarchicalShapeStyle.tertiary : .primary)
                 }
                 .buttonStyle(.plain)
                 .disabled(messageText.isEmpty || aiService.isLoading || !aiService.hasApiKey)
@@ -215,8 +205,7 @@ struct SidebarAIChat: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(NookDesign.Surface.fill)
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .nookControlGlass(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         .padding(.horizontal, 8)
     }
 
@@ -264,7 +253,7 @@ struct SidebarAIChat: View {
                 }
             }
 
-            Button(action: { showSettingsDialog() }) {
+            Button(action: { showSettings() }) {
                 Label("Manage Models...", systemImage: "gearshape")
             }
         }
@@ -310,11 +299,11 @@ struct SidebarAIChat: View {
         }) {
             Image(systemName: configService.generationConfig.webSearchEnabled ? "globe.americas.fill" : "globe")
                 .font(NookDesign.Font.body)
-                .foregroundStyle(configService.generationConfig.webSearchEnabled ? .green : contrastText.opacity(0.5))
+                .foregroundStyle(configService.generationConfig.webSearchEnabled ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(
                     NookDesign.Radius.shape(NookDesign.Radius.sm)
-                        .fill(configService.generationConfig.webSearchEnabled ? .green.opacity(0.15) : contrastText.opacity(0.08))
+                        .fill(configService.generationConfig.webSearchEnabled ? .green.opacity(0.15) : NookDesign.Surface.fill)
                 )
         }
         .buttonStyle(.plain)
@@ -328,25 +317,24 @@ struct SidebarAIChat: View {
         VStack(spacing: 12) {
             Image(systemName: "key.fill")
                 .font(NookDesign.Font.display)
-                .foregroundStyle(contrastText.opacity(0.3))
+                .foregroundStyle(.tertiary)
 
             Text("API Key Required")
                 .font(NookDesign.Font.label)
-                .foregroundStyle(contrastText.opacity(0.8))
+                .foregroundStyle(.primary)
 
             Text("Add your API key to start chatting")
                 .font(NookDesign.Font.secondary)
-                .foregroundStyle(contrastText.opacity(0.6))
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button(action: { showSettingsDialog() }) {
+            Button(action: { showSettings() }) {
                 Text("Add API Key")
                     .font(NookDesign.Font.secondary)
-                    .foregroundColor(.black)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(.white.opacity(0.9))
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+                    .nookControlGlass(in: Capsule())
             }
             .buttonStyle(.plain)
         }
@@ -361,17 +349,17 @@ struct SidebarAIChat: View {
 
             Image(systemName: webSearchEnabled && supportsWebSearch ? "globe" : "sparkle")
                 .font(NookDesign.Font.display)
-                .foregroundStyle(webSearchEnabled && supportsWebSearch ? .green.opacity(0.6) : contrastText.opacity(0.3))
+                .foregroundStyle(webSearchEnabled && supportsWebSearch ? AnyShapeStyle(.green.opacity(0.6)) : AnyShapeStyle(.tertiary))
 
             Text("Ask Nook")
                 .font(NookDesign.Font.label)
-                .foregroundStyle(contrastText.opacity(0.8))
+                .foregroundStyle(.primary)
 
             if webSearchEnabled && supportsWebSearch {
                 VStack(spacing: 6) {
                     Text("Questions about this page, or just curious? I'm here.")
                         .font(NookDesign.Font.secondary)
-                        .foregroundStyle(contrastText.opacity(0.6))
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
 
                     HStack(spacing: 4) {
@@ -390,7 +378,7 @@ struct SidebarAIChat: View {
             } else {
                 Text("Questions about this page, or just curious? I'm here.")
                     .font(NookDesign.Font.secondary)
-                    .foregroundStyle(contrastText.opacity(0.6))
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
         }
@@ -410,12 +398,12 @@ struct SidebarAIChat: View {
                 } else {
                     Text("Thinking...")
                         .font(NookDesign.Font.secondary)
-                        .foregroundStyle(contrastText.opacity(0.5))
+                        .foregroundStyle(.secondary)
                 }
                 if configService.generationConfig.webSearchEnabled && !aiService.isExecutingTools {
                     Text("Searching the web...")
                         .font(NookDesign.Font.caption)
-                        .foregroundStyle(contrastText.opacity(0.4))
+                        .foregroundStyle(.tertiary)
                 }
             }
         }
@@ -434,9 +422,8 @@ struct SidebarAIChat: View {
         }
     }
 
-    private func showSettingsDialog() {
-        // Open the settings window to the AI tab
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    private func showSettings() {
+        browserManager.openSettings(tab: .ai)
     }
 
     private func showClearMessagesDialog() {
@@ -486,13 +473,15 @@ struct SidebarAIChat: View {
 struct MessageBubble: View {
     let message: ChatMessage
     @EnvironmentObject var gradientColorManager: GradientColorManager
+    @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.openURL) var openURL
     @State private var isHovered: Bool = false
     @State private var showCopied: Bool = false
 
-    private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
+    /// The person's own messages carry the space's accent; private windows keep the neutral one.
+    private var accent: Color {
+        windowState.isIncognito ? SpaceGradient.incognito.primaryColor : gradientColorManager.accentColor
     }
 
     var body: some View {
@@ -515,7 +504,7 @@ struct MessageBubble: View {
                                         .font(NookDesign.Font.caption)
                                 }
                             }
-                            .foregroundStyle(contrastText.opacity(0.5))
+                            .foregroundStyle(.secondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(.green.opacity(0.15))
@@ -543,7 +532,7 @@ struct MessageBubble: View {
 
                                 Text("Sources")
                                     .font(NookDesign.Font.caption)
-                                    .foregroundStyle(contrastText.opacity(0.5))
+                                    .foregroundStyle(.secondary)
                                     .padding(.horizontal, 12)
 
                                 VStack(spacing: 4) {
@@ -556,10 +545,7 @@ struct MessageBubble: View {
                             .padding(.bottom, 10)
                         }
                     }
-                    .background(
-                        NookDesign.Radius.shape(NookDesign.Radius.lg)
-                            .fill(contrastText.opacity(0.12))
-                    )
+                    .nookControlGlass(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
                     .overlay(alignment: .topTrailing) {
                         if isHovered {
                             Button(action: {
@@ -572,15 +558,16 @@ struct MessageBubble: View {
                             }) {
                                 Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
                                     .font(NookDesign.Font.caption)
-                                    .foregroundStyle(contrastText.opacity(0.8))
+                                    .foregroundStyle(.secondary)
                                     .frame(width: 28, height: 28)
+                                    // Raised, not glass: it sits on the bubble's glass
                                     .background(
                                         NookDesign.Radius.shape(NookDesign.Radius.md)
-                                            .fill(.black.opacity(0.5))
+                                            .fill(NookDesign.Surface.raised)
                                     )
                                     .overlay(
                                         NookDesign.Radius.shape(NookDesign.Radius.md)
-                                            .stroke(contrastText.opacity(0.15), lineWidth: 1)
+                                            .strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth)
                                     )
                             }
                             .buttonStyle(.plain)
@@ -591,14 +578,11 @@ struct MessageBubble: View {
                 } else {
                     Text(message.content)
                         .font(NookDesign.Font.bodyRegular)
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.primary)
                         .textSelection(.enabled)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(
-                            NookDesign.Radius.shape(NookDesign.Radius.lg)
-                                .fill(.white.opacity(0.9))
-                        )
+                        .nookControlGlass(tint: accent, in: NookDesign.Radius.shape(NookDesign.Radius.lg))
                 }
             }
 
@@ -672,7 +656,7 @@ struct MessageBubble: View {
 
         return Text(parseInlineMarkdown(text))
             .font(.system(size: fontSize, weight: weight))
-            .foregroundStyle(contrastText.opacity(0.95))
+            .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 2)
     }
@@ -681,7 +665,7 @@ struct MessageBubble: View {
         Text(parseInlineMarkdown(text))
             .font(NookDesign.Font.bodyRegular)
             .lineSpacing(4)
-            .foregroundStyle(contrastText.opacity(0.9))
+            .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -689,12 +673,12 @@ struct MessageBubble: View {
         HStack(alignment: .top, spacing: 6) {
             Text("•")
                 .font(NookDesign.Font.body)
-                .foregroundStyle(contrastText.opacity(0.7))
+                .foregroundStyle(.secondary)
                 .padding(.top, 1)
             Text(parseInlineMarkdown(text))
                 .font(NookDesign.Font.bodyRegular)
                 .lineSpacing(4)
-                .foregroundStyle(contrastText.opacity(0.9))
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -703,12 +687,12 @@ struct MessageBubble: View {
         HStack(alignment: .top, spacing: 6) {
             Text("•")
                 .font(NookDesign.Font.body)
-                .foregroundStyle(contrastText.opacity(0.7))
+                .foregroundStyle(.secondary)
                 .padding(.top, 1)
             Text(parseInlineMarkdown(text))
                 .font(NookDesign.Font.bodyRegular)
                 .lineSpacing(4)
-                .foregroundStyle(contrastText.opacity(0.9))
+                .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -718,27 +702,25 @@ struct MessageBubble: View {
             if !language.isEmpty {
                 Text(language)
                     .font(NookDesign.Font.caption)
-                    .foregroundStyle(contrastText.opacity(0.5))
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(contrastText.opacity(0.08))
+                    .background(NookDesign.Surface.fill)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
             }
             Text(code)
                 .font(NookDesign.Font.secondary.monospaced())
-                .foregroundStyle(contrastText.opacity(0.9))
+                .foregroundStyle(.primary)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.black.opacity(0.3))
+                .background(NookDesign.Surface.fillPressed)
                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
     }
 
     private func parseInlineMarkdown(_ text: String) -> AttributedString {
         do {
-            var attributed = try AttributedString(markdown: text, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace))
-            attributed.foregroundColor = contrastText.opacity(0.9)
-            return attributed
+            return try AttributedString(markdown: text, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace))
         } catch {
             return AttributedString(text)
         }
@@ -749,13 +731,8 @@ struct MessageBubble: View {
 
 struct CitationView: View {
     let citation: URLCitation
-    @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.openURL) var openURL
     @State private var isHovered = false
-
-    private var contrastText: Color {
-        Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
-    }
 
     var body: some View {
         Button(action: {
@@ -766,18 +743,18 @@ struct CitationView: View {
             HStack(spacing: 6) {
                 Image(systemName: "link")
                     .font(NookDesign.Font.caption)
-                    .foregroundStyle(contrastText.opacity(0.4))
+                    .foregroundStyle(.tertiary)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(citation.domain)
                         .font(NookDesign.Font.caption)
-                        .foregroundStyle(contrastText.opacity(isHovered ? 0.9 : 0.7))
+                        .foregroundStyle(isHovered ? .primary : .secondary)
                         .lineLimit(1)
 
                     if let title = citation.title, !title.isEmpty {
                         Text(title)
                             .font(NookDesign.Font.caption)
-                            .foregroundStyle(contrastText.opacity(0.5))
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
@@ -786,17 +763,17 @@ struct CitationView: View {
 
                 Image(systemName: "arrow.up.forward")
                     .font(NookDesign.Font.caption)
-                    .foregroundStyle(contrastText.opacity(isHovered ? 0.6 : 0.4))
+                    .foregroundStyle(isHovered ? .secondary : .tertiary)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(
                 NookDesign.Radius.shape(NookDesign.Radius.sm)
-                    .fill(contrastText.opacity(isHovered ? 0.12 : 0.08))
+                    .fill(isHovered ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
             )
             .overlay(
                 NookDesign.Radius.shape(NookDesign.Radius.sm)
-                    .stroke(contrastText.opacity(isHovered ? 0.2 : 0.0), lineWidth: 1)
+                    .stroke(isHovered ? NookDesign.Surface.hairline : .clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

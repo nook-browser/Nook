@@ -378,7 +378,11 @@ class AIService {
     private func runOnDeviceTool(_ name: String, argumentsJSON: String, tag: String) async -> String {
         let arguments = (try? JSONSerialization.jsonObject(with: Data(argumentsJSON.utf8))) as? [String: Any] ?? [:]
         currentToolName = name
-        defer { currentToolName = nil }
+        isExecutingTools = true
+        defer {
+            currentToolName = nil
+            isExecutingTools = false
+        }
         let result = await executeToolCall(AIToolCall(name: name, arguments: arguments))
         return wrapUntrusted(AppleIntelligenceProvider.fitted(result.content, tokens: AppleIntelligenceProvider.toolOutputTokens), tag: tag)
     }
