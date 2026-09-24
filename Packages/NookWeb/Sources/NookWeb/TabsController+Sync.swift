@@ -26,4 +26,8 @@ extension TabsController: CloudSyncEngineDelegate {
         guard repaired.repair() else { return }
         apply(SyncMerge.change(from: tree, to: repaired))
     }
+
+    public func syncDisabledRemotely() {
+        settings.syncEnabled = false
+    }
 }

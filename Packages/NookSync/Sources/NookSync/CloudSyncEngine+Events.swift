@@ -5,6 +5,8 @@ import NookTabsCore
 
 extension CloudSyncEngine {
     public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
+        // An engine dropped by stop() can still deliver; its state is not ours.
+        guard syncEngine === engine else { return }
         switch event {
         case .stateUpdate(let update):
             saveStateSerialization(update.stateSerialization)
@@ -13,7 +15,8 @@ extension CloudSyncEngine {
         case .fetchedDatabaseChanges(let changes):
             handleFetchedDatabaseChanges(changes)
         case .fetchedRecordZoneChanges(let changes):
-            handleFetchedRecordZoneChanges(changes)
+            absorbServerRecords(changes.modifications.map(\.record),
+                                deletedIDs: changes.deletions.map(\.recordID))
         case .sentRecordZoneChanges(let sent):
             handleSentRecordZoneChanges(sent)
         case .willFetchChanges, .willSendChanges:
@@ -32,6 +35,7 @@ extension CloudSyncEngine {
 
     public func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext,
                                           syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
+        guard syncEngine === engine else { return nil }
         let scope = context.options.scope
         let pending = syncEngine.state.pendingRecordZoneChanges.filter { scope.contains($0) }
         guard !pending.isEmpty, let tree = delegate?.syncCurrentTree else { return nil }
@@ -42,6 +46,27 @@ extension CloudSyncEngine {
             SyncRecordProvider.record(recordName: recordID.recordName, tree: tree, snapshot: snapshot,
                                       deviceID: deviceID, deviceName: deviceName)
         }
+    }
+
+    // MARK: - Server copies
+
+    /// Fetched records and conflict server copies both land here. The diff
+    /// afterwards is what sends back any row where local won; skipping it when
+    /// the merge changed nothing left the server stale until the next edit.
+    func absorbServerRecords(_ records: [CKRecord], deletedIDs: [CKRecord.ID]) {
+        var batch = RemoteBatch(spaces: [], items: [], deletions: [])
+        for record in records where !snapshot.absorb(record, into: &batch) {
+            log.error("Skipped \(record.recordType, privacy: .public) record \(record.recordID.recordName, privacy: .public)")
+        }
+        for recordID in deletedIDs {
+            snapshot.absorbDeletion(recordID, into: &batch)
+        }
+        saveSnapshot()
+        refreshOtherDevices()
+        if !batch.isEmpty {
+            delegate?.syncApplyRemote(batch)
+        }
+        noteLocalChange()
     }
 
     // MARK: - Event handling
@@ -60,65 +85,21 @@ extension CloudSyncEngine {
 
     private func handleFetchedDatabaseChanges(_ changes: CKSyncEngine.Event.FetchedDatabaseChanges) {
         for deletion in changes.deletions where deletion.zoneID == RecordMapper.zoneID {
-            // The zone was purged server-side. Reset and re-seed from local.
-            log.info("NookSync zone deleted remotely; re-seeding")
-            snapshot = SyncSnapshot()
-            saveSnapshot()
-            otherDevices = []
-            lastPublishedTabs = nil
-            engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: RecordMapper.zoneID))])
-            noteLocalChange()
-        }
-    }
-
-    private func handleFetchedRecordZoneChanges(_ changes: CKSyncEngine.Event.FetchedRecordZoneChanges) {
-        var batch = RemoteBatch(spaces: [], items: [], deletions: [])
-        for modification in changes.modifications {
-            let record = modification.record
-            switch record.recordType {
-            case SyncRecordType.space:
-                guard let space = RecordMapper.space(from: record) else {
-                    log.error("Skipped malformed Space record \(record.recordID.recordName, privacy: .public)")
-                    continue
-                }
-                batch.spaces.append(space)
-                snapshot.spaces[space.id] = space
-                snapshot.systemFields[space.id] = SyncRecordProvider.systemFields(of: record)
-            case SyncRecordType.item:
-                guard let item = RecordMapper.item(from: record) else {
-                    log.error("Skipped malformed SyncedItem record \(record.recordID.recordName, privacy: .public)")
-                    continue
-                }
-                batch.items.append(item)
-                snapshot.items[item.id] = item
-                snapshot.systemFields[item.id] = SyncRecordProvider.systemFields(of: record)
-            case SyncRecordType.device:
-                if let payload = DeviceTabs.payload(from: record) {
-                    absorbDevicePayload(payload)
-                    snapshot.systemFields[payload.deviceID] = SyncRecordProvider.systemFields(of: record)
-                }
-            default:
-                break // A newer Nook's record type; skipping keeps coexistence.
+            switch SyncZoneDeletion.action(for: deletion.reason) {
+            case .reseed:
+                log.info("NookSync zone reset by iCloud; re-seeding from this Mac")
+                snapshot = SyncSnapshot()
+                saveSnapshot()
+                refreshOtherDevices()
+                lastPublishedTabs = nil
+                engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: RecordMapper.zoneID))])
+                noteLocalChange()
+            case .disable:
+                log.info("NookSync zone deleted by the user; sync turned off on this Mac")
+                stop(discardState: true)
+                delegate?.syncDisabledRemotely()
+                return
             }
-        }
-        for deletion in changes.deletions {
-            let name = deletion.recordID.recordName
-            if let id = UUID(uuidString: name) {
-                batch.deletions.append(id)
-                snapshot.spaces[id] = nil
-                snapshot.items[id] = nil
-                snapshot.systemFields[id] = nil
-            } else if name.hasPrefix("device-") {
-                let idPart = String(name.dropFirst("device-".count))
-                if let id = UUID(uuidString: idPart) {
-                    otherDevices.removeAll { $0.deviceID == id }
-                    snapshot.systemFields[id] = nil
-                }
-            }
-        }
-        saveSnapshot()
-        if !batch.isEmpty {
-            delegate?.syncApplyRemote(batch)
         }
     }
 
@@ -148,35 +129,27 @@ extension CloudSyncEngine {
                 snapshot.systemFields[id] = nil
             }
         }
-        for failure in sent.failedRecordSaves {
-            handleSaveFailure(failure)
-        }
         saveSnapshot()
+        var conflicts: [CKRecord] = []
+        for failure in sent.failedRecordSaves {
+            if failure.error.code == .serverRecordChanged, let server = failure.error.serverRecord {
+                conflicts.append(server)
+            } else {
+                handleSaveFailure(failure)
+            }
+        }
+        guard !conflicts.isEmpty else { return }
+        // The server copy goes through the same LWW as a fetch. Our own device
+        // record has one writer, so its conflict only means stale system fields.
+        absorbServerRecords(conflicts, deletedIDs: [])
+        if conflicts.contains(where: { $0.recordID == deviceRecordID }) {
+            engine?.state.add(pendingRecordZoneChanges: [.saveRecord(deviceRecordID)])
+        }
     }
 
     private func handleSaveFailure(_ failure: CKSyncEngine.Event.SentRecordZoneChanges.FailedRecordSave) {
         let recordID = failure.record.recordID
         switch failure.error.code {
-        case .serverRecordChanged:
-            // The server copy is the arbiter: take its system fields, then
-            // re-enqueue so our fields merge onto it through the provider.
-            if let server = failure.error.serverRecord {
-                if let id = UUID(uuidString: recordID.recordName) {
-                    snapshot.systemFields[id] = SyncRecordProvider.systemFields(of: server)
-                    switch server.recordType {
-                    case SyncRecordType.space:
-                        if let space = RecordMapper.space(from: server) { snapshot.spaces[space.id] = space }
-                    case SyncRecordType.item:
-                        if let item = RecordMapper.item(from: server) { snapshot.items[item.id] = item }
-                    default:
-                        break
-                    }
-                } else if recordID.recordName == DeviceTabs.recordName(for: deviceID) {
-                    snapshot.systemFields[deviceID] = SyncRecordProvider.systemFields(of: server)
-                }
-            }
-            engine?.state.add(pendingRecordZoneChanges: [.saveRecord(recordID)])
-            noteLocalChange()
         case .zoneNotFound:
             engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: RecordMapper.zoneID))])
             engine?.state.add(pendingRecordZoneChanges: [.saveRecord(recordID)])

@@ -129,3 +129,32 @@ struct DiffTests {
         #expect(SyncSnapshot.load(from: url) == SyncSnapshot())
     }
 }
+
+extension DiffTests {
+    /// Relaunch mid-first-fetch, or a folder record that never decodes: the
+    /// loader's repair drops the orphan into the tabs section. Nobody moved it,
+    /// so no tombstone may go out and delete it on every other Mac.
+    @Test func orphanEjectedByRepairIsHeldNotTombstoned() {
+        let id = UUID()
+        let neverArrived = UUID()
+        let underFolder = pinnedTab(id, modifiedAt: t0, parent: .folder(itemID: neverArrived))
+        let ejected = pinnedTab(id, modifiedAt: now, parent: .tabs(spaceID: spaceID))
+        let tree = TabTree(spaces: [space], items: [ejected])
+        let changes = SyncDiff.changes(tree: tree, snapshot: snapshot(spaces: [space], items: [underFolder]), now: now)
+        #expect(changes.isEmpty)
+    }
+
+    @Test func folderMovedOutOfPinnedTombstonesFolderAndChildren() {
+        let folderID = UUID()
+        let childID = UUID()
+        let pinnedFolder = Item(id: folderID, parent: .pinned(spaceID: spaceID), order: OrderKey("V"),
+                                kind: .folder, modifiedAt: t0)
+        let child = pinnedTab(childID, modifiedAt: t0, parent: .folder(itemID: folderID))
+        var movedFolder = pinnedFolder
+        movedFolder.parent = .tabs(spaceID: spaceID)
+        let tree = TabTree(spaces: [space], items: [movedFolder, child])
+        let changes = SyncDiff.changes(tree: tree, snapshot: snapshot(spaces: [space], items: [pinnedFolder, child]), now: now)
+        #expect(Set(changes.upsertItems.map(\.id)) == [folderID, childID])
+        #expect(changes.upsertItems.allSatisfy { $0.deletedAt == now })
+    }
+}

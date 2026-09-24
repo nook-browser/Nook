@@ -11,6 +11,10 @@ public protocol CloudSyncEngineDelegate: AnyObject {
     /// End of a fetch cycle. The delegate runs `repair` here, never per batch,
     /// so a child whose folder arrives in a later batch is not ejected.
     func syncFetchDidComplete()
+    /// The user deleted Nook's iCloud data from elsewhere. The engine has
+    /// stopped; the delegate turns the setting off so a relaunch does not
+    /// upload everything again.
+    func syncDisabledRemotely()
 }
 
 /// Thin owner of one CKSyncEngine over the private database's NookSync zone.
@@ -46,7 +50,6 @@ public final class CloudSyncEngine: CKSyncEngineDelegate {
     @ObservationIgnored var lastPublishedTabs: [DeviceTabsPayload.Tab]?
     @ObservationIgnored let log = Logger(subsystem: "com.gstudios.nook", category: "Sync")
 
-    static let staleDeviceCutoff: TimeInterval = 14 * 24 * 60 * 60
     static let diffCoalesce: Duration = .seconds(2)
     static let devicePublishInterval: Duration = .seconds(30)
 
@@ -96,6 +99,7 @@ public final class CloudSyncEngine: CKSyncEngineDelegate {
     private func configureEngine() {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         snapshot = SyncSnapshot.load(from: snapshotURL)
+        refreshOtherDevices()
         let database = CKContainer(identifier: containerID).privateCloudDatabase
         let configuration = CKSyncEngine.Configuration(
             database: database,
@@ -184,32 +188,30 @@ public final class CloudSyncEngine: CKSyncEngineDelegate {
     // MARK: - Devices
 
     public func removeDevice(_ id: UUID) {
-        otherDevices.removeAll { $0.deviceID == id }
+        snapshot.devices[id] = nil
+        saveSnapshot()
+        refreshOtherDevices()
         engine?.state.add(pendingRecordZoneChanges: [
             .deleteRecord(CKRecord.ID(recordName: DeviceTabs.recordName(for: id), zoneID: RecordMapper.zoneID)),
         ])
     }
 
-    func absorbDevicePayload(_ payload: DeviceTabsPayload) {
-        guard payload.deviceID != deviceID else { return }
-        var devices = otherDevices.filter { $0.deviceID != payload.deviceID }
-        devices.append(payload)
-        let cutoff = Date().addingTimeInterval(-Self.staleDeviceCutoff)
-        otherDevices = devices
-            .filter { $0.lastSeen > cutoff }
-            .sorted { $0.lastSeen > $1.lastSeen }
+    func refreshOtherDevices() {
+        otherDevices = snapshot.otherDevices(excluding: deviceID)
     }
 
     // MARK: - Cloud data removal
 
+    /// Stops first: a live engine answers the deletion's zoneNotFound errors
+    /// by creating the zone again.
     public func deleteCloudData() async {
+        stop(discardState: true)
         let database = CKContainer(identifier: containerID).privateCloudDatabase
         do {
             _ = try await database.modifyRecordZones(saving: [], deleting: [RecordMapper.zoneID])
         } catch {
             log.error("Zone delete failed: \(error.localizedDescription, privacy: .public)")
         }
-        stop(discardState: true)
     }
 
     // MARK: - Persistence

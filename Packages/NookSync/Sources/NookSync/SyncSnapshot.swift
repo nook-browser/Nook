@@ -10,6 +10,9 @@ public struct SyncSnapshot: Codable, Equatable, Sendable {
     public var items: [UUID: Item] = [:]
     /// Archived CKRecord system fields per record id, for conflict-free resaves.
     public var systemFields: [UUID: Data] = [:]
+    /// Device records by device id, own included. Kept here because an
+    /// incremental fetch never redelivers an unchanged record.
+    public var devices: [UUID: DeviceTabsPayload] = [:]
 
     public init() {}
 
@@ -24,6 +27,23 @@ public struct SyncSnapshot: Codable, Equatable, Sendable {
               let snapshot = try? JSONDecoder().decode(SyncSnapshot.self, from: data)
         else { return SyncSnapshot() }
         return snapshot
+    }
+
+    /// The favorites or pinned section a row sits under by the server's own
+    /// rows, or nil when its folder chain leaves the snapshot. A row whose chain
+    /// never resolved was never fully placed on this Mac, so its landing in the
+    /// tabs section is the loader's orphan repair and not a move by the user.
+    func syncedSection(of id: UUID) -> Parent? {
+        var visited: Set<UUID> = [id]
+        guard var parent = items[id]?.parent else { return nil }
+        while case .folder(let folderID) = parent {
+            guard visited.insert(folderID).inserted, let folder = items[folderID] else { return nil }
+            parent = folder.parent
+        }
+        switch parent {
+        case .favorites, .pinned: return parent
+        case .tabs, .folder: return nil
+        }
     }
 }
 
@@ -67,7 +87,8 @@ public enum SyncDiff {
         for (id, row) in snapshot.items where !held.contains(id) {
             if tree.items[id] == nil {
                 out.deleteIDs.append(id)
-            } else if row.deletedAt == nil, case .tabs = tree.section(of: id) {
+            } else if row.deletedAt == nil, case .tabs = tree.section(of: id),
+                      snapshot.syncedSection(of: id) != nil {
                 var tombstone = row
                 tombstone.deletedAt = now
                 tombstone.modifiedAt = now
