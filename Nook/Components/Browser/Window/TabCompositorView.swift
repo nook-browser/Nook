@@ -30,6 +30,7 @@ class TabCompositorManager: ObservableObject {
     private var memoryPressureSource: DispatchSourceMemoryPressure?
     private var appResignObserver: Any?
     private var lastMemoryPressureTime: Date?
+    private var lastMemoryPressureWasCritical = false
     private var budgetRetryTimer: Timer?
 
     weak var browserManager: BrowserManager?
@@ -126,6 +127,8 @@ class TabCompositorManager: ObservableObject {
                 self?.handleTimeout(itemID)
             }
         }
+        // Idle unloads can run late; the slack lets macOS batch the wakeups.
+        timer.tolerance = 60
         unloadTimers[itemID] = timer
     }
 
@@ -205,34 +208,46 @@ class TabCompositorManager: ObservableObject {
 
     private func setupMemoryPressureMonitoring() {
         let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
-        source.setEventHandler { [weak self] in
+        source.setEventHandler { [weak self, weak source] in
+            // The level is only readable inside the handler.
+            let critical = source?.data.contains(.critical) ?? true
             Task { @MainActor in
-                self?.handleMemoryPressure()
+                self?.handleMemoryPressure(critical: critical)
             }
         }
         source.resume()
         memoryPressureSource = source
     }
 
-    private func handleMemoryPressure() {
-        // Act at most once per 30 seconds.
+    private func handleMemoryPressure(critical: Bool) {
+        // Act at most once per 30 seconds, except that a critical event right after a warning
+        // still gets its full response.
         let now = Date()
-        if let lastTime = lastMemoryPressureTime, now.timeIntervalSince(lastTime) < 30 { return }
+        if let lastTime = lastMemoryPressureTime, now.timeIntervalSince(lastTime) < 30,
+           !critical || lastMemoryPressureWasCritical {
+            return
+        }
         lastMemoryPressureTime = now
+        lastMemoryPressureWasCritical = critical
 
         guard let sessions = tabs?.sessions else { return }
         let candidates = sessions.filter(canUnloadInactive).sorted { importance($0) < importance($1) }
         guard !candidates.isEmpty else { return }
 
         let count: Int
-        if let keepCount = mode.memoryPressureKeepCount {
+        if !critical, mode.memoryPressureKeepCount == nil {
+            // A warning asks for room, so the least important page goes and the rest stay.
+            // Power Saving keeps its keep count at every level.
+            count = 1
+        } else if let keepCount = mode.memoryPressureKeepCount {
             // Power Saving: unload all but the selected page and keepCount most recent.
             let loaded = sessions.filter { !$0.isUnloaded }.count
             count = max(0, loaded - 1 - keepCount)
         } else {
             count = Int(ceil(Double(candidates.count) * mode.memoryPressureUnloadFraction))
         }
-        Self.log.notice("memory pressure: loaded \(self.loadedCount, privacy: .public), evicting \(count, privacy: .public)")
+        Self.log.notice(
+            "memory pressure (\(critical ? "critical" : "warning", privacy: .public)): loaded \(self.loadedCount, privacy: .public), evicting \(count, privacy: .public)")
         candidates.prefix(count).forEach { evict($0, reason: .memoryPressure) }
     }
 
