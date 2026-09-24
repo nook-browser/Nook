@@ -78,8 +78,8 @@ jobs:
         run: |
           set -e
           mkdir -p build
-          # CI entitlements omit push/autofill which require provisioning profiles.
-          # The re-sign step applies the full entitlements before notarization.
+          # CI entitlements omit push, iCloud and autofill, which need a provisioning
+          # profile. The re-sign step adds push and iCloud when the profile secret is set.
           ENTITLEMENTS="$(pwd)/Nook/Nook-CI.entitlements"
           # Apple Silicon only: deployment target is macOS 26 and MLX has no x86_64 slice.
           xcodebuild -scheme Nook -configuration Release \
@@ -133,22 +133,22 @@ jobs:
           # directory and double-signing would invalidate the signature.
           codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime "$SPARKLE"
 
-          # iCloud and push entitlements need a Developer ID provisioning
-          # profile embedded in the bundle. Without the secret the profile is
-          # skipped and signing falls back to the entitlements alone, which
-          # notarizes but ships without CloudKit sync.
+          # iCloud and push entitlements are restricted: macOS kills a Developer
+          # ID app that carries them without an embedded provisioning profile,
+          # and notarization does not catch it. Without the profile secret the
+          # app is signed with the reduced set and ships without iCloud sync.
+          ENTITLEMENTS="$(pwd)/Nook/Nook-CI.entitlements"
           if [ -n "$DEVELOPER_ID_PROVISION_B64" ]; then
             echo "$DEVELOPER_ID_PROVISION_B64" | base64 --decode \
               > "Nook.app/Contents/embedded.provisionprofile"
+            ENTITLEMENTS="$(pwd)/Nook/Nook-CI-iCloud.entitlements"
           else
-            echo "warning: DEVELOPER_ID_PROVISION_B64 secret missing; DMG ships without iCloud sync"
+            echo "::warning::DEVELOPER_ID_PROVISION_B64 is not set; this DMG ships without iCloud sync"
           fi
 
-          # Re-sign the main app with CI entitlements. The provisioning profile
-          # above is what licenses the iCloud and push entitlements in them.
           codesign --force --sign "$SIGNING_IDENTITY" --timestamp \
             --options runtime \
-            --entitlements "$(pwd)/Nook/Nook-CI.entitlements" \
+            --entitlements "$ENTITLEMENTS" \
             "Nook.app"
 
       - name: Verify signature before notarizing
