@@ -3,7 +3,7 @@ import CloudKit
 import Foundation
 import NookTabsCore
 
-extension CloudSyncEngine: CKSyncEngineDelegate {
+extension CloudSyncEngine {
     public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
         switch event {
         case .stateUpdate(let update):

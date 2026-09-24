@@ -122,3 +122,29 @@ struct MergeTests {
         #expect(merged.item(liveID) != nil)
     }
 }
+
+extension MergeTests {
+    @Test func changeFromToReachesTargetIncludingRemovals() {
+        let keepID = UUID()
+        let goneID = UUID()
+        let newID = UUID()
+        let current = TabTree(spaces: [space(name: "Old", modifiedAt: t0)],
+                              items: [pinnedTab(keepID, title: "Keep", modifiedAt: t0),
+                                      pinnedTab(goneID, title: "Gone", modifiedAt: t0)])
+        var edited = pinnedTab(keepID, title: "Keep", modifiedAt: t1)
+        edited.customTitle = "Renamed"
+        let target = TabTree(spaces: [space(name: "New", modifiedAt: t1)],
+                             items: [edited, pinnedTab(newID, title: "New", modifiedAt: t1)])
+        let change = SyncMerge.change(from: current, to: target)
+        var applied = current
+        _ = applied.apply(change)
+        #expect(applied.spaces == target.spaces)
+        #expect(applied.items == target.items)
+        #expect(applied.items[goneID] == nil)
+    }
+
+    @Test func changeFromIdenticalTreesIsEmpty() {
+        let tree = TabTree(spaces: [space()], items: [pinnedTab(UUID(), modifiedAt: t0)])
+        #expect(SyncMerge.change(from: tree, to: tree).isEmpty)
+    }
+}

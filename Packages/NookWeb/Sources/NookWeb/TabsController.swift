@@ -12,6 +12,7 @@
 import Foundation
 import NookBlocker
 import NookSettings
+import NookSync
 import NookTabsCore
 import NookTweaks
 import OSLog
@@ -67,6 +68,9 @@ public final class TabsController {
     @ObservationIgnored public weak var alerts: AlertPresenter?
     /// Called with each tab that a move brought into a pinned section from the tabs section.
     @ObservationIgnored public var onTabsPinned: (([UUID]) -> Void)?
+    /// iCloud sync, attached at startup when the feature is available. Never set
+    /// in a read-only session.
+    @ObservationIgnored public private(set) var syncEngine: CloudSyncEngine?
 
     /// Launch argument that redirects tab state, e.g. `-NookStateDir /tmp/bench`.
     /// Read from the argument domain only, never from persisted defaults, so a stray written
@@ -159,6 +163,13 @@ public final class TabsController {
 
     public func save() {
         store.save(tree, device)
+        syncEngine?.noteLocalChange()
+    }
+
+    /// Wires sync up. The engine's lifecycle (start/stop) stays with the caller.
+    public func attachSyncEngine(_ engine: CloudSyncEngine) {
+        syncEngine = engine
+        engine.delegate = self
     }
 
     /// Writes now, with every regular window's current frame. Called at quit; windows closing

@@ -49,4 +49,20 @@ public enum SyncMerge {
         let changed = spaces != tree.spaces || items != tree.items
         return (TabTree(spaces: Array(spaces.values), items: Array(items.values)), changed)
     }
+
+    /// The Change that turns `current` into `target` through TabTree.apply.
+    /// A Change's dictionaries hold optionals, so removals must be written with
+    /// updateValue; plain subscript assignment of nil would drop the key.
+    public static func change(from current: TabTree, to target: TabTree) -> Change {
+        var change = Change()
+        for id in Set(current.spaces.keys).union(target.spaces.keys)
+        where current.spaces[id] != target.spaces[id] {
+            change.spaces.updateValue(target.spaces[id], forKey: id)
+        }
+        for id in Set(current.items.keys).union(target.items.keys)
+        where current.items[id] != target.items[id] {
+            change.items.updateValue(target.items[id], forKey: id)
+        }
+        return change
+    }
 }

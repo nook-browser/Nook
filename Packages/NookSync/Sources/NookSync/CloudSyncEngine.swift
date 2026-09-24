@@ -18,7 +18,7 @@ public protocol CloudSyncEngineDelegate: AnyObject {
 /// this class schedules, persists and translates events.
 @MainActor
 @Observable
-public final class CloudSyncEngine {
+public final class CloudSyncEngine: CKSyncEngineDelegate {
     public enum Status: Equatable, Sendable {
         case off
         case noAccount
