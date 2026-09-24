@@ -161,7 +161,7 @@ struct SpaceView: View {
                 if row.item.isFolder {
                     TabFolderView(item: row.item, spaceID: spaceID, isDropTarget: isDropTarget)
                 } else {
-                    SpaceTab(item: row.item)
+                    SpaceTab(item: row.item, hasChildren: row.hasChildren)
                 }
             }
             .opacity(dragSession.draggedItem?.tabId == row.item.id ? NookDesign.Surface.unloadedOpacity : 1)
@@ -197,7 +197,8 @@ struct SpaceView: View {
         return VStack(spacing: NookDesign.Spacing.xs) {
             SpaceSeparator(
                 isHovering: $isSidebarHovered,
-                onClear: { tabs.close(looseTabs) },
+                // Clear empties the section: a tab goes with its whole trail.
+                onClear: { looseTabs.forEach(tabs.remove) },
                 onOrganize: nookSettings.tabOrganizerEnabled && tabOrganizerManager.isAvailable ? {
                     Task {
                         await tabOrganizerManager.organizeTabs(in: spaceID, using: tabs)

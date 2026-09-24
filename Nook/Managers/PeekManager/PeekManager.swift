@@ -18,6 +18,8 @@ final class PeekManager {
     private(set) var page: PageSession?
     /// The window Peek opened in; the others show nothing.
     private(set) var windowId: UUID?
+    /// The tab Peek was opened from; moving the page to a tab nests it there.
+    @ObservationIgnored private var openerID: UUID?
 
     @ObservationIgnored weak var browserManager: BrowserManager?
 
@@ -43,6 +45,7 @@ final class PeekManager {
         page.onClose = { [weak self] in self?.dismissPeek() }
         self.page = page
         windowId = window?.id
+        openerID = source.itemID
     }
 
     func dismissPeek() {
@@ -57,7 +60,7 @@ final class PeekManager {
         let previous = window.selectedItemID
         self.page = nil
         windowId = nil
-        guard let itemID = browserManager.tabs.adopt(page, in: window) else { return }
+        guard let itemID = browserManager.tabs.adopt(page, in: window, from: openerID) else { return }
         // The adopted page is selected; pair it with the page the window showed before.
         if let previous, previous != itemID {
             browserManager.tabs.select(previous, in: window)
@@ -69,7 +72,7 @@ final class PeekManager {
         guard let page, let browserManager, let window = page.detachedWindow else { return }
         self.page = nil
         windowId = nil
-        browserManager.tabs.adopt(page, in: window)
+        browserManager.tabs.adopt(page, in: window, from: openerID)
     }
 
     var canEnterSplitView: Bool {

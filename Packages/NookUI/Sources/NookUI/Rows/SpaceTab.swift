@@ -15,6 +15,8 @@ import NookWeb
 public struct SpaceTab: View {
     let item: Item
     var menuContext: TabMenuContext = .sidebar
+    /// A tab with a trail of child tabs draws a chevron that collapses it, as a folder row does.
+    var hasChildren = false
 
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
@@ -32,10 +34,28 @@ public struct SpaceTab: View {
 
     public init(
         item: Item,
-        menuContext: TabMenuContext = .sidebar
+        menuContext: TabMenuContext = .sidebar,
+        hasChildren: Bool = false
     ) {
         self.item = item
         self.menuContext = menuContext
+        self.hasChildren = hasChildren
+    }
+
+    /// The folder row's chevron; clicking it collapses the trail without selecting the tab.
+    private var trailChevron: some View {
+        let isOpen = tabs.isOpen(folder: item.id)
+        return Button(action: {
+            withAnimation(NookDesign.Motion.spring) { tabs.toggleFolder(item.id) }
+        }) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: NookDesign.Size.rowGlyph - 1, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .rotationEffect(.degrees(isOpen ? 90 : 0))
+                .animation(NookDesign.Motion.standard, value: isOpen)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     public var body: some View {
@@ -49,6 +69,7 @@ public struct SpaceTab: View {
             }
         }) {
             HStack(spacing: NookDesign.Spacing.md) {
+                if hasChildren { trailChevron }
                 ItemFavicon(item: item, session: session)
                     .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))

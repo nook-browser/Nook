@@ -193,18 +193,23 @@ struct TabTreeTests {
         var history: [Change] = []
         var applied = 0
         var deepest = 0
+        var trailsSeen = 0
 
         for step in 0..<1_000 {
             let liveItems = f.tree.items.values.filter { $0.deletedAt == nil }.map(\.id).sorted { $0.uuidString < $1.uuidString }
             let folders = f.tree.items.values.filter { $0.deletedAt == nil && $0.isFolder }.map(\.id).sorted { $0.uuidString < $1.uuidString }
+            // Any live item can be asked to hold children, so trails and their rejections both occur.
+            let hosts = folders + liveItems.filter { !folders.contains($0) }
             let spaces = f.tree.orderedSpaces.map(\.id)
             func randomParent() -> Parent {
                 // Folders are favored so deep nesting and depth-limit rejections both occur.
                 switch Int.random(in: 0..<6, using: &rng) {
                 case 0: return .favorites(spaceID: spaces.randomElement(using: &rng)!)
                 case 1: return .pinned(spaceID: spaces.randomElement(using: &rng)!)
-                case 2 where !folders.isEmpty, 3 where !folders.isEmpty, 4 where !folders.isEmpty:
+                case 2 where !folders.isEmpty, 3 where !folders.isEmpty:
                     return .folder(itemID: folders.randomElement(using: &rng)!)
+                case 4 where !hosts.isEmpty:
+                    return .folder(itemID: hosts.randomElement(using: &rng)!)
                 default: return .tabs(spaceID: spaces.randomElement(using: &rng)!)
                 }
             }
@@ -233,7 +238,7 @@ struct TabTreeTests {
                     change = try f.tree.rename(id, customTitle: Bool.random(using: &rng) ? "n\(step)" : nil, now: fixedNow)
                 case 6:
                     guard let id = liveItems.randomElement(using: &rng) else { continue }
-                    let result = try f.tree.close(id, now: fixedNow)
+                    let result = try f.tree.close(id, promotingChildren: Bool.random(using: &rng), now: fixedNow)
                     closed.append(result.closed)
                     change = result.change
                 case 7:
@@ -270,6 +275,7 @@ struct TabTreeTests {
                 #expect(f.tree == after, "redo mismatch at step \(step) op \(op)")
                 history.append(change)
                 applied += 1
+                trailsSeen += f.tree.items.values.contains { $0.deletedAt == nil && !$0.isFolder && f.tree.hasChildren($0.id) } ? 1 : 0
                 deepest = max(deepest, f.tree.items.values.filter { $0.deletedAt == nil }.map { f.tree.folderDepth(of: $0.id) }.max() ?? 0)
             } catch {
                 #expect(f.tree == before, "failed op \(op) at step \(step) changed the tree: \(error)")
@@ -277,5 +283,6 @@ struct TabTreeTests {
         }
         #expect(applied > 400, "only \(applied) edits succeeded; the generator is too restrictive")
         #expect(deepest >= 3, "nesting only reached depth \(deepest)")
+        #expect(trailsSeen > 50, "trails formed after only \(trailsSeen) edits")
     }
 }

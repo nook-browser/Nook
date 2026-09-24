@@ -43,15 +43,16 @@ func checkInvariants(_ tree: TabTree, sourceLocation: SourceLocation = #_sourceL
         switch item.parent {
         case .favorites(let spaceID), .pinned(let spaceID), .tabs(let spaceID):
             #expect(tree.space(spaceID) != nil, "parent space missing", sourceLocation: sourceLocation)
-        case .folder(let folderID):
-            #expect(tree.item(folderID)?.isFolder == true, "parent folder missing", sourceLocation: sourceLocation)
+        case .folder(let hostID):
+            // A folder, or a tab in the Tabs section holding a tab (a trail).
+            #expect(tree.accepts(child: item.isFolder, under: hostID), "bad parent \(hostID)", sourceLocation: sourceLocation)
         }
         // No cycles, within the depth limit, and no folder in favorites.
         guard let chain = tree.folderChain(of: item.id) else {
             Issue.record("cycle at \(item.id)", sourceLocation: sourceLocation)
             continue
         }
-        let levels = chain.folders.count + (item.isFolder ? 1 : 0)
+        let levels = chain.folders.count + ((item.isFolder || tree.hasChildren(item.id)) ? 1 : 0)
         #expect(levels <= TabTree.maxFolderDepth, "too deep: \(levels)", sourceLocation: sourceLocation)
         if case .favorites = chain.section {
             #expect(chain.folders.isEmpty, "folder in favorites", sourceLocation: sourceLocation)

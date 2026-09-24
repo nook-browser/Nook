@@ -48,9 +48,16 @@ extension TabTree {
     @discardableResult
     public mutating func move(_ id: UUID, to parent: Parent, after: UUID?, currentURL: URL? = nil, now: Date = Date()) throws -> Change {
         guard var moving = item(id) else { throw TreeError.missingItem }
-        try validate(parent: parent, placing: id, isFolder: moving.isFolder)
+        // Trails live in the Tabs section only. Moving into pinned or favorites flattens every
+        // trail in the moved subtree, parents first, so each child lands right after its parent.
+        // A parent tab moved alone leaves its children in its place and validates as a plain tab;
+        // nothing in pinned or favorites can sit inside its subtree, so no cycle check is lost.
+        let trails = sectionOf(parent).map(Self.isSynced) == true
+            ? subtree(of: id).filter { items[$0]?.isFolder == false && hasChildren($0) } : []
+        try validate(parent: parent, placing: trails.first == id ? nil : id, isFolder: moving.isFolder)
         let before = scope(of: id)
         var change = Change()
+        for trail in trails { promoteChildren(of: trail, change: &change, now: now) }
         moving.order = placeKey(in: parent, after: after, excluding: id, change: &change, now: now)
         moving.parent = parent
         moving.modifiedAt = now
@@ -100,11 +107,13 @@ extension TabTree {
 
     /// Removes an item and its subtree. Synced items become tombstones so a future sync can send
     /// the delete; device items are removed. Returns the undo change and the closed records.
-    public mutating func close(_ id: UUID, now: Date = Date()) throws -> (change: Change, closed: ClosedEntry) {
-        guard item(id) != nil, let section = section(of: id) else { throw TreeError.missingItem }
+    /// `promotingChildren` closes a parent tab alone: its children first move up into its place.
+    public mutating func close(_ id: UUID, promotingChildren: Bool = false, now: Date = Date()) throws -> (change: Change, closed: ClosedEntry) {
+        guard let target = item(id), let section = section(of: id) else { throw TreeError.missingItem }
+        var change = Change()
+        if promotingChildren, !target.isFolder { promoteChildren(of: id, change: &change, now: now) }
         let ids = subtree(of: id)
         let closedItems = ids.compactMap { items[$0] }
-        var change = Change()
         for itemID in ids { remove(&change, itemID: itemID, now: now) }
         return (change, ClosedEntry(items: closedItems, section: section, closedAt: now))
     }
@@ -113,9 +122,9 @@ extension TabTree {
     /// when that still accepts it, else the root of its original section, else `fallback`.
     public mutating func reopen(_ entry: ClosedEntry, fallback: Parent, now: Date = Date()) throws -> Change {
         guard let root = entry.items.first else { throw TreeError.missingItem }
-        let height = entry.items.contains(where: \.isFolder) ? Self.height(of: root.id, in: entry.items) : 0
+        let height = Self.height(of: root.id, in: entry.items)
         let candidates: [Parent] = [root.parent, entry.section, fallback]
-        guard let parent = candidates.first(where: { canPlace(entryRoot: root, height: height, under: $0) }) else {
+        guard let parent = candidates.first(where: { canPlace(entryRoot: root, entryItems: entry.items, height: height, under: $0) }) else {
             throw TreeError.missingParent
         }
         var change = Change()
@@ -199,10 +208,16 @@ extension TabTree {
         case .pinned(let spaceID), .tabs(let spaceID):
             guard space(spaceID) != nil else { throw TreeError.missingSpace }
         case .folder(let folderID):
-            guard let folder = item(folderID), folder.isFolder else { throw TreeError.missingParent }
+            guard let host = item(folderID) else { throw TreeError.missingParent }
             guard let chain = folderChain(of: folderID) else { throw TreeError.cycle }
             if let id, id == folderID || chain.folders.contains(id) { throw TreeError.cycle }
-            if case .favorites = chain.section { throw TreeError.folderInFavorites }
+            if host.isFolder {
+                if case .favorites = chain.section { throw TreeError.folderInFavorites }
+            } else {
+                // A trail: a tab in the Tabs section holding tabs.
+                guard case .tabs = chain.section else { throw TreeError.childOutsideTabs }
+                if isFolder { throw TreeError.folderInTab }
+            }
             // The new position sits inside the folder plus its ancestors.
             let depth = chain.folders.count + 1
             let height = id.map { folderHeight(of: $0) } ?? (isFolder ? 1 : 0)
@@ -232,6 +247,33 @@ extension TabTree {
             items[itemID] = target
         } else {
             items[itemID] = nil
+        }
+    }
+
+    /// Moves a tab's children up into its place, right after it, in their order.
+    private mutating func promoteChildren(of id: UUID, change: inout Change, now: Date) {
+        guard let host = items[id] else { return }
+        var after = id
+        for child in children(of: .folder(itemID: id)) {
+            var moved = child
+            moved.order = placeKey(in: host.parent, after: after, excluding: child.id, change: &change, now: now)
+            moved.parent = host.parent
+            moved.modifiedAt = now
+            record(&change, item: moved)
+            after = child.id
+        }
+    }
+
+    /// The section a parent value belongs to.
+    func sectionOf(_ parent: Parent) -> Parent? {
+        if case .folder(let id) = parent { return section(of: id) }
+        return parent
+    }
+
+    static func isSynced(_ section: Parent) -> Bool {
+        switch section {
+        case .favorites, .pinned: return true
+        case .tabs, .folder: return false
         }
     }
 
@@ -278,23 +320,22 @@ extension TabTree {
         return keys[index]
     }
 
-    private func canPlace(entryRoot root: Item, height: Int, under parent: Parent) -> Bool {
+    private func canPlace(entryRoot root: Item, entryItems: [Item], height: Int, under parent: Parent) -> Bool {
         switch parent {
         case .favorites(let s): return !root.isFolder && space(s) != nil
         case .pinned(let s), .tabs(let s): return space(s) != nil
         case .folder(let f):
-            guard let folder = item(f), folder.isFolder, let chain = folderChain(of: f) else { return false }
-            if case .favorites = chain.section { return false }
+            guard accepts(child: root.isFolder, under: f), let chain = folderChain(of: f) else { return false }
+            // A closed trail never goes back into pinned (its folder may have moved there).
+            let holdsTrail = entryItems.contains { record in !record.isFolder && entryItems.contains { $0.parent == .folder(itemID: record.id) } }
+            if holdsTrail, Self.isSynced(chain.section) { return false }
             return chain.folders.count + 1 + height <= Self.maxFolderDepth
         }
     }
 
     static func height(of rootID: UUID, in records: [Item]) -> Int {
-        let byParent = Dictionary(grouping: records, by: \.parent)
-        func height(_ id: UUID) -> Int {
-            1 + ((byParent[.folder(itemID: id)] ?? []).filter(\.isFolder).map { height($0.id) }.max() ?? 0)
-        }
-        return records.first(where: { $0.id == rootID })?.isFolder == true ? height(rootID) : 0
+        let folders = Set(records.filter(\.isFolder).map(\.id))
+        return nestingHeight(of: rootID, isFolder: { folders.contains($0) }, children: Dictionary(grouping: records, by: \.parent))
     }
 }
 

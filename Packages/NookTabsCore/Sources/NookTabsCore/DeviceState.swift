@@ -22,7 +22,7 @@ public struct DeviceState: Codable, Equatable, Sendable {
 
     /// Drops references to items and spaces that no longer exist.
     public mutating func prune(against tree: TabTree) {
-        openFolders = openFolders.filter { tree.item($0)?.isFolder == true }
+        openFolders = openFolders.filter { tree.item($0)?.isFolder == true || tree.hasChildren($0) }
         openPages = openPages.filter { tree.item($0.key) != nil && tree.scope(of: $0.key) == .synced }
         for i in windows.indices {
             if let spaceID = windows[i].spaceID, tree.space(spaceID) == nil { windows[i].spaceID = nil }

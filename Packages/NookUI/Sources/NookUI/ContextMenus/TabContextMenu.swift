@@ -295,12 +295,13 @@ public struct TabContextMenu: View {
             }
         }
 
-        // Close others / below apply to the tabs section, where closing removes items.
+        // Close others / below apply to the tabs section, where closing removes items. Each
+        // closed tab takes its trail with it; this tab's own children stay.
         if context == .sidebar, case .tabs = section {
             let siblings = tabs.children(of: item.parent).filter { !$0.isFolder }
             if siblings.contains(where: { $0.id != itemID }) {
                 Button {
-                    tabs.close(siblings.map(\.id).filter { $0 != itemID })
+                    siblings.map(\.id).filter { $0 != itemID }.forEach(tabs.remove)
                 } label: {
                     Label("Close Other Tabs", systemImage: "xmark.circle")
                 }
@@ -308,7 +309,7 @@ public struct TabContextMenu: View {
 
             if let position = siblings.firstIndex(where: { $0.id == itemID }), position + 1 < siblings.count {
                 Button {
-                    tabs.close(siblings[(position + 1)...].map(\.id))
+                    siblings[(position + 1)...].map(\.id).forEach(tabs.remove)
                 } label: {
                     Label("Close All Below", systemImage: "arrow.down.to.line")
                 }

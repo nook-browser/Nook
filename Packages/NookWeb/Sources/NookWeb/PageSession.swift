@@ -732,8 +732,9 @@ public final class PageSession: NSObject, Identifiable {
 
     // MARK: - Opening links
 
-    /// Opens `url` in a background tab in this page's window and space. Used by
-    /// "Open Link in New Tab" in the context menu and by a middle click on a link.
+    /// Opens `url` in a background tab in this page's window and space, as a child of this tab
+    /// (a trail). Used by "Open Link in New Tab" in the context menu, a middle click and a
+    /// Command-click on a link.
     /// A private window's own tree keeps the link inside that window.
     ///
     /// The URL comes from the page's own markup, so the scheme is checked here rather
@@ -743,7 +744,7 @@ public final class PageSession: NSObject, Identifiable {
     public func openInNewTab(_ url: URL) {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
         guard let tabs = controller, let window = tabs.window(for: self) else { return }
-        tabs.open(url: url, in: window, placement: .background, below: itemID)
+        tabs.open(url: url, in: window, placement: .background, from: itemID)
     }
 
     // MARK: - Equality

@@ -112,9 +112,11 @@ public enum SidebarSection: String, Codable, Hashable, Sendable {
 
 public struct Row: Hashable, Sendable, Identifiable {
     public let item: Item
-    /// Number of folders the item sits inside.
+    /// Number of folders and parent tabs the item sits inside.
     public let depth: Int
     public let section: SidebarSection
+    /// A tab with children, which the sidebar draws with a disclosure chevron.
+    public let hasChildren: Bool
     public var id: UUID { item.id }
 }
 
@@ -125,6 +127,10 @@ public enum TreeError: Error, Equatable, Sendable {
     case cycle
     case tooDeep
     case folderInFavorites
+    /// A tab's children are tabs.
+    case folderInTab
+    /// Only a tab in the Tabs section holds children.
+    case childOutsideTabs
     case notATab
     case lastSpace
 }

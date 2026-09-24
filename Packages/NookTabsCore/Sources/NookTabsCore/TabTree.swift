@@ -53,8 +53,9 @@ public struct TabTree: Codable, Equatable, Sendable {
 
     // MARK: - Ancestry
 
-    /// Folder ids from the item's parent up to the section, nearest first. nil on a cycle or a
-    /// missing folder. Follows tombstoned records so scope is known for deleted items too.
+    /// Ids of the folders and parent tabs from the item's parent up to the section, nearest first.
+    /// nil on a cycle or a missing parent. Follows tombstoned records so scope is known for deleted
+    /// items too.
     func folderChain(of id: UUID) -> (folders: [UUID], section: Parent)? {
         var folders: [UUID] = []
         var visited: Set<UUID> = [id]
@@ -95,17 +96,44 @@ public struct TabTree: Codable, Equatable, Sendable {
         return out
     }
 
-    /// Number of folders an item sits inside.
+    /// Number of folders and parent tabs an item sits inside.
     func folderDepth(of id: UUID) -> Int { folderChain(of: id)?.folders.count ?? 0 }
 
-    /// Deepest folder nesting inside a folder, counting the folder itself as 1.
+    /// Deepest nesting inside an item, counting the item itself as 1 when it is a folder or a tab
+    /// with children (a trail), else 0.
     func folderHeight(of id: UUID) -> Int {
-        guard let root = item(id), root.isFolder else { return 0 }
-        let groups = childrenByParent()
-        func height(_ folderID: UUID) -> Int {
-            1 + ((groups[.folder(itemID: folderID)] ?? []).filter(\.isFolder).map { height($0.id) }.max() ?? 0)
+        guard item(id) != nil else { return 0 }
+        return Self.nestingHeight(of: id, isFolder: { self.items[$0]?.isFolder == true }, children: childrenByParent())
+    }
+
+    static func nestingHeight(of id: UUID, isFolder: (UUID) -> Bool, children: [Parent: [Item]]) -> Int {
+        let kids = children[.folder(itemID: id)] ?? []
+        guard isFolder(id) || !kids.isEmpty else { return 0 }
+        return 1 + (kids.map { nestingHeight(of: $0.id, isFolder: isFolder, children: children) }.max() ?? 0)
+    }
+
+    /// Whether `hostID` can take a child: a folder anywhere but favorites, or a tab in the Tabs
+    /// section taking a tab (a trail). Pinned tabs and favorites never hold children.
+    func accepts(child isFolder: Bool, under hostID: UUID) -> Bool {
+        guard let host = item(hostID), let chain = folderChain(of: hostID) else { return false }
+        if host.isFolder {
+            if case .favorites = chain.section { return false }
+            return true
         }
-        return height(id)
+        guard !isFolder, case .tabs = chain.section else { return false }
+        return true
+    }
+
+    /// Whether a new tab can go under tab `hostID` as the start or end of a trail: the host is a
+    /// tab in the Tabs section and the child stays within `maxFolderDepth`.
+    public func canTakeChild(_ hostID: UUID) -> Bool {
+        guard item(hostID)?.isFolder == false else { return false }
+        return (try? validate(parent: .folder(itemID: hostID), placing: nil, isFolder: false)) != nil
+    }
+
+    /// A live tab with children.
+    public func hasChildren(_ id: UUID) -> Bool {
+        items.values.contains { $0.deletedAt == nil && $0.parent == .folder(itemID: id) }
     }
 
     // MARK: - Ordering
