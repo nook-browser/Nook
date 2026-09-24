@@ -70,15 +70,13 @@ struct PeekOverlayView: View {
                         .frame(maxHeight: .infinity, alignment: .top)
                         .id(page.itemID)
                 }
-
-                // Action buttons in the margin left of the card, within the scaled area
-                actionButtons
-                    .position(
-                        x: -30,
-                        y: 80
-                    )
             }
             .frame(width: frame.width, height: frame.height)
+            // The buttons sit in the margin left of the card, level with its top.
+            .overlay(alignment: .topLeading) {
+                actionButtons
+                    .alignmentGuide(.leading) { $0[.trailing] + NookDesign.Spacing.lg }
+            }
             .position(
                 x: frame.minX + (frame.width / 2),
                 y: geometry.size.height / 2
@@ -86,81 +84,30 @@ struct PeekOverlayView: View {
         }
     }
 
+    /// Close, split and new tab as one glass group, like the sidebar's history buttons.
     private var actionButtons: some View {
-        VStack(spacing: 12) {
-            // Close button
-            actionButton(
-                icon: "xmark",
-                action: { peek.dismissPeek() },
-                color: currentSpaceColor
-            )
-
-            // Split view button (disabled if already in split view)
-            actionButton(
-                icon: "square.split.2x1",
-                action: { peek.moveToSplitView() },
-                color: currentSpaceColor,
-                disabled: !peek.canEnterSplitView
-            )
-
-            // New tab button
-            actionButton(
-                icon: "plus.square.on.square",
-                action: { peek.moveToNewTab() },
-                color: currentSpaceColor
-            )
+        VStack(spacing: 0) {
+            Button(action: { peek.dismissPeek() }) {
+                Image(systemName: "xmark")
+            }
+            divider
+            // Disabled while the window is already split.
+            Button(action: { peek.moveToSplitView() }) {
+                Image(systemName: "square.split.2x1")
+            }
+            .disabled(!peek.canEnterSplitView)
+            divider
+            Button(action: { peek.moveToNewTab() }) {
+                Image(systemName: "plus.square.on.square")
+            }
         }
+        // Dividers take any width offered; the group is the buttons' width.
+        .frame(width: NookDesign.Size.glassControl)
+        .nookGlassControls(in: Capsule())
     }
 
-    @ViewBuilder
-    private func actionButton(
-        icon: String,
-        action: @escaping () -> Void,
-        color: Color,
-        disabled: Bool = false
-    ) -> some View {
-        HoverButton(icon: icon, action: action, color: color, disabled: disabled)
-    }
-
-    // MARK: - Hover Button
-    private struct HoverButton: View {
-        @Environment(\.colorScheme) var colorScheme
-        let icon: String
-        let action: () -> Void
-        let color: Color
-        let disabled: Bool
-        @State private var isHovering = false
-
-        var body: some View {
-            Button(action: action) {
-                Image(systemName: icon)
-                    .font(NookDesign.Font.label)
-                    .foregroundStyle(disabled ? Color.gray : color)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle()
-                            .fill(Color(nsColor: colorScheme == .dark ? NSColor.white : NSColor.black))
-                            .opacity(disabled ? 0.5 : (isHovering ? 0.85 : 1.0))
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(color.opacity(disabled ? 0.3 : (isHovering ? 0.8 : 0.6)), lineWidth: 1)
-                    )
-            }
-            .disabled(disabled)
-            .buttonStyle(PlainButtonStyle())
-            .scaleEffect(disabled ? 0.9 : 1.0)
-            .onHoverTracking { hovering in
-                isHovering = hovering
-                if hovering {
-                    NSCursor.pointingHand.set()
-                } else {
-                    NSCursor.arrow.set()
-                }
-            }
-            .animation(NookDesign.Motion.quick, value: isHovering)
-            .animation(NookDesign.Motion.quick, value: disabled)
-        }
+    private var divider: some View {
+        Divider().padding(.horizontal, NookDesign.Spacing.sm)
     }
 
     // MARK: - Layout Calculation
