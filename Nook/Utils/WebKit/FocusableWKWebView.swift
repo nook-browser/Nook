@@ -49,6 +49,24 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// Keeps a mini window page's fixed content clear of the window's glass toolbar while the
+    /// page scrolls underneath it. Synced in `layout()` so it survives resize, full screen and
+    /// toolbar changes; in a browser window the inset stays zero.
+    override func layout() {
+        super.layout()
+        guard let window = window as? MiniBrowserWindow, bounds.height > 0 else {
+            if obscuredContentInsets.top != 0 { obscuredContentInsets = NSEdgeInsetsZero }
+            return
+        }
+        // How far this view reaches up under the titlebar and toolbar. WebKit throws on
+        // negative insets or insets taller than the view, both possible mid-layout.
+        let overlap = convert(bounds, to: nil).maxY - window.contentLayoutRect.maxY
+        let inset = min(max(0, overlap), bounds.height - 1)
+        if obscuredContentInsets.top != inset {
+            obscuredContentInsets = NSEdgeInsets(top: inset, left: 0, bottom: 0, right: 0)
+        }
+    }
+
     /// Set when sidebar PiP asks to isolate the page; undone when the view next lands in a tab.
     var isPictureInPictureIsolated = false
 
@@ -240,7 +258,7 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
 
         // The page chose this URL. Cookies for any other site would make the save a credentialed
         // cross-site GET; public CDN media does not need them.
-        guard Self.isSameSite(url.host, self.url?.host) else {
+        guard PageSession.isSameSite(url.host, self.url?.host) else {
             completion(request)
             return
         }
@@ -307,18 +325,6 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
             allowedContentTypes: Self.imageContentTypes,
             mediaOnly: true
         )
-    }
-
-    // No public suffix list: hosts match when one equals or contains the other, so a page on a
-    // bare shared suffix (github.io) would match its subdomains. Use a PSL if that proves too loose.
-    private static func isSameSite(_ lhs: String?, _ rhs: String?) -> Bool {
-        func bare(_ host: String?) -> String {
-            let host = host?.lowercased() ?? ""
-            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-        }
-        let a = bare(lhs), b = bare(rhs)
-        guard !a.isEmpty, !b.isEmpty else { return false }
-        return a == b || a.hasSuffix(".\(b)") || b.hasSuffix(".\(a)")
     }
 
     private static func relevantCookies(for url: URL, from cookies: [HTTPCookie]) -> [HTTPCookie] {

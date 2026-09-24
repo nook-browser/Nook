@@ -98,7 +98,8 @@ extension BrowserModel: PageSessionDelegate {
 
     func presentPeek(url: URL, from session: PageSession) { session.navigate(to: url.absoluteString) }
 
-    func presentSignInWindow(url: URL, completion: @escaping (Bool) -> Void) { completion(false) }
+    /// No mini windows on a phone: the popup becomes a tab, opener intact.
+    func presentPopupWindow(_ session: PageSession) { tabs.adopt(session, in: window) }
 
     func handleAuthenticationChallenge(
         _ challenge: URLAuthenticationChallenge, for session: PageSession,

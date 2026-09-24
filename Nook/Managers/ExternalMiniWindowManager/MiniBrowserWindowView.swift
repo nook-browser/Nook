@@ -1,41 +1,22 @@
 // Licensed under GPL-3.0. See LICENSE.
 import SwiftUI
 import AppKit
+import NookWeb
 
 struct MiniBrowserWindowView: View {
-    let session: MiniWindowSession
+    let page: PageSession
+    @EnvironmentObject private var gradientColorManager: GradientColorManager
 
     var body: some View {
-        webContent
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea(.container, edges: .top)
-            .background(Color(NSColor.windowBackgroundColor))
-    }
-
-    @ViewBuilder private var webContent: some View {
-        if isRunningInPreviews {
-            ContentUnavailableView("Web Content Placeholder", systemImage: "safari")
-        } else {
-            MiniWindowWebView(session: session)
+        // The page runs up under the glass toolbar; the load bar sits just below it.
+        ZStack(alignment: .top) {
+            DetachedPageHost(page: page)
+                .ignoresSafeArea(.container, edges: .top)
+            if let webView = page.webView {
+                PageLoadBar(webView: webView, tint: gradientColorManager.accentColor)
+            }
         }
-    }
-
-    private var isRunningInPreviews: Bool {
-        ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(NSColor.windowBackgroundColor))
     }
 }
-
-#if DEBUG
-#Preview {
-    // Provide a mock session for preview
-    let session = MiniWindowSession(
-        url: URL(string: "https://apple.com")!,
-        profile: nil,
-        originName: "Preview",
-        targetSpaceResolver: { "Preview Space" },
-        adoptHandler: { _ in }
-    )
-    MiniBrowserWindowView(session: session)
-        .environmentObject(GradientColorManager())
-}
-#endif

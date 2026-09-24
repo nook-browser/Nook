@@ -12,84 +12,19 @@ import AppKit
 import Combine
 import NookWeb
 
-@MainActor
-final class MiniWindowSession: ObservableObject, Identifiable {
-    let id = UUID()
-    let profile: Profile?
-    let originName: String
-    private let targetSpaceResolver: () -> String
-    private let adoptHandler: (MiniWindowSession) -> Void
-    private let authCompletionHandler: ((Bool, URL?) -> Void)?
-
-    @Published var currentURL: URL
-    @Published var title: String
-    @Published var isAuthComplete: Bool = false
-    @Published var authSuccess: Bool = false
-
-    /// The loaded page, handed to the new tab on adopt so it does not reload.
-    weak var webView: WKWebView?
-
-    init(
-        url: URL,
-        profile: Profile?,
-        originName: String,
-        targetSpaceResolver: @escaping () -> String,
-        adoptHandler: @escaping (MiniWindowSession) -> Void,
-        authCompletionHandler: ((Bool, URL?) -> Void)? = nil
-    ) {
-        self.profile = profile
-        self.originName = originName
-        self.targetSpaceResolver = targetSpaceResolver
-        self.adoptHandler = adoptHandler
-        self.authCompletionHandler = authCompletionHandler
-        self.currentURL = url
-        self.title = url.absoluteString
-    }
-
-    var targetSpaceName: String { targetSpaceResolver() }
-
-    func adopt() {
-        adoptHandler(self)
-    }
-
-    func updateNavigationState(url: URL?, title: String?) {
-        if let url { currentURL = url }
-        if let title, !title.isEmpty { self.title = title }
-    }
-
-    func completeAuth(success: Bool, finalURL: URL? = nil) {
-        isAuthComplete = true
-        authSuccess = success
-        if let finalURL = finalURL {
-            currentURL = finalURL
-        }
-        authCompletionHandler?(success, finalURL)
-        
-        // Don't auto-adopt - let the user decide when to adopt the window
-        // The authentication completion is communicated back to the original tab
-        // but the mini window stays open for the user to manually adopt if desired
-    }
-
-    func cancelAuthDueToClose() {
-        guard !isAuthComplete else { return }
-        authCompletionHandler?(false, nil)
-    }
-}
-
+/// Mini windows: a link from another app, or a sign-in popup that keeps `window.opener`, shown
+/// as a detached page in its own small window until it closes or moves to a tab.
 @MainActor
 final class ExternalMiniWindowManager {
-    private struct SessionEntry {
-        let controller: MiniBrowserWindowController
-    }
-
     private weak var browserManager: BrowserManager?
-    private var sessions: [UUID: SessionEntry] = [:]
+    private var controllers: [UUID: MiniBrowserWindowController] = [:]
 
     func attach(browserManager: BrowserManager) {
         self.browserManager = browserManager
     }
 
-    func present(url: URL, authCompletionHandler: ((Bool, URL?) -> Void)? = nil) {
+    /// A link from another app, in the data store of the active window's space.
+    func present(url: URL) {
         guard let browserManager else { return }
         let window = browserManager.windowRegistry?.activeWindow
         let profile = window.flatMap { window in
@@ -97,54 +32,37 @@ final class ExternalMiniWindowManager {
                 ? window.ephemeralProfile
                 : window.spaceID.flatMap { browserManager.tabs.profile(forSpace: $0) }
         } ?? browserManager.currentProfile
-        let session = MiniWindowSession(
-            url: url,
-            profile: profile,
-            originName: profile?.name ?? "Default",
-            targetSpaceResolver: { [weak browserManager] in
-                guard let browserManager else { return "Current Space" }
+        guard let profile else { return }
+        present(browserManager.tabs.openDetached(url: url, profile: profile, in: window))
+    }
+
+    func present(_ page: PageSession) {
+        guard let browserManager else { return }
+        let controller = MiniBrowserWindowController(
+            page: page,
+            targetSpaceName: {
                 let tabs = browserManager.tabs
                 let space = browserManager.windowRegistry?.activeWindow?.spaceID.flatMap { tabs.space($0) }
                     ?? tabs.orderedSpaces.first
                 return space?.name ?? "Current Space"
-            },
-            adoptHandler: { [weak self] session in
-                self?.adopt(session: session)
-            },
-            authCompletionHandler: authCompletionHandler
-        )
-
-        let controller = MiniBrowserWindowController(
-            session: session,
-            adoptAction: { [weak session] in session?.adopt() },
-            onClose: { [weak self] session in
-                session.cancelAuthDueToClose()
-                self?.sessions[session.id] = nil
+            }(),
+            adoptAction: { [weak self] in self?.adopt(page) },
+            onClose: { [weak self, weak browserManager] in
+                self?.controllers[page.itemID] = nil
+                browserManager?.tabs.endDetached(page)
             },
             gradientColorManager: browserManager.gradientColorManager
         )
-
-        sessions[session.id] = SessionEntry(controller: controller)
+        page.onClose = { [weak controller] in controller?.close() }
+        controllers[page.itemID] = controller
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func adopt(session: MiniWindowSession) {
+    private func adopt(_ page: PageSession) {
         guard let browserManager, let window = browserManager.windowRegistry?.activeWindow else { return }
-        let tabs = browserManager.tabs
-
-        // The live page carries its space's data store; only reuse it when the window shows
-        // that same space, otherwise reload in the space's own store.
-        let windowStoreID = window.isIncognito ? window.ephemeralProfile?.id : window.spaceID
-        if let webView = session.webView, windowStoreID == session.profile?.id {
-            tabs.adopt(webView: webView, url: session.currentURL, title: webView.title ?? session.currentURL.host ?? "",
-                       in: window, placement: .newTab)
-        } else {
-            tabs.open(url: session.currentURL, in: window, placement: .newTab)
-        }
-
-        sessions[session.id]?.controller.close()
-        sessions[session.id] = nil
+        browserManager.tabs.adopt(page, in: window)
+        controllers[page.itemID]?.close()
     }
 }
 
@@ -172,11 +90,11 @@ final class MiniBrowserWindow: NSWindow {
 
 @MainActor
 final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
-    private let session: MiniWindowSession
+    private let page: PageSession
+    private let targetSpaceName: String
     private let adoptAction: () -> Void
-    private let onClose: (MiniWindowSession) -> Void
-    private let gradientColorManager: GradientColorManager
-    private var titleObservers: Set<AnyCancellable> = []
+    private let onClose: () -> Void
+    private var titleObserver: AnyCancellable?
 
     private static let maximumSize = NSSize(width: 1280, height: 900)
     private static let minimumSize = NSSize(width: 640, height: 480)
@@ -190,13 +108,16 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
         )
     }
 
-    init(session: MiniWindowSession, adoptAction: @escaping () -> Void, onClose: @escaping (MiniWindowSession) -> Void, gradientColorManager: GradientColorManager) {
-        self.session = session
+    init(
+        page: PageSession, targetSpaceName: String, adoptAction: @escaping () -> Void,
+        onClose: @escaping () -> Void, gradientColorManager: GradientColorManager
+    ) {
+        self.page = page
+        self.targetSpaceName = targetSpaceName
         self.adoptAction = adoptAction
         self.onClose = onClose
-        self.gradientColorManager = gradientColorManager
 
-        let contentView = MiniBrowserWindowView(session: session)
+        let contentView = MiniBrowserWindowView(page: page)
             .environmentObject(gradientColorManager)
 
         let hostingController = NSHostingController(rootView: contentView)
@@ -219,7 +140,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
 
         window.delegate = self
         window.openInSpaceAction = adoptAction
-        window.subtitle = session.originName
+        window.subtitle = page.profile?.name ?? "Default"
         installToolbar(on: window)
         observeNavigationState(for: window)
     }
@@ -234,7 +155,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        onClose(session)
+        onClose()
     }
 
     @objc private func openInSpace(_ sender: Any?) {
@@ -255,11 +176,12 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Mirrors the page into the window's title and the space into its subtitle,
     /// so the toolbar carries no label views of its own.
     private func observeNavigationState(for window: NSWindow) {
-        session.$currentURL
+        window.title = page.url.host() ?? page.url.absoluteString
+        titleObserver = page.webView?.publisher(for: \.url)
+            .compactMap { $0 }
             .sink { [weak window] url in
                 window?.title = url.host() ?? url.absoluteString
             }
-            .store(in: &titleObservers)
     }
 }
 
@@ -285,8 +207,8 @@ extension MiniBrowserWindowController: NSToolbarDelegate {
             return item
         case .miniOpenInSpace:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.title = "Open in \(session.targetSpaceName)"
-            item.toolTip = "Open this page as a tab in \(session.targetSpaceName) (⌘O)"
+            item.title = "Open in \(targetSpaceName)"
+            item.toolTip = "Open this page as a tab in \(targetSpaceName) (⌘O)"
             item.isBordered = true
             item.target = self
             item.action = #selector(openInSpace(_:))
@@ -302,6 +224,6 @@ extension MiniBrowserWindowController: NSSharingServicePickerToolbarItemDelegate
     /// isolated. Marking it `nonisolated` forced a `MainActor.assumeIsolated` whose executor
     /// check segfaults in the concurrency runtime on macOS 27 (26A428) during toolbar validation.
     func items(for pickerToolbarItem: NSSharingServicePickerToolbarItem) -> [Any] {
-        [session.currentURL]
+        [page.url]
     }
 }

@@ -404,16 +404,11 @@ class BrowserManager: ObservableObject {
 
     var siteRoutingManager: SiteRoutingManager
     var externalMiniWindowManager = ExternalMiniWindowManager()
-    @Published var peekManager = PeekManager()
+    let peekManager = PeekManager()
 
     // TEMPORARY: Will be removed when cross-window coordination is eliminated
     weak var webViewCoordinator: WebViewCoordinator?
-    weak var windowRegistry: WindowRegistry? {
-        didSet {
-            // Update PeekManager's windowRegistry reference when this changes
-            peekManager.windowRegistry = windowRegistry
-        }
-    }
+    weak var windowRegistry: WindowRegistry?
 
     private var savedSidebarWidth: CGFloat = 250
     private let userDefaults = UserDefaults.standard

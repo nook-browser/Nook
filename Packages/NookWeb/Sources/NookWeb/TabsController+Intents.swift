@@ -33,33 +33,66 @@ extension TabsController {
         return id
     }
 
-    /// Wraps a web view created elsewhere (Peek, mini window) in a new item and session.
-    @discardableResult
-    public func adopt(webView: WKWebView, url: URL, title: String, in window: BrowserWindowState, placement: Placement) -> UUID? {
-        let owner = owner(of: window)
-        let replaced = placement == .replaceCurrent ? window.selectedItemID : nil
-        let source = tree(owner)
-        let target: Parent
-        var after: UUID? = nil
-        if let replaced, let item = source.item(replaced), source.scope(of: replaced) == .device {
-            target = item.parent
-            after = replaced
-        } else if let spaceID = window.spaceID {
-            target = .tabs(spaceID: spaceID)
-        } else {
-            return nil
-        }
-        let id = UUID()
-        guard perform(owner, "adopt", { try $0.createTab(id: id, url: url, title: title, in: target, after: after) }) != nil else {
-            return nil
-        }
+    // MARK: - Detached Pages
+
+    /// A page outside the tree, for Peek or a mini window. It loads at once, runs the same
+    /// navigation, blocking and dialog code as a tab, and stays out of the sidebar until
+    /// `adopt(_:in:)` makes it a tab. `endDetached(_:)` closes it.
+    public func openDetached(url: URL, profile: Profile, in window: BrowserWindowState?) -> PageSession {
         let session = PageSession(
-            itemID: id, url: url, title: title, isPrivate: window.privateTree != nil,
-            controller: self, adoptedWebView: webView)
+            itemID: UUID(), url: url, title: url.host ?? url.absoluteString,
+            isPrivate: profile.isEphemeral, controller: self)
+        session.detachedProfile = profile
+        session.detachedWindow = window
+        session.loadWebViewIfNeeded()
+        return session
+    }
+
+    /// A WebKit-created popup from `opener` shown outside the tree (a sign-in window). It keeps
+    /// `window.opener`, and WebKit drives its first navigation.
+    func openDetachedPopup(configuration: WKWebViewConfiguration, url: URL?, opener: PageSession) -> PageSession? {
+        guard let profile = opener.profile,
+              let webView = webViews?.makeWebView(configuration: configuration) else { return nil }
+        let pageURL = url ?? URL(string: "about:blank")!
+        let session = PageSession(
+            itemID: UUID(), url: pageURL, title: pageURL.host ?? pageURL.absoluteString,
+            isPrivate: opener.isPrivate, controller: self)
+        session.detachedProfile = profile
+        session.detachedWindow = window(for: opener)
+        session.installPopupWebView(webView)
+        return session
+    }
+
+    /// Makes a detached page a selected tab of `window`, live view and all. A window whose space
+    /// uses another data store opens the URL fresh instead, and the detached page ends.
+    @discardableResult
+    public func adopt(_ session: PageSession, in window: BrowserWindowState) -> UUID? {
+        guard session.isDetached else { return nil }
+        let store = window.privateTree != nil ? window.ephemeralProfile : window.spaceID.flatMap { profile(forSpace: $0) }
+        guard store === session.detachedProfile, let spaceID = window.spaceID,
+              perform(owner(of: window), "adopt", {
+                  try $0.createTab(id: session.itemID, url: session.url, title: session.title, in: .tabs(spaceID: spaceID), after: nil)
+              }) != nil
+        else {
+            let id = open(url: session.url, in: window, placement: .newTab)
+            endDetached(session)
+            return id
+        }
+        session.detachedProfile = nil
+        session.detachedWindow = nil
+        session.onClose = nil
         register(session, in: window)
-        if placement != .background { select(id, in: window) }
-        if let replaced, after == replaced { close(replaced) }
-        return id
+        // Extensions could not see the page while it had no item.
+        if !session.isPrivate { tabEvents?.tabOpened(session) }
+        select(session.itemID, in: window)
+        return session.itemID
+    }
+
+    /// Closes a detached page that never became a tab.
+    public func endDetached(_ session: PageSession) {
+        guard session.isDetached else { return }
+        session.onClose = nil
+        session.tearDown()
     }
 
     /// A WebKit-created popup from `opener`: a new selected tab in the opener's window whose

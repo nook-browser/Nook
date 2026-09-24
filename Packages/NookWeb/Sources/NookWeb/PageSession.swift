@@ -32,8 +32,18 @@ public final class PageSession: NSObject, Identifiable {
 
     /// The profile whose data store this page uses.
     public var profile: Profile? {
-        controller?.profile(for: self)
+        detachedProfile ?? controller?.profile(for: self)
     }
+
+    // MARK: - Detached Pages
+
+    /// Set while the page is shown outside the tab tree, in Peek or a mini window: the data store
+    /// it uses and the window it belongs to. Cleared when the page becomes a tab.
+    @ObservationIgnored public internal(set) var detachedProfile: Profile?
+    @ObservationIgnored public internal(set) weak var detachedWindow: BrowserWindowState?
+    /// Runs when the page calls `window.close()`, so Peek or the mini window can close.
+    @ObservationIgnored public var onClose: (() -> Void)?
+    public var isDetached: Bool { detachedProfile != nil }
 
     // MARK: - Page State
 
@@ -194,8 +204,6 @@ public final class PageSession: NSObject, Identifiable {
     // MARK: - Web View Ownership
 
     var primaryWebView: WKWebView?
-    /// A view created elsewhere (Peek, mini window, popup) that this session adopts on setup.
-    @ObservationIgnored var adoptedWebView: WKWebView?
     /// The window that owns the primary web view; nil until a window displays the page.
     @ObservationIgnored var primaryWindowId: UUID?
 
@@ -224,15 +232,13 @@ public final class PageSession: NSObject, Identifiable {
         url: URL,
         title: String,
         isPrivate: Bool,
-        controller: TabsController?,
-        adoptedWebView: WKWebView? = nil
+        controller: TabsController?
     ) {
         self.itemID = itemID
         self.url = url
         self.title = title
         self.isPrivate = isPrivate
         self.controller = controller
-        self.adoptedWebView = adoptedWebView
         self.favicon = SwiftUI.Image(systemName: "globe")
         super.init()
         restoreFaviconFromCache()
@@ -300,14 +306,9 @@ public final class PageSession: NSObject, Identifiable {
             configuration.webExtensionController = extensionController
         }
 
-        let adopted = adoptedWebView
-        if let adopted {
-            primaryWebView = adopted
-        } else {
-            let created = controller?.webViews?.makeWebView(configuration: configuration)
-            (created as? SessionWebView)?.contextMenuBridge = WebContextMenuBridge(session: self, configuration: configuration)
-            primaryWebView = created
-        }
+        let created = controller?.webViews?.makeWebView(configuration: configuration)
+        (created as? SessionWebView)?.contextMenuBridge = WebContextMenuBridge(session: self, configuration: configuration)
+        primaryWebView = created
 
         guard let webView = primaryWebView else {
             Self.log.error("No web view created for item \(self.itemID.uuidString, privacy: .public)")
@@ -320,16 +321,7 @@ public final class PageSession: NSObject, Identifiable {
         webView.allowsMagnification = true
         setupThemeColorObserver(for: webView)
         setupNavigationStateObservers(for: webView)
-
-        // Adopted Peek and mini-window views have their own controllers without Nook's
-        // handlers, so they need the same setup as a fresh view.
         configure(webView)
-        // An adopted page already finished loading, so didFinish will not inject the page
-        // observers (SPA URL, media state, link hover) for this document.
-        if adopted != nil, !webView.isLoading, webView.url != nil {
-            injectPageObservers(into: webView)
-            if let current = webView.url { url = current }
-        }
 
         // Inform extensions before loading so content scripts and messaging can resolve this
         // page during early document phases.
@@ -342,14 +334,14 @@ public final class PageSession: NSObject, Identifiable {
         }
         // Consume popup suppression only after setup succeeds. WebKit drives the original
         // navigation; any replacement view must load the saved URL.
-        let shouldLoadInitialURL = !isPopupHost && adopted == nil
+        let shouldLoadInitialURL = !isPopupHost
         isPopupHost = false
         if shouldLoadInitialURL {
             load(url)
         }
     }
 
-    /// Handlers, user agent and preferences shared by primary, clone, adopted and popup views.
+    /// Handlers, user agent and preferences shared by primary, clone and popup views.
     /// The view's controller must belong to this view alone: handlers are keyed by name.
     public func configure(_ webView: WKWebView) {
         let controller = webView.configuration.userContentController
@@ -395,7 +387,7 @@ public final class PageSession: NSObject, Identifiable {
         }
     }
 
-    /// Releases every web view for this page (primary, window clones, adopted view) and resets
+    /// Releases every web view for this page (primary and window clones) and resets
     /// live state. The item and its URL stay; selecting it again loads a fresh view.
     public func unload() {
         let interval = BrowserPerformance.signposter.beginInterval("TabEviction")
@@ -408,7 +400,6 @@ public final class PageSession: NSObject, Identifiable {
         coordinator?.releaseWebViews(for: self)
         if let primary, !primaryIsPooled { cleanupClone(primary) }
         primaryWebView = nil
-        adoptedWebView = nil
         // WebKit only supplies the original popup navigation. A replacement view must load the
         // saved URL through the normal setup path.
         isPopupHost = false

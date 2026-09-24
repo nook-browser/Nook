@@ -69,8 +69,8 @@ extension BrowserManager: PageSessionDelegate {
         peekManager.presentExternalURL(url, from: session)
     }
 
-    func presentSignInWindow(url: URL, completion: @escaping (Bool) -> Void) {
-        externalMiniWindowManager.present(url: url) { success, _ in completion(success) }
+    func presentPopupWindow(_ session: PageSession) {
+        externalMiniWindowManager.present(session)
     }
 
     func handleAuthenticationChallenge(

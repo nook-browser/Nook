@@ -85,6 +85,7 @@ public enum NookDesign {
         public static let rowButton: CGFloat = 20      // hover-only close/unload button in a row
         public static let cornerButton: CGFloat = 14   // button tucked into a tile corner, kept off the tile's centre
         public static let hairlineWidth: CGFloat = 1   // 1pt rule
+        public static let loadBar: CGFloat = 2         // page load progress along the top of Peek and the mini window
         public static let waveAmplitude: CGFloat = 3   // peak of the separator's working wave
         public static let waveLength: CGFloat = 56     // one full cycle of that wave
         public static let dropTail: CGFloat = 100      // empty drop target height below the last row

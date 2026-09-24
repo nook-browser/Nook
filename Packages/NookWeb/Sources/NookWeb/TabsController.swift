@@ -473,6 +473,7 @@ public final class TabsController {
     /// The window a session's actions belong to: its private window, else the active window
     /// when that window can show the item, else a window selecting it, else the active window.
     public func window(for session: PageSession) -> BrowserWindowState? {
+        if let window = session.detachedWindow { return window }
         if session.isPrivate {
             return privateWindows.first { $0.privateSessions[session.itemID] === session }
         }
