@@ -55,6 +55,9 @@ extension PlatformColor {
 extension PlatformImage {
     var singlePixelCGImage: CGImage? { cgImage(forProposedRect: nil, context: nil, hints: nil) }
 }
+
+/// Hands a URL WebKit cannot load (mailto:, tel:, an app's own scheme) to the app registered for it.
+@MainActor func openWithSystem(_ url: URL) { NSWorkspace.shared.open(url) }
 #else
 import UIKit
 
@@ -100,6 +103,8 @@ extension PlatformColor {
 extension PlatformImage {
     var singlePixelCGImage: CGImage? { cgImage }
 }
+
+@MainActor func openWithSystem(_ url: URL) { UIApplication.shared.open(url) }
 #endif
 
 extension PlatformImage {

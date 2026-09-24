@@ -279,6 +279,18 @@ extension PageSession: WKNavigationDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
+        // mailto:, tel: and app schemes go to the system. A subframe needs a click, so an ad
+        // iframe cannot launch an app on its own.
+        if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
+           !WKWebView.handlesURLScheme(scheme), scheme != "webkit-extension", scheme != "safari-web-extension"
+        {
+            decisionHandler(.cancel)
+            if navigationAction.targetFrame?.isMainFrame != false || navigationAction.navigationType == .linkActivated {
+                openWithSystem(url)
+            }
+            return
+        }
+
         if let url = navigationAction.request.url,
             navigationAction.targetFrame?.isMainFrame == true
         {
