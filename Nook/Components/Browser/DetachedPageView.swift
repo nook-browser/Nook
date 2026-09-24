@@ -22,20 +22,45 @@ struct DetachedPageHost: NSViewRepresentable {
     var cornerRadius: CGFloat = 0
 
     func makeNSView(context: Context) -> NSView {
-        let container = NSView()
+        let container = DetachedPageContainer()
         container.wantsLayer = true
         container.layer?.cornerCurve = .continuous
         container.layer?.masksToBounds = true
-        if let webView = page.webView {
-            webView.frame = container.bounds
-            webView.autoresizingMask = [.width, .height]
-            container.addSubview(webView)
-        }
+        container.pendingPage = page.webView
         return container
     }
 
     func updateNSView(_ container: NSView, context: Context) {
         container.layer?.cornerRadius = cornerRadius
+    }
+}
+
+/// Holds the page until the container is in a window, then keeps it at the container's bounds.
+/// SwiftUI sizes a new container before it is in a window (2000x1500, then the card's size), and
+/// WebKit resizes its inner drawing view only for the first of those: the page then drew at
+/// 2000x1500, offset by (-201, -402.5), in an 1848x1195 Peek card. Tabs never resize off-window.
+private final class DetachedPageContainer: NSView {
+    /// Attached once; after a move to a tab the view belongs to the tab.
+    weak var pendingPage: NSView?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // A page moved to a tab before the card reached the window stays in the tab.
+        guard window != nil, let page = pendingPage, page.superview == nil else { return }
+        pendingPage = nil
+        page.frame = bounds
+        addSubview(page)
+    }
+
+    override func resizeSubviews(withOldSize oldSize: NSSize) { pinSubviews() }
+
+    override func layout() {
+        super.layout()
+        pinSubviews()
+    }
+
+    private func pinSubviews() {
+        for subview in subviews where subview.frame != bounds { subview.frame = bounds }
     }
 }
 
