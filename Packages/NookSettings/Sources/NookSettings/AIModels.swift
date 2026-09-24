@@ -15,6 +15,7 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable {
     case openRouter = "openrouter"
     case ollama = "ollama"
     case openAICompatible = "openai_compatible"
+    case appleIntelligence = "apple_intelligence"
 
     public var id: String { rawValue }
 
@@ -24,13 +25,14 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         case .openRouter: return "OpenRouter"
         case .ollama: return "Ollama (Local)"
         case .openAICompatible: return "OpenAI Compatible"
+        case .appleIntelligence: return "Apple Intelligence"
         }
     }
 
     public var requiresAPIKey: Bool {
         switch self {
         case .gemini, .openRouter: return true
-        case .ollama, .openAICompatible: return false
+        case .ollama, .openAICompatible, .appleIntelligence: return false
         }
     }
 
@@ -39,7 +41,7 @@ public enum AIProviderType: String, Codable, CaseIterable, Identifiable {
         case .gemini: return "https://generativelanguage.googleapis.com/v1beta"
         case .openRouter: return "https://openrouter.ai/api/v1"
         case .ollama: return "http://localhost:11434"
-        case .openAICompatible: return nil
+        case .openAICompatible, .appleIntelligence: return nil
         }
     }
 }

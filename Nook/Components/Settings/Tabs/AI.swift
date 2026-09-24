@@ -70,7 +70,7 @@ struct SettingsAITab: View {
 
             // MARK: - Providers
             Section("Providers") {
-                ForEach(configService.providers) { provider in
+                ForEach(configService.providers.filter { $0.providerType != .appleIntelligence || AppleIntelligenceProvider.isAvailable }) { provider in
                     providerRow(provider)
                 }
 
@@ -115,7 +115,7 @@ struct SettingsAITab: View {
                         .font(NookDesign.Font.secondary)
                 }
 
-                ForEach(configService.models) { model in
+                ForEach(configService.models.filter { $0.providerId != AppleIntelligenceProvider.providerId || AppleIntelligenceProvider.isAvailable }) { model in
                     HStack {
                         VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
                             Text(model.displayName)
@@ -713,6 +713,8 @@ struct SettingsAITab: View {
         Task {
             do {
                 switch provider.providerType {
+                case .appleIntelligence:
+                    break
                 case .gemini:
                     // The key goes in a header; in the URL it would reach logs and proxies
                     var request = URLRequest(url: URL(string: "\(provider.baseURL)/models")!)

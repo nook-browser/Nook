@@ -275,7 +275,9 @@ Located in `Nook/Managers/AIManager/`:
 - **AIService**: Central orchestrator: providers, conversations, streaming, tool execution (max 20 iterations)
 - **AIConfigService**: Provider configuration and API key management
 - **AIProvider**: Protocol + factory for provider implementations
-- **Providers/**: `GeminiProvider`, `OpenRouterProvider`, `OllamaProvider`, `OpenAICompatibleProvider`
+- **Providers/**: `AppleIntelligenceProvider`, `GeminiProvider`, `OpenRouterProvider`, `OllamaProvider`, `OpenAICompatibleProvider`
+- **`AppleIntelligenceProvider`** is the on-device chat on `SystemLanguageModel`, the model the tab organizer uses. `AIConfigService` lists it first and makes it active when no provider is usable (no provider, no model, or a missing key); without Apple Intelligence it is hidden. It gets its own short instructions, a page, history and tool-output budget in estimated tokens (4096-token context on macOS 26, 8192 on 27), and eight browser tools, not the page readers or JavaScript. The framework runs tools inside one response, so they reach `AIService.runOnDeviceTool` through a closure and keep the usual approval and switches; the provider never returns `.toolCalls`. On overflow it retries once without history, unless a tool already ran. **macOS 27 throws the 27 SDK's `LanguageModelError`, not `GenerationError`**, and CI's Xcode may lack that type, so errors are matched by case name through `Mirror`; a `catch` on `GenerationError` alone misses every error on 27.
+- **Gemini 3 needs `thoughtSignature` sent back** on the first `functionCall` of each step, or the next request fails with a 400. `AIToolCall.thoughtSignature` carries it; tool results go back together in one `user` turn. **GPT-5 and o-series reject `max_tokens` and any non-default temperature**; `OpenAICompatibleProvider` resends with the parameter the 400 names fixed.
 - **MCP/**: `MCPManager` (server lifecycle), `MCPClient` (JSON-RPC), `MCPTransport` (stdio/SSE)
 - **Tools/**: `BrowserTools` (tool definitions), `BrowserToolExecutor` (executes browser actions from AI)
 

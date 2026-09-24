@@ -61,6 +61,8 @@ struct SidebarAIChat: View {
     @State private var newModelId: String = ""
     @FocusState private var isTextFieldFocused: Bool
 
+    private let streamingBubbleID = "streaming"
+
     private var contrastText: Color {
         Garnish.contrastingShade(of: gradientColorManager.accentColor, targetRatio: 4.5, blendStyle: .strong) ?? .white
     }
@@ -83,11 +85,19 @@ struct SidebarAIChat: View {
                         }
 
                         if aiService.isLoading {
-                            loadingView
+                            if aiService.streamingText.isEmpty {
+                                loadingView
+                            } else {
+                                MessageBubble(message: ChatMessage(role: .assistant, content: aiService.streamingText, timestamp: .now))
+                                    .id(streamingBubbleID)
+                            }
                         }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
+                }
+                .onChange(of: aiService.streamingText) {
+                    proxy.scrollTo(streamingBubbleID, anchor: .bottom)
                 }
                 .onChange(of: aiService.messages.count) { _, _ in
                     if let last = aiService.messages.last {
@@ -248,8 +258,10 @@ struct SidebarAIChat: View {
 
             Divider()
 
-            Button(action: { showAddModelPopover = true }) {
-                Label("Add Model...", systemImage: "plus.circle")
+            if configService.activeProviderType != .appleIntelligence {
+                Button(action: { showAddModelPopover = true }) {
+                    Label("Add Model...", systemImage: "plus.circle")
+                }
             }
 
             Button(action: { showSettingsDialog() }) {

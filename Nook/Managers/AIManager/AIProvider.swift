@@ -12,6 +12,7 @@ import NookSettings
 // MARK: - Provider Protocol
 
 protocol AIProviderProtocol {
+    /// `onStream` gets the whole reply so far each time, not the newest piece.
     func sendMessage(
         messages: [AIMessage],
         model: String,
