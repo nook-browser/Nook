@@ -215,6 +215,14 @@ extension ExtensionManager {
         let optPerms = optionalPermissions.map(\.rawValue).sorted()
         let reqHosts = requestedMatches.map(\.string).sorted()
         let optHosts = optionalMatches.map(\.string).sorted()
+        // A prompt replaced by another dialog or dismissed from the scrim counts as Cancel.
+        let decide = ResumeOnce(fallback: false) { granted in
+            if granted {
+                onDecision(requestedPermissions.union(optionalPermissions), requestedMatches.union(optionalMatches))
+            } else {
+                onCancel()
+            }
+        }
 
         bm.showDialog {
             StandardDialog(
@@ -230,18 +238,12 @@ extension ExtensionManager {
                         optionalHostPermissions: optHosts,
                         isRuntimeRequest: isRuntimeRequest,
                         onGrant: {
-                            let allPerms = requestedPermissions.union(
-                                optionalPermissions
-                            )
-                            let allHosts = requestedMatches.union(
-                                optionalMatches
-                            )
                             bm.closeDialog()
-                            onDecision(allPerms, allHosts)
+                            decide(true)
                         },
                         onDeny: {
                             bm.closeDialog()
-                            onCancel()
+                            decide(false)
                         },
                         extensionLogo: extensionLogo
                     )
@@ -1032,6 +1034,7 @@ extension ExtensionManager {
         }
 
         let urlStrings = needsPrompt.map { $0.absoluteString }.sorted()
+        let decide = ResumeOnce(fallback: false) { completionHandler($0 ? urls : granted, nil) }
 
         bm.showDialog {
             StandardDialog(
@@ -1046,11 +1049,11 @@ extension ExtensionManager {
                         isRuntimeRequest: true,
                         onGrant: {
                             bm.closeDialog()
-                            completionHandler(urls, nil)
+                            decide(true)
                         },
                         onDeny: {
                             bm.closeDialog()
-                            completionHandler(granted, nil)
+                            decide(false)
                         },
                         extensionLogo: extensionContext.webExtension.icon(
                             for: .init(width: 64, height: 64)
