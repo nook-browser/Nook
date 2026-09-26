@@ -105,25 +105,10 @@ struct ExtensionLibraryView: View {
                 }
 
                 // Add New button
-                Button {
-                    ExtensionManager.shared.showExtensionInstallDialog()
-                } label: {
-                    VStack(spacing: 5) {
-                        NookDesign.Radius.shape(NookDesign.Radius.md)
-                            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                            .foregroundStyle(.secondary.opacity(0.2))
-                            .frame(width: 34, height: 34)
-                            .overlay {
-                                Image(systemName: "plus")
-                                    .font(NookDesign.Font.title)
-                                    .foregroundStyle(.secondary.opacity(0.3))
-                            }
-                        Text("Add New")
-                            .font(NookDesign.Font.caption)
-                            .foregroundStyle(.secondary.opacity(0.3))
-                    }
+                AddNewExtensionButton {
+                    onDismiss()
+                    browserManager.openSettings(tab: .extensions)
                 }
-                .buttonStyle(.plain)
             }
             }
             .frame(maxHeight: 300)
@@ -317,6 +302,40 @@ private struct CopyButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        }
+        .buttonStyle(.plain)
+        .onHoverTracking { isHovering = $0 }
+    }
+}
+
+// MARK: - Add New Extension Button
+
+private struct AddNewExtensionButton: View {
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                NookDesign.Radius.shape(NookDesign.Radius.md)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    .foregroundStyle(.secondary.opacity(0.2))
+                    .frame(width: 34, height: 34)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(NookDesign.Font.title)
+                            .foregroundStyle(.secondary.opacity(0.3))
+                    }
+                Text("Add New")
+                    .font(NookDesign.Font.caption)
+                    .foregroundStyle(.secondary.opacity(0.3))
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity)
+            .background(isHovering ? NookDesign.Surface.fill : Color.clear)
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
         .buttonStyle(.plain)

@@ -49,6 +49,14 @@ extension BrowserManager: TabActions {
         )
     }
 
+    func presentWindowTint(for spaceID: UUID) {
+        dialogManager.showDialog {
+            WindowTintSettingsPanel(spaceID: spaceID) { [weak self] in
+                self?.dialogManager.closeDialog()
+            }
+        }
+    }
+
     func confirmSpaceDeletion(spaceName: String, tabCount: Int, isLastSpace: Bool, onDelete: @escaping () -> Void) {
         dialogManager.showDialog(
             SpaceDeleteConfirmationDialog(

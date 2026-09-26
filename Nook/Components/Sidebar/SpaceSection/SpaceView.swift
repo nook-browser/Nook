@@ -55,20 +55,30 @@ struct SpaceView: View {
         let pinned = rows.filter { $0.section == .pinned }
         let regular = rows.filter { $0.section == .tabs }
         let split = splitPair(in: rows)
+        let pinnedZone = DropZoneID.section(.pinned(spaceID: spaceID))
+        let showsPinnedAppendSlot = dragSession.isDragging
+            && !dragSession.isSettlingDrop
+            && dragSession.sourceZone != pinnedZone
+        let isAddingBookmark = dragSession.isDragging
+            && !dragSession.isSettlingDrop
+            && dragSession.sourceZone != .favorites(spaceID: spaceID)
+        let hasFavorites = !tabs.favorites(of: spaceID).isEmpty
+        let hasPins = !pinned.isEmpty
+        let hasFavoritesOrPins = hasFavorites || hasPins || showsPinnedAppendSlot || isAddingBookmark || tabOrganizerManager.isOrganizing
 
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: NookDesign.Spacing.sectionGap) {
-                if !pinned.isEmpty {
-                    sectionList(.pinned(spaceID: spaceID), rows: pinned, split: split, showsTail: false)
+                if !pinned.isEmpty || showsPinnedAppendSlot {
+                    sectionList(.pinned(spaceID: spaceID), rows: pinned, split: split, showsTail: false, showsAppendSlot: showsPinnedAppendSlot)
                         .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
                 }
 
                 VStack(spacing: NookDesign.Spacing.sectionGap) {
-                    separatorAndNewTab(regular: regular)
+                    separatorAndNewTab(regular: regular, hasFavoritesOrPins: hasFavoritesOrPins)
                     sectionList(.tabs(spaceID: spaceID), rows: regular, split: split, showsTail: true)
                 }
             }
-            .animation(NookDesign.Motion.standard, value: pinned.isEmpty)
+            .animation(NookDesign.Motion.quick, value: hasFavoritesOrPins)
             .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
         }
         .contentShape(Rectangle())
@@ -78,7 +88,7 @@ struct SpaceView: View {
 
     // MARK: - Sections
 
-    private func sectionList(_ section: Parent, rows allRows: [Row], split: SplitPair?, showsTail: Bool) -> some View {
+    private func sectionList(_ section: Parent, rows allRows: [Row], split: SplitPair?, showsTail: Bool, showsAppendSlot: Bool = false) -> some View {
         // The pair is one row at its anchor; the other half's own row is hidden.
         let rows = split.map { split in allRows.filter { !split.contains($0.id) || $0.id == split.anchorID } } ?? allRows
         let zone = DropZoneID.section(section)
@@ -113,6 +123,11 @@ struct SpaceView: View {
                             }
                     }
                 }
+                .animation(NookDesign.Motion.quick, value: rows.map(\.id))
+
+                if showsAppendSlot {
+                    pinAppendSlot
+                }
 
                 if showsTail {
                     Color.clear
@@ -146,6 +161,27 @@ struct SpaceView: View {
             .clipShape(Capsule())
     }
 
+    private var pinAppendSlot: some View {
+        HStack(spacing: NookDesign.Spacing.sm) {
+            Image(systemName: "pin")
+                .font(NookDesign.Font.caption)
+            Text("Pin in this space")
+                .font(NookDesign.Font.caption)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, NookDesign.Spacing.md)
+        .frame(maxWidth: .infinity, minHeight: NookDesign.Size.row, alignment: .leading)
+        .background {
+            NookDesign.Radius.shape(NookDesign.Radius.lg)
+                .strokeBorder(
+                    NookDesign.Surface.dropBorderActive,
+                    style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                )
+        }
+        .contentShape(Rectangle())
+    }
+
     @ViewBuilder
     private func rowView(_ row: Row, zone: DropZoneID, split: SplitPair?, isDropTarget: Bool) -> some View {
         if let split, row.id == split.anchorID {
@@ -153,7 +189,7 @@ struct SpaceView: View {
         } else {
             let session = tabs.session(for: row.item.id)
             NookDragSourceView(
-                item: NookDragItem(tabId: row.item.id, title: tabs.title(for: row.item), urlString: tabs.currentURL(for: row.item)?.absoluteString ?? ""),
+                item: NookDragItem(tabId: row.item.id, title: tabs.title(for: row.item), urlString: tabs.currentURL(for: row.item)?.absoluteString ?? "", isFolder: row.item.isFolder),
                 icon: row.item.isFolder ? Image(systemName: "folder.fill") : session?.favicon,
                 zoneID: zone,
                 manager: dragSession
@@ -164,7 +200,9 @@ struct SpaceView: View {
                     SpaceTab(item: row.item, hasChildren: row.hasChildren)
                 }
             }
-            .opacity(dragSession.draggedItem?.tabId == row.item.id ? NookDesign.Surface.unloadedOpacity : 1)
+            .opacity(dragSession.draggedItem?.tabId == row.item.id
+                     ? (dragSession.isSettlingDrop ? 0 : NookDesign.Surface.unloadedOpacity)
+                     : 1)
             .id(row.item.id)
         }
     }
@@ -192,23 +230,28 @@ struct SpaceView: View {
 
     // MARK: - Separator and New Tab
 
-    private func separatorAndNewTab(regular: [Row]) -> some View {
+    @ViewBuilder
+    private func separatorAndNewTab(regular: [Row], hasFavoritesOrPins: Bool) -> some View {
         let looseTabs = regular.filter { $0.depth == 0 && !$0.item.isFolder }.map(\.item.id)
-        return VStack(spacing: NookDesign.Spacing.xs) {
-            SpaceSeparator(
-                isHovering: $isSidebarHovered,
-                // Clear empties the section: a tab goes with its whole trail.
-                onClear: { looseTabs.forEach(tabs.remove) },
-                onOrganize: nookSettings.tabOrganizerEnabled && tabOrganizerManager.isAvailable ? {
-                    Task {
-                        await tabOrganizerManager.organizeTabs(in: spaceID, using: tabs)
-                    }
-                } : nil,
-                isOrganizing: tabOrganizerManager.isOrganizing,
-                tabCount: looseTabs.count
-            )
-            .padding(.horizontal, NookDesign.Spacing.md)
+        if hasFavoritesOrPins {
+            VStack(spacing: NookDesign.Spacing.xs) {
+                SpaceSeparator(
+                    isHovering: $isSidebarHovered,
+                    // Clear empties the section: a tab goes with its whole trail.
+                    onClear: { looseTabs.forEach(tabs.remove) },
+                    onOrganize: nookSettings.tabOrganizerEnabled && tabOrganizerManager.isAvailable ? {
+                        Task {
+                            await tabOrganizerManager.organizeTabs(in: spaceID, using: tabs)
+                        }
+                    } : nil,
+                    isOrganizing: tabOrganizerManager.isOrganizing,
+                    tabCount: looseTabs.count
+                )
+                .padding(.horizontal, NookDesign.Spacing.md)
 
+                newTabButton
+            }
+        } else {
             newTabButton
         }
     }

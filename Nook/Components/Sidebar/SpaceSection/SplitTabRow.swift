@@ -53,6 +53,8 @@ private struct SplitHalfTab: View {
         ) {
             SplitHalfLabel(item: item)
         }
-        .opacity(dragSession.draggedItem?.tabId == item.id ? NookDesign.Surface.unloadedOpacity : 1)
+        .opacity(dragSession.draggedItem?.tabId == item.id
+                 ? (dragSession.isSettlingDrop ? 0 : NookDesign.Surface.unloadedOpacity)
+                 : 1)
     }
 }

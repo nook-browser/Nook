@@ -36,11 +36,14 @@ struct NookDragItem: Codable, Equatable {
     let tabId: UUID
     var title: String
     var urlString: String
+    /// Optional for compatibility with drag payloads created before folders were distinguished.
+    var isFolder: Bool?
 
-    init(tabId: UUID, title: String, urlString: String = "") {
+    init(tabId: UUID, title: String, urlString: String = "", isFolder: Bool? = nil) {
         self.tabId = tabId
         self.title = title
         self.urlString = urlString
+        self.isFolder = isFolder
     }
 }
 

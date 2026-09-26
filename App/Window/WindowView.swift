@@ -23,8 +23,8 @@ struct WindowView: View {
     @Environment(AIService.self) private var aiService
     @Environment(TabOrganizerManager.self) private var tabOrganizerManager
     @Environment(\.nookSettings) var nookSettings
-    @Environment(\.openSettings) private var openSettings
     @StateObject private var hoverSidebarManager = HoverSidebarManager()
+    @State private var urlBarFrame: CGRect = .zero
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
@@ -32,8 +32,7 @@ struct WindowView: View {
             WindowBackground()
                 .contextMenu {
                     Button("Space Settings...") {
-                        SettingsNavigation.shared.currentSettingsTab = .spaces
-                        openSettings()
+                        browserManager.openSettings(tab: .spaces)
                     }
                     .disabled(windowState.spaceID.flatMap { tabs.space($0) } == nil)
                 }
@@ -45,7 +44,7 @@ struct WindowView: View {
                 .environmentObject(hoverSidebarManager)
                 .environment(windowState)
 
-            CommandPaletteView()
+            CommandPaletteView(urlBarFrame: urlBarFrame)
             DialogView()
 
             // Peek overlay for external link previews
@@ -56,16 +55,13 @@ struct WindowView: View {
                 .zIndex(10000)
 
         }
+        .coordinateSpace(name: "WindowSpace")
+        .onPreferenceChange(URLBarFramePreferenceKey.self) { urlBarFrame = $0 }
         // The window buttons sit in the sidebar's header, so they come and go with it.
         .background(TrafficLights(visible: windowState.isSidebarVisible || hoverSidebarManager.isOverlayVisible))
         .overlayPreferenceValue(DownloadsButtonAnchorKey.self) { anchor in
             DownloadFlightOverlay(target: anchor)
                 .zIndex(8000)
-        }
-        // In-window so the menus get the key window's active glass; see ExtensionLibraryOverlay.
-        .overlayPreferenceValue(ExtensionLibraryAnchorKey.self) { anchor in
-            ExtensionLibraryOverlay(anchor: anchor)
-                .zIndex(9000)
         }
         // System notification toasts - top trailing corner
         .overlay(alignment: .topTrailing) {
@@ -119,7 +115,6 @@ struct WindowView: View {
         }
         // Lifecycle management
         .onAppear {
-            browserManager.openSettingsAction = openSettings
             hoverSidebarManager.attach(browserManager: browserManager)
             hoverSidebarManager.windowRegistry = windowRegistry
             hoverSidebarManager.nookSettings = nookSettings
@@ -197,17 +192,26 @@ struct WindowView: View {
 
     @ViewBuilder
     private func WindowBackground() -> some View {
-        // Private windows keep the neutral incognito accent, never the space's color.
-        let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
-        let isActive = windowRegistry.activeWindowId == windowState.id
+        let tintHex = windowState.isIncognito ? nil : windowState.spaceID.flatMap { tabs.space($0)?.windowTintHex }
 
-        NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)
-            // Private windows tint all chrome so they are never mistaken for a regular window.
-            .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .backgroundDraggable()
-            .environment(windowState)
-            .animation(NookDesign.Motion.standard, value: isActive)
+        ZStack {
+            BlurEffectView(
+                material: .underWindowBackground,
+                blendingMode: .behindWindow,
+                state: .followsWindowActiveState
+            )
+
+            if let tintHex {
+                Color(hex: tintHex).opacity(NookDesign.Surface.windowTintOpacity)
+            }
+
+            if windowState.isIncognito {
+                NookDesign.Surface.privateTint
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .backgroundDraggable()
+        .environment(windowState)
     }
 
     @ViewBuilder

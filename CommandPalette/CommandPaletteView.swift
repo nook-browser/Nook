@@ -15,12 +15,15 @@ import NookWeb
 import NookUI
 
 struct CommandPaletteView: View {
+    let urlBarFrame: CGRect
+
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var searchManager = SearchManager()
     @Environment(\.nookSettings) var nookSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @FocusState private var isSearchFocused: Bool
     @State private var text: String = ""
@@ -82,270 +85,297 @@ struct CommandPaletteView: View {
         let isVisible = commandPalette.isVisible
         let textFieldColor: Color = text.isEmpty ? .secondary : .primary
 
-        return ZStack {
-            Color.clear
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    commandPalette.close()
-                }
-                .gesture(WindowDragGesture())
+        return GeometryReader { geometry in
+            ZStack {
+                Color.clear
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        commandPalette.close()
+                    }
+                    .gesture(WindowDragGesture())
 
-            VStack {
-                Spacer()
-                HStack {
+                VStack {
                     Spacer()
-                    VStack {
-                        VStack(alignment: .center,spacing: 6) {
-                            HStack(spacing: 15) {
-                                Image(systemName: leadingIconName)
-                                .id(leadingIconName)
-                                .transition(.blur(intensity: 2, scale: 0.6).animation(NookDesign.Motion.standard))
-                                .font(NookDesign.Font.bodyRegular)
-                                .foregroundStyle(Color.primary)
-                                .frame(width: 15)
+                    HStack {
+                        Spacer()
+                        VStack {
+                            VStack(alignment: .center,spacing: 6) {
+                                HStack(spacing: 15) {
+                                    Image(systemName: leadingIconName)
+                                    .id(leadingIconName)
+                                    .transition(.blur(intensity: 2, scale: 0.6).animation(NookDesign.Motion.standard))
+                                    .font(NookDesign.Font.bodyRegular)
+                                    .foregroundStyle(Color.primary)
+                                    .frame(width: 15)
 
-                                if let site = activeSiteSearch {
-                                    Text(site.name)
-                                        .font(NookDesign.Font.label)
-                                        .foregroundStyle(Garnish.contrastingShade(of: site.color, targetRatio: 4.5, blendStyle: .strong) ?? .white)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 4)
-                                        .background(site.color)
-                                        .clipShape(Capsule())
-                                        .transition(
-                                            .blur(intensity: 8, scale: 0.6)
-                                            .animation(NookDesign.Motion.spring)
+                                    if let site = activeSiteSearch {
+                                        Text(site.name)
+                                            .font(NookDesign.Font.label)
+                                            .foregroundStyle(Garnish.contrastingShade(of: site.color, targetRatio: 4.5, blendStyle: .strong) ?? .white)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 4)
+                                            .background(site.color)
+                                            .clipShape(Capsule())
+                                            .transition(
+                                                .blur(intensity: 8, scale: 0.6)
+                                                .animation(NookDesign.Motion.spring)
+                                            )
+                                    }
+
+                                    ZStack(alignment: .trailing) {
+                                        TextField(
+                                            activeSiteSearch != nil
+                                                ? "Search \(activeSiteSearch!.name)..."
+                                                : "Search or enter URL...",
+                                            text: $text
                                         )
-                                }
+                                        .textFieldStyle(.plain)
+                                        .font(NookDesign.Font.heading)
+                                        .foregroundColor(textFieldColor)
+                                        .tint(gradientColorManager.accentColor)
+                                        .overlay(alignment: .leading) {
+                                            if let suffix = inlineCompletionSuffix {
+                                                (Text(text).foregroundColor(.clear) + Text(suffix).foregroundColor(.secondary))
+                                                    .font(NookDesign.Font.heading)
+                                                    .lineLimit(1)
+                                                    .allowsHitTesting(false)
+                                            }
+                                        }
+                                        .focused($isSearchFocused)
+                                        .onKeyPress(.tab) {
+                                            if isComposing { return .ignored }
+                                            if let match = siteSearchMatch, activeSiteSearch == nil {
+                                                withAnimation(NookDesign.Motion.spring) {
+                                                    activeSiteSearch = match
+                                                }
+                                                text = ""
+                                                return .handled
+                                            }
+                                            // Tab accepts the top suggestion when nothing is selected
+                                            if selectedSuggestionIndex < 0 && !visibleSuggestions.isEmpty {
+                                                selectedSuggestionIndex = 0
+                                                isNavigatingSuggestion = true
+                                                text = displayTextForSuggestion(visibleSuggestions[0])
+                                                return .handled
+                                            }
+                                            // Tab with a selected suggestion = accept it (same as Enter)
+                                            if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count {
+                                                let suggestion = visibleSuggestions[selectedSuggestionIndex]
+                                                selectSuggestion(suggestion)
+                                                return .handled
+                                            }
+                                            return .ignored
+                                        }
+                                        .onKeyPress(.return) {
+                                            if isComposing { return .ignored }
+                                            handleReturn()
+                                            return .handled
+                                        }
+                                        .onKeyPress(.upArrow) {
+                                            if isComposing { return .ignored }
+                                            navigateSuggestions(direction: -1)
+                                            return .handled
+                                        }
+                                        .onKeyPress(.downArrow) {
+                                            if isComposing { return .ignored }
+                                            navigateSuggestions(direction: 1)
+                                            return .handled
+                                        }
+                                        .onKeyPress(.escape) {
+                                            if isComposing { return .ignored }
+                                            if activeSiteSearch != nil {
+                                                withAnimation(NookDesign.Motion.standard) {
+                                                    activeSiteSearch = nil
+                                                }
+                                                return .handled
+                                            }
+                                            commandPalette.close()
+                                            return .handled
+                                        }
+                                        .onKeyPress(.delete) {
+                                            if isComposing { return .ignored }
+                                            if activeSiteSearch != nil && text.isEmpty {
+                                                withAnimation(NookDesign.Motion.standard) {
+                                                    activeSiteSearch = nil
+                                                }
+                                                return .handled
+                                            }
+                                            return .ignored
+                                        }
+                                        .onKeyPress(characters: CharacterSet(charactersIn: "\u{7F}")) { _ in
+                                            if isComposing { return .ignored }
+                                            if activeSiteSearch != nil && text.isEmpty {
+                                                withAnimation(NookDesign.Motion.standard) {
+                                                    activeSiteSearch = nil
+                                                }
+                                                return .handled
+                                            }
+                                            return .ignored
+                                        }
+                                        .onChange(of: text) { _, newValue in
+                                            if isNavigatingSuggestion {
+                                                isNavigatingSuggestion = false
+                                                return
+                                            }
+                                            userTypedText = newValue
+                                            searchManager.searchSuggestions(
+                                                for: newValue
+                                            )
+                                            selectedSuggestionIndex = -1
+                                        }
 
-                                ZStack(alignment: .trailing) {
-                                    TextField(
-                                        activeSiteSearch != nil
-                                            ? "Search \(activeSiteSearch!.name)..."
-                                            : "Search or enter URL...",
-                                        text: $text
-                                    )
-                                    .textFieldStyle(.plain)
-                                    .font(NookDesign.Font.heading)
-                                    .foregroundColor(textFieldColor)
-                                    .tint(gradientColorManager.accentColor)
-                                    .overlay(alignment: .leading) {
-                                        if let suffix = inlineCompletionSuffix {
-                                            (Text(text).foregroundColor(.clear) + Text(suffix).foregroundColor(.secondary))
-                                                .font(NookDesign.Font.heading)
-                                                .lineLimit(1)
-                                                .allowsHitTesting(false)
+                                        if activeSiteSearch == nil, let match = siteSearchMatch {
+                                            HStack(spacing: 6) {
+                                                Text("Search \(match.name)")
+                                                    .font(NookDesign.Font.body)
+                                                    .foregroundStyle(Color.secondary)
+
+                                                Text("Tab")
+                                                    .font(NookDesign.Font.caption)
+                                                    .foregroundStyle(Color.secondary)
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(
+                                                        NookDesign.Radius.shape(NookDesign.Radius.xs)
+                                                            .fill(NookDesign.Surface.fill)
+                                                    )
+                                                    .overlay(
+                                                        NookDesign.Radius.shape(NookDesign.Radius.xs)
+                                                            .stroke(NookDesign.Surface.hairline, lineWidth: 0.5)
+                                                    )
+                                            }
+                                            .allowsHitTesting(false)
+                                            .transition(
+                                                .blur(intensity: 4, scale: 0.92)
+                                                .animation(NookDesign.Motion.standard)
+                                            )
                                         }
                                     }
-                                    .focused($isSearchFocused)
-                                    .onKeyPress(.tab) {
-                                        if isComposing { return .ignored }
-                                        if let match = siteSearchMatch, activeSiteSearch == nil {
-                                            withAnimation(NookDesign.Motion.spring) {
-                                                activeSiteSearch = match
-                                            }
-                                            text = ""
-                                            return .handled
-                                        }
-                                        // Tab accepts the top suggestion when nothing is selected
-                                        if selectedSuggestionIndex < 0 && !visibleSuggestions.isEmpty {
-                                            selectedSuggestionIndex = 0
-                                            isNavigatingSuggestion = true
-                                            text = displayTextForSuggestion(visibleSuggestions[0])
-                                            return .handled
-                                        }
-                                        // Tab with a selected suggestion = accept it (same as Enter)
-                                        if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count {
-                                            let suggestion = visibleSuggestions[selectedSuggestionIndex]
+                                }
+                                .animation(NookDesign.Motion.spring, value: activeSiteSearch != nil)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 8)
+
+                                if !visibleSuggestions.isEmpty {
+                                    Capsule()
+                                        .fill(NookDesign.Surface.hairline)
+                                        .frame(height: 0.5)
+                                        .frame(maxWidth: .infinity)
+                                }
+
+                                if !visibleSuggestions.isEmpty {
+                                    CommandPaletteSuggestionsListView(
+                                        suggestions: visibleSuggestions,
+                                        selectedIndex: $selectedSuggestionIndex,
+                                        hoveredIndex: $hoveredSuggestionIndex,
+                                        onSelect: { suggestion in
                                             selectSuggestion(suggestion)
-                                            return .handled
                                         }
-                                        return .ignored
-                                    }
-                                    .onKeyPress(.return) {
-                                        if isComposing { return .ignored }
-                                        handleReturn()
-                                        return .handled
-                                    }
-                                    .onKeyPress(.upArrow) {
-                                        if isComposing { return .ignored }
-                                        navigateSuggestions(direction: -1)
-                                        return .handled
-                                    }
-                                    .onKeyPress(.downArrow) {
-                                        if isComposing { return .ignored }
-                                        navigateSuggestions(direction: 1)
-                                        return .handled
-                                    }
-                                    .onKeyPress(.escape) {
-                                        if isComposing { return .ignored }
-                                        if activeSiteSearch != nil {
-                                            withAnimation(NookDesign.Motion.standard) {
-                                                activeSiteSearch = nil
-                                            }
-                                            return .handled
-                                        }
-                                        commandPalette.close()
-                                        return .handled
-                                    }
-                                    .onKeyPress(.delete) {
-                                        if isComposing { return .ignored }
-                                        if activeSiteSearch != nil && text.isEmpty {
-                                            withAnimation(NookDesign.Motion.standard) {
-                                                activeSiteSearch = nil
-                                            }
-                                            return .handled
-                                        }
-                                        return .ignored
-                                    }
-                                    .onKeyPress(characters: CharacterSet(charactersIn: "\u{7F}")) { _ in
-                                        if isComposing { return .ignored }
-                                        if activeSiteSearch != nil && text.isEmpty {
-                                            withAnimation(NookDesign.Motion.standard) {
-                                                activeSiteSearch = nil
-                                            }
-                                            return .handled
-                                        }
-                                        return .ignored
-                                    }
-                                    .onChange(of: text) { _, newValue in
-                                        if isNavigatingSuggestion {
-                                            isNavigatingSuggestion = false
-                                            return
-                                        }
-                                        userTypedText = newValue
-                                        searchManager.searchSuggestions(
-                                            for: newValue
-                                        )
-                                        selectedSuggestionIndex = -1
-                                    }
-
-                                    if activeSiteSearch == nil, let match = siteSearchMatch {
-                                        HStack(spacing: 6) {
-                                            Text("Search \(match.name)")
-                                                .font(NookDesign.Font.body)
-                                                .foregroundStyle(Color.secondary)
-
-                                            Text("Tab")
-                                                .font(NookDesign.Font.caption)
-                                                .foregroundStyle(Color.secondary)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(
-                                                    NookDesign.Radius.shape(NookDesign.Radius.xs)
-                                                        .fill(NookDesign.Surface.fill)
-                                                )
-                                                .overlay(
-                                                    NookDesign.Radius.shape(NookDesign.Radius.xs)
-                                                        .stroke(NookDesign.Surface.hairline, lineWidth: 0.5)
-                                                )
-                                        }
-                                        .allowsHitTesting(false)
-                                        .transition(
-                                            .blur(intensity: 4, scale: 0.92)
-                                            .animation(NookDesign.Motion.standard)
-                                        )
-                                    }
+                                    )
                                 }
                             }
-                            .animation(NookDesign.Motion.spring, value: activeSiteSearch != nil)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 8)
-
-                            if !visibleSuggestions.isEmpty {
-                                Capsule()
-                                    .fill(NookDesign.Surface.hairline)
-                                    .frame(height: 0.5)
-                                    .frame(maxWidth: .infinity)
-                            }
-
-                            if !visibleSuggestions.isEmpty {
-                                CommandPaletteSuggestionsListView(
-                                    suggestions: visibleSuggestions,
-                                    selectedIndex: $selectedSuggestionIndex,
-                                    hoveredIndex: $hoveredSuggestionIndex,
-                                    onSelect: { suggestion in
-                                        selectSuggestion(suggestion)
-                                    }
-                                )
-                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity)
+                            .frame(width: effectiveCommandPaletteWidth)
+                            .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
+                            .animation(
+                                NookDesign.Motion.quick,
+                                value: searchManager.suggestions.count
+                            )
+                            Spacer()
                         }
-                        .padding(10)
-                        .frame(maxWidth: .infinity)
-                        .frame(width: effectiveCommandPaletteWidth)
-                        .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
-                        .animation(
-                            NookDesign.Motion.quick,
-                            value: searchManager.suggestions.count
+                        .frame(
+                            width: effectiveCommandPaletteWidth,
+                            height: 328
                         )
+
                         Spacer()
                     }
-                    .frame(
-                        width: effectiveCommandPaletteWidth,
-                        height: 328
-                    )
-
                     Spacer()
                 }
-                Spacer()
+                .opacity(isVisible ? 1.0 : 0.0)
+                .scaleEffect(paletteScale(isVisible: isVisible))
+                .offset(paletteOffset(isVisible: isVisible, size: geometry.size))
+                .animation(paletteAnimation, value: isVisible)
+
             }
+            .allowsHitTesting(isVisible)
+            .onChange(of: commandPalette.isVisible) { _, newVisible in
+                if newVisible {
+                    searchManager.setTabs(browserManager.tabs, window: windowState)
+                    searchManager.setHistoryManager(browserManager.historyManager)
+                    searchManager.updateSpaceContext()
 
-        }
-        .allowsHitTesting(isVisible)
-        .opacity(isVisible ? 1.0 : 0.0)
-        .onChange(of: commandPalette.isVisible) { _, newVisible in
-            if newVisible {
-                searchManager.setTabs(browserManager.tabs, window: windowState)
-                searchManager.setHistoryManager(browserManager.historyManager)
-                searchManager.updateSpaceContext()
+                    text = commandPalette.prefilledText
+                    userTypedText = commandPalette.prefilledText
 
-                text = commandPalette.prefilledText
-                userTypedText = commandPalette.prefilledText
-
-                DispatchQueue.main.async {
-                    isSearchFocused = true
                     DispatchQueue.main.async {
-                        NSApplication.shared.sendAction(
-                            #selector(NSText.selectAll(_:)),
-                            to: nil,
-                            from: nil
-                        )
+                        isSearchFocused = true
+                        DispatchQueue.main.async {
+                            NSApplication.shared.sendAction(
+                                #selector(NSText.selectAll(_:)),
+                                to: nil,
+                                from: nil
+                            )
+                        }
+                    }
+                } else {
+                    isSearchFocused = false
+                    searchManager.clearSuggestions()
+                    text = ""
+                    userTypedText = ""
+                    activeSiteSearch = nil
+                    selectedSuggestionIndex = -1
+                }
+            }
+            .onChange(of: windowState.spaceID) { _, _ in
+                if commandPalette.isVisible {
+                    searchManager.updateSpaceContext()
+                    searchManager.clearSuggestions()
+                }
+            }
+            .onChange(of: searchManager.suggestions.count) { _, _ in
+                let count = visibleSuggestions.count
+                if count == 0 {
+                    selectedSuggestionIndex = -1
+                } else if selectedSuggestionIndex >= count {
+                    selectedSuggestionIndex = count - 1
+                }
+            }
+            .animation(NookDesign.Motion.quick, value: selectedSuggestionIndex)
+            .onChange(of: commandPalette.prefilledText) { _, newValue in
+                if isVisible {
+                    text = newValue
+                    userTypedText = newValue
+                    DispatchQueue.main.async {
+                        isSearchFocused = true
                     }
                 }
-            } else {
-                isSearchFocused = false
-                searchManager.clearSuggestions()
-                text = ""
-                userTypedText = ""
-                activeSiteSearch = nil
-                selectedSuggestionIndex = -1
             }
         }
-        .onChange(of: windowState.spaceID) { _, _ in
-            if commandPalette.isVisible {
-                searchManager.updateSpaceContext()
-                searchManager.clearSuggestions()
-            }
-        }
-        .onChange(of: searchManager.suggestions.count) { _, _ in
-            let count = visibleSuggestions.count
-            if count == 0 {
-                selectedSuggestionIndex = -1
-            } else if selectedSuggestionIndex >= count {
-                selectedSuggestionIndex = count - 1
-            }
-        }
-        .animation(NookDesign.Motion.quick, value: selectedSuggestionIndex)
-        .onChange(of: commandPalette.prefilledText) { _, newValue in
-            if isVisible {
-                text = newValue
-                userTypedText = newValue
-                DispatchQueue.main.async {
-                    isSearchFocused = true
-                }
-            }
-        }
+    }
+
+    private var animatesFromURLBar: Bool {
+        commandPalette.openedFromURLBar && !urlBarFrame.isEmpty
+    }
+
+    private var paletteAnimation: Animation? {
+        guard animatesFromURLBar else { return nil }
+        return reduceMotion ? NookDesign.Motion.quick : NookDesign.Motion.standard
+    }
+
+    private func paletteScale(isVisible: Bool) -> CGFloat {
+        guard animatesFromURLBar, !reduceMotion, !isVisible else { return 1 }
+        return 0.28
+    }
+
+    private func paletteOffset(isVisible: Bool, size: CGSize) -> CGSize {
+        guard animatesFromURLBar, !reduceMotion, !isVisible else { return .zero }
+        return CGSize(
+            width: urlBarFrame.midX - size.width / 2,
+            height: urlBarFrame.midY - size.height / 2
+        )
     }
 
     // MARK: - Suggestions List Subview

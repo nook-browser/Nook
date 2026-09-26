@@ -175,12 +175,18 @@ extension PageSession: WKNavigationDelegate {
         didFail navigation: WKNavigation!,
         withError error: Error
     ) {
-        loadingState = .didFail(error)
-
-        // Set error favicon on navigation failure
-        Task { @MainActor in
-            self.favicon = Image(systemName: "exclamationmark.triangle")
+        // WebKit files a failure for every navigation it stops, including the ones it stops
+        // on purpose: Back/Forward interrupts the page being left, a new load supersedes the
+        // old one, `decisionHandler(.cancel)` and a frame torn down with its parent all land
+        // here. None of them mean the page on screen broke, so none of them may swap its
+        // favicon for the warning triangle.
+        if Self.isBenignNavigationError(error) {
+            updateNavigationStateEnhanced(source: "didFail")
+            return
         }
+
+        loadingState = .didFail(error)
+        favicon = Image(systemName: "exclamationmark.triangle")
 
         updateNavigationStateEnhanced(source: "didFail")
     }
@@ -238,24 +244,42 @@ extension PageSession: WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        loadingState = .didFailProvisionalNavigation(error)
-
         // didStartProvisionalNavigation moved `url` to the attempted URL. A navigation that
         // never commits (download response, Stop, network error) must not become the URL
         // that is persisted and restored; the view still shows the committed page. When a
         // newer navigation superseded this one, isLoading is still true and that one owns `url`.
+        // This runs even for the benign cancellations below: they are exactly the ones that
+        // leave an attempted URL behind.
         if !webView.isLoading, let committed = webView.url, committed != url {
             url = committed
             controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
             controller?.pageCommitted(itemID: itemID, url: committed)
         }
 
-        // Set connection error favicon
-        Task { @MainActor in
-            self.favicon = Image(systemName: "wifi.exclamationmark")
+        // Same cancellations as didFail: Back/Forward, Stop, a superseding load, a policy
+        // reject. The page the user is on never stopped showing, so it keeps its loading
+        // state and its favicon.
+        if Self.isBenignNavigationError(error) {
+            updateNavigationStateEnhanced(source: "didFailProvisional")
+            return
         }
 
+        loadingState = .didFailProvisionalNavigation(error)
+        favicon = Image(systemName: "wifi.exclamationmark")
+
         updateNavigationStateEnhanced(source: "didFailProvisional")
+    }
+
+    /// Errors that only say WebKit stopped a navigation it meant to stop. The page the user
+    /// is looking at is fine, so its favicon and loading state must not be overwritten.
+    private static func isBenignNavigationError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        // NSURLErrorCancelled: Stop, Back/Forward on a loading page, a load superseded by
+        // another, a frame torn down with its parent.
+        if nsError.domain == NSURLErrorDomain, nsError.code == NSURLErrorCancelled { return true }
+        // WebKitErrorFrameLoadInterruptedByPolicyChange (102): decidePolicyFor rejected it.
+        if nsError.domain == "WebKitErrorDomain", nsError.code == 102 { return true }
+        return false
     }
 
     public func webView(

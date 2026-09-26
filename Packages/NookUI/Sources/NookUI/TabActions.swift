@@ -23,6 +23,10 @@ import NookWeb
     func editPinnedURL(url: URL, title: String, onSave: @escaping (URL) -> Void)
     /// The "New Space" dialog. `onCreate` gets the name and the accent hex.
     func presentSpaceCreation(onCreate: @escaping (String, String) -> Void)
+#if os(macOS)
+    /// Presents the window tint controls for a space in the window-wide dialog layer.
+    func presentWindowTint(for spaceID: UUID)
+#endif
     /// The destructive confirmation before a space and its tabs go away.
     func confirmSpaceDeletion(spaceName: String, tabCount: Int, isLastSpace: Bool, onDelete: @escaping () -> Void)
     /// Opens Settings on the Spaces tab.

@@ -60,6 +60,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     // MARK: - Application Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        GradientColorManager.installSelectionColorHook()
         setupURLEventHandling()
         setupMouseButtonHandling()
         setupSleepWakeHandling()

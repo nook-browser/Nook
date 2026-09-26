@@ -72,10 +72,7 @@ struct SpacesSideBarView: View {
                     .padding(.horizontal, NookDesign.Spacing.sidebarInset)
             }
 
-            // Header (window controls, nav buttons, URL bar)
-            SidebarHeader(isSidebarHovered: isSidebarHovered, onNewSpace: showSpaceCreationDialog)
-                .environmentObject(browserManager)
-                .environment(windowState)
+            SidebarHeader(isSidebarHovered: isSidebarHovered)
 
             // Spaces page view with draggable spacer
             ZStack {
@@ -132,7 +129,7 @@ struct SpacesSideBarView: View {
         // Extra top padding when sidebar is on the left to avoid overlapping native traffic light buttons
         .padding(.top, nookSettings.sidebarPosition == .left ? NookDesign.Spacing.sidebarTop : NookDesign.Spacing.sidebarInset)
         .overlay(alignment: .topLeading) {
-            if nookSettings.sidebarPosition == .left {
+            if nookSettings.sidebarPosition == .left && !nookSettings.topBarAddressView {
                 titleRow
                     .frame(height: NookDesign.Spacing.sidebarTop)
                     .padding(.leading, NookDesign.Spacing.trafficLights)
@@ -340,7 +337,6 @@ struct SpacesSideBarView: View {
                 .environment(windowRegistry)
                 .environment(nookSettings)
                 .padding(.horizontal, NookDesign.Spacing.sidebarInset)
-                .padding(.bottom, NookDesign.Spacing.sectionGap)
             }
 
             SpaceView(
@@ -361,9 +357,13 @@ struct SpacesSideBarView: View {
         }
     }
 
-    /// Back, forward and reload at the trailing edge, unless the URL bar mode has them.
+    /// Sidebar toggles and history controls share the title row.
     private var titleRow: some View {
         HStack(spacing: 0) {
+            SidebarWindowControlsView()
+                .environmentObject(browserManager)
+                .environment(windowState)
+
             Spacer(minLength: 0)
             if !nookSettings.topBarAddressView {
                 SidebarHistoryButtons()

@@ -579,9 +579,9 @@ extension TabsController {
         return id
     }
 
-    public func updateSpace(_ spaceID: UUID, name: String?, icon: String?, accentHex: String?) {
+    public func updateSpace(_ spaceID: UUID, name: String?, icon: String?, accentHex: String?, windowTintHex: String?? = nil) {
         guard let owner = owner(ofSpace: spaceID) else { return }
-        perform(owner, "updateSpace") { try $0.updateSpace(spaceID, name: name, icon: icon, accentHex: accentHex) }
+        perform(owner, "updateSpace") { try $0.updateSpace(spaceID, name: name, icon: icon, accentHex: accentHex, windowTintHex: windowTintHex) }
     }
 
     func moveSpace(_ spaceID: UUID, after: UUID?) {

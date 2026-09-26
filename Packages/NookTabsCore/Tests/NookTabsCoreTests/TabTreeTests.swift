@@ -4,6 +4,31 @@ import Testing
 @testable import NookTabsCore
 
 struct TabTreeTests {
+    @Test func windowTintCanBeSetAndClearedWithoutChangingAccent() throws {
+        var f = Fixture()
+
+        try f.tree.updateSpace(f.spaceA, windowTintHex: .some("#336699"), now: fixedNow)
+        #expect(f.tree.space(f.spaceA)?.windowTintHex == "#336699")
+        #expect(f.tree.space(f.spaceA)?.accentHex == "#000")
+
+        try f.tree.updateSpace(f.spaceA, windowTintHex: .some(nil), now: fixedNow)
+        #expect(f.tree.space(f.spaceA)?.windowTintHex == nil)
+        #expect(f.tree.space(f.spaceA)?.accentHex == "#000")
+    }
+
+    @Test func olderSpaceRecordsDecodeWithoutWindowTint() throws {
+        let fixture = Fixture()
+        let space = try #require(fixture.tree.space(fixture.spaceA))
+        let encoded = try JSONEncoder().encode(space)
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "windowTintHex")
+        let oldRecord = try JSONSerialization.data(withJSONObject: object)
+
+        let decoded = try JSONDecoder().decode(SpaceRecord.self, from: oldRecord)
+        #expect(decoded.windowTintHex == nil)
+        #expect(decoded.accentHex == space.accentHex)
+    }
+
     @Test func createPlacesAfterSibling() {
         var f = Fixture()
         let tabs = Parent.tabs(spaceID: f.spaceA)

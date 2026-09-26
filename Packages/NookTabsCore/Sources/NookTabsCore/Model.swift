@@ -8,15 +8,17 @@ public struct SpaceRecord: Identifiable, Codable, Hashable, Sendable {
     public var name: String
     public var icon: String
     public var accentHex: String
+    public var windowTintHex: String?
     public var order: OrderKey
     public var modifiedAt: Date
     public var deletedAt: Date?
 
-    public init(id: UUID = UUID(), name: String, icon: String, accentHex: String, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil) {
+    public init(id: UUID = UUID(), name: String, icon: String, accentHex: String, windowTintHex: String? = nil, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil) {
         self.id = id
         self.name = name
         self.icon = icon
         self.accentHex = accentHex
+        self.windowTintHex = windowTintHex
         self.order = order
         self.modifiedAt = modifiedAt
         self.deletedAt = deletedAt

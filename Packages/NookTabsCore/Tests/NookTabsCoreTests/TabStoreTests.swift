@@ -55,6 +55,21 @@ struct TabStoreTests {
         #expect(reloaded.device == device)
     }
 
+    @Test func windowTintSurvivesSaveAndReload() throws {
+        let dir = tempDirectory()
+        let (initialTree, device, fixture) = sample()
+        var tree = initialTree
+        try tree.updateSpace(fixture.spaceA, windowTintHex: .some("#336699"), now: fixedNow)
+        let store = TabStore(directory: dir)
+        _ = store.load(now: fixedNow)
+        store.save(tree, device)
+        store.flush()
+
+        let reloaded = TabStore(directory: dir).load(now: fixedNow)
+        #expect(reloaded.tree.space(fixture.spaceA)?.windowTintHex == "#336699")
+        #expect(reloaded.tree.space(fixture.spaceA)?.accentHex == tree.space(fixture.spaceA)?.accentHex)
+    }
+
     @Test func coalescesBurstsIntoOneWrite() throws {
         let dir = tempDirectory()
         var (tree, device, f) = sample()

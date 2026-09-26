@@ -35,6 +35,22 @@ enum DropLayout {
     case grid(count: Int, columns: Int)
 }
 
+enum NookDropPreviewStyle: Equatable {
+    case tabRow
+    case pinnedTile
+}
+
+struct NookDropSettlement: Equatable {
+    let id: UUID
+    let destinationFrame: CGRect
+    let previewStyle: NookDropPreviewStyle
+    let reduceMotion: Bool
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.destinationFrame == rhs.destinationFrame && lhs.previewStyle == rhs.previewStyle && lhs.reduceMotion == rhs.reduceMotion
+    }
+}
+
 extension Notification.Name {
     static let tabDragDidEnd = Notification.Name("tabDragDidEnd")
 }
@@ -64,8 +80,10 @@ final class NookDragSessionManager: ObservableObject {
     @Published var dropDepth = 0
 
     @Published var sidebarScreenFrame: CGRect = .zero
+    @Published private(set) var dropSettlement: NookDropSettlement?
 
     var isDragging: Bool { draggedItem != nil }
+    var isSettlingDrop: Bool { dropSettlement != nil }
 
     var isCursorInSidebar: Bool {
         guard sidebarScreenFrame.width > 0 else { return false }
@@ -87,7 +105,6 @@ final class NookDragSessionManager: ObservableObject {
     private var mouseMonitor: Any?
     private var activeDragSourceId: UUID?
     private var mouseDownPoint: NSPoint?
-    private var mouseDownEvent: NSEvent?
     private var dragInitiatedFromMonitor: Bool = false
     private static let dragThreshold: CGFloat = 4
 
@@ -135,7 +152,6 @@ final class NookDragSessionManager: ObservableObject {
             // Check if mouseDown is within any registered drag source
             activeDragSourceId = nil
             mouseDownPoint = nil
-            mouseDownEvent = nil
             dragInitiatedFromMonitor = false
 
             for (id, source) in registeredSources {
@@ -144,7 +160,6 @@ final class NookDragSessionManager: ObservableObject {
                 if view.bounds.contains(localPoint) {
                     activeDragSourceId = id
                     mouseDownPoint = event.locationInWindow
-                    mouseDownEvent = event
                     break
                 }
             }
@@ -171,7 +186,6 @@ final class NookDragSessionManager: ObservableObject {
         case .leftMouseUp:
             activeDragSourceId = nil
             mouseDownPoint = nil
-            mouseDownEvent = nil
             dragInitiatedFromMonitor = false
             return event
 
@@ -184,13 +198,14 @@ final class NookDragSessionManager: ObservableObject {
 
     func beginDrag(item: NookDragItem, icon: Image?, from zone: DropZoneID, cursorScreenPoint: NSPoint) {
         ensurePreviewWindow()
+        dropSettlement = nil
 
         // Set cursor position BEFORE draggedItem so the preview window
         // positions correctly before orderFront is called by the Combine subscriber
         _updateCursorScreenPosition(cursorScreenPoint)
 
-        draggedItem = item
         draggedIcon = icon
+        draggedItem = item
         sourceZone = zone
         activeZone = zone
         isOutsideWindow = false
@@ -301,11 +316,42 @@ final class NookDragSessionManager: ObservableObject {
     // MARK: - Drop
 
     func cancelDrag() {
-        clearDrag()
+        withAnimation(NookDesign.Motion.quick) { clearDrag() }
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
 
+    /// Move the model while the dragged item stays hidden, then reveal it where the preview lands.
+    func performDrop(
+        item: NookDragItem,
+        position: DropPosition,
+        destinationFrame: CGRect?,
+        reduceMotion: Bool,
+        commit: () -> Void
+    ) {
+        guard let destinationFrame, !destinationFrame.isNull, previewWindow != nil else {
+            commit()
+            withAnimation(NookDesign.Motion.quick) { clearDrag() }
+            NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
+            return
+        }
+
+        let settlement = NookDropSettlement(
+            id: UUID(),
+            destinationFrame: destinationFrame,
+            previewStyle: isFavorites(position.zone) ? .pinnedTile : .tabRow,
+            reduceMotion: reduceMotion
+        )
+        withAnimation(reduceMotion ? nil : NookDesign.Motion.spring) { dropSettlement = settlement }
+        commit()
+        previewWindow?.settle(to: settlement) { [weak self] in
+            guard let self, self.dropSettlement?.id == settlement.id else { return }
+            withAnimation(NookDesign.Motion.quick) { self.clearDrag() }
+            NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
+        }
+    }
+
     func clearDrag() {
+        dropSettlement = nil
         draggedItem = nil
         draggedIcon = nil
         sourceZone = nil
@@ -313,6 +359,11 @@ final class NookDragSessionManager: ObservableObject {
         isOutsideWindow = false
         dropPosition = nil
         dropDepth = 0
+    }
+
+    private func isFavorites(_ zone: DropZoneID?) -> Bool {
+        guard case .favorites? = zone else { return false }
+        return true
     }
 
     // MARK: - Haptics

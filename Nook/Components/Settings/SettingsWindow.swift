@@ -6,18 +6,19 @@
 //  Created by Claude on 26/03/2026.
 //
 
+import AppKit
 import SwiftUI
 import NookDesign
 import NookUI
 
 struct SettingsWindow: View {
+    static let presentationKey = "settings"
+
     @EnvironmentObject var browserManager: BrowserManager
     @EnvironmentObject var gradientColorManager: GradientColorManager
-    @Environment(\.nookSettings) var nookSettings
+    @Environment(\.isEnabled) private var isEnabled
 
-    private let windowSize = CGSize(width: 780, height: 540)
-    @State private var query = ""
-
+    @Bindable var navigation: SettingsNavigation
     // Back/forward walk every place visited, sidebar picks and sub-pane pushes alike.
     @State private var paths: [SettingsTabs: [SettingsSubPane]] = [:]
     @State private var back: [SettingsLocation] = []
@@ -25,38 +26,37 @@ struct SettingsWindow: View {
     @State private var restoring = false
 
     private var location: SettingsLocation {
-        let tab = SettingsNavigation.shared.currentSettingsTab
+        let tab = navigation.currentSettingsTab
         return SettingsLocation(tab: tab, path: paths[tab] ?? [])
     }
 
-    var body: some View {
-        let navigation = SettingsNavigation.shared
-        let tab = navigation.currentSettingsTab
-        // A sidebar pick lands on the tab's root, like System Settings.
-        let selection = Binding(
+    private var selection: Binding<SettingsTabs> {
+        Binding(
             get: { navigation.currentSettingsTab },
             set: { paths[$0] = []; navigation.currentSettingsTab = $0 }
         )
-        // Like System Settings: the sidebar always shows, and the selected page names the window.
-        NavigationSplitView(columnVisibility: .constant(.all)) {
-            SettingsSidebar(selection: selection, query: $query)
-                .toolbar(removing: .sidebarToggle)
-                .searchable(text: $query, placement: .sidebar, prompt: "Search")
-        } detail: {
-            SettingsDetailPane(
-                tab: tab,
-                path: Binding(get: { paths[tab] ?? [] }, set: { paths[tab] = $0 }),
-                history: HistoryToolbar(
-                    canGoBack: !back.isEmpty,
-                    canGoForward: !forward.isEmpty,
-                    goBack: { go(from: &back, to: &forward) },
-                    goForward: { go(from: &forward, to: &back) }
-                )
-            )
-            .environmentObject(browserManager)
-            .environmentObject(gradientColorManager)
-            // Rebuilds the pane per tab so each opens scrolled to the top.
-            .id(tab)
+    }
+
+    var body: some View {
+        let tab = navigation.currentSettingsTab
+        GeometryReader { geometry in
+            let panelWidth = min(850, max(0, geometry.size.width - 40))
+            let panelHeight = min(600, max(0, geometry.size.height - 40))
+            let compact = panelWidth < 680
+
+            NookPanel(maxWidth: 850, padding: 0) {
+                HStack(spacing: 0) {
+                    if !compact {
+                        SettingsSidebar(selection: selection)
+                            .frame(width: 220)
+                        Divider()
+                    }
+
+                    detailPane(for: tab, compact: compact)
+                }
+                .frame(width: panelWidth, height: panelHeight)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onChange(of: location) { old, _ in
             if restoring { restoring = false; return }
@@ -64,11 +64,12 @@ struct SettingsWindow: View {
             back.append(old)
             forward.removeAll()
         }
-        // System Settings is resizable and remembers its size; a fixed frame is not.
-        .frame(minWidth: windowSize.width, minHeight: windowSize.height)
-        .navigationSplitViewStyle(.balanced)
         .toggleStyle(SettingsSwitch())
-        .background(UnifiedToolbarWindow())
+        .onExitCommand {
+            if isEnabled {
+                browserManager.dialogManager.closeDialog()
+            }
+        }
     }
 
     private func go(from stack: inout [SettingsLocation], to other: inout [SettingsLocation]) {
@@ -76,7 +77,78 @@ struct SettingsWindow: View {
         other.append(location)
         restoring = true
         paths[target.tab] = target.path
-        SettingsNavigation.shared.currentSettingsTab = target.tab
+        navigation.currentSettingsTab = target.tab
+    }
+
+    private var availableTabs: [SettingsTabs] {
+        SettingsTabs.sidebarGroups.flatMap { $0.tabs }.filter {
+            $0 != .extensions || browserManager.extensionManager != nil
+        }
+    }
+
+    private func detailPane(for tab: SettingsTabs, compact: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                if compact && paths[tab]?.last == nil {
+                    Picker("Section", selection: selection) {
+                        ForEach(availableTabs, id: \.self) { tab in
+                            Text(tab.name).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(maxWidth: 180)
+                }
+
+                if !back.isEmpty || !forward.isEmpty {
+                    Button {
+                        go(from: &back, to: &forward)
+                    } label: {
+                        Image(systemName: "chevron.backward")
+                    }
+                    .disabled(back.isEmpty)
+                    .accessibilityLabel("Back")
+
+                    Button {
+                        go(from: &forward, to: &back)
+                    } label: {
+                        Image(systemName: "chevron.forward")
+                    }
+                    .disabled(forward.isEmpty)
+                    .accessibilityLabel("Forward")
+                }
+
+                if !compact || paths[tab]?.last != nil {
+                    Text(paths[tab]?.last?.title ?? tab.name)
+                        .font(NookDesign.Font.label)
+                }
+                Spacer()
+
+                Button {
+                    browserManager.dialogManager.closeDialog()
+                } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 28, height: 28)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Close Settings")
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .frame(height: 52)
+
+            Divider()
+
+            SettingsDetailPane(
+                tab: tab,
+                path: Binding(get: { paths[tab] ?? [] }, set: { paths[tab] = $0 })
+            )
+            .environmentObject(browserManager)
+            .environmentObject(gradientColorManager)
+            .id(tab)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -96,86 +168,55 @@ private struct SettingsLocation: Hashable {
     let path: [SettingsSubPane]
 }
 
-/// System Settings keeps both buttons showing, disabled when there is nowhere to go.
-/// Applied to the root pane and to every pushed pane, since a push replaces the toolbar.
-/// The `.navigation` group style is what draws System Settings' one capsule with the divider;
-/// a plain ControlGroup collapses into the overflow menu.
-private struct HistoryToolbar: ViewModifier {
-    let canGoBack: Bool
-    let canGoForward: Bool
-    let goBack: () -> Void
-    let goForward: () -> Void
-
-    func body(content: Content) -> some View {
-        content.toolbar {
-            ToolbarItem(placement: .navigation) {
-                ControlGroup {
-                    Button(action: goBack) {
-                        Image(systemName: "chevron.backward")
-                    }
-                    .disabled(!canGoBack)
-
-                    Button(action: goForward) {
-                        Image(systemName: "chevron.forward")
-                    }
-                    .disabled(!canGoForward)
-                }
-                .controlGroupStyle(.navigation)
-                .controlSize(.large)
-            }
-        }
-    }
-}
-
-/// The Settings scene ignores `.windowToolbarStyle` and lays its toolbar out in the old two-row
-/// preference style. System Settings' single row (back button, then the title inline, traffic
-/// lights 26pt in from the corner) needs the style set on the window itself.
-private struct UnifiedToolbarWindow: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { Probe() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    private final class Probe: NSView {
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            // SwiftUI installs the toolbar after the view lands, so wait one turn.
-            guard let window else { return }
-            DispatchQueue.main.async { window.toolbarStyle = .unified }
-        }
-    }
-}
-
 // MARK: - Sidebar
 
 private struct SettingsSidebar: View {
     @Binding var selection: SettingsTabs
-    @Binding var query: String
     @EnvironmentObject var browserManager: BrowserManager
 
-    private let sidebarWidth: CGFloat = 230
-
     var body: some View {
-        List(selection: $selection) {
-            ForEach(Array(SettingsTabs.sidebarGroups.enumerated()), id: \.offset) { _, group in
-                let tabs = group.tabs.filter { tab in
-                    guard tab.matches(query) else { return false }
-                    return tab != .extensions || browserManager.extensionManager != nil
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Nook")
+                        .font(.headline)
+                    if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                        Text("Version \(version)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                if !tabs.isEmpty {
-                    Section {
-                        ForEach(tabs, id: \.self) { tab in
-                            sidebarRow(tab)
-                        }
-                    } header: {
-                        // A group header reads as a filter label while searching, so it goes.
-                        if let title = group.title, query.isEmpty {
-                            Text(title)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            List(selection: $selection) {
+                ForEach(Array(SettingsTabs.sidebarGroups.enumerated()), id: \.offset) { _, group in
+                    let tabs = group.tabs.filter {
+                        $0 != .extensions || browserManager.extensionManager != nil
+                    }
+                    if !tabs.isEmpty {
+                        Section {
+                            ForEach(tabs, id: \.self) { tab in
+                                sidebarRow(tab)
+                            }
+                        } header: {
+                            if let title = group.title {
+                                Text(title)
+                            }
                         }
                     }
                 }
             }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
         }
-        .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(sidebarWidth)
     }
 
     private func sidebarRow(_ tab: SettingsTabs) -> some View {
@@ -184,15 +225,20 @@ private struct SettingsSidebar: View {
         } icon: {
             Image(systemName: tab.icon)
                 .imageScale(.small)
-                .foregroundStyle(.white)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.primary)
                 .frame(
                     width: NookDesign.Size.settingsChip,
                     height: NookDesign.Size.settingsChip
                 )
-                .background(
+                .background {
                     NookDesign.Radius.shape(NookDesign.Radius.sm)
-                        .fill(tab.iconColor.gradient)
-                )
+                        .fill(.primary.opacity(0.12))
+                }
+                .overlay {
+                    NookDesign.Radius.shape(NookDesign.Radius.sm)
+                        .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+                }
         }
         .tag(tab)
     }
@@ -204,6 +250,13 @@ private struct SettingsSidebar: View {
 enum SettingsSubPane: Hashable {
     case cookies
     case cache
+
+    var title: String {
+        switch self {
+        case .cookies: "Cookie Management"
+        case .cache: "Cache Management"
+        }
+    }
 
     @MainActor @ViewBuilder
     var view: some View {
@@ -219,7 +272,6 @@ enum SettingsSubPane: Hashable {
 private struct SettingsDetailPane: View {
     let tab: SettingsTabs
     @Binding var path: [SettingsSubPane]
-    let history: HistoryToolbar
     @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
@@ -255,11 +307,9 @@ private struct SettingsDetailPane: View {
                 }
             }
             .navigationTitle(tab.name)
-            .modifier(history)
             .navigationDestination(for: SettingsSubPane.self) { pane in
                 pane.view
                     .navigationBarBackButtonHidden(true)
-                    .modifier(history)
             }
         }
     }
