@@ -233,7 +233,7 @@ struct WebsiteView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events
                         // This allows right-clicks to pass through to the underlying NSView (WKWebView)
-                        .allowsHitTesting(!browserManager.dialogManager.isVisible)
+                        .allowsHitTesting(!browserManager.dialogManager.isVisible(in: windowState.id))
                         .contentShape(Rectangle())
                     }
                     // Removed SwiftUI contextMenu - it intercepts ALL right-clicks

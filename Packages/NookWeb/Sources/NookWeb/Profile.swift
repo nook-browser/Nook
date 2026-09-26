@@ -31,7 +31,7 @@ public final class Profile: NSObject, Identifiable {
     // Cached stats
     public private(set) var cachedCookieCount: Int = 0
     public private(set) var cachedRecordCount: Int = 0
-    public var estimatedDataSize: String { "Cookies: \(cachedCookieCount), Records: \(cachedRecordCount)" }
+    public var websiteDataSummary: String { "Cookies: \(cachedCookieCount) · Website data: \(cachedRecordCount)" }
     public var cookieCount: Int { cachedCookieCount }
     public var hasStoredData: Bool { cachedCookieCount > 0 || cachedRecordCount > 0 }
 

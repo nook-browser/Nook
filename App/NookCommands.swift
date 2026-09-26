@@ -16,7 +16,6 @@ struct NookCommands: Commands {
     let windowRegistry: WindowRegistry
     let shortcutManager: KeyboardShortcutManager
     let tabOrganizerManager: TabOrganizerManager
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.nookSettings) var nookSettings
 
     init(browserManager: BrowserManager, windowRegistry: WindowRegistry, shortcutManager: KeyboardShortcutManager, tabOrganizerManager: TabOrganizerManager) {
@@ -82,23 +81,29 @@ struct NookCommands: Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
 
-        // The Settings scene supplies the standard Settings… item at ⌘,
-        CommandGroup(after: .appSettings) {
-            Button("Import from another Browser") {
-                browserManager.dialogManager.showDialog(
-                    BrowserImportDialog(
-                        onCancel: {
-                            browserManager.dialogManager.closeDialog()
-                        }
-                    )
-                )
+        CommandGroup(replacing: .appInfo) {
+            Button("About Nook", systemImage: "info.circle") {
+                browserManager.showAbout()
             }
+        }
+
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings…", systemImage: "gearshape") {
+                browserManager.openSettings(tab: .general)
+            }
+            .keyboardShortcut(",", modifiers: .command)
+            .disabled(!nookSettings.didFinishOnboarding)
+
+            Button("Import from another Browser", systemImage: "square.and.arrow.down") {
+                browserManager.showBrowserImportDialog()
+            }
+            .disabled(!nookSettings.didFinishOnboarding)
         }
 
         // Replace the standard Quit menu item to route through showQuitDialog(),
         // which respects the "warn before quitting" setting
         CommandGroup(replacing: .appTermination) {
-            Button("Quit Nook") {
+            Button("Quit Nook", systemImage: "power") {
                 browserManager.showQuitDialog()
             }
             .keyboardShortcut("q", modifiers: .command)
@@ -107,11 +112,11 @@ struct NookCommands: Commands {
         // App Menu Section (under Nook)
         CommandGroup(after: .appInfo) {
             Divider()
-            Button("Make Nook Default Browser") {
+            Button("Make Nook Default Browser", systemImage: "globe") {
                 browserManager.setAsDefaultBrowser()
             }
 
-            Button("Check for Updates...") {
+            Button("Check for Updates...", systemImage: "arrow.triangle.2.circlepath") {
                 browserManager.appDelegate?.updaterController.checkForUpdates(nil)
             }
         }
@@ -119,12 +124,12 @@ struct NookCommands: Commands {
 
         // Edit Section
         CommandGroup(replacing: .undoRedo) {
-            Button("Undo Close Tab") {
+            Button("Undo Close Tab", systemImage: "arrow.uturn.backward") {
                 if let window = windowRegistry.activeWindow { browserManager.tabs.reopenLastClosed(in: window) }
             }
             .modifier(dynamicShortcut(.undoCloseTab))
 
-            Button("Reopen Closed Tab") {
+            Button("Reopen Closed Tab", systemImage: "arrow.uturn.forward") {
                 if let window = windowRegistry.activeWindow { browserManager.tabs.reopenLastClosed(in: window) }
             }
             .keyboardShortcut("t", modifiers: [.command, .shift])
@@ -132,36 +137,36 @@ struct NookCommands: Commands {
 
         // File Section
         CommandGroup(after: .newItem) {
-            Button("New Tab") {
+            Button("New Tab", systemImage: "plus.square") {
                 windowRegistry.activeWindow?.commandPalette?.open()
             }
             .modifier(dynamicShortcut(.newTab))
-            Button("New Window") {
+            Button("New Window", systemImage: "macwindow.badge.plus") {
                 browserManager.createNewWindow()
             }
             .modifier(dynamicShortcut(.newWindow))
             
-            Button("New Incognito Window") {
+            Button("New Incognito Window", systemImage: "eye.slash") {
                 browserManager.createIncognitoWindow()
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             
             Divider()
-            Button("Open Command Bar") {
+            Button("Open Command Bar", systemImage: "command") {
                 let currentURL = browserManager.tabs.activeWindowSession?.url.absoluteString ?? ""
                 windowRegistry.activeWindow?.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
             }
             .modifier(dynamicShortcut(.focusAddressBar))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
-            Button("Copy Current URL") {
+            Button("Copy Current URL", systemImage: "link") {
                 browserManager.copyCurrentURL()
             }
             .modifier(dynamicShortcut(.copyCurrentURL))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
             Divider()
-            Button("Print…") {
+            Button("Print…", systemImage: "printer") {
                 browserManager.printCurrentPage()
             }
             .modifier(dynamicShortcut(.printPage))
@@ -170,18 +175,18 @@ struct NookCommands: Commands {
 
         // Sidebar commands
         CommandGroup(after: .sidebar) {
-            Button("Toggle Sidebar") {
+            Button("Toggle Sidebar", systemImage: "sidebar.left") {
                 browserManager.toggleSidebar()
             }
             .modifier(dynamicShortcut(.toggleSidebar))
 
-            Button("Toggle AI Assistant") {
+            Button("Toggle AI Assistant", systemImage: "sparkles") {
                 browserManager.toggleAISidebar()
             }
             .modifier(dynamicShortcut(.toggleAIAssistant))
             .disabled(!nookSettings.showAIAssistant)
 
-            Button("Toggle Picture in Picture") {
+            Button("Toggle Picture in Picture", systemImage: "pip") {
                 browserManager.tabs.activeWindowSession?.requestPictureInPicture()
             }
             .modifier(dynamicShortcut(.togglePictureInPicture))
@@ -193,7 +198,7 @@ struct NookCommands: Commands {
             if tabOrganizerManager.isAvailable {
                 Divider()
 
-                Button("Organize Tabs") {
+                Button("Organize Tabs", systemImage: "rectangle.stack") {
                     if let spaceID = windowRegistry.activeWindow?.spaceID {
                         Task {
                             await tabOrganizerManager.organizeTabs(in: spaceID, using: browserManager.tabs)
@@ -211,13 +216,13 @@ struct NookCommands: Commands {
         // View commands
         CommandGroup(after: .windowSize) {
 
-            Button("Find in Page") {
+            Button("Find in Page", systemImage: "magnifyingglass") {
                 browserManager.showFindBar()
             }
             .modifier(dynamicShortcut(.findInPage))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
-            Button("Reload Page") {
+            Button("Reload Page", systemImage: "arrow.clockwise") {
                 browserManager.tabs.activeWindowSession?.refresh()
             }
             .modifier(dynamicShortcut(.refresh))
@@ -225,19 +230,19 @@ struct NookCommands: Commands {
 
             Divider()
 
-            Button("Zoom In") {
+            Button("Zoom In", systemImage: "plus.magnifyingglass") {
                 browserManager.zoomInCurrentTab()
             }
             .modifier(dynamicShortcut(.zoomIn))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
-            Button("Zoom Out") {
+            Button("Zoom Out", systemImage: "minus.magnifyingglass") {
                 browserManager.zoomOutCurrentTab()
             }
             .modifier(dynamicShortcut(.zoomOut))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
-            Button("Actual Size") {
+            Button("Actual Size", systemImage: "1.magnifyingglass") {
                 browserManager.resetZoomCurrentTab()
             }
             .modifier(dynamicShortcut(.actualSize))
@@ -245,7 +250,7 @@ struct NookCommands: Commands {
 
             Divider()
 
-            Button("Hard Reload (Ignore Cache)") {
+            Button("Hard Reload (Ignore Cache)", systemImage: "arrow.triangle.2.circlepath") {
                 browserManager.hardReloadCurrentPage()
             }
             .modifier(dynamicShortcut(.hardReload))
@@ -253,7 +258,7 @@ struct NookCommands: Commands {
 
             Divider()
 
-            Button("Web Inspector") {
+            Button("Web Inspector", systemImage: "chevron.left.forwardslash.chevron.right") {
                 browserManager.openWebInspector()
             }
             .modifier(dynamicShortcut(.openDevTools))
@@ -261,7 +266,10 @@ struct NookCommands: Commands {
 
             Divider()
 
-            Button(browserManager.tabs.activeWindowSession?.isAudioMuted == true ? "Unmute Audio" : "Mute Audio") {
+            Button(
+                browserManager.tabs.activeWindowSession?.isAudioMuted == true ? "Unmute Audio" : "Mute Audio",
+                systemImage: browserManager.tabs.activeWindowSession?.isAudioMuted == true ? "speaker.wave.2" : "speaker.slash"
+            ) {
                 browserManager.tabs.activeWindowSession?.toggleMute()
             }
             .modifier(dynamicShortcut(.muteUnmuteAudio))
@@ -272,79 +280,79 @@ struct NookCommands: Commands {
 
         Group {
             CommandMenu("Privacy") {
-                Menu("Clear Cookies") {
-                    Button("Clear Cookies for Current Site") {
+                Menu("Clear Cookies", systemImage: "circle.grid.3x3") {
+                    Button("Clear Cookies for Current Site", systemImage: "globe") {
                         browserManager.clearCurrentPageCookies()
                     }
                     .disabled(browserManager.tabs.activeWindowSession?.url.host == nil)
 
-                    Button("Clear Expired Cookies") {
+                    Button("Clear Expired Cookies", systemImage: "clock.badge.xmark") {
                         browserManager.clearExpiredCookies()
                     }
 
                     Divider()
 
-                    Button("Clear All Cookies") {
+                    Button("Clear All Cookies", systemImage: "trash") {
                         browserManager.clearAllCookies()
                     }
 
                     Divider()
 
-                    Button("Clear Third-Party Cookies") {
+                    Button("Clear Third-Party Cookies", systemImage: "person.2.slash") {
                         browserManager.clearThirdPartyCookies()
                     }
 
-                    Button("Clear High-Risk Cookies") {
+                    Button("Clear High-Risk Cookies", systemImage: "exclamationmark.shield") {
                         browserManager.clearHighRiskCookies()
                     }
                 }
 
-                Menu("Clear Cache") {
-                    Button("Clear Cache for Current Site") {
+                Menu("Clear Cache", systemImage: "internaldrive") {
+                    Button("Clear Cache for Current Site", systemImage: "globe") {
                         browserManager.clearCurrentPageCache()
                     }
                     .disabled(browserManager.tabs.activeWindowSession?.url.host == nil)
 
-                    Button("Clear Stale Cache") {
+                    Button("Clear Stale Cache", systemImage: "clock.arrow.circlepath") {
                         browserManager.clearStaleCache()
                     }
 
-                    Button("Clear Disk Cache") {
+                    Button("Clear Disk Cache", systemImage: "internaldrive") {
                         browserManager.clearDiskCache()
                     }
 
-                    Button("Clear Memory Cache") {
+                    Button("Clear Memory Cache", systemImage: "memorychip") {
                         browserManager.clearMemoryCache()
                     }
 
                     Divider()
 
-                    Button("Clear All Cache") {
+                    Button("Clear All Cache", systemImage: "trash") {
                         browserManager.clearAllCache()
                     }
 
                     Divider()
 
-                    Button("Clear Personal Data Cache") {
+                    Button("Clear Personal Data Cache", systemImage: "person.crop.circle.badge.xmark") {
                         browserManager.clearPersonalDataCache()
                     }
 
-                    Button("Clear Favicon Cache") {
+                    Button("Clear Favicon Cache", systemImage: "photo") {
                         browserManager.clearFaviconCache()
                     }
                 }
 
                 Divider()
 
-                Button("Privacy Cleanup") {
+                Button("Privacy Cleanup", systemImage: "hand.raised") {
                     browserManager.performPrivacyCleanup()
                 }
 
-                Button("Clear Browsing History") {
+                Button("Clear Browsing History", systemImage: "clock.arrow.circlepath") {
                     browserManager.historyManager.clearHistory()
                 }
 
-                Button("Clear All Website Data") {
+                Button("Clear All Website Data", systemImage: "trash") {
                     Task {
                         // Tabs use one store per space; Peek and the base config have used the default.
                         let tabs = browserManager.tabs
@@ -359,39 +367,38 @@ struct NookCommands: Commands {
             }
 
             CommandMenu("Extensions") {
-                Button("Toggle Extension Library") {
+                Button("Toggle Extension Library", systemImage: "puzzlepiece.extension") {
                     browserManager.toggleExtensionLibrary()
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
 
                 Divider()
 
-                Button("Install Extension...") {
+                Button("Install Extension...", systemImage: "plus.app") {
                     browserManager.showExtensionInstallDialog()
                 }
                 .modifier(dynamicShortcut(.installExtension))
 
-                Button("Manage Extensions...") {
-                    SettingsNavigation.shared.currentSettingsTab = .extensions
-                    openSettings()
+                Button("Manage Extensions...", systemImage: "gearshape") {
+                    browserManager.openSettings(tab: .extensions)
                 }
 
                 Divider()
 
-                Button("Chrome Web Store") {
+                Button("Chrome Web Store", systemImage: "storefront") {
                     browserManager.tabs.activeWindowSession?.load(URL(string: "https://chromewebstore.google.com")!)
                 }
 
                 #if DEBUG
                 Divider()
-                Button("Open Popup Console") {
+                Button("Open Popup Console", systemImage: "terminal") {
                     browserManager.extensionManager?.showPopupConsole()
                 }
                 #endif
             }
 
             CommandMenu("Appearance") {
-                Button("Space Settings...") {
+                Button("Space Settings...", systemImage: "paintpalette") {
                     browserManager.showSpaceSettings()
                 }
                 .modifier(dynamicShortcut(.customizeSpaceGradient))

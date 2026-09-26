@@ -21,20 +21,29 @@ class CommandPalette {
     /// Whether pressing Return should navigate the current tab (vs creating new tab)
     var shouldNavigateCurrentTab: Bool = false
 
+    /// Whether the current presentation was opened from a URL bar.
+    var openedFromURLBar = false
+
     // MARK: - Actions
 
     /// Open the command palette with optional prefill text
     func open(prefill: String = "", navigateCurrentTab: Bool = false) {
+        openedFromURLBar = false
+        present(prefill: prefill, navigateCurrentTab: navigateCurrentTab)
+    }
+
+    /// Open from the URL bar so the palette can animate from that control.
+    func openFromURLBar(prefill: String = "", navigateCurrentTab: Bool = false) {
+        openedFromURLBar = true
+        present(prefill: prefill, navigateCurrentTab: navigateCurrentTab)
+    }
+
+    private func present(prefill: String, navigateCurrentTab: Bool) {
         prefilledText = prefill
         self.shouldNavigateCurrentTab = navigateCurrentTab
         DispatchQueue.main.async {
             self.isVisible = true
         }
-    }
-
-    /// Open the command palette with the current tab's URL
-    func openWithCurrentURL(_ url: URL) {
-        open(prefill: url.absoluteString, navigateCurrentTab: true)
     }
 
     /// Close the command palette

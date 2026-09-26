@@ -71,7 +71,7 @@ public enum NookDesign {
         public static let favicon: CGFloat = 16
         public static let essentialsTile: CGFloat = 44
         public static let essentialsFavicon: CGFloat = 20
-        public static let urlBar: CGFloat = 32
+        public static let urlBar: CGFloat = 40
         public static let navRow: CGFloat = 28
         #if os(iOS)
         // The floating bar's control row. 50 clears the 44pt touch minimum with
@@ -151,10 +151,8 @@ public enum NookDesign {
         public static let danger = Color(hex: "#F60000")
         public static let scrim = Color.black.opacity(0.4)                 // modal dimming behind a dialog
         public static let privateTint = Color(red: 0.36, green: 0.22, blue: 0.62).opacity(0.38) // private window chrome
-        /// The neutral accent a private window's chrome uses in place of a space's. Keep in step
-        /// with `SpaceGradient.incognito`, which is the persisted form of the same color.
-        public static let incognitoAccent = Color(hex: "#8E8E93")
-
+        /// A subtle wash over the system window material when a Space tint is enabled.
+        public static let windowTintOpacity = 0.12
         #if os(macOS)
         public static let windowBackground = Color(nsColor: .windowBackgroundColor)
         public static let raised = Color(nsColor: .controlBackgroundColor) // active row, active tile
@@ -163,22 +161,6 @@ public enum NookDesign {
         public static let raised = Color(uiColor: .secondarySystemBackground) // active row, active tile
         #endif
 
-        /// Sidebar/window chrome fill: the space accent fading to the system window background.
-        /// The top stop is a tint, not the raw accent, so it reads as light/washed out for every
-        /// color. Inactive windows blend further toward that background, approximating the dimming
-        /// NSVisualEffectView.followsWindowActiveState used to give the old blur for free.
-        public static func containerGradient(accent: Color, isActive: Bool) -> LinearGradient {
-            let end = windowBackground
-            let topBlend = isActive ? 0.55 : 0.8
-            #if os(macOS)
-            let top = Color(nsColor: NSColor(accent).blended(withFraction: topBlend, of: .windowBackgroundColor) ?? NSColor(accent))
-            #else
-            // ponytail: iOS not built yet; NSColor.blended(withFraction:of:) has no UIKit
-            // equivalent. Flat opacity tint stands in until an iOS window chrome exists.
-            let top = accent.opacity(1 - topBlend)
-            #endif
-            return LinearGradient(colors: [top, end], startPoint: .top, endPoint: .bottom)
-        }
     }
 
     // MARK: - Elevation

@@ -7,51 +7,35 @@
 //
 
 import SwiftUI
-import NookDesign
+import NookUI
+import NookWeb
 
 struct DialogView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(BrowserWindowState.self) private var windowState
 
     var body: some View {
+        let dialogs = browserManager.dialogManager.presentations(in: windowState.id)
+
         ZStack {
-            if browserManager.dialogManager.isVisible,
-               let dialog = browserManager.dialogManager.activeDialog {
-                overlayBackground
-                dialogContent(dialog)
-                    .transition(.asymmetric(
-                        insertion: .offset(y: 30).combined(with: .blur(intensity: 3, scale: 1)),
-                        removal: .offset(y: -30).combined(with: .blur(intensity: 3, scale: 1))
-                    ))
-                    .zIndex(1)
+            ForEach(Array(dialogs.enumerated()), id: \.element.id) { index, presentation in
+                NookModalOverlay(isPresented: presentation.isPresented, onDismiss: {
+                    browserManager.dialogManager.dismiss(presentation.id)
+                }) {
+                    presentation.content
+                }
+                .allowsHitTesting(index == dialogs.count - 1)
+                .disabled(index != dialogs.count - 1)
+                .accessibilityHidden(index != dialogs.count - 1)
             }
         }
-        .animation(NookDesign.Motion.spring, value: browserManager.dialogManager.isVisible)
-        .onChange(of: browserManager.dialogManager.isVisible) { _, isVisible in
-            if isVisible {
+        .onChange(of: dialogs.map(\.id)) { old, new in
+            if new.count > old.count {
                 // Resign WebView first responder so keyboard events reach the dialog
                 if let window = NSApp.keyWindow {
                     window.makeFirstResponder(nil)
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private var overlayBackground: some View {
-        NookDesign.Surface.scrim
-            .ignoresSafeArea()
-            .onTapGesture {
-                browserManager.dialogManager.closeDialog()
-            }
-            .transition(.opacity)
-    }
-
-    @ViewBuilder
-    private func dialogContent(_ dialog: AnyView) -> some View {
-        HStack {
-            Spacer()
-            dialog
-            Spacer()
         }
     }
 }

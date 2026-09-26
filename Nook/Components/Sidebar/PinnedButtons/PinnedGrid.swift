@@ -40,84 +40,87 @@ struct PinnedGrid: View {
 
         if let spaceID = effectiveSpaceID {
             let zone = DropZoneID.favorites(spaceID: spaceID)
-            if items.isEmpty {
-                let isDragging = dragSession.isDragging
+            let isAddingBookmark = dragSession.isDragging
+                && !dragSession.isSettlingDrop
+                && dragSession.draggedItem?.isFolder != true
+                && dragSession.sourceZone != zone
+            let showsFavorites = !items.isEmpty || isAddingBookmark
 
-                NookDropZoneHostView(
-                    zoneID: zone,
-                    layout: .grid(count: 0, columns: colsCount),
-                    manager: dragSession,
-                    onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
-                ) {
-                    VStack(spacing: NookDesign.Spacing.md) {
-                        Image(systemName: "star.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-
-                        VStack(spacing: NookDesign.Spacing.xxs) {
-                            Text("Drag to add Favorites")
-                                .font(NookDesign.Font.label)
-                                .foregroundStyle(.secondary)
-
-                            Text("Favorites keep your most\nused sites and apps close")
-                                .font(NookDesign.Font.secondary)
-                                .foregroundStyle(.tertiary)
-                                .multilineTextAlignment(.center)
+            Group {
+                if items.isEmpty {
+                    NookDropZoneHostView(
+                        zoneID: zone,
+                        layout: .grid(count: 0, columns: colsCount),
+                        manager: dragSession,
+                        onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
+                    ) {
+                        if isAddingBookmark {
+                            LazyVGrid(columns: columns, alignment: .center, spacing: NookDesign.Spacing.sm) {
+                                bookmarkDropPlaceholder
+                            }
+                        } else {
+                            Color.clear
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 0)
                         }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, NookDesign.Spacing.xl)
-                    .padding(.horizontal, NookDesign.Spacing.lg)
-                    .background {
-                        NookDesign.Radius.shape(NookDesign.Radius.lg)
-                            .strokeBorder(style: StrokeStyle(lineWidth: NookDesign.Size.hairlineWidth, dash: [NookDesign.Spacing.sm, NookDesign.Spacing.xs]))
-                            .foregroundStyle(isDragging ? NookDesign.Surface.dropBorderActive : NookDesign.Surface.dropBorderIdle)
-                    }
-                    .background {
-                        NookDesign.Radius.shape(NookDesign.Radius.lg)
-                            .fill(isDragging ? NookDesign.Surface.fillPressed : Color.clear)
-                    }
-                    .animation(NookDesign.Motion.quick, value: isDragging)
-                }
-            } else {
-                NookDropZoneHostView(
-                    zoneID: zone,
-                    layout: .grid(count: items.count, columns: colsCount),
-                    manager: dragSession,
-                    onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
-                ) {
-                    LazyVGrid(columns: columns, alignment: .center, spacing: NookDesign.Spacing.sm) {
-                        let insertionIdx = insertionIndex(in: zone, items: items)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .allowsHitTesting(!browserManager.isSwitchingSpace)
+                } else {
+                    NookDropZoneHostView(
+                        zoneID: zone,
+                        layout: .grid(count: items.count, columns: colsCount),
+                        manager: dragSession,
+                        onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
+                    ) {
+                        LazyVGrid(columns: columns, alignment: .center, spacing: NookDesign.Spacing.sm) {
+                            let insertionIdx = insertionIndex(in: zone, items: items)
 
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            let isDraggedItem = dragSession.draggedItem?.tabId == item.id
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                let isDraggedItem = dragSession.draggedItem?.tabId == item.id
 
-                            if let ins = insertionIdx, ins == index, !isDraggedItem {
-                                essentialsPlaceholder
+                                if let ins = insertionIdx, ins == index, !isDraggedItem {
+                                    insertionPlaceholder(in: zone)
+                                }
+
+                                PinnedTile(item: item, zone: zone)
+                                    .opacity(isDraggedItem
+                                             ? (dragSession.isSettlingDrop ? 0 : NookDesign.Surface.unloadedOpacity)
+                                             : 1)
+                                    .animation(NookDesign.Motion.quick, value: isDraggedItem)
                             }
 
-                            PinnedTile(item: item, zone: zone)
-                                .opacity(isDraggedItem ? 0.0 : 1.0)
+                            if let ins = insertionIdx, ins >= items.count {
+                                insertionPlaceholder(in: zone)
+                            }
                         }
-
-                        if let ins = insertionIdx, ins >= items.count {
-                            essentialsPlaceholder
-                        }
+                        .animation(NookDesign.Motion.quick, value: insertionIndex(in: zone, items: items))
+                        .animation(NookDesign.Motion.quick, value: items.map(\.id))
                     }
-                    .animation(NookDesign.Motion.spring, value: insertionIndex(in: zone, items: items))
+                    .contentShape(Rectangle())
+                    .fixedSize(horizontal: false, vertical: true)
+                    .animation(shouldAnimate ? NookDesign.Motion.quick : nil, value: colsCount)
+                    .animation(shouldAnimate ? NookDesign.Motion.quick : nil, value: items.count)
+                    .allowsHitTesting(!browserManager.isSwitchingSpace)
                 }
-                .contentShape(Rectangle())
-                .fixedSize(horizontal: false, vertical: true)
-                .animation(shouldAnimate ? NookDesign.Motion.standard : nil, value: colsCount)
-                .animation(shouldAnimate ? NookDesign.Motion.standard : nil, value: items.count)
-                .allowsHitTesting(!browserManager.isSwitchingSpace)
             }
+            .padding(.bottom, showsFavorites ? NookDesign.Spacing.sectionGap : 0)
         }
     }
 
     /// The insertion index for the grid during a drag, or nil when no placeholder should show.
     private func insertionIndex(in zone: DropZoneID, items: [Item]) -> Int? {
-        guard dragSession.isDragging, dragSession.activeZone == zone,
+        guard dragSession.isDragging,
+              !dragSession.isSettlingDrop,
+              dragSession.draggedItem?.isFolder != true else {
+            return nil
+        }
+        // A tab coming from another section is offered at the end of the bookmark list for the
+        // whole drag. Reordering bookmarks keeps following the pointer as before.
+        if dragSession.sourceZone != zone {
+            return items.count
+        }
+        guard dragSession.activeZone == zone,
               let position = dragSession.dropPosition, position.zone == zone else {
             return nil
         }
@@ -129,6 +132,28 @@ struct PinnedGrid: View {
             return nil
         }
         return position.index
+    }
+
+    @ViewBuilder
+    private func insertionPlaceholder(in zone: DropZoneID) -> some View {
+        if dragSession.sourceZone == zone {
+            essentialsPlaceholder
+        } else {
+            bookmarkDropPlaceholder
+        }
+    }
+
+    private var bookmarkDropPlaceholder: some View {
+        NookDesign.Radius.shape(NookDesign.Radius.lg)
+            .fill(Color.clear)
+            .frame(minWidth: NookDesign.Size.essentialsTile, minHeight: NookDesign.Size.essentialsTile)
+            .overlay {
+                NookDesign.Radius.shape(NookDesign.Radius.lg)
+                    .strokeBorder(
+                        NookDesign.Surface.dropBorderActive,
+                        style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
+                    )
+            }
     }
 
     private var essentialsPlaceholder: some View {

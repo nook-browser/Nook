@@ -347,6 +347,12 @@ final class Persistence {
 
 @MainActor
 class BrowserManager: ObservableObject {
+    private enum PendingWindowPresentation {
+        case about
+        case settings(SettingsTabs)
+        case browserImport
+    }
+
     // Legacy global state - kept for backward compatibility during transition
     /// Tracks which pinned tab tile is hovered (for middle-click → reset to pinned URL)
     @Published var hoveredPinnedTabId: UUID? = nil
@@ -376,14 +382,14 @@ class BrowserManager: ObservableObject {
 
     /// Reference to the app delegate for Sparkle integration
     weak var appDelegate: AppDelegate?
-    /// SwiftUI's action for the Settings scene, handed over by `WindowView`. The old
-    /// `showSettingsWindow:` selector no longer opens a SwiftUI Settings scene.
-    var openSettingsAction: OpenSettingsAction?
 
     var modelContext: ModelContext
     /// The tab model: tree, device state, window selection and live pages.
     let tabs: TabsController
     var dialogManager: DialogManager
+    private var settingsNavigationByWindow: [UUID: SettingsNavigation] = [:]
+    private var pendingWindowPresentations: [PendingWindowPresentation] = []
+    private var isCreatingWindowForPresentation = false
     var downloadManager: DownloadManager
     var authenticationManager: AuthenticationManager
     var historyManager: HistoryManager
@@ -447,7 +453,7 @@ class BrowserManager: ObservableObject {
         self.currentProfile = initialProfile
 
         // settingsManager will be injected from NookApp
-        self.dialogManager = DialogManager()
+        self.dialogManager = DialogManager(windowRegistry: windowRegistry)
         self.downloadManager = DownloadManager.shared
         self.authenticationManager = AuthenticationManager()
         // Initialize managers with the current space's data store for isolation
@@ -733,6 +739,24 @@ class BrowserManager: ObservableObject {
 
     func showQuitDialog() {
         if self.nookSettings?.askBeforeQuit == true {
+            guard windowRegistry?.activeWindowId != nil else {
+                let alert = NSAlert()
+                alert.messageText = "Quit Nook?"
+                alert.informativeText = "You may lose unsaved work in your tabs."
+                alert.addButton(withTitle: "Always Quit")
+                alert.addButton(withTitle: "Quit")
+                alert.addButton(withTitle: "Cancel")
+                switch alert.runModal() {
+                case .alertFirstButtonReturn:
+                    nookSettings?.askBeforeQuit = false
+                    quitApplication()
+                case .alertSecondButtonReturn:
+                    quitApplication()
+                default:
+                    break
+                }
+                return
+            }
             dialogManager.showQuitDialog(
                 onAlwaysQuit: {
                     self.nookSettings?.askBeforeQuit = false
@@ -785,9 +809,67 @@ class BrowserManager: ObservableObject {
         openSettings(tab: .spaces)
     }
 
+    func showAbout() {
+        guard nookSettings?.didFinishOnboarding == true else {
+            NSApp.orderFrontStandardAboutPanel(nil)
+            return
+        }
+        presentInBrowserWindow(.about)
+    }
+
     func openSettings(tab: SettingsTabs) {
-        SettingsNavigation.shared.currentSettingsTab = tab
-        openSettingsAction?.callAsFunction()
+        guard nookSettings?.didFinishOnboarding == true else { return }
+        presentInBrowserWindow(.settings(tab))
+    }
+
+    func showBrowserImportDialog() {
+        guard nookSettings?.didFinishOnboarding == true else { return }
+        presentInBrowserWindow(.browserImport)
+    }
+
+    private func presentInBrowserWindow(_ presentation: PendingWindowPresentation) {
+        if let windowID = windowRegistry?.activeWindowId {
+            present(presentation, in: windowID)
+            return
+        }
+
+        pendingWindowPresentations.append(presentation)
+        guard !isCreatingWindowForPresentation else { return }
+        isCreatingWindowForPresentation = true
+        createNewWindow()
+    }
+
+    private func present(_ presentation: PendingWindowPresentation, in windowID: UUID) {
+        switch presentation {
+        case .about:
+            guard !dialogManager.hasPresentation(key: AboutView.presentationKey, in: windowID) else { return }
+            dialogManager.showDialog(
+                AboutView(),
+                in: windowID,
+                blocksTabKey: false,
+                key: AboutView.presentationKey
+            )
+        case .settings(let tab):
+            let navigation = settingsNavigationByWindow[windowID] ?? SettingsNavigation(initialTab: tab)
+            navigation.currentSettingsTab = tab
+            settingsNavigationByWindow[windowID] = navigation
+            guard !dialogManager.hasPresentation(key: SettingsWindow.presentationKey, in: windowID) else { return }
+            dialogManager.showDialog(
+                SettingsWindow(navigation: navigation),
+                in: windowID,
+                blocksTabKey: false,
+                key: SettingsWindow.presentationKey
+            )
+        case .browserImport:
+            dialogManager.showDialog(
+                BrowserImportDialog(onCancel: { [weak self] in self?.dialogManager.closeDialog() }),
+                in: windowID
+            )
+        }
+    }
+
+    func forgetSettings(in windowID: UUID) {
+        settingsNavigationByWindow.removeValue(forKey: windowID)
     }
 
     func closeDialog() {
@@ -939,6 +1021,12 @@ class BrowserManager: ObservableObject {
         tabs.attach(window: windowState)
         guard !windowState.isIncognito else { return }
         windowSpaceChanged(windowState)
+        if !pendingWindowPresentations.isEmpty {
+            let pending = pendingWindowPresentations
+            pendingWindowPresentations.removeAll()
+            isCreatingWindowForPresentation = false
+            pending.forEach { present($0, in: windowState.id) }
+        }
         applyStartupLoadMode(for: windowState)
         restoreSavedWindows()
     }

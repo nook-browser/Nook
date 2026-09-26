@@ -29,7 +29,7 @@ struct URLBarView: View {
                         if session != nil {
                             HStack(spacing: NookDesign.Spacing.xs) {
                                 Image(systemName: isSecure(for: session) ? "lock.fill" : "globe")
-                                    .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                                    .font(.system(size: NookDesign.Size.spaceIcon, weight: .medium))
                                     .foregroundStyle(.secondary)
                                 // Two texts so a narrow sidebar cuts the path first and then the
                                 // host's head: `accounts.google.com.x.evil.tld` must keep `evil.tld`.
@@ -40,16 +40,16 @@ struct URLBarView: View {
                                     Text(displayPath(for: session)).foregroundStyle(.tertiary)
                                         .truncationMode(.tail)
                                 }
-                                .font(NookDesign.Font.secondary)
+                                .font(NookDesign.Font.body)
                                 .lineLimit(1)
                             }
                         } else {
                             HStack(spacing: NookDesign.Spacing.xs) {
                                 Image(systemName: "magnifyingglass")
-                                    .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                                    .font(.system(size: NookDesign.Size.spaceIcon, weight: .medium))
                                     .foregroundStyle(textColor)
                                 Text("Search or Enter URL...")
-                                    .font(NookDesign.Font.secondary)
+                                    .font(NookDesign.Font.body)
                                     .foregroundStyle(textColor)
                             }
                         }
@@ -58,7 +58,7 @@ struct URLBarView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         let urlString = session?.url.absoluteString ?? ""
-                        windowState.commandPalette?.open(prefill: urlString, navigateCurrentTab: true)
+                        windowState.commandPalette?.openFromURLBar(prefill: urlString, navigateCurrentTab: true)
                     }
 
                     // Copy link button (show on hover when tab is selected)
@@ -116,7 +116,7 @@ struct URLBarView: View {
             PageLoadingProgressBar(session: session)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: NookDesign.Radius.md, bottomTrailingRadius: NookDesign.Radius.md, style: .continuous))
         }
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        .clipShape(Capsule())
         // Report the frame in the window space so we can overlay the mini palette above all content
         .background(
             GeometryReader { proxy in

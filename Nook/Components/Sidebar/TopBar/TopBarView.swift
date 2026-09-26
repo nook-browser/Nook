@@ -39,6 +39,10 @@ struct TopBarView: View {
             // Main content
             ZStack {
                 HStack(spacing: 8) {
+                    SidebarWindowControlsView()
+                        .environmentObject(browserManager)
+                        .environment(windowState)
+
                     navigationControls
 
                     if hasPiPControl, let tab = currentTab {
@@ -48,12 +52,6 @@ struct TopBarView: View {
                     urlBar
 
                     Spacer()
-
-                    if browserManager.nookSettings?.showAIAssistant ?? false
-                        && !windowState.isSidebarAIChatVisible
-                    {
-                        ChatButton(navButtonColor: navButtonColor)
-                    }
 
                 }
 
@@ -191,9 +189,9 @@ struct TopBarView: View {
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if let currentTab = browserManager.tabs.selectedSession(in: windowState) {
-                            commandPalette.openWithCurrentURL(currentTab.url)
+                            commandPalette.openFromURLBar(prefill: currentTab.url.absoluteString, navigateCurrentTab: true)
                         } else {
-                            commandPalette.open()
+                            commandPalette.openFromURLBar()
                         }
                     }
 
@@ -491,52 +489,4 @@ struct TopBarView: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
-}
-
-struct ChatButton: View {
-    @EnvironmentObject var browserManager: BrowserManager
-    @Environment(BrowserWindowState.self) private var windowState
-    @State private var isHovered: Bool = false
-
-    var navButtonColor: Color
-    
-    
-
-
-    var body: some View {
-        Button {
-            browserManager.toggleAISidebar(for: windowState)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "message.fill")
-                Text("Chat")
-            }
-            .font(NookDesign.Font.body)
-            .foregroundStyle(navButtonColor)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(backgroundColor)
-            .clipShape(
-                NookDesign.Radius.shape(NookDesign.Radius.sm)
-            )
-            .contentShape(
-                NookDesign.Radius.shape(NookDesign.Radius.sm)
-            )
-        }
-        .buttonStyle(.plain)
-        .onHoverTracking { state in
-            isHovered = state
-        }
-
-    }
-    
-    private var backgroundColor: Color {
-        let isDark = browserManager.tabs.selectedSession(in: windowState)?.topBarBackgroundColor?.isPerceivedDark == true
-        if isHovered {
-            return isDark ? .white.opacity(0.15) : .black.opacity(0.1)
-        } else {
-            return isDark ? .white.opacity(0.1) : .black.opacity(0.05)
-        }
-    }
-
 }

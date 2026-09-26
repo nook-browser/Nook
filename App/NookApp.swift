@@ -64,6 +64,8 @@ struct NookApp: App {
                     .environment(\.nookSettings, settingsManager)
                     .environment(settingsManager)
                     .environment(\.tabActions, browserManager)
+                    .environment(\.contentBlocker, browserManager.contentBlockerManager)
+                    .environment(\.siteRouting, browserManager.siteRoutingManager)
                     .environment(keyboardShortcutManager)
                     .environment(aiConfigService)
                     .environment(mcpManager)
@@ -89,25 +91,6 @@ struct NookApp: App {
         }
 
 
-        // macOS 26 style sidebar settings window
-        Settings {
-            SettingsWindow()
-                .environmentObject(browserManager)
-                .environment(browserManager.tabs)
-                .environmentObject(browserManager.gradientColorManager)
-                .environment(\.nookSettings, settingsManager)
-                .environment(settingsManager)
-                .environment(\.tabActions, browserManager)
-                .environment(\.contentBlocker, browserManager.contentBlockerManager)
-                .environment(\.siteRouting, browserManager.siteRoutingManager)
-                .environment(keyboardShortcutManager)
-                .environment(aiConfigService)
-                .environment(mcpManager)
-                .environment(tabOrganizerManager)
-        }
-        // contentMinSize lets the window grow past the content's ideal size,
-        // which .contentSize pinned it to.
-        .windowResizability(.contentMinSize)
     }
 
     // MARK: - Application Lifecycle Setup
@@ -210,6 +193,8 @@ struct NookApp: App {
             [webViewCoordinator, weak browserManager] windowId in
             // Only cleanup if browserManager still exists (it's captured weakly)
             if let browserManager = browserManager {
+                browserManager.dialogManager.dismissDialogs(in: windowId)
+                browserManager.forgetSettings(in: windowId)
                 browserManager.sidebarPiPWindowClosing(windowId)
                 if browserManager.peekManager.windowId == windowId { browserManager.peekManager.dismissPeek() }
                 webViewCoordinator.cleanupWindow(windowId, tabs: browserManager.tabs)
@@ -339,4 +324,3 @@ private final class FullScreenToolbarView: NSView {
         observers.forEach(NotificationCenter.default.removeObserver)
     }
 }
-

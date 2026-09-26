@@ -10,21 +10,58 @@ import Observation
 import SwiftUI
 import Garnish
 import NookDesign
+import NookUI
+import NookWeb
+
+struct DialogPresentation: Identifiable {
+    let id = UUID()
+    let content: AnyView
+    let windowID: UUID?
+    let blocksTabKey: Bool
+    let key: String?
+    var isPresented = true
+}
 
 @MainActor
 @Observable
 class DialogManager {
-    var isVisible: Bool = false
-    var activeDialog: AnyView?
+    private(set) var presentations: [DialogPresentation] = []
 
+    @ObservationIgnored private weak var windowRegistry: WindowRegistry?
     private var tabKeyMonitor: Any?
+
+    init(windowRegistry: WindowRegistry) {
+        self.windowRegistry = windowRegistry
+    }
 
     // MARK: - Presentation
 
-    func showDialog<Content: View>(_ dialog: Content) {
-        activeDialog = AnyView(dialog)
-        isVisible = true
-        installTabKeyMonitor()
+    func presentations(in windowID: UUID) -> [DialogPresentation] {
+        presentations.filter { $0.windowID == nil || $0.windowID == windowID }
+    }
+
+    func isVisible(in windowID: UUID) -> Bool {
+        presentations.contains { $0.windowID == nil || $0.windowID == windowID }
+    }
+
+    func hasPresentation(key: String, in windowID: UUID) -> Bool {
+        presentations.contains { $0.key == key && $0.windowID == windowID && $0.isPresented }
+    }
+
+    func showDialog<Content: View>(
+        _ dialog: Content,
+        in windowID: UUID? = nil,
+        blocksTabKey: Bool = true,
+        key: String? = nil
+    ) {
+        guard let target = windowID ?? windowRegistry?.activeWindowId else { return }
+        presentations.append(DialogPresentation(
+            content: AnyView(dialog),
+            windowID: target,
+            blocksTabKey: blocksTabKey,
+            key: key
+        ))
+        updateTabKeyMonitor()
     }
 
     func showDialog<Content: View>(@ViewBuilder builder: () -> Content) {
@@ -32,24 +69,50 @@ class DialogManager {
     }
 
     func closeDialog() {
-        guard isVisible else {
-            activeDialog = nil
-            return
-        }
+        let windowID = windowRegistry?.activeWindowId
+        guard let presentation = presentations.last(where: {
+            windowID == nil || $0.windowID == nil || $0.windowID == windowID
+        }) else { return }
+        dismiss(presentation.id)
+    }
 
-        isVisible = false
-        removeTabKeyMonitor()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-            self?.activeDialog = nil
+    func dismiss(_ presentationID: UUID) {
+        guard let index = presentations.firstIndex(where: { $0.id == presentationID }),
+              presentations[index].isPresented else { return }
+        withAnimation(NookDesign.Motion.spring) {
+            presentations[index].isPresented = false
         }
+        updateTabKeyMonitor()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self,
+                  let index = self.presentations.firstIndex(where: { $0.id == presentationID }),
+                  !self.presentations[index].isPresented else { return }
+            self.presentations.remove(at: index)
+        }
+    }
+
+    func dismissDialogs(in windowID: UUID) {
+        presentations.removeAll { $0.windowID == windowID }
+        updateTabKeyMonitor()
     }
 
     // MARK: - Tab Key Blocking
 
-    private func installTabKeyMonitor() {
+    private func updateTabKeyMonitor() {
+        guard presentations.contains(where: { $0.blocksTabKey && $0.isPresented }) else {
+            removeTabKeyMonitor()
+            return
+        }
         guard tabKeyMonitor == nil else { return }
-        tabKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            if event.keyCode == 48 {
+        tabKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let shouldBlock = MainActor.assumeIsolated {
+                guard let self, event.keyCode == 48 else { return false }
+                let windowID = self.windowRegistry?.activeWindowId
+                return self.presentations.last(where: {
+                    windowID == nil || $0.windowID == nil || $0.windowID == windowID
+                }).map({ $0.blocksTabKey && $0.isPresented }) == true
+            }
+            if shouldBlock {
                 NSSound.beep()
                 return nil
             }
@@ -77,11 +140,6 @@ class DialogManager {
                 },
                 content: {
                     VStack(alignment: .leading, spacing: 20) {
-                        Image("nook-logo-1024")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 50, height: 50)
-                            .nookElevation(.raised)
                         Text("Quit Nook?")
                             .font(NookDesign.Font.heading)
                             .foregroundStyle(AppColors.textPrimary)
@@ -160,21 +218,6 @@ extension DialogPresentable {
 
 // MARK: - Dialog Surfaces
 
-struct DialogCard<Content: View>: View {
-    private let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some View {
-        content
-            .padding(NookDesign.Spacing.xl)
-            .frame(maxWidth: NookDesign.Size.dialogMaxWidth, alignment: .leading)
-            .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
-    }
-}
-
 struct StandardDialog<Header: View, Content: View, Footer: View>: View {
     private let header: AnyView?
     private let content: Content
@@ -196,7 +239,7 @@ struct StandardDialog<Header: View, Content: View, Footer: View>: View {
     }
 
     var body: some View {
-        DialogCard {
+        NookPanel(maxWidth: NookDesign.Size.dialogMaxWidth) {
             VStack(alignment: .leading, spacing: 25) {
                 if let header {
 
