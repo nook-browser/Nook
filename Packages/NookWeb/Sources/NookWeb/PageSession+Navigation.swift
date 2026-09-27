@@ -177,9 +177,8 @@ extension PageSession: WKNavigationDelegate {
     ) {
         loadingState = .didFail(error)
 
-        // Set error favicon on navigation failure
-        Task { @MainActor in
-            self.favicon = Image(systemName: "exclamationmark.triangle")
+        if Self.isConnectionFailure(error) {
+            favicon = Image(systemName: "exclamationmark.triangle")
         }
 
         updateNavigationStateEnhanced(source: "didFail")
@@ -250,12 +249,18 @@ extension PageSession: WKNavigationDelegate {
             controller?.pageCommitted(itemID: itemID, url: committed)
         }
 
-        // Set connection error favicon
-        Task { @MainActor in
-            self.favicon = Image(systemName: "wifi.exclamationmark")
+        if Self.isConnectionFailure(error) {
+            favicon = Image(systemName: "wifi.exclamationmark")
         }
 
         updateNavigationStateEnhanced(source: "didFailProvisional")
+    }
+
+    /// A load the network failed. Not a cancel (a newer navigation, Stop), a download, or a
+    /// content-blocked page, all of which leave the page and its favicon as they were.
+    static func isConnectionFailure(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain == NSURLErrorDomain && error.code != NSURLErrorCancelled
     }
 
     public func webView(

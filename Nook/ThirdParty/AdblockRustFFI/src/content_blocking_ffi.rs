@@ -8,6 +8,7 @@ use crate::guard;
 use adblock::content_blocking::{CbRule, CbRuleEquivalent};
 use adblock::filters::cosmetic::CosmeticFilterMask;
 use adblock::lists::{parse_filter, ParseOptions, ParsedLine};
+use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -106,7 +107,7 @@ fn widen_domains_to_subdomains(rule: &mut CbRule) {
 #[derive(Default)]
 pub(crate) struct Conversion {
     pub rules: Vec<CbRule>,
-    /// Lines skipped on purpose because they cancel another rule.
+    /// Lines skipped on purpose: they cancel another rule, or a `$badfilter` cancels them.
     pub skipped: usize,
     /// Lines with no equivalent in Safari's content blocking syntax. Procedural
     /// cosmetic filters and `$redirect` dominate this; they are handled
@@ -123,6 +124,7 @@ pub(crate) struct Conversion {
 fn convert_text(text: &str) -> Conversion {
     let opts = ParseOptions::default();
     let mut c = Conversion::default();
+    let mut parsed_lines = Vec::new();
 
     for line in text.lines() {
         let line = line.trim();
@@ -130,19 +132,32 @@ fn convert_text(text: &str) -> Conversion {
             continue;
         }
         match parse_filter(line, true, opts) {
-            Ok(parsed) => {
-                if cancels_another_rule(&parsed) {
-                    c.skipped += 1;
-                    continue;
-                }
-                match CbRuleEquivalent::try_from(parsed) {
-                    Ok(equivalent) => c.rules.extend(equivalent.into_iter().map(|mut r| {
-                        widen_domains_to_subdomains(&mut r);
-                        r
-                    })),
-                    Err(_) => c.unconverted += 1,
-                }
-            }
+            Ok(parsed) => parsed_lines.push(parsed),
+            Err(_) => c.unconverted += 1,
+        }
+    }
+
+    // A `$badfilter` removes the rule it names from every list, as the engine and the
+    // crate's own converter do. `get_id` leaves the badfilter bit out, so the ids match.
+    let cancelled: HashSet<_> = parsed_lines
+        .iter()
+        .filter_map(|p| match p {
+            ParsedLine::Network(n) if n.is_badfilter() => Some(n.get_id()),
+            _ => None,
+        })
+        .collect();
+
+    for parsed in parsed_lines {
+        let is_cancelled = matches!(&parsed, ParsedLine::Network(n) if cancelled.contains(&n.get_id()));
+        if is_cancelled || cancels_another_rule(&parsed) {
+            c.skipped += 1;
+            continue;
+        }
+        match CbRuleEquivalent::try_from(parsed) {
+            Ok(equivalent) => c.rules.extend(equivalent.into_iter().map(|mut r| {
+                widen_domains_to_subdomains(&mut r);
+                r
+            })),
             Err(_) => c.unconverted += 1,
         }
     }
@@ -266,6 +281,40 @@ mod tests {
         let c = convert_text("||example.com^$badfilter\n");
         assert!(c.rules.is_empty(), "a $badfilter rule must not convert");
         assert_eq!(c.skipped, 1);
+    }
+
+    /// Peter Lowe's `||t.co^` blocked every t.co link although uBlock's unbreak list
+    /// cancels it. Option order and aliases must not hide the match.
+    #[test]
+    fn badfilter_removes_the_rule_it_names() {
+        let c = convert_text("||t.co^\n||x.test^$script,third-party\n||t.co^$badfilter\n||x.test^$3p,script,badfilter\n");
+        assert!(c.rules.is_empty(), "got {}", serde_json::to_string(&c.rules).unwrap());
+        assert_eq!(c.skipped, 4);
+    }
+
+    #[test]
+    fn badfilter_leaves_other_variants_alone() {
+        let c = convert_text("||t.co^$subdocument,domain=kshow123.tv\n||t.co^$badfilter\n");
+        assert_eq!(c.rules.len(), 1);
+    }
+
+    #[test]
+    fn bundled_lists_do_not_block_t_co() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../Packages/NookBlocker/Sources/NookBlocker/Resources");
+        let mut text = String::new();
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let p = entry.unwrap().path();
+            if p.extension().and_then(|e| e.to_str()) == Some("txt") {
+                text.push_str(&std::fs::read_to_string(&p).unwrap());
+                text.push('\n');
+            }
+        }
+        let bare = convert_text("||t.co^").rules.remove(0).trigger.url_filter;
+        let blocked = convert_text(&text).rules.into_iter().any(|r| {
+            r.trigger.url_filter == bare && r.trigger.if_domain.is_none() && r.trigger.resource_type.is_none()
+        });
+        assert!(!blocked, "the bundled lists still block every t.co link");
     }
 
     /// Skipping a rule that is deliberately unconvertible is not a failure, or

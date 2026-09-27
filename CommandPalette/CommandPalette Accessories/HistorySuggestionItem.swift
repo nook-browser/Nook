@@ -65,42 +65,22 @@ struct HistorySuggestionItem: View {
                 isHovered = hovering
             }
         }
-        .onAppear {
-            Task { await fetchFavicon(for: entry.url) }
+        // Rows are keyed by index, so a row is reused for the next entry as the query changes.
+        .task(id: entry.url) {
+            resolvedFavicon = nil
+            let image = await fetchFavicon(for: entry.url)
+            if !Task.isCancelled { resolvedFavicon = image.map(SwiftUI.Image.init(nsImage:)) }
         }
     }
-    
-    private func fetchFavicon(for url: URL) async {
-        let defaultFavicon = SwiftUI.Image(systemName: "globe")
-        guard url.scheme == "http" || url.scheme == "https", url.host != nil else {
-            await MainActor.run { self.resolvedFavicon = defaultFavicon }
-            return
-        }
-        
-        let cacheKey = url.host ?? url.absoluteString
-        if let cachedFavicon = await FaviconCache.shared.cachedImage(for: cacheKey).map(SwiftUI.Image.init(nsImage:)) {
-            await MainActor.run { self.resolvedFavicon = cachedFavicon }
-            return
-        }
-        
-        do {
-            let favicon = try await FaviconFinder(url: url)
-                .fetchFaviconURLs()
-                .download()
-                .largest()
-            if let faviconImage = favicon.image {
-                let nsImage = faviconImage.image
-                let swiftUIImage = SwiftUI.Image(nsImage: nsImage)
-                
-                FaviconCache.shared.store(nsImage, for: cacheKey)
-                
-                await MainActor.run { self.resolvedFavicon = swiftUIImage }
-            } else {
-                await MainActor.run { self.resolvedFavicon = defaultFavicon }
-            }
-        } catch {
-            await MainActor.run { self.resolvedFavicon = defaultFavicon }
-        }
+
+    private func fetchFavicon(for url: URL) async -> NSImage? {
+        guard url.scheme == "http" || url.scheme == "https", let cacheKey = url.host else { return nil }
+        if let cached = await FaviconCache.shared.cachedImage(for: cacheKey) { return cached }
+        guard let image = try? await FaviconFinder(url: url).fetchFaviconURLs().download().largest().image?.image,
+              !Task.isCancelled
+        else { return nil }
+        FaviconCache.shared.store(image, for: cacheKey)
+        return image
     }
 }
 
