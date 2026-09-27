@@ -25,14 +25,6 @@ struct WebsiteLoadingIndicator: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 8)
-        .background(
-            Rectangle()
-                .fill(Color.clear)
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    zoomCurrentWindow()
-                }
-        )
         
         
     }

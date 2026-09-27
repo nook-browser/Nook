@@ -646,7 +646,9 @@ public final class TabsController {
             return
         }
         let others = regularWindows.filter { $0.id != window.id }
-        guard !isTerminating, !others.isEmpty else { return }
+        guard !isTerminating else { return }
+        // The last window's record stays to reopen it, at the size it had when it closed.
+        guard !others.isEmpty else { return mirror(window) }
         device.windows.removeAll { $0.id == window.id }
         save()
     }
@@ -660,9 +662,11 @@ public final class TabsController {
     /// Copies a regular window's selection into DeviceState.windows.
     public func mirror(_ window: BrowserWindowState) {
         guard window.privateTree == nil else { return }
+        // No window yet (attach runs first) or one in full screen keeps the frame it had.
+        let frame = window.windowHandle?.frameString ?? device.windows.first { $0.id == window.id }?.frame
         let record = WindowRecord(
             id: window.id, spaceID: window.spaceID, selectedItemBySpace: window.selectedItemBySpace,
-            split: window.split, frame: window.windowHandle?.frameString)
+            split: window.split, frame: frame)
         if let index = device.windows.firstIndex(where: { $0.id == window.id }) {
             guard device.windows[index] != record else { return }
             device.windows[index] = record

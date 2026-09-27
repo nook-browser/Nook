@@ -10,7 +10,8 @@ import AppKit
 import NookWeb
 
 extension NSWindow: WindowHandle {
-    public var frameString: String? { NSStringFromRect(frame) }
+    /// Nil in full screen, where the frame is the screen's and not the one to reopen at.
+    public var frameString: String? { styleMask.contains(.fullScreen) ? nil : NSStringFromRect(frame) }
 
     public func applyFrame(_ rectString: String) {
         let rect = NSRectFromString(rectString)

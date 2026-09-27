@@ -74,6 +74,5 @@ struct SidebarWindowControlsView: View {
                 .layoutPriority(1)
         }
         .frame(height: NookDesign.Size.glassControl)
-        .background(DoubleClickView { NSApp.keyWindow?.performZoom(nil) })
     }
 }
