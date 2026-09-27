@@ -176,6 +176,8 @@ public final class AdvancedRulesEngine {
             ("facebook-sponsored-blocker", #"(^|\.)facebook\.com$"#, ""),
             ("instagram-feed-prune", #"(^|\.)instagram\.com$"#, ""),
             ("instagram-sponsored-blocker", #"(^|\.)instagram\.com$"#, ""),
+            // Patches JSON.parse like the pruners, pointing t.co links at their destination.
+            ("x-direct-links", #"(^|\.)(twitter\.com|x\.com)$"#, ""),
             ("twitter-ad-blocker", #"(^|\.)(twitter\.com|x\.com)$"#, ""),
         ]
         for entry in siteScripts {
