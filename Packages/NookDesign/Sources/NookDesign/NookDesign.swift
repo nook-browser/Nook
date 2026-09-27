@@ -90,6 +90,8 @@ public enum NookDesign {
         public static let dropTail: CGFloat = 100      // empty drop target height below the last row
         public static let dialogMaxWidth: CGFloat = 500
         public static let glassControl: CGFloat = 36   // sidebar glass controls, the size of a macOS 26 toolbar button
+        public static let pipSkip: CGFloat = 48        // PiP skip buttons, as in the system PiP window
+        public static let pipPlay: CGFloat = 64        // PiP play/pause, as in the system PiP window
         // Narrowest sidebar: the lights (88), the history pill (110), the inset (8).
         public static let sidebarMin: CGFloat = 206
 
@@ -130,7 +132,8 @@ public enum NookDesign {
 
     public enum Motion {
         public static let quick = Animation.easeOut(duration: 0.12)      // hover, press
-        public static let standard = Animation.smooth(duration: 0.22)    // selection, reveal, fold
+        public static let standardDuration: TimeInterval = 0.22          // `standard`, for AppKit animations
+        public static let standard = Animation.smooth(duration: standardDuration)    // selection, reveal, fold
         public static let settle = Animation.smooth(duration: 0.6)       // the separator wave rising and flattening
         public static let wavePeriod: TimeInterval = 1.6                 // seconds for the wave to travel one cycle
         public static let flight = Animation.easeIn(duration: 0.6)       // a download flying from the page to its button

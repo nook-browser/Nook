@@ -90,6 +90,10 @@ final class NookDragSessionManager: ObservableObject {
     private var mouseDownEvent: NSEvent?
     private var dragInitiatedFromMonitor: Bool = false
     private static let dragThreshold: CGFloat = 4
+    /// Views drawn over the tab list that own their clicks, such as the sidebar video.
+    private let dragBarriers = NSHashTable<NSView>.weakObjects()
+
+    func addDragBarrier(_ view: NSView) { dragBarriers.add(view) }
 
     func registerDragSource(_ view: NookDragSourceNSView, id: UUID) {
         registeredSources[id] = WeakDragSource(view: view)
@@ -138,10 +142,16 @@ final class NookDragSessionManager: ObservableObject {
             mouseDownEvent = nil
             dragInitiatedFromMonitor = false
 
+            if dragBarriers.allObjects.contains(where: { barrier in
+                barrier.window === event.window && !barrier.isHiddenOrHasHiddenAncestor
+                    && barrier.bounds.contains(barrier.convert(event.locationInWindow, from: nil))
+            }) { return event }
+
             for (id, source) in registeredSources {
                 guard let view = source.view, let window = view.window, event.window == window else { continue }
                 let localPoint = view.convert(event.locationInWindow, from: nil)
-                if view.bounds.contains(localPoint) {
+                // A hidden row, such as one on another space's page, keeps its frame.
+                if !view.isHiddenOrHasHiddenAncestor, view.bounds.contains(localPoint) {
                     activeDragSourceId = id
                     mouseDownPoint = event.locationInWindow
                     mouseDownEvent = event
