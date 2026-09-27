@@ -71,7 +71,6 @@ public enum NookDesign {
         public static let favicon: CGFloat = 16
         public static let essentialsTile: CGFloat = 44
         public static let essentialsFavicon: CGFloat = 20
-        public static let urlBar: CGFloat = 32
         public static let navRow: CGFloat = 28
         #if os(iOS)
         // The floating bar's control row. 50 clears the 44pt touch minimum with
@@ -141,7 +140,7 @@ public enum NookDesign {
     // MARK: - Surface
 
     public enum Surface {
-        public static let fill = Color.primary.opacity(0.045)           // hover, URL bar, idle tile
+        public static let fill = Color.primary.opacity(0.045)           // hover, idle tile
         public static let fillPressed = Color.primary.opacity(0.08)
         public static let hairline = Color.primary.opacity(0.08)
         public static let unloadedOpacity: Double = 0.55

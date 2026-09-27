@@ -76,6 +76,16 @@ struct ExtensionLibraryView: View {
             .disabled(currentTab == nil)
 
             MuteButton(tab: currentTab)
+
+            let isPiPActive = currentTab?.hasPiPActive == true
+            UtilityTile(
+                systemImage: isPiPActive ? "pip.exit" : "pip.enter",
+                help: isPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture"
+            ) {
+                currentTab?.requestPictureInPicture()
+                onDismiss()
+            }
+            .disabled(!(currentTab.map { $0.hasVideoContent || $0.hasPiPActive } ?? false))
         }
         .padding(12)
     }
@@ -249,31 +259,17 @@ private struct MuteButton: View {
     let tab: PageSession?
 
     @State private var isMuted = false
-    @State private var isHovering = false
 
     var body: some View {
-        Button {
+        UtilityTile(
+            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+            help: isMuted ? "Unmute" : "Mute"
+        ) {
             tab?.toggleMute()
             // Update local state immediately for snappy UI
             if tab != nil { isMuted.toggle() }
-        } label: {
-            VStack(spacing: 5) {
-                Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(NookDesign.Font.title)
-                    .frame(width: 28, height: 28)
-                    .contentTransition(.symbolEffect(.replace))
-                Text(isMuted ? "Unmute" : "Mute")
-                    .font(NookDesign.Font.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         }
-        .buttonStyle(.plain)
         .disabled(tab == nil)
-        .onHoverTracking { isHovering = $0 }
         .onAppear { isMuted = tab?.isAudioMuted ?? false }
         .onChange(of: tab?.isAudioMuted) { _, newValue in
             isMuted = newValue ?? false
@@ -288,11 +284,14 @@ private struct CopyButton: View {
     let label: String
     let action: () -> Bool  // returns true if copy succeeded
 
-    @State private var isHovering = false
     @State private var showCheckmark = false
 
     var body: some View {
-        Button {
+        UtilityTile(
+            systemImage: showCheckmark ? "checkmark" : icon,
+            help: showCheckmark ? "Copied!" : label,
+            tint: showCheckmark ? .green : .primary
+        ) {
             if action() {
                 withAnimation(NookDesign.Motion.quick) {
                     showCheckmark = true
@@ -303,23 +302,39 @@ private struct CopyButton: View {
                     }
                 }
             }
-        } label: {
-            VStack(spacing: 5) {
-                Image(systemName: showCheckmark ? "checkmark" : icon)
-                    .font(NookDesign.Font.title)
-                    .foregroundStyle(showCheckmark ? .green : .primary)
-                    .frame(width: 28, height: 28)
-                    .contentTransition(.symbolEffect(.replace))
-                Text(showCheckmark ? "Copied!" : label)
-                    .font(NookDesign.Font.caption)
-                    .foregroundStyle(showCheckmark ? .green : .secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        }
+    }
+}
+
+// MARK: - Utility Tile
+
+/// Sized and filled like a favorites tile, icon only; the name is the tooltip.
+private struct UtilityTile: View {
+    let systemImage: String
+    let help: String
+    var tint: Color = .primary
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(NookDesign.Font.title)
+                .foregroundStyle(isEnabled ? AnyShapeStyle(tint) : AnyShapeStyle(.tertiary))
+                .contentTransition(.symbolEffect(.replace))
+                .frame(maxWidth: .infinity)
+                .frame(height: NookDesign.Size.essentialsTile)
+                .background(
+                    isHovering && isEnabled ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill,
+                    in: NookDesign.Radius.shape(NookDesign.Radius.lg)
+                )
+                .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         }
         .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(help)
         .onHoverTracking { isHovering = $0 }
     }
 }

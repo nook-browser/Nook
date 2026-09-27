@@ -28,9 +28,12 @@ struct URLBarView: View {
                     Group {
                         if session != nil {
                             HStack(spacing: NookDesign.Spacing.xs) {
-                                Image(systemName: isSecure(for: session) ? "lock.fill" : "globe")
-                                    .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
-                                    .foregroundStyle(.secondary)
+                                // HTTPS is the norm, so only a page that is not gets a mark.
+                                if isInsecure(for: session) {
+                                    Image(systemName: "lock.open.fill")
+                                        .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
                                 // Two texts so a narrow sidebar cuts the path first and then the
                                 // host's head: `accounts.google.com.x.evil.tld` must keep `evil.tld`.
                                 HStack(spacing: 0) {
@@ -56,6 +59,7 @@ struct URLBarView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
+                    .pointerStyle(.horizontalText)
                     .onTapGesture {
                         let urlString = session?.url.absoluteString ?? ""
                         windowState.commandPalette?.open(prefill: urlString, navigateCurrentTab: true)
@@ -73,19 +77,6 @@ struct URLBarView: View {
                         .contentTransition(.symbolEffect(.replace))
                     }
 
-                    // PiP button (show when video content is available or PiP is active)
-                    if let session, (session.hasVideoContent || session.hasPiPActive) {
-                        Button(action: {
-                            session.requestPictureInPicture()
-                        }) {
-                            Image(systemName: session.hasPiPActive ? "pip.exit" : "pip.enter")
-                                .font(NookDesign.Font.secondary)
-                                .foregroundStyle(textColor.opacity(session.hasPiPActive ? 1.0 : 0.7))
-                        }
-                        .buttonStyle(NookIconButtonStyle(size: NookDesign.Size.iconButton, radius: NookDesign.Radius.sm))
-                        .help(session.hasPiPActive ? "Exit Picture in Picture" : "Enter Picture in Picture")
-                    }
-                    
                     // Pinned extension buttons + library button
                     if let extensionManager = browserManager.extensionManager {
                         let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
@@ -108,15 +99,12 @@ struct URLBarView: View {
                 }
                 .padding(.horizontal, NookDesign.Spacing.rowPadding)
         }
-        .frame(maxWidth: .infinity, minHeight: NookDesign.Size.urlBar, maxHeight: NookDesign.Size.urlBar)
-        .background(
-           backgroundColor
-        )
+        .frame(maxWidth: .infinity, minHeight: NookDesign.Size.glassControl, maxHeight: NookDesign.Size.glassControl)
         .overlay(alignment: .bottom) {
             PageLoadingProgressBar(session: session)
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: NookDesign.Radius.md, bottomTrailingRadius: NookDesign.Radius.md, style: .continuous))
         }
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        .clipShape(Capsule())
+        .nookControlGlass(in: Capsule())
         // Report the frame in the window space so we can overlay the mini palette above all content
         .background(
             GeometryReader { proxy in
@@ -134,9 +122,6 @@ struct URLBarView: View {
         
     }
     
-    private var backgroundColor: Color {
-        isHovering ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill
-    }
     private var textColor: Color {
         .secondary
     }
@@ -146,7 +131,7 @@ struct URLBarView: View {
         return formatURL(session.url)
     }
 
-    private func isSecure(for session: PageSession?) -> Bool { session?.url.scheme == "https" }
+    private func isInsecure(for session: PageSession?) -> Bool { session?.url.scheme == "http" }
     /// The host, carrying the port when the URL names a non-default one. A development
     /// server at `localhost:3000` is a different origin from one at `localhost:8080`, so
     /// dropping the port left the bar showing the wrong thing. `URL.port` reports a port
