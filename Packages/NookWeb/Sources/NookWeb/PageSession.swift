@@ -51,6 +51,8 @@ public final class PageSession: NSObject, Identifiable {
     public var url: URL
     public var title: String
     public var favicon: SwiftUI.Image
+    /// A page the ad blocker stopped from loading. The blocked-page card shows while it is set.
+    public internal(set) var blockedURL: URL?
 
     public enum LoadingState: Equatable {
         case idle
@@ -541,6 +543,27 @@ public final class PageSession: NSObject, Identifiable {
         primaryWebView?.stopLoading()
         loadingState = .idle
     }
+
+    /// Loads the page the ad blocker stopped, unblocked until this page moves to another host.
+    public func continueToBlockedPage() {
+        guard let blockedURL else { return }
+        controller?.blocker.continueToBlockedPage(blockedURL, in: self)
+        load(blockedURL)
+    }
+
+    /// Back to the page still showing under the card, or closes a page that has none.
+    public func leaveBlockedPage() {
+        if hasCommittedPage {
+            blockedURL = nil
+        } else if isDetached {
+            onClose?()
+        } else {
+            controller?.close(itemID)
+        }
+    }
+
+    /// False until a page commits: a blocked first load leaves nothing to go back to.
+    public var hasCommittedPage: Bool { primaryWebView?.backForwardList.currentItem != nil }
 
     /// Selects this page in the active window (a click inside the web view).
     public func activate() {

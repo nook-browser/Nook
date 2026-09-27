@@ -64,6 +64,8 @@ struct PeekOverlayView: View {
                 DetachedPageHost(page: page, cornerRadius: cornerRadius)
                     .id(page.itemID)
 
+                BlockedPageView(session: page)
+
                 if let webView = page.webView {
                     PageLoadBar(webView: webView, tint: currentSpaceColor)
                         .padding(.horizontal, cornerRadius)

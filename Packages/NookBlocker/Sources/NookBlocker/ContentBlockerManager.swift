@@ -54,6 +54,14 @@ public final class ContentBlockerManager: NSObject {
 
     private var temporarilyDisabledTabs: [UUID: Date] = [:]
     private var allowedDomains: Set<String> = []
+    /// Hosts a page continued to past the blocked-page card. Dropped when that page navigates to
+    /// another host, so a redirector opens and its destination is blocked as usual.
+    private var continuedHosts: [UUID: String] = [:]
+
+    /// Lets `session` load `url`'s host unblocked until it navigates to another host.
+    public func continueToBlockedPage(_ url: URL, in session: any BlockablePage) {
+        continuedHosts[session.itemID] = url.host?.lowercased()
+    }
 
     public func isTemporarilyDisabled(tabId: UUID) -> Bool {
         if let until = temporarilyDisabledTabs[tabId] {
@@ -94,6 +102,7 @@ public final class ContentBlockerManager: NSObject {
 
     private func isExempt(itemID: UUID, isOAuthFlow: Bool, host: String?) -> Bool {
         !isEnabled || isTemporarilyDisabled(tabId: itemID) || isDomainAllowed(host) || isOAuthFlow
+            || (host != nil && continuedHosts[itemID] == host?.lowercased())
     }
 
     private func isExempt(_ session: any BlockablePage, host: String?) -> Bool {
@@ -254,6 +263,9 @@ public final class ContentBlockerManager: NSObject {
     // MARK: - Per-Navigation (main frame, from PageSession.decidePolicyFor)
 
     public func setupContentBlockerScripts(for url: URL, in webView: WKWebView, tab session: any BlockablePage) {
+        if let continued = continuedHosts[session.itemID], continued != url.host?.lowercased() {
+            continuedHosts[session.itemID] = nil
+        }
         guard isEnabled else { return }
         setupContentBlockerScripts(for: url, in: webView, exempt: isExempt(session, host: url.host))
     }

@@ -270,6 +270,10 @@ struct WebsiteView: View {
                 }
             }
 
+            if !shouldShowSplit, let session = browserManager.tabs.controllableSession(in: windowState) {
+                BlockedPageView(session: session)
+            }
+
             // Split preview overlay - shows cards during drag operations
             if splitManager.getSplitState(for: windowState.id).isPreviewActive {
                 SplitPreviewOverlay()

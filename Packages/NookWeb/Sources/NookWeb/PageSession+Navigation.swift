@@ -20,6 +20,7 @@ extension PageSession: WKNavigationDelegate {
         didStartProvisionalNavigation navigation: WKNavigation!
     ) {
         loadingState = .didStartProvisionalNavigation
+        blockedURL = nil
         controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
@@ -238,6 +239,10 @@ extension PageSession: WKNavigationDelegate {
         withError error: Error
     ) {
         loadingState = .didFailProvisionalNavigation(error)
+        let attempted = url
+        if Self.isBlockedByContentBlocker(error) {
+            blockedURL = (error as NSError).userInfo[NSURLErrorFailingURLErrorKey] as? URL ?? attempted
+        }
 
         // didStartProvisionalNavigation moved `url` to the attempted URL. A navigation that
         // never commits (download response, Stop, network error) must not become the URL
@@ -261,6 +266,12 @@ extension PageSession: WKNavigationDelegate {
     static func isConnectionFailure(_ error: Error) -> Bool {
         let error = error as NSError
         return error.domain == NSURLErrorDomain && error.code != NSURLErrorCancelled
+    }
+
+    /// WebKitErrorFrameLoadBlockedByContentBlocker, which WebKit keeps private.
+    static func isBlockedByContentBlocker(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain == "WebKitErrorDomain" && error.code == 104
     }
 
     public func webView(

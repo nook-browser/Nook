@@ -12,6 +12,7 @@ struct MiniBrowserWindowView: View {
         ZStack(alignment: .top) {
             DetachedPageHost(page: page)
                 .ignoresSafeArea(.container, edges: .top)
+            BlockedPageView(session: page)
             if let webView = page.webView {
                 PageLoadBar(webView: webView, tint: gradientColorManager.accentColor)
             }
