@@ -310,13 +310,15 @@ extension PageSession: WKNavigationDelegate {
         if let url = navigationAction.request.url,
             navigationAction.targetFrame?.isMainFrame == true
         {
-            // $removeparam: restart the navigation without tracking parameters
+            // urlskip= goes past a known redirector; $removeparam restarts without tracking
+            // parameters. Either way the replacement comes back through here.
             if navigationAction.navigationType != .backForward,
                (navigationAction.request.httpMethod ?? "GET") == "GET",
-               let stripped = controller?.blocker.strippedTrackingParams(for: url, tab: self)
+               let replacement = controller?.blocker.urlSkipTarget(for: url, from: self.url, tab: self)
+                   ?? controller?.blocker.strippedTrackingParams(for: url, tab: self)
             {
                 decisionHandler(.cancel)
-                webView.load(URLRequest(url: stripped))
+                webView.load(URLRequest(url: replacement))
                 return
             }
 

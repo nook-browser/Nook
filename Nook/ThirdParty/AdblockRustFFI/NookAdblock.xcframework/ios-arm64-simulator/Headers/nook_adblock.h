@@ -83,6 +83,20 @@ void nook_adblock_string_free(char *s);
 /// Free the result with nook_adblock_string_free.
 char *nook_adblock_cosmetic_for_url(void *engine, const char *url);
 
+/// uBlock Origin `urlskip=` rules from filter text (UTF-8, not NUL-terminated).
+/// Only lines containing "urlskip=" are read. Writes the number of usable rules
+/// to *out_rule_count (may be NULL). Returns NULL on a NULL or non-UTF-8 input.
+/// Free with nook_adblock_urlskip_free. Serialize all calls on one skipper.
+void *nook_adblock_urlskip_new(const char *rules_utf8, size_t rules_len, size_t *out_rule_count);
+
+/// The URL a top-level navigation to `url` from a page at `source_url` should
+/// load instead, when a urlskip rule names `url` as a redirector. NULL otherwise.
+/// Free the result with nook_adblock_string_free.
+char *nook_adblock_urlskip_target(void *skipper, const char *url, const char *source_url);
+
+/// NULL is a no-op.
+void nook_adblock_urlskip_free(void *skipper);
+
 #ifdef __cplusplus
 }
 #endif

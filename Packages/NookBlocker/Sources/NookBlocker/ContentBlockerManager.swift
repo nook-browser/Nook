@@ -36,6 +36,7 @@ public final class ContentBlockerManager: NSObject {
     public let filterListManager = FilterListManager()
     public let advancedRulesEngine = AdvancedRulesEngine()
     public private(set) var trackingParamStripper = TrackingParamStripper()
+    private var urlSkipper: URLSkipper?
     private var lastRulesHash: String?
 
     /// In-flight activation; startup tab loading waits on it so the first page is protected.
@@ -194,6 +195,8 @@ public final class ContentBlockerManager: NSObject {
 
         await advancedRulesEngine.build(sources: sources)
         trackingParamStripper = await Task.detached(priority: .userInitiated) { TrackingParamStripper(rules: rules) }.value
+        urlSkipper = await Task.detached(priority: .userInitiated) { URLSkipper(rules: rules) }.value
+        cbLog.info("urlskip: \(self.urlSkipper?.ruleCount ?? 0, privacy: .public) rules")
         lastRulesHash = result.rulesHash
     }
 
@@ -251,6 +254,14 @@ public final class ContentBlockerManager: NSObject {
     /// The URL with tracking parameters removed, or nil when nothing should change.
     public func strippedTrackingParams(for url: URL, tab session: any BlockablePage) -> URL? {
         strippedTrackingParams(for: url, exempt: isExempt(session, host: url.host))
+    }
+
+    /// Where a navigation to a known redirector really goes (`urlskip=`), or nil.
+    public func urlSkipTarget(for url: URL, from source: URL?, tab session: any BlockablePage) -> URL? {
+        guard isEnabled, !isExempt(session, host: url.host),
+              let target = urlSkipper?.target(for: url, from: source) else { return nil }
+        cbLog.info("urlskip \(url.host ?? "-", privacy: .private(mask: .hash)) -> \(target.host ?? "-", privacy: .private(mask: .hash))")
+        return target
     }
 
     private func strippedTrackingParams(for url: URL, exempt: Bool) -> URL? {

@@ -154,3 +154,11 @@ jeepforum.com##+js(remove-node-text, script, error-report.com)
 ||ads.reddit.com^
 ||pixel.facebook.com^
 ||analytics.tiktok.com^
+
+! === OUTBOUND LINK REDIRECTS ===
+! Meta wraps outbound links in a redirect that logs the click. Go straight to the
+! destination, as uBlock already does for l.threads.com.
+||l.facebook.com/l.php?u=http$doc,urlskip=?u
+||lm.facebook.com/l.php?u=http$doc,urlskip=?u
+||l.messenger.com/l.php?u=http$doc,urlskip=?u
+||l.instagram.com/?u=http$doc,urlskip=?u

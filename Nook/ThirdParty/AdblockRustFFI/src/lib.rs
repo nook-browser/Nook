@@ -12,13 +12,14 @@ use std::ptr;
 
 pub(crate) mod content_blocking_ffi;
 pub(crate) mod cosmetic_ffi;
+pub(crate) mod urlskip_ffi;
 
 // panic = "abort" in release; catch_unwind still guards debug/test builds.
 pub(crate) fn guard<T>(f: impl FnOnce() -> T, fallback: T) -> T {
     catch_unwind(AssertUnwindSafe(f)).unwrap_or(fallback)
 }
 
-unsafe fn cstr<'a>(p: *const c_char) -> Option<&'a str> {
+pub(crate) unsafe fn cstr<'a>(p: *const c_char) -> Option<&'a str> {
     if p.is_null() {
         return None;
     }

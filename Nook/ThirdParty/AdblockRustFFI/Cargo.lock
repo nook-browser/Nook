@@ -313,8 +313,11 @@ version = "0.1.0"
 dependencies = [
  "adblock",
  "base64",
+ "percent-encoding",
+ "regex",
  "serde",
  "serde_json",
+ "url",
 ]
 
 [[package]]
