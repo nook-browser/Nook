@@ -152,7 +152,7 @@ enum WebContextMenuItem {
     @MainActor
     private func isEnabled(context: FocusableWKWebView) -> Bool {
         switch self {
-        case .pageBack: return context.canGoBack
+        case .pageBack: return context.canGoBack || context.owningSession?.canGoBackOrReturn == true
         case .pageForward: return context.canGoForward
         default: return true
         }
@@ -162,7 +162,7 @@ enum WebContextMenuItem {
     private func performAction(on webView: FocusableWKWebView, payload: WebContextMenuPayload) {
         switch self {
         case .pageBack:
-            webView.goBack()
+            if let session = webView.owningSession { session.goBack(in: webView) } else { webView.goBack() }
         case .pageForward:
             webView.goForward()
         case .pageReload:

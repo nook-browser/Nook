@@ -50,7 +50,7 @@ struct SidebarHistoryButtons: View {
         browserManager.tabs.controllableSession(in: windowState)
     }
 
-    private var canGoBack: Bool { session?.canGoBack ?? false }
+    private var canGoBack: Bool { session?.canGoBackOrReturn ?? false }
     private var canGoForward: Bool { session?.canGoForward ?? false }
 
     /// This window's own view of the page, so a clone navigates in its window.
@@ -59,7 +59,7 @@ struct SidebarHistoryButtons: View {
     }
 
     private func goBack() {
-        if let webView = windowWebView { webView.goBack() } else { session?.goBack() }
+        session?.goBack(in: windowWebView)
     }
 
     private func goForward() {

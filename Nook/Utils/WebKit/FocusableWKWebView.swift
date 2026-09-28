@@ -38,6 +38,16 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
         super.mouseDown(with: event)
     }
 
+    /// A three-finger or Magic Mouse swipe back. WebKit only acts on it with history, so on a
+    /// page opened from another tab it returns there, like the two-finger swipe.
+    override func swipe(with event: NSEvent) {
+        if event.deltaX > 0, !canGoBack, let session = owningSession, session.canGoBackOrReturn {
+            session.goBack(in: self)
+        } else {
+            super.swipe(with: event)
+        }
+    }
+
     override func rightMouseDown(with event: NSEvent) {
         owningSession?.activate()
         // Ensure this webview becomes first responder so willOpenMenu gets called

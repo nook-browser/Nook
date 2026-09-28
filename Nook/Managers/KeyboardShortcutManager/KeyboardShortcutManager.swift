@@ -450,12 +450,8 @@ class KeyboardShortcutManager {
             // Navigation
             case .goBack:
                 // Use window-specific webview like the UI buttons do
-                if let window = self.windowRegistry?.activeWindow,
-                   let itemID = window.selectedItemID,
-                   let webView = browserManager.getWebView(for: itemID, in: window.id) {
-                    if webView.canGoBack {
-                        webView.goBack()
-                    }
+                if let window = self.windowRegistry?.activeWindow, let session = tabs.controllableSession(in: window) {
+                    session.goBack(in: browserManager.getWebView(for: session.itemID, in: window.id))
                 }
             case .goForward:
                 // Use window-specific webview like the UI buttons do

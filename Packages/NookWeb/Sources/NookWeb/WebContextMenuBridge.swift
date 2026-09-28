@@ -188,10 +188,10 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             return
         }
         // A middle click or Command-click on a link rides the same bridge: WebKit does not
-        // turn either into a new tab, so the page has to report it.
+        // turn either into a new tab, so the page has to report it. Shift brings the tab forward.
         if let href = (dictionary["middleClickHref"] ?? dictionary["commandClickHref"]) as? String {
             if let url = URL(string: href) {
-                session?.openInNewTab(url)
+                session?.openInNewTab(url, foreground: dictionary["foreground"] as? Bool == true)
             }
             return
         }
@@ -304,7 +304,7 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
                 setTimeout(function() {
                     if (event.defaultPrevented) { return; }
                     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload) {
-                        window.webkit.messageHandlers.contextMenuPayload.postMessage({ middleClickHref: href });
+                        window.webkit.messageHandlers.contextMenuPayload.postMessage({ middleClickHref: href, foreground: event.shiftKey });
                     }
                 }, 0);
             } catch (error) {
@@ -324,7 +324,7 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
                 if (!link || !link.href) { return; }
                 event.preventDefault();
                 if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload) {
-                    window.webkit.messageHandlers.contextMenuPayload.postMessage({ commandClickHref: link.href });
+                    window.webkit.messageHandlers.contextMenuPayload.postMessage({ commandClickHref: link.href, foreground: event.shiftKey });
                 }
             } catch (error) {
                 console.error('[Nook Context Menu] command click error', error);

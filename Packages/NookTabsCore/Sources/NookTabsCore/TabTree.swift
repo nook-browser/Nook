@@ -131,6 +131,12 @@ public struct TabTree: Codable, Equatable, Sendable {
         return (try? validate(parent: .folder(itemID: hostID), placing: nil, isFolder: false)) != nil
     }
 
+    /// The tab whose page opened `id`: its parent when that parent is a tab, not a folder.
+    public func trailParent(of id: UUID) -> UUID? {
+        guard case .folder(let hostID)? = item(id)?.parent, item(hostID)?.isFolder == false else { return nil }
+        return hostID
+    }
+
     /// A live tab with children.
     public func hasChildren(_ id: UUID) -> Bool {
         items.values.contains { $0.deletedAt == nil && $0.parent == .folder(itemID: id) }

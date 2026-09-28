@@ -14,6 +14,8 @@ struct TrailTests {
         #expect(f.tree.hasChildren(parent))
         #expect(f.tree.scope(of: child) == .device)
         #expect(f.tree.spaceID(of: child) == f.spaceA)
+        #expect(f.tree.trailParent(of: child) == parent)
+        #expect(f.tree.trailParent(of: parent) == nil)
 
         #expect(throws: TreeError.folderInTab) {
             try f.tree.createFolder(title: "f", in: .folder(itemID: parent), after: nil, now: fixedNow)
@@ -30,6 +32,7 @@ struct TrailTests {
         // A tab inside a folder in the Tabs section still counts as the Tabs section.
         let folder = f.folder("folder", in: tabs)
         let inFolder = f.tab("in folder", in: .folder(itemID: folder))
+        #expect(f.tree.trailParent(of: inFolder) == nil)
         f.tab("grandchild", in: .folder(itemID: inFolder))
         checkInvariants(f.tree)
     }

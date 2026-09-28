@@ -157,14 +157,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                         registry.activeWindow?.commandPalette?.open()
                     }
                 case 3:  // Back button
-                    guard
-                        let windowState = registry.activeWindow,
-                        let itemID = windowState.selectedItemID,
-                        let webView = manager.getWebView(for: itemID, in: windowState.id)
+                    guard let windowState = registry.activeWindow,
+                          let session = manager.tabs.controllableSession(in: windowState)
                     else {
                         return
                     }
-                    webView.goBack()
+                    session.goBack(in: manager.getWebView(for: session.itemID, in: windowState.id))
                 case 4:  // Forward button
                     guard
                         let windowState = registry.activeWindow,

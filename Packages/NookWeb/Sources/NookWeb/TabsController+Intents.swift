@@ -341,6 +341,19 @@ extension TabsController {
         close(selected)
     }
 
+    /// The tab whose page opened `itemID`, which Back returns to once the page has no history.
+    public func opener(of itemID: UUID) -> UUID? {
+        owner(ofItem: itemID).flatMap { tree($0).trailParent(of: itemID) }
+    }
+
+    /// Back with no page left: shows the tab that opened `itemID` and closes it, as Safari and
+    /// Zen do. Reopen Closed Tab brings it back.
+    public func returnToOpener(_ itemID: UUID, in window: BrowserWindowState) {
+        guard let opener = opener(of: itemID) else { return }
+        select(opener, in: window)
+        close(itemID)
+    }
+
     /// Restores the newest closed entry and selects it. A private window reopens from its own
     /// in-memory history.
     public func reopenLastClosed(in window: BrowserWindowState) {

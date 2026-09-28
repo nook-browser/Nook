@@ -111,8 +111,8 @@ struct TopBarView: View {
                     shouldAnimateColorChange ? NookDesign.Motion.standard : nil,
                     value: navButtonColor
                 )
-                .disabled(!(session?.canGoBack ?? false))
-                .opacity((session?.canGoBack ?? false) ? 1.0 : 0.4)
+                .disabled(!(session?.canGoBackOrReturn ?? false))
+                .opacity((session?.canGoBackOrReturn ?? false) ? 1.0 : 0.4)
                 .contextMenu {
                     NavigationHistoryContextMenu(
                         historyType: .back,
@@ -237,7 +237,7 @@ struct TopBarView: View {
     }
 
     private func goBack() {
-        if let webView = windowWebView { webView.goBack() } else { session?.goBack() }
+        session?.goBack(in: windowWebView)
     }
 
     private func goForward() {

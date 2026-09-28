@@ -374,6 +374,21 @@ extension PageSession: WKNavigationDelegate {
             }
         }
 
+        // A favorite or pinned tab stays on its site: a clicked link to another site opens in Peek,
+        // as its target=_blank links do. Sign-in pages still load here so the login lands in the tab.
+        if navigationAction.navigationType == .linkActivated,
+           navigationAction.targetFrame?.isMainFrame == true, !isDetached,
+           let url = navigationAction.request.url, !OAuthDetector.isLikelyOAuthURL(url),
+           shouldRedirectToPeek(url: url)
+        {
+            decisionHandler(.cancel)
+            RunLoop.current.perform { [weak self] in
+                guard let self else { return }
+                self.controller?.sessionDelegate?.presentPeek(url: url, from: self)
+            }
+            return
+        }
+
         decisionHandler(.allow)
     }
 

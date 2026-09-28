@@ -175,6 +175,8 @@ public final class PageSession: NSObject, Identifiable {
 
     // MARK: - Internal State
 
+    /// Back and forward history kept across an unload, so the next view comes back with it.
+    @ObservationIgnored var savedHistory: Any?
     /// One-shot initial-navigation suppression for a WebKit-created popup.
     @ObservationIgnored var isPopupHost: Bool = false
     /// JavaScript dialogs since the last commit, and whether the user silenced the page.
@@ -338,7 +340,13 @@ public final class PageSession: NSObject, Identifiable {
         // navigation; any replacement view must load the saved URL.
         let shouldLoadInitialURL = !isPopupHost
         isPopupHost = false
-        if shouldLoadInitialURL {
+        let history = savedHistory
+        savedHistory = nil
+        if shouldLoadInitialURL, let history {
+            webView.interactionState = history
+            // Restoring shows the cached copy, as Back does; reload revalidates it like a fresh load.
+            if webView.reload() == nil { load(url) }
+        } else if shouldLoadInitialURL {
             load(url)
         }
     }
@@ -395,6 +403,9 @@ public final class PageSession: NSObject, Identifiable {
         let interval = BrowserPerformance.signposter.beginInterval("TabEviction")
         defer { BrowserPerformance.signposter.endInterval("TabEviction", interval) }
         let primary = primaryWebView
+        if let primary, primary.backForwardList.currentItem != nil {
+            savedHistory = primary.interactionState
+        }
         let coordinator = controller?.webViews
         let primaryIsPooled = primary.map { view in
             coordinator?.allWebViews(for: itemID).contains(where: { $0 === view }) == true
@@ -424,6 +435,7 @@ public final class PageSession: NSObject, Identifiable {
     func tearDown() {
         hasPiPActive = false
         unload()
+        savedHistory = nil
         isAudioMuted = false
         controller?.sessionDelegate?.cleanupZoom(for: itemID)
         if webStoreHandler != nil {
@@ -480,6 +492,8 @@ public final class PageSession: NSObject, Identifiable {
 
     public func load(_ newURL: URL) {
         url = newURL
+        // A new page on an unloaded session starts fresh instead of restoring, then leaving, the old one.
+        savedHistory = nil
         loadingState = .didStartProvisionalNavigation
 
         // Grant extension access before loading so content scripts inject at document_start.
@@ -509,10 +523,18 @@ public final class PageSession: NSObject, Identifiable {
         load(validURL)
     }
 
-    public func goBack() {
-        guard canGoBack else { return }
-        primaryWebView?.goBack()
+    /// Back in `view`, one window's view of this page (the primary by default). With no page left
+    /// to go back to, the tab closes and the tab that opened it shows.
+    public func goBack(in view: WKWebView? = nil) {
+        if let view = view ?? primaryWebView, view.canGoBack {
+            view.goBack()
+        } else if !canGoBack, let controller, let window = controller.window(for: self) {
+            controller.returnToOpener(itemID, in: window)
+        }
     }
+
+    /// Whether Back does anything: history to go back through, or a tab to return to.
+    public var canGoBackOrReturn: Bool { canGoBack || controller?.opener(of: itemID) != nil }
 
     public func goForward() {
         guard canGoForward else { return }
@@ -760,7 +782,7 @@ public final class PageSession: NSObject, Identifiable {
 
     // MARK: - Opening links
 
-    /// Opens `url` in a background tab in this page's window and space, as a child of this tab
+    /// Opens `url` in a new tab, in the background unless `foreground`, in this page's window and space, as a child of this tab
     /// (a trail). Used by "Open Link in New Tab" in the context menu, a middle click and a
     /// Command-click on a link.
     /// A private window's own tree keeps the link inside that window.
@@ -769,10 +791,10 @@ public final class PageSession: NSObject, Identifiable {
     /// than at each caller: a page must not be able to talk Nook into opening a tab on
     /// `javascript:`, `data:` or `file:`.
     /// ponytail: http(s) only. Widen if someone reports a legitimate scheme.
-    public func openInNewTab(_ url: URL) {
+    public func openInNewTab(_ url: URL, foreground: Bool = false) {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
         guard let tabs = controller, let window = tabs.window(for: self) else { return }
-        tabs.open(url: url, in: window, placement: .background, from: itemID)
+        tabs.open(url: url, in: window, placement: foreground ? .newTab : .background, from: itemID)
     }
 
     // MARK: - Equality
