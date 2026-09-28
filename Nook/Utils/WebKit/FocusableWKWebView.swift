@@ -93,6 +93,34 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
         }
     }
 
+    /// With navigation gestures on and no back item, WebKit bounces the page's back edge whatever
+    /// its edge setting, which uses up the swipe before `PageSession`'s
+    /// `_webView:didNotHandleWheelEvent:` can see it. For a swipe back on a page opened from another
+    /// tab, gestures go off and that edge stays still, the state a page with history is in; a
+    /// carousel still scrolls. Only swipes back toggle it, so page snapshots keep recording.
+    override func scrollWheel(with event: NSEvent) {
+        if event.phase == .began {
+            let rightToLeft = userInterfaceLayoutDirection == .rightToLeft
+            let isSwipeBack = abs(event.scrollingDeltaY) < abs(event.scrollingDeltaX) / 2
+                && (rightToLeft ? event.scrollingDeltaX < 0 : event.scrollingDeltaX > 0)
+            let returnsToOpener = isSwipeBack && !canGoBack && owningSession?.canGoBackOrReturn == true
+            if allowsBackForwardNavigationGestures == returnsToOpener {
+                allowsBackForwardNavigationGestures = !returnsToOpener
+            }
+            let backEdge: UInt = rightToLeft ? 4 : 1  // _WKRectEdgeRight, _WKRectEdgeLeft
+            setRubberBandingEdges(returnsToOpener ? 15 & ~backEdge : 15)  // 15: _WKRectEdgeAll, WebKit's default
+        }
+        super.scrollWheel(with: event)
+    }
+
+    /// `_setRubberBandingEnabled:`, private.
+    private func setRubberBandingEdges(_ edges: UInt) {
+        let selector = NSSelectorFromString("_setRubberBandingEnabled:")
+        guard responds(to: selector) else { return }
+        typealias Setter = @convention(c) (AnyObject, Selector, UInt) -> Void
+        unsafeBitCast(method(for: selector), to: Setter.self)(self, selector, edges)
+    }
+
     /// `_setIgnoresNonWheelEvents:`, private; also stops WebKit's post-scroll fake mouse moves.
     private func setIgnoresNonWheelEvents(_ ignores: Bool) {
         let selector = NSSelectorFromString("_setIgnoresNonWheelEvents:")
