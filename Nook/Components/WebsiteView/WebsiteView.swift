@@ -619,6 +619,12 @@ struct TabCompositorWrapper: NSViewRepresentable {
         let selected = tabs.selectedSession(in: windowState)
         let split = browserManager.splitManager
 
+        // While fullscreen, WebKit's window holds the page and leaves a placeholder here. Moving
+        // either strands the page off screen when fullscreen ends, still playing.
+        let pages = [selected] + [split.leftTabId(for: windowState.id), split.rightTabId(for: windowState.id)]
+            .map { $0.flatMap(tabs.session(for:)) }
+        if pages.contains(where: { ($0?.webView?.fullscreenState ?? .notInFullscreen) != .notInFullscreen }) { return }
+
         // Identify overlay (always preserved)
         let overlay = containerView.subviews.compactMap { $0 as? SplitDropCaptureView }.first
         // Content subviews = everything except the overlay

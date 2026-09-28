@@ -605,6 +605,7 @@ public final class PageSession: NSObject, Identifiable {
             webView.addObserver(self, forKeyPath: "canGoBack", options: [.new, .initial], context: nil)
             webView.addObserver(self, forKeyPath: "canGoForward", options: [.new, .initial], context: nil)
             webView.addObserver(self, forKeyPath: "title", options: [.new], context: nil)
+            webView.addObserver(self, forKeyPath: "fullscreenState", options: [.new], context: nil)
             // No URL observer: it fired during setup and overwrote restored URLs.
             // didCommit/didFinish own URL updates.
             navigationStateObservedWebViews.add(webView)
@@ -616,6 +617,7 @@ public final class PageSession: NSObject, Identifiable {
             webView.removeObserver(self, forKeyPath: "canGoBack")
             webView.removeObserver(self, forKeyPath: "canGoForward")
             webView.removeObserver(self, forKeyPath: "title")
+            webView.removeObserver(self, forKeyPath: "fullscreenState")
             navigationStateObservedWebViews.remove(webView)
         }
     }
@@ -640,6 +642,9 @@ public final class PageSession: NSObject, Identifiable {
             if let newTitle = webView.title, !newTitle.isEmpty, newTitle != title {
                 updateTitle(newTitle)
             }
+        } else if keyPath == "fullscreenState", let webView = object as? WKWebView {
+            // The compositor skips its passes while fullscreen; catch up once the page is back.
+            if webView.fullscreenState == .notInFullscreen { controller?.refreshWindows(showing: itemID) }
         } else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
         }
