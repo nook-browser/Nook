@@ -27,8 +27,8 @@ youtube.com##ytd-in-feed-ad-layout-renderer
 youtube.com##ytd-banner-promo-renderer
 youtube.com##.ytp-ad-overlay-container
 youtube.com##.ytp-ad-text-overlay
-youtube.com##.video-ads
-youtube.com###player-ads
+! YouTube's ad-block check plants div#player-ads.ytd-merch-shelf-renderer.ytp-featured-product
+! baits and reads their display: hide YouTube elements by tag name, never by that id or classes.
 youtube.com###masthead-ad
 youtube.com##ytd-promoted-sparkles-web-renderer
 youtube.com##ytd-promoted-video-renderer
@@ -43,7 +43,7 @@ youtube.com##ytd-display-ad-renderer
 youtube.com##ytd-statement-banner-renderer
 youtube.com##ytd-compact-promoted-item-renderer
 youtube.com##ytd-promoted-sparkles-text-search-renderer
-youtube.com##.ytd-merch-shelf-renderer
+youtube.com##ytd-merch-shelf-renderer
 youtube.com##ytd-action-companion-ad-renderer
 youtube.com##ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"]
 youtube.com##ytd-player-legacy-desktop-watch-ads-renderer

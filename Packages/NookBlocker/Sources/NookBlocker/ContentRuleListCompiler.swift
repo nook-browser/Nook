@@ -82,9 +82,7 @@ final class ContentRuleListCompiler {
 
         cbLog.info("adblock-rust: \(rules.count) source, \(converted.ruleCount) safari, \(converted.skippedCount) skipped (cancel other rules), \(converted.unconvertedCount) no Safari equivalent")
 
-        // Prepend built-in YouTube rules
-        var allEntries = converted.entries
-        allEntries.insert(contentsOf: youTubeNetworkRules(), at: 0)
+        let allEntries = converted.entries
 
         // Remove old rule lists
         await removeOldRuleLists(store: store)
@@ -235,32 +233,5 @@ final class ContentRuleListCompiler {
                 cont.resume(returning: list)
             }
         }
-    }
-
-    // MARK: - Built-in YouTube Rules
-
-    private static func youTubeNetworkRules() -> [[String: Any]] {
-        let ytDomain = ["*youtube.com", "*youtu.be"]
-        return [
-            ["trigger": ["url-filter": "googlevideo\\.com/initplayback.*adsp", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "block"] as [String: Any]],
-            ["trigger": ["url-filter": "/pagead/", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "block"] as [String: Any]],
-            ["trigger": ["url-filter": "/api/stats/ads", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "block"] as [String: Any]],
-            ["trigger": ["url-filter": "/get_midroll_info", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "block"] as [String: Any]],
-            ["trigger": ["url-filter": "doubleclick\\.net", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "block"] as [String: Any]],
-            ["trigger": ["url-filter": "googleadservices\\.com", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "block"] as [String: Any]],
-            ["trigger": ["url-filter": "/youtubei/v1/player/ad_break", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "block"] as [String: Any]],
-            ["trigger": ["url-filter": "youtube\\.com/ptracking", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "block"] as [String: Any]],
-            ["trigger": ["url-filter": ".*", "if-domain": ytDomain] as [String: Any],
-             "action": ["type": "css-display-none",
-                        "selector": "ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-banner-promo-renderer, ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer, #masthead-ad, #player-ads, .video-ads, ytd-rich-item-renderer:has(ytd-ad-slot-renderer)"] as [String: Any]],
-        ]
     }
 }

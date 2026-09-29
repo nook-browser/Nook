@@ -49,10 +49,10 @@ public final class FilterListManager {
         FilterList(name: "EasyList", url: URL(string: "https://easylist.to/easylist/easylist.txt")!, filename: "easylist.txt", knownSizeRange: 100_000...10_000_000, category: .ads),
         FilterList(name: "EasyPrivacy", url: URL(string: "https://easylist.to/easylist/easyprivacy.txt")!, filename: "easyprivacy.txt", knownSizeRange: 50_000...5_000_000, category: .privacy),
         FilterList(name: "Peter Lowe's", url: URL(string: "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext")!, filename: "peter-lowes.txt", knownSizeRange: 10_000...2_000_000, category: .ads),
-        FilterList(name: "uBlock Filters", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt")!, filename: "ublock-filters.txt", knownSizeRange: 50_000...5_000_000, category: .ads, isTrusted: true),
+        FilterList(name: "uBlock Filters", url: URL(string: "https://ublockorigin.github.io/uAssetsCDN/filters/filters.min.txt")!, filename: "ublock-filters.min.txt", knownSizeRange: 50_000...5_000_000, category: .ads, isTrusted: true),
         FilterList(name: "uBlock Unbreak", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/unbreak.txt")!, filename: "ublock-unbreak.txt", knownSizeRange: 5_000...2_000_000, category: .ads, isTrusted: true),
         FilterList(name: "uBlock Badware", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt")!, filename: "ublock-badware.txt", knownSizeRange: 5_000...2_000_000, category: .malware, isTrusted: true),
-        FilterList(name: "uBlock Privacy", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt")!, filename: "ublock-privacy.txt", knownSizeRange: 5_000...2_000_000, category: .privacy, isTrusted: true),
+        FilterList(name: "uBlock Privacy", url: URL(string: "https://ublockorigin.github.io/uAssetsCDN/filters/privacy.min.txt")!, filename: "ublock-privacy.min.txt", knownSizeRange: 5_000...2_000_000, category: .privacy, isTrusted: true),
         FilterList(name: "uBlock Quick Fixes", url: URL(string: "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/quick-fixes.txt")!, filename: "ublock-quick-fixes.txt", knownSizeRange: 1_000...2_000_000, category: .ads, isTrusted: true),
         FilterList(name: "AdGuard URL Tracking Protection", url: URL(string: "https://filters.adtidy.org/extension/ublock/filters/17.txt")!, filename: "adguard-url-tracking.txt", knownSizeRange: 20_000...5_000_000, category: .privacy),
         FilterList(name: "Online Malicious URL Blocklist", url: URL(string: "https://malware-filter.gitlab.io/malware-filter/urlhaus-filter-online.txt")!, filename: "urlhaus-filter.txt", knownSizeRange: 10_000...5_000_000, category: .malware),
@@ -182,7 +182,7 @@ public final class FilterListManager {
         var sources: [Source] = []
         for list in Self.defaultLists + optional {
             if let content = loadCachedList(list) {
-                sources.append(Source(rules: content, isTrusted: list.isTrusted))
+                sources.append(Source(rules: FilterPreprocessor.apply(content), isTrusted: list.isTrusted))
             }
         }
         for name in Self.bundledOnlyLists {
@@ -381,8 +381,8 @@ public final class FilterListManager {
         var suspiciousCount = 0
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            // Skip comment lines and standard filter rules
-            if trimmed.hasPrefix("!") || trimmed.hasPrefix("#") { continue }
+            // Skip comments and scriptlet rules (`##+js(`, `#@#+js(`)
+            if trimmed.hasPrefix("!") || trimmed.hasPrefix("#") || trimmed.contains("#+js(") { continue }
             // Check non-filter-rule lines for suspicious content
             for pattern in suspiciousPatterns {
                 if trimmed.contains(pattern) {

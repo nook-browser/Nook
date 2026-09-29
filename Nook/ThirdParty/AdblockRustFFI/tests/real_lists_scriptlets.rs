@@ -15,7 +15,7 @@ fn res_dir() -> std::path::PathBuf {
 }
 
 const TRUSTED_LISTS: &[&str] = &[
-    "ublock-filters", "ublock-privacy", "ublock-badware",
+    "ublock-filters.min", "ublock-privacy.min", "ublock-badware",
     "ublock-quick-fixes", "ublock-unbreak", "nook-filters-default",
 ];
 
