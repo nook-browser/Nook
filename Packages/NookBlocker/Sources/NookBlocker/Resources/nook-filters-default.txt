@@ -86,8 +86,6 @@ instagram.com##div[role="dialog"]:has(a[href*="/ads/about"])
 
 ! === TWITTER / X ===
 
-twitter.com##article:has(div[data-testid="placementTracking"])
-x.com##article:has(div[data-testid="placementTracking"])
 twitter.com,x.com##+js(json-prune-fetch-response, data.timeline_by_id.timeline.instructions.[-].entries.[-].content.itemContent.promotedMetadata, , url:/graphql/)
 
 ! === REDDIT ===

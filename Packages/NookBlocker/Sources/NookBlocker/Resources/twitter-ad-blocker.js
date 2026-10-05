@@ -90,9 +90,11 @@
     var hidesBefore = hiddenCount;
 
     // Strategy 1: placementTracking containers (most reliable)
-    // Twitter wraps promoted content in elements with this data-testid
+    // Twitter wraps promoted content in elements with this data-testid.
+    // Inside a post it wraps any video player instead, so skip those.
     var trackingEls = document.querySelectorAll('[data-testid="placementTracking"]');
     for (var i = 0; i < trackingEls.length; i++) {
+      if (trackingEls[i].closest('article')) continue;
       var cell = getCellContainer(trackingEls[i]);
       if (cell && !processedCells.has(cell)) {
         var article = cell.querySelector(TWEET_SEL);
@@ -109,9 +111,6 @@
       var cell = getCellContainer(article);
       if (!cell || processedCells.has(cell)) continue;
 
-      // Get the tweet text container to exclude it from badge search
-      var tweetText = article.querySelector(TWEET_TEXT_SEL);
-
       // Scan all leaf-level spans for ad badge text
       var spans = article.querySelectorAll('span');
       for (var k = 0; k < spans.length; k++) {
@@ -122,8 +121,8 @@
         var text = span.textContent;
         if (!text || text.length > 20) continue;
 
-        // Skip spans inside the actual tweet text
-        if (tweetText && tweetText.contains(span)) continue;
+        // Skip spans inside post text, including a quoted post's
+        if (span.closest(TWEET_TEXT_SEL)) continue;
 
         if (isAdLabel(text)) {
           // Additional validation: the ad badge is usually NOT inside
