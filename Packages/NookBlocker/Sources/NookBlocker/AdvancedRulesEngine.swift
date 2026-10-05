@@ -73,7 +73,7 @@ public final class AdvancedRulesEngine {
         // The redirect table rides in the same script. Both are per-navigation
         // main-frame state, and a second script would be one more thing to strip
         // and re-add every time the blocker is toggled.
-        var redirects = "[]"
+        var redirects = "null"
         let applicable = Self.redirects(for: pageUrl)
         if !applicable.isEmpty,
            let data = try? JSONSerialization.data(withJSONObject: applicable),
@@ -134,18 +134,21 @@ public final class AdvancedRulesEngine {
         return host == entry || host.hasSuffix("." + entry)
     }
 
-    /// The rules that can fire on this page, bodies resolved. Most of the 600-odd
-    /// rules are domain-scoped, so a page usually gets the global ones and no more.
-    static func redirects(for pageUrl: URL) -> [[Any]] {
-        guard let table = redirectTable, let host = pageUrl.host?.lowercased() else { return [] }
-        var out: [[Any]] = []
+    /// The rules that can fire on this page, as `rules: [[regex, resource, types]]`
+    /// plus each named resource's body once. Most of the 900-odd rules are
+    /// domain-scoped, so a page usually gets the global ones and no more.
+    static func redirects(for pageUrl: URL) -> [String: Any] {
+        guard let table = redirectTable, let host = pageUrl.host?.lowercased() else { return [:] }
+        var rules: [[Any]] = []
+        var bodies: [String: String] = [:]
         for rule in table.rules {
             if let excluded = rule.x, excluded.contains(where: { hostMatches(host, $0) }) { continue }
             if let domains = rule.d, !domains.contains(where: { hostMatches(host, $0) }) { continue }
             guard let body = table.bodies[rule.r] else { continue }
-            out.append([rule.p, body, rule.t ?? []])
+            rules.append([rule.p, rule.r, rule.t ?? []])
+            bodies[rule.r] = body
         }
-        return out
+        return rules.isEmpty ? [:] : ["rules": rules, "bodies": bodies]
     }
 
     // MARK: - Static scripts (identical for every webview)

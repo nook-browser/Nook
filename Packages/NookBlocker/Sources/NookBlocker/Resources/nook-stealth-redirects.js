@@ -28,14 +28,16 @@
   if (window.__nookStealthRedirectsLoaded) return;
   window.__nookStealthRedirectsLoaded = true;
 
-  // [regexSource, dataURL, [requestType, ...]]
-  const TABLE = Array.isArray(window.__nookRedirects) ? window.__nookRedirects : [];
-  if (TABLE.length === 0) return;
+  // { rules: [[regexSource, resourceName, [requestType, ...]]], bodies: { resourceName: dataURL } }
+  const TABLE = window.__nookRedirects;
+  if (!TABLE || !Array.isArray(TABLE.rules) || !TABLE.bodies) return;
 
   const compiled = [];
-  for (let i = 0; i < TABLE.length; i++) {
+  for (let i = 0; i < TABLE.rules.length; i++) {
+    const [source, name, types] = TABLE.rules[i];
+    if (!TABLE.bodies[name]) continue;
     try {
-      compiled.push([new RegExp(TABLE[i][0]), TABLE[i][1], TABLE[i][2] || []]);
+      compiled.push([new RegExp(source), TABLE.bodies[name], types || []]);
     } catch (e) { /* a pattern JavaScriptCore will not take is simply skipped */ }
   }
 

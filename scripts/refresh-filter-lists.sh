@@ -28,3 +28,8 @@ for entry in "${LISTS[@]}"; do
   mv "$tmp" "$DEST/$name"
   echo "$name $(wc -c < "$DEST/$name") bytes"
 done
+
+# The stealth redirect table is generated from these lists, so it must follow them.
+cd "$(dirname "$0")/.."
+node scripts/build-redirects.mjs
+node scripts/check-redirects.mjs

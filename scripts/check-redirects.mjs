@@ -29,11 +29,21 @@ assert(Object.values(bodies).every(b => b.startsWith('data:')), 'bodies must be 
 assert(!rules.some(r => /html-load|ad-shield/i.test(r.p)),
   'Ad-Shield validates its payload and must never be answered');
 
+// YouTube reports a failed XHR to doubleclick's biscotti endpoint as an ad blocker,
+// and throttles playback for it. uBO answers that XHR; so must every page here.
+assert(hit('https://googleads.g.doubleclick.net/pagead/id', r => !r.d && r.r === 'noop.txt' && r.t?.includes('xhr')),
+  'a global doubleclick xhr rule must answer YouTube\'s biscotti probe');
+
 // The matcher itself, against a table shaped like the one Swift emits.
-const table = [
-  ['^https?://([^/?#]+\\.)?ads\\.example\\.com/gpt\\.js', bodies[Object.keys(bodies)[0]], ['script']],
-  ['^https?://([^/?#]+\\.)?pix\\.example\\.com/p\\.gif', 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==', ['image']],
-];
+const gif = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+const table = {
+  rules: [
+    ['^https?://([^/?#]+\\.)?ads\\.example\\.com/gpt\\.js', 'shim', ['script']],
+    ['^https?://([^/?#]+\\.)?pix\\.example\\.com/p\\.gif', 'gif', ['image']],
+    ['^https?://([^/?#]+\\.)?gone\\.example\\.com/', 'missing', []],
+  ],
+  bodies: { shim: bodies[Object.keys(bodies)[0]], gif },
+};
 const sandbox = {
   window: { __nookRedirects: table },
   document: { baseURI: 'https://site.example/' },
@@ -50,11 +60,12 @@ const src = readFileSync(res + 'nook-stealth-redirects.js', 'utf8')
 vm.runInContext(src, sandbox);
 const { bodyFor, decode } = sandbox.window.__test;
 
-assert.strictEqual(bodyFor('https://ads.example.com/gpt.js', 'script'), table[0][1], 'script rule must fire');
+assert.strictEqual(bodyFor('https://ads.example.com/gpt.js', 'script'), table.bodies.shim, 'script rule must fire');
 assert.strictEqual(bodyFor('https://ads.example.com/gpt.js', 'image'), null, 'request type must be honoured');
 assert.strictEqual(bodyFor('https://unrelated.example/app.js', 'script'), null, 'unrelated URL must pass through');
+assert.strictEqual(bodyFor('https://gone.example.com/x', 'xhr'), null, 'a rule without a body must not fire');
 assert.strictEqual(bodyFor('data:text/html,x', 'script'), null, 'non-http schemes are not ours');
-assert.strictEqual(decode(table[1][1]).mime, 'image/gif', 'mime must survive the round trip');
-assert(decode(table[0][1]).text.length > 0, 'a real shim must decode to a body');
+assert.strictEqual(decode(table.bodies.gif).mime, 'image/gif', 'mime must survive the round trip');
+assert(decode(table.bodies.shim).text.length > 0, 'a real shim must decode to a body');
 
 console.log(`${rules.length} rules, ${Object.keys(bodies).length} bodies, all redirect checks passed`);
