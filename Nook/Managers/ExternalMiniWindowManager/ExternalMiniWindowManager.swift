@@ -38,15 +38,14 @@ final class ExternalMiniWindowManager {
 
     func present(_ page: PageSession) {
         guard let browserManager else { return }
+        let tabs = browserManager.tabs
+        let target = browserManager.windowRegistry?.activeWindow?.spaceID.flatMap { tabs.space($0) }
+            ?? tabs.orderedSpaces.first
         let controller = MiniBrowserWindowController(
             page: page,
-            targetSpaceName: {
-                let tabs = browserManager.tabs
-                let space = browserManager.windowRegistry?.activeWindow?.spaceID.flatMap { tabs.space($0) }
-                    ?? tabs.orderedSpaces.first
-                return space?.name ?? "Current Space"
-            }(),
-            adoptAction: { [weak self] in self?.adopt(page) },
+            targetSpaceName: target?.name ?? "Current Space",
+            otherSpaces: tabs.orderedSpaces.filter { $0.id != target?.id }.map { ($0.id, $0.name) },
+            adoptAction: { [weak self] spaceID in self?.adopt(page, in: spaceID) },
             onClose: { [weak self, weak browserManager] in
                 self?.controllers[page.itemID] = nil
                 browserManager?.tabs.endDetached(page)
@@ -59,8 +58,11 @@ final class ExternalMiniWindowManager {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func adopt(_ page: PageSession) {
+    /// Into the active window's space, or into `spaceID`, which the window switches to first.
+    /// Another space has its own data store, so the page opens there fresh.
+    private func adopt(_ page: PageSession, in spaceID: UUID? = nil) {
         guard let browserManager, let window = browserManager.windowRegistry?.activeWindow else { return }
+        if let spaceID { browserManager.tabs.setSpace(spaceID, in: window) }
         browserManager.tabs.adopt(page, in: window)
         controllers[page.itemID]?.close()
     }
@@ -92,7 +94,8 @@ final class MiniBrowserWindow: NSWindow {
 final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
     private let page: PageSession
     private let targetSpaceName: String
-    private let adoptAction: () -> Void
+    private let otherSpaces: [(id: UUID, name: String)]
+    private let adoptAction: (UUID?) -> Void
     private let onClose: () -> Void
     private var titleObserver: AnyCancellable?
 
@@ -109,11 +112,13 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     init(
-        page: PageSession, targetSpaceName: String, adoptAction: @escaping () -> Void,
-        onClose: @escaping () -> Void, gradientColorManager: GradientColorManager
+        page: PageSession, targetSpaceName: String, otherSpaces: [(id: UUID, name: String)],
+        adoptAction: @escaping (UUID?) -> Void, onClose: @escaping () -> Void,
+        gradientColorManager: GradientColorManager
     ) {
         self.page = page
         self.targetSpaceName = targetSpaceName
+        self.otherSpaces = otherSpaces
         self.adoptAction = adoptAction
         self.onClose = onClose
 
@@ -139,7 +144,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
 
         window.delegate = self
-        window.openInSpaceAction = adoptAction
+        window.openInSpaceAction = { adoptAction(nil) }
         window.subtitle = page.profile?.name ?? "Default"
         installToolbar(on: window)
         observeNavigationState(for: window)
@@ -159,7 +164,11 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func openInSpace(_ sender: Any?) {
-        adoptAction()
+        adoptAction(nil)
+    }
+
+    @objc private func openInOtherSpace(_ sender: NSMenuItem) {
+        adoptAction(sender.representedObject as? UUID)
     }
 
     // MARK: - Toolbar
@@ -206,7 +215,22 @@ extension MiniBrowserWindowController: NSToolbarDelegate {
             item.toolTip = "Share"
             return item
         case .miniOpenInSpace:
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            // A split button when there are other spaces: the button opens here, its menu elsewhere.
+            let item: NSToolbarItem
+            if otherSpaces.isEmpty {
+                item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            } else {
+                let menuItem = NSMenuToolbarItem(itemIdentifier: itemIdentifier)
+                let menu = NSMenu()
+                for space in otherSpaces {
+                    let entry = NSMenuItem(title: "Open in \(space.name)", action: #selector(openInOtherSpace(_:)), keyEquivalent: "")
+                    entry.target = self
+                    entry.representedObject = space.id
+                    menu.addItem(entry)
+                }
+                menuItem.menu = menu
+                item = menuItem
+            }
             item.title = "Open in \(targetSpaceName)"
             item.toolTip = "Open this page as a tab in \(targetSpaceName) (⌘O)"
             item.isBordered = true

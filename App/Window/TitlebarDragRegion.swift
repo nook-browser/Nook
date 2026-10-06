@@ -16,11 +16,15 @@ enum TitlebarDragRegion {
     private static let selector = NSSelectorFromString("_regionForOpaqueDescendants:forMove:forUnderTitlebar:")
     private typealias RegionIMP = @convention(c) (AnyObject, Selector, NSRect, Bool, Bool) -> OpaquePointer?
     @MainActor private static var patched = Set<Method>()
+    /// Every NSHostingView specialization shares one Method, so the patch reaches every SwiftUI
+    /// window; only these keep the AppKit answer. The mini window's page runs under its toolbar
+    /// and would block the whole band.
+    nonisolated(unsafe) private static let browserWindows = NSHashTable<NSWindow>.weakObjects()
 
-    /// Once per hosting class: every SwiftUI root view type is its own class with its own copy of
-    /// the method. A class that does not override NSView's answer, or whose method has another
+    /// A hosting view that does not override NSView's answer, or whose method has another
     /// signature, is left alone, and the band drags the window as it did before.
     @MainActor static func letAppKitViewsBlockDrags(in window: NSWindow) {
+        browserWindows.add(window)
         guard let root = window.contentView,
               let method = class_getInstanceMethod(type(of: root), selector),
               let appKitMethod = class_getInstanceMethod(NSView.self, selector),
@@ -36,7 +40,8 @@ enum TitlebarDragRegion {
         let selector = selector
         // Only the title band changes; SwiftUI keeps answering for the rest of the window.
         let answer: @convention(block) (AnyObject, NSRect, Bool, Bool) -> OpaquePointer? = { view, rect, forMove, underTitlebar in
-            (underTitlebar ? appKit : swiftUI)(view, selector, rect, forMove, underTitlebar)
+            let browser = underTitlebar && browserWindows.contains((view as? NSView)?.window)
+            return (browser ? appKit : swiftUI)(view, selector, rect, forMove, underTitlebar)
         }
         method_setImplementation(method, imp_implementationWithBlock(answer))
         patched.insert(method)
