@@ -442,7 +442,7 @@ private struct ExtensionGridItem: View {
             }
         }
 
-        let adapter = currentTab.flatMap { ExtensionManager.shared.adapter(for: $0.itemID) }
+        let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
         ctx.performAction(for: adapter)
     }
 
@@ -451,7 +451,7 @@ private struct ExtensionGridItem: View {
             badgeText = nil
             return
         }
-        let adapter = currentTab.flatMap { ExtensionManager.shared.adapter(for: $0.itemID) }
+        let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
         badgeText = ctx.action(for: adapter)?.badgeText
     }
 }

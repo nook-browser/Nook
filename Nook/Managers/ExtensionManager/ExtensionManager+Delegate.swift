@@ -26,7 +26,7 @@ extension ExtensionManager {
         completionHandler: @escaping (Error?) -> Void
     ) {
         let extName = extensionContext.webExtension.displayName ?? "?"
-        Self.logger.info("presentActionPopup for '\(extName, privacy: .public)'")
+        Self.logger.notice("presentActionPopup for '\(extName, privacy: .public)'")
 
         // Permissions were granted when the context loaded. Optional permissions stay
         // behind chrome.permissions.request(); opening a popup does not grant them.
@@ -101,6 +101,9 @@ extension ExtensionManager {
                 // Clean up stale anchors (no view OR no window)
                 anchors.removeAll { $0.view == nil || $0.view?.window == nil }
                 self.actionAnchors[extId] = anchors
+                // A button in a collapsed sidebar or hidden top bar stays in the window; a popover
+                // shown from it never appears.
+                anchors.removeAll { $0.view?.isHiddenOrHasHiddenAncestor != false || $0.view?.bounds.isEmpty != false }
                 Self.logger.debug("   📌 After cleanup: \(anchors.count) anchors")
 
                 // Find anchor in current window
@@ -114,6 +117,7 @@ extension ExtensionManager {
                         of: view,
                         preferredEdge: .maxY
                     )
+                    Self.logger.notice("Popup shown at key window anchor, shown=\(popover.isShown)")
                     focusPopupWebView()
                     completionHandler(nil)
                     return
@@ -128,6 +132,7 @@ extension ExtensionManager {
                         of: view,
                         preferredEdge: .maxY
                     )
+                    Self.logger.notice("Popup shown at another window's anchor, shown=\(popover.isShown), visible=\(view.window?.isVisible == true)")
                     focusPopupWebView()
                     completionHandler(nil)
                     return
@@ -149,6 +154,7 @@ extension ExtensionManager {
                     of: contentView,
                     preferredEdge: .minY
                 )
+                Self.logger.notice("Popup shown at window center, shown=\(popover.isShown)")
                 focusPopupWebView()
                 completionHandler(nil)
                 return
@@ -492,8 +498,8 @@ extension ExtensionManager {
                 // When isSafariApi=true and chrome.browserAction.openPopup() is unavailable,
                 // Bitwarden sends this to open its action popup.
                 Self.logger.info("[NativeMessaging] Intercepting showPopover for '\(extensionContext.webExtension.displayName ?? "?", privacy: .public)'")
-                let session = browserManagerRef?.tabs.activeWindowSession
-                extensionContext.performAction(for: session.flatMap { adapter(for: $0.itemID) })
+                let window = browserManagerRef?.windowRegistry?.activeWindow
+                extensionContext.performAction(for: window.flatMap { actionAdapter(in: $0) })
                 replyHandler(["success": true], nil)
                 return
 
@@ -679,8 +685,8 @@ extension ExtensionManager {
                     port.sendMessage(["command": command, "text": text] as [String: Any]) { _ in }
 
                 case "showPopover":
-                    let session = self?.browserManagerRef?.tabs.activeWindowSession
-                    extensionContext.performAction(for: session.flatMap { self?.adapter(for: $0.itemID) })
+                    let window = self?.browserManagerRef?.windowRegistry?.activeWindow
+                    extensionContext.performAction(for: window.flatMap { self?.actionAdapter(in: $0) })
                     port.sendMessage(["command": command, "success": true] as [String: Any]) { _ in }
 
                 default:

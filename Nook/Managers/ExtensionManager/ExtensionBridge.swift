@@ -40,13 +40,17 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
         guard let state else { return nil }
         let tabs = browserManager.tabs
+        if let front = ExtensionManager.shared.detachedAdapters(in: state).first(where: { $0.isInFront }) {
+            return front
+        }
         guard let itemID = tabs.selectedItemID(in: state) ?? tabs.displayOrder(in: state).first else { return nil }
         return ExtensionManager.shared.adapter(for: itemID)
     }
 
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
         guard let state else { return [] }
-        return browserManager.tabs.displayOrder(in: state).compactMap { ExtensionManager.shared.adapter(for: $0) }
+        let items = browserManager.tabs.displayOrder(in: state).compactMap { ExtensionManager.shared.adapter(for: $0) }
+        return items + ExtensionManager.shared.detachedAdapters(in: state)
     }
 
     func frame(for extensionContext: WKWebExtensionContext) -> CGRect {
@@ -143,9 +147,13 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     let itemID: UUID
     private unowned let browserManager: BrowserManager
 
-    init(itemID: UUID, browserManager: BrowserManager) {
+    /// Set for a Peek or mini window page, which has no item until it is adopted.
+    private weak var detachedPage: PageSession?
+
+    init(itemID: UUID, browserManager: BrowserManager, detachedPage: PageSession? = nil) {
         self.itemID = itemID
         self.browserManager = browserManager
+        self.detachedPage = detachedPage
         super.init()
     }
 
@@ -158,7 +166,17 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     override var hash: Int { itemID.hashValue }
 
     private var tabs: TabsController { browserManager.tabs }
-    private var session: PageSession? { tabs.session(for: itemID) }
+    private var session: PageSession? { detached ?? tabs.session(for: itemID) }
+
+    /// The page while it is still a Peek or mini window page; nil once adopted as a tab.
+    var detached: PageSession? { detachedPage.flatMap { $0.isDetached ? $0 : nil } }
+
+    /// A detached page is in front when Peek shows it over its window or its mini window is key.
+    var isInFront: Bool {
+        guard let page = detached else { return false }
+        guard let window = page.webView?.window else { return true }
+        return window.isKeyWindow || window.isMainWindow || window === page.detachedWindow?.window
+    }
 
     /// The window this tab belongs to: the focused window when it shows the tab, else any
     /// regular window that shows it, else the focused regular window.
@@ -166,6 +184,9 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         let registry = browserManager.windowRegistry
         let regular = (registry?.allWindows ?? []).filter { $0.privateTree == nil }
         let active = registry?.activeWindow.flatMap { $0.privateTree == nil ? $0 : nil }
+        if let page = detached {
+            return page.detachedWindow.flatMap { $0.privateTree == nil ? $0 : nil } ?? active ?? regular.first
+        }
         let candidates = (active.map { [$0] } ?? []) + regular.filter { $0 !== active }
         return candidates.first { tabs.displayOrder(in: $0).contains(itemID) } ?? active ?? regular.first
     }
@@ -187,12 +208,14 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func isSelected(for extensionContext: WKWebExtensionContext) -> Bool {
-        tabs.activeWindowSession?.itemID == itemID
+        if detached != nil { return isInFront }
+        return tabs.activeWindowSession?.itemID == itemID
     }
 
     func indexInWindow(for extensionContext: WKWebExtensionContext) -> Int {
         guard let window = hostWindow else { return 0 }
-        return tabs.displayOrder(in: window).firstIndex(of: itemID) ?? 0
+        let order = tabs.displayOrder(in: window)
+        return order.firstIndex(of: itemID) ?? (detached != nil ? order.count : 0)
     }
 
     func isLoadingComplete(for extensionContext: WKWebExtensionContext) -> Bool {
@@ -226,6 +249,11 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func activate(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
+        if let page = detached {
+            page.webView?.window?.makeKeyAndOrderFront(nil)
+            completionHandler(nil)
+            return
+        }
         guard let window = hostWindow else {
             completionHandler(error(2, "No window"))
             return
@@ -235,7 +263,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func close(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
-        tabs.close(itemID)
+        if let page = detached { page.onClose?() } else { tabs.close(itemID) }
         completionHandler(nil)
     }
 

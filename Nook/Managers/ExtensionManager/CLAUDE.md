@@ -94,7 +94,7 @@ PageSession.loadWebViewIfNeeded()
 
 `TabsController` sends the rest: `notifyTabActivated` from `select`, `notifyTabClosed(itemID:)` from `endSession` (item closed, pinned page closed), `notifyTabMoved` from `move` (reorder, folder, another space, and `[.pinned]` when the item crosses between the tabs section and pinned/favorites). Window focus and close come from `NSWindow.didBecomeMain` / `willClose` observers in `observeWindowEvents()`; focusing a window activates its selected page.
 
-Activation, move, property-change and close events are forwarded only for items in `openedTabIDs`. Private items never get an adapter (`adapter(for:)` returns nil for anything in a private window's tree), so they are never opened.
+Activation, move, property-change and close events are forwarded only for items in `openedTabIDs`. Peek, mini window and sign-in popup pages get an adapter with no item (`detachedAdapter(for:)`), listed after the host window's tabs and active while in front; `endDetached` closes it. Private items never get an adapter (`adapter(for:)` returns nil for anything in a private window's tree), so they are never opened.
 
 ## Permission Model
 

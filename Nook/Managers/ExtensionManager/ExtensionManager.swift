@@ -216,6 +216,7 @@ final class ExtensionManager: NSObject, ObservableObject,
     // MARK: - NSPopoverDelegate
     
     func popoverDidClose(_ notification: Notification) {
+        Self.logger.notice("Extension popup closed")
         DispatchQueue.main.async {
             self.isPopupActive = false
         }

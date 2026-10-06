@@ -121,7 +121,7 @@ struct ExtensionActionButton: View {
             badgeText = nil
             return
         }
-        let adapter = currentSession.flatMap { ExtensionManager.shared.adapter(for: $0.itemID) }
+        let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
         let action = ctx.action(for: adapter)
         badgeText = action?.badgeText
     }
@@ -129,7 +129,7 @@ struct ExtensionActionButton: View {
     private static let logger = Logger(subsystem: "com.nook.browser", category: "ExtensionAction")
 
     private func showExtensionPopup() {
-        Self.logger.info("Action tapped for '\(self.ext.name, privacy: .public)' id=\(self.ext.id, privacy: .public)")
+        Self.logger.notice("Action tapped for '\(self.ext.name, privacy: .public)' id=\(self.ext.id, privacy: .public)")
 
         guard let extensionContext = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
             Self.logger.error("No extension context for id=\(self.ext.id, privacy: .public). Available: \(ExtensionManager.shared.loadedContextIDs.joined(separator: ", "), privacy: .public)")
@@ -137,30 +137,31 @@ struct ExtensionActionButton: View {
         }
 
         let session = currentSession
-        let adapter = session.flatMap { ExtensionManager.shared.adapter(for: $0.itemID) }
+        let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
 
         // No permission grants here: required permissions were granted at load, site access
         // follows the extension's approved patterns, and activeTab is granted by WebKit on click.
 
-        // Wake background worker and AWAIT it before triggering the action.
-        // MV3 workers auto-terminate after ~5 min; if the popup opens before the
-        // worker is alive, chrome.runtime.sendMessage hangs and the popup shows
-        // a spinner for several seconds.
-        if extensionContext.webExtension.hasBackgroundContent {
-            Task { @MainActor in
-                do {
-                    try await extensionContext.loadBackgroundContent()
-                    Self.logger.debug("Background worker alive for '\(self.ext.name, privacy: .public)'")
-                } catch {
-                    Self.logger.error("Background wake failed: \(error.localizedDescription, privacy: .public)")
-                }
-                Self.logger.info("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
-                extensionContext.performAction(for: adapter)
-            }
-        } else {
-            Self.logger.info("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
+        let perform = {
+            Self.logger.notice("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
             extensionContext.performAction(for: adapter)
         }
+        guard extensionContext.webExtension.hasBackgroundContent else { return perform() }
+
+        // Wait for the background page so the popup does not spin, but never more than 1.5 s:
+        // a background load that fails can leave WebKit's wake callback uncalled, and the click
+        // then did nothing at all.
+        var performed = false
+        let performOnce = { (reason: String) in
+            guard !performed else { return }
+            performed = true
+            if reason != "ready" { Self.logger.notice("Opening popup without background page: \(reason, privacy: .public)") }
+            perform()
+        }
+        extensionContext.loadBackgroundContent { error in
+            DispatchQueue.main.async { performOnce(error.map { "wake failed: \($0.localizedDescription)" } ?? "ready") }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { performOnce("wake timed out") }
     }
 }
 

@@ -15,13 +15,43 @@ extension ExtensionManager {
     /// Called once a session has a web view, before it loads, so content scripts can resolve it.
     func notifyTabOpened(_ session: PageSession) {
         guard !session.isPrivate, let controller = extensionController,
-              !openedTabIDs.contains(session.itemID),
-              let adapter = adapter(for: session.itemID)
+              !openedTabIDs.contains(session.itemID)
         else { return }
+        guard let adapter = session.isDetached ? detachedAdapter(for: session) : adapter(for: session.itemID) else {
+            Self.logger.notice("Page not announced to extensions: no adapter (item \(session.itemID.uuidString, privacy: .public))")
+            return
+        }
         // The window must be known to the controller before its tab.
-        _ = adapter.hostWindow.flatMap { windowAdapter(for: $0) }
+        let window = adapter.hostWindow
+        _ = window.flatMap { windowAdapter(for: $0) }
         openedTabIDs.insert(session.itemID)
         controller.didOpenTab(adapter)
+        // Peek and mini window pages open in front, so they become the active tab.
+        if adapter.detached != nil {
+            notifyTabActivated(new: session, previous: window.flatMap { browserManagerRef?.tabs.selectedSession(in: $0) })
+        }
+    }
+
+    /// Peek, mini window and sign-in popup pages are tabs to extensions, so content scripts
+    /// can reach the background page and the popup fills the page in front.
+    private func detachedAdapter(for session: PageSession) -> ExtensionTabAdapter? {
+        guard let bm = browserManagerRef else { return nil }
+        let created = ExtensionTabAdapter(itemID: session.itemID, browserManager: bm, detachedPage: session)
+        tabAdapters[session.itemID] = created
+        return created
+    }
+
+    /// The tab an action button in `window` acts on: a Peek page over it, else its selected tab.
+    func actionAdapter(in window: BrowserWindowState) -> ExtensionTabAdapter? {
+        if let peek = detachedAdapters(in: window).first(where: { $0.isInFront }) { return peek }
+        return browserManagerRef?.tabs.selectedSession(in: window).flatMap { adapter(for: $0.itemID) }
+    }
+
+    /// Opened Peek and mini window pages hosted by `window`.
+    func detachedAdapters(in window: BrowserWindowState) -> [ExtensionTabAdapter] {
+        openedTabIDs.compactMap { id in
+            tabAdapters[id].flatMap { $0.detached != nil && $0.hostWindow === window ? $0 : nil }
+        }
     }
 
     func notifyTabActivated(new: PageSession, previous: PageSession?) {
@@ -54,7 +84,12 @@ extension ExtensionManager {
             openedTabIDs.remove(itemID)
         }
         guard let controller = extensionController, let adapter = openedAdapter(for: itemID) else { return }
+        let detachedHost = adapter.detached != nil ? adapter.hostWindow : nil
         controller.didCloseTab(adapter, windowIsClosing: false)
+        // The page Peek or a mini window covered is in front again.
+        if let detachedHost, let selected = browserManagerRef?.tabs.selectedSession(in: detachedHost) {
+            notifyTabActivated(new: selected, previous: nil)
+        }
     }
 
     /// An opened tab moved in the sidebar: reorder, folder, pin, unpin or another space.

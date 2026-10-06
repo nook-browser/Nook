@@ -71,15 +71,23 @@ extension ExtensionManager {
     }
 
     private func windowBecameMain(_ nsWindow: NSWindow?) {
-        guard let nsWindow, let controller = extensionController, let bm = browserManagerRef,
-              let window = bm.windowRegistry?.allWindows.first(where: { $0.window === nsWindow })
-        else { return }
+        guard let nsWindow, let controller = extensionController, let bm = browserManagerRef else { return }
+        guard let window = bm.windowRegistry?.allWindows.first(where: { $0.window === nsWindow }) else {
+            // A mini window: its page becomes the active tab of the window hosting it.
+            if let page = openedTabIDs.lazy.compactMap({ self.tabAdapters[$0]?.detached }).first(where: { $0.webView?.window === nsWindow }),
+               let host = tabAdapters[page.itemID]?.hostWindow.flatMap({ windowAdapter(for: $0) }) {
+                controller.didFocusWindow(host)
+                notifyTabActivated(new: page, previous: nil)
+            }
+            return
+        }
         // A private window focused: tabs.query({active: true}) has no answer, as before.
         guard let adapter = windowAdapter(for: window) else { return }
         controller.didFocusWindow(adapter)
         // Extensions resolve the active tab from the focused window, so switching windows
         // switches the active tab too.
-        if let session = bm.tabs.selectedSession(in: window) {
+        if let session = detachedAdapters(in: window).first(where: { $0.isInFront })?.detached
+            ?? bm.tabs.selectedSession(in: window) {
             notifyTabActivated(new: session, previous: nil)
         }
     }

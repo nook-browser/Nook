@@ -132,6 +132,7 @@ extension TabsController {
         guard session.isDetached else { return }
         session.onClose = nil
         session.tearDown()
+        if !session.isPrivate { tabEvents?.tabClosed(itemID: session.itemID) }
     }
 
     /// A WebKit-created popup from `opener`: a new selected tab in the opener's window whose
