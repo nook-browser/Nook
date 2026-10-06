@@ -73,8 +73,8 @@ invocation above. Three things it has to get right:
 - **`CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO` or the build ships `get-task-allow`.** Manual signing
   adds it by default. It lets any local process attach a debugger and read the app's memory, which
   gives away most of what the hardened runtime is there for. Notarization rejects it too. Verify
-  with `codesign -d --entitlements - <app>`: Release should show `apple-events`, `allow-jit` and
-  the `PIPAgent` mach-lookup, nothing else.
+  with `codesign -d --entitlements - <app>`: Release should show `apple-events` and the `PIPAgent`
+  mach-lookup, nothing else.
 
 Install with `ditto`, which preserves the bundle seal, rather than `cp -R`:
 `rm -rf /Applications/Nook.app && ditto build-release/Build/Products/Release/Nook.app /Applications/Nook.app`.
@@ -329,7 +329,7 @@ Located in `Packages/NookBlocker/Sources/NookBlocker/`. Full description in `doc
 
 The passkey entitlement (`web-browser.public-key-credential`) was requested and declined by Apple; it is not in the file. The only WebAuthn code in the app is the suppression script in `BrowserConfig.swift` described above.
 
-**Hardened runtime exceptions live in build settings.** `RUNTIME_EXCEPTION_*` in `project.pbxproj` become `com.apple.security.cs.*` entitlements at signing, so neither entitlements file shows them; check a built product with `codesign -d --entitlements -`. Release keeps `ALLOW_JIT` only. `ALLOW_DYLD_ENVIRONMENT_VARIABLES` and `DISABLE_LIBRARY_VALIDATION` are NO in Release (they let any local process inject a dylib into Nook and take its Keychain items and TCC grants) and stay YES in Debug for the debugger and previews.
+**Hardened runtime exceptions live in build settings.** `RUNTIME_EXCEPTION_*` in `project.pbxproj` become `com.apple.security.cs.*` entitlements at signing, so neither entitlements file shows them; check a built product with `codesign -d --entitlements -`. Release has none. `ALLOW_JIT` is off because nothing in the app process runs JavaScript worth compiling: pages and extension backgrounds run in WebKit's own processes, which carry Apple's entitlements, and CI's final re-sign never carried it anyway (1.1.0 through 1.2.0 shipped without it). `ALLOW_DYLD_ENVIRONMENT_VARIABLES` and `DISABLE_LIBRARY_VALIDATION` are NO in Release (they let any local process inject a dylib into Nook and take its Keychain items and TCC grants) and stay YES in Debug for the debugger and previews.
 
 **Info.plist**: Registers as URL handler for `http`/`https` (`CFBundleURLTypes`, LSHandlerRank `Owner`) plus `CFBundleDocumentTypes` for `public.html`/`public.xhtml`/`public.url` at rank `Default`, so Nook appears in the default-browser picker. The `Owner` rank on the schemes is one of the criteria Apple checks for the macOS browser passkey entitlement; do not lower it. Allows arbitrary loads in web content and local networking. Sparkle: daily check, feed `https://nook-browser.github.io/Nook/appcast.xml`, `SUPublicEDKey` must match the `SPARKLE_SIGNING_KEY` repo secret.
 
