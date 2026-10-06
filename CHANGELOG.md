@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+
+- Links skip redirect pages
+- Ad-blocked pages tell you they are blocked and allow you to access anyway
+- Going back on a linked tab returns you to the previous tab
+- Dragging PiP video into sidebar docks it
+
+### Changed
+
+- Liquid Glass styling
+- PiP controls moved to page menu
+- Sleeping tabs keep history
+
+### Fixed
+
+- YouTube detecting ad blocker
+- X hiding posts with videos
+- Password managers not working in Peek and mini
+- Bugs
+
 ## 1.1.1
 
 ### Added
