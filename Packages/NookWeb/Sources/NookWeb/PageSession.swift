@@ -704,10 +704,12 @@ public final class PageSession: NSObject, Identifiable {
         }
         let cacheKey = url.host ?? url.absoluteString
 
-        if let cached = await FaviconCache.shared.cachedImage(for: cacheKey) {
+        // Show the cached icon at once, and refetch it once a day so a site's new icon replaces the old one.
+        let cached = await FaviconCache.shared.cachedImage(for: cacheKey)
+        if let cached {
             favicon = SwiftUI.Image(platformImage: cached)
             hasFavicon = true
-            return
+            guard await FaviconCache.shared.isStale(cacheKey) else { return }
         }
 
         faviconFetchAttempts += 1
@@ -732,8 +734,9 @@ public final class PageSession: NSObject, Identifiable {
             return
         }
 
-        // hasFavicon stays false so ensureFaviconLoaded() can retry.
-        favicon = defaultFavicon
+        // A failed refresh keeps the cached icon; otherwise hasFavicon stays false so
+        // ensureFaviconLoaded() can retry.
+        if cached == nil { favicon = defaultFavicon }
     }
 
     private static func fetchFaviconImage(for url: URL) async -> PlatformImage? {

@@ -68,6 +68,20 @@ public final class FaviconCache: @unchecked Sendable {
         return image
     }
 
+    /// How long a stored favicon is trusted before a visit fetches it again.
+    public static let maxAge: TimeInterval = 24 * 60 * 60
+
+    /// True when the disk copy is older than `maxAge`. Memory-only entries (private pages) are never stale.
+    public func isStale(_ key: String) async -> Bool {
+        let url = fileURL(key)
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+                continuation.resume(returning: modified.map { -$0.timeIntervalSinceNow > Self.maxAge } ?? false)
+            }
+        }
+    }
+
     // MARK: - Store
 
     /// Stores in memory and writes a PNG to disk.
