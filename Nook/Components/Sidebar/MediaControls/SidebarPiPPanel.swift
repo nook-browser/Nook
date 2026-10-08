@@ -219,6 +219,14 @@ final class SidebarPiPController: PictureInPictureHolder {
         exit()
     }
 
+    /// Brings this window forward on the video's tab; selecting the tab plays the video inline again.
+    func returnToTab() {
+        guard let session, let windowState, let tabs = session.controller else { return }
+        windowState.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        tabs.select(session.itemID, in: windowState)
+    }
+
     // MARK: - Floating
 
     /// Called mid-drag from the sidebar: the panel appears under the pointer and keeps following.
@@ -750,9 +758,12 @@ private struct PiPControls: View {
                     button("Forward", "goforward.10", NookDesign.Size.pipSkip * scale) { controller?.seek(10) }
                 }
 
-                HStack {
+                HStack(spacing: NookDesign.Spacing.sm * scale) {
                     button("Close", "xmark", NookDesign.Size.chromeControl * scale, action: onClose)
                     Spacer()
+                    button("Return to Tab", "arrow.up.forward.app", NookDesign.Size.chromeControl * scale) {
+                        controller?.returnToTab()
+                    }
                     button(corner.label, corner.symbol, NookDesign.Size.chromeControl * scale, action: corner.action)
                 }
                 .padding(NookDesign.Spacing.sm * scale)

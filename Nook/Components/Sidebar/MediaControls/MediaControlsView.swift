@@ -157,6 +157,16 @@ struct MediaControlsView: View {
 
                         Spacer()
 
+                        Button("Return to Tab", systemImage: "arrow.up.forward.app") {
+                            browserManager.tabs.select(tab.itemID, in: windowState)
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(NookIconButtonStyle(size: 24))
+                        .foregroundStyle(Color.white)
+                        .help("Return to Tab")
+
+                        Spacer()
+
                         // Mute toggle
                         Button(isMuted ? "Unmute" : "Mute", systemImage: isMuted ? "speaker.slash.fill": "speaker.wave.2.fill") {
                             Task {
