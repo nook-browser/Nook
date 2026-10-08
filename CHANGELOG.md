@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.2.1
+
+### Added
+
+- Return to Tab button on PiP and the media bar
+
+### Changed
+
+- Removed LiquidGlass styling. It did not match our calm browser philosophy.
+- Improved Spaces switch speed and loading logic.
+- Settings sidebar redesigned
+- YouTube and Social Media merged into Tweaks
+
+### Fixed
+
+- Favicons not updating when a site changes its icon
+- Crash when swiping to a space with a split view
+- Bugs
+
 ## 1.2.0
 
 ### Added
