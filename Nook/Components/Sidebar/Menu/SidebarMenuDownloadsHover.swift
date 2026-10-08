@@ -32,8 +32,8 @@ struct SidebarMenuHoverDownloads: View {
             }
         }
         .padding(NookDesign.Spacing.xs)
-        // The recent downloads card that opens above the bottom bar on hover.
-        .nookControlGlass(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+        // The recent downloads card that opens over the tab list on hover.
+        .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         .padding(.horizontal, NookDesign.Spacing.sidebarInset)
         .onAppear {
             updateItemsVisible(count: downloads.count)

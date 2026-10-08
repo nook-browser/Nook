@@ -143,7 +143,7 @@ struct SidebarAIChat: View {
                     windowState.isSidebarAIChatVisible = false
                 }
             }
-            .nookGlassControls(in: Circle())
+            .nookIconButtons()
 
             if !aiService.messages.isEmpty {
                 Text("Ask Nook")
@@ -154,18 +154,16 @@ struct SidebarAIChat: View {
 
             Spacer()
 
-            HStack(spacing: 0) {
+            HStack(spacing: NookDesign.Spacing.xxs) {
                 Button("Settings", systemImage: "gearshape") {
                     showSettings()
                 }
-                Divider().padding(.vertical, NookDesign.Spacing.sm)
                 Button("Clear Messages", systemImage: "trash") {
                     showClearMessagesDialog()
                 }
                 .disabled(aiService.messages.isEmpty)
             }
-            .frame(height: NookDesign.Size.glassControl)
-            .nookGlassControls(in: Capsule())
+            .nookIconButtons()
         }
         .padding(.horizontal, 8)
     }
@@ -205,7 +203,7 @@ struct SidebarAIChat: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .nookControlGlass(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .nookControlSurface(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         .padding(.horizontal, 8)
     }
 
@@ -257,6 +255,9 @@ struct SidebarAIChat: View {
                 Label("Manage Models...", systemImage: "gearshape")
             }
         }
+        .menuStyle(.button)
+        .buttonStyle(RectNavButtonStyle())
+        .controlSize(.small)
         .popover(isPresented: $showAddModelPopover, arrowEdge: .top) {
             VStack(spacing: 8) {
                 Text("Add Model by ID")
@@ -298,17 +299,10 @@ struct SidebarAIChat: View {
             }
         }) {
             Image(systemName: configService.generationConfig.webSearchEnabled ? "globe.americas.fill" : "globe")
-                .font(NookDesign.Font.body)
                 .foregroundStyle(configService.generationConfig.webSearchEnabled ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    NookDesign.Radius.shape(NookDesign.Radius.sm)
-                        .fill(configService.generationConfig.webSearchEnabled ? .green.opacity(0.15) : NookDesign.Surface.fill)
-                )
         }
-        .buttonStyle(.plain)
-        .frame(height: 28)
-        .frame(width: 36)
+        .buttonStyle(NookIconButtonStyle())
+        .help(configService.generationConfig.webSearchEnabled ? "Web Search On" : "Web Search Off")
     }
 
     // MARK: - Empty/Loading States
@@ -328,15 +322,9 @@ struct SidebarAIChat: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button(action: { showSettings() }) {
-                Text("Add API Key")
-                    .font(NookDesign.Font.secondary)
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .nookControlGlass(in: Capsule())
-            }
-            .buttonStyle(.plain)
+            Button("Add API Key") { showSettings() }
+                .font(NookDesign.Font.secondary)
+                .buttonStyle(RectNavButtonStyle())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 60)
@@ -545,7 +533,7 @@ struct MessageBubble: View {
                             .padding(.bottom, 10)
                         }
                     }
-                    .nookControlGlass(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+                    .nookControlSurface(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
                     .overlay(alignment: .topTrailing) {
                         if isHovered {
                             Button(action: {
@@ -560,7 +548,7 @@ struct MessageBubble: View {
                                     .font(NookDesign.Font.caption)
                                     .foregroundStyle(.secondary)
                                     .frame(width: 28, height: 28)
-                                    // Raised, not glass: it sits on the bubble's glass
+                                    // Raised so it stands off the bubble's fill
                                     .background(
                                         NookDesign.Radius.shape(NookDesign.Radius.md)
                                             .fill(NookDesign.Surface.raised)
@@ -582,7 +570,7 @@ struct MessageBubble: View {
                         .textSelection(.enabled)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .nookControlGlass(tint: accent, in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+                        .nookControlSurface(tint: accent, in: NookDesign.Radius.shape(NookDesign.Radius.lg))
                 }
             }
 

@@ -173,7 +173,7 @@ struct DialogCard<Content: View>: View {
         content
             .padding(NookDesign.Spacing.xl)
             .frame(maxWidth: NookDesign.Size.dialogMaxWidth, alignment: .leading)
-            .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
+            .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
     }
 }
 
@@ -236,7 +236,6 @@ struct DialogHeader: View {
             ZStack {
                 Circle()
                     .fill(gradientColorManager.accentColor.opacity(0.1))
-                    .nookClearGlassEffect(tint: gradientColorManager.accentColor.opacity(0.2))
                     .frame(width: 48, height: 48)
 
                 Image(systemName: icon)

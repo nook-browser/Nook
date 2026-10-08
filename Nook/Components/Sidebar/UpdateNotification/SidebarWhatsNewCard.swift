@@ -58,7 +58,7 @@ struct SidebarWhatsNewCard: View {
                     .padding(NookDesign.Spacing.xs)
                 }
             }
-            .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+            .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
             .onHoverTracking { isHovering = $0 }
             .animation(NookDesign.Motion.quick, value: isHovering)
             .transition(.opacity.combined(with: .move(edge: .bottom)))

@@ -50,26 +50,25 @@ public struct NookIconButtonStyle: ButtonStyle {
 }
 
 public extension View {
-    /// Icon buttons as sidebar glass chrome: toolbar-sized, round hover fills, large symbols.
-    func nookGlassControls<S: InsettableShape>(in shape: S) -> some View {
+    /// Standalone icon buttons, Nook's one button look: no container, a fill only on hover.
+    func nookIconButtons() -> some View {
         labelStyle(.iconOnly)
-            .imageScale(.large)
-            .buttonStyle(NookIconButtonStyle(size: NookDesign.Size.glassControl, radius: NookDesign.Size.glassControl / 2))
-            .nookControlGlass(in: shape)
+            .buttonStyle(NookIconButtonStyle())
+            .foregroundStyle(.primary)
     }
 }
 
 /// Rectangular, labeled variant of NookIconButtonStyle that allows custom widths
 /// Use this for buttons that need to be wider than square (e.g., "New Space" button)
-struct RectNavButtonStyle: ButtonStyle {
+public struct RectNavButtonStyle: ButtonStyle {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.isEnabled) var isEnabled
     @Environment(\.controlSize) var controlSize
     @State private var isHovering: Bool = false
 
-    init() {}
+    public init() {}
 
-    func makeBody(configuration: Configuration) -> some View {
+    public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(.primary)
             .padding(.horizontal, horizontalPadding)

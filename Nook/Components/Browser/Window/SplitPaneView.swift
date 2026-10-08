@@ -3,7 +3,7 @@
 //  SplitPaneView.swift
 //  Nook
 //
-//  One pane of the split view: the page, with glass controls floating over it. The compositor keeps
+//  One pane of the split view: the page, with controls floating over it. The compositor keeps
 //  panes across refreshes so a web view never leaves its superview while the pair holds.
 //
 
@@ -113,14 +113,14 @@ private struct SplitPaneTitle: View {
             }
             .padding(.horizontal, NookDesign.Spacing.rowPadding)
             .frame(height: NookDesign.Size.navRow)
-            .contentShape(Capsule())
+            .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
             .onTapGesture { tabs.select(itemID, in: windowState) }
-            .nookGlassEffect(in: Capsule())
+            .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
         }
     }
 }
 
-/// Separate and close, floating at the pane's top trailing corner in one glass capsule.
+/// Separate and close, floating at the pane's top trailing corner in one group.
 private struct SplitPaneButtons: View {
     let itemID: UUID
 
@@ -139,7 +139,7 @@ private struct SplitPaneButtons: View {
         }
         .padding(.horizontal, NookDesign.Spacing.xs)
         .frame(height: NookDesign.Size.navRow)
-        .nookGlassEffect(in: Capsule())
+        .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
     }
 }
 

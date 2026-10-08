@@ -93,7 +93,7 @@ struct SidebarUpdateNotification: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+                .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
                 .frame(maxWidth: .infinity)
                 .onHoverTracking { hovering in
                     isHovering = hovering

@@ -11,38 +11,30 @@ import NookDesign
 import NookWeb
 import NookUI
 
-/// Back, forward and reload in the title row: one glass pill, like Safari's. The space name gives
+/// Back, forward and reload in the title row, as separate icon buttons. The space name gives
 /// way before it does, and `Size.sidebarMin` keeps the sidebar wide enough to show it whole.
 struct SidebarHistoryButtons: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: NookDesign.Spacing.xxs) {
             Button("Go Back", systemImage: "chevron.backward", action: goBack)
                 .disabled(!canGoBack)
                 .contextMenu {
                     NavigationHistoryContextMenu(historyType: .back, windowState: windowState)
                 }
-            divider
             Button("Go Forward", systemImage: "chevron.forward", action: goForward)
                 .disabled(!canGoForward)
                 .contextMenu {
                     NavigationHistoryContextMenu(historyType: .forward, windowState: windowState)
                 }
-            divider
             Button(action: reloadOrStop) {
                 Image(systemName: session?.isLoading == true ? "xmark" : "arrow.clockwise")
                     .contentTransition(.symbolEffect(.replace))
             }
         }
-        // Dividers take any height offered; the group is the buttons' height.
-        .frame(height: NookDesign.Size.glassControl)
-        .nookGlassControls(in: Capsule())
-    }
-
-    private var divider: some View {
-        Divider().padding(.vertical, NookDesign.Spacing.sm)
+        .nookIconButtons()
     }
 
     /// Nil while another window holds the page: its controls stay inert until Move Here.

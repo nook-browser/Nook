@@ -32,7 +32,7 @@ extension BrowserConfiguration {
         preferences.setValue(true, forKey: key)
     }
 
-    /// WebKit's PDF viewer draws its own zoom/save bar over the page. Nook draws glass controls
+    /// WebKit's PDF viewer draws its own zoom/save bar over the page. Nook draws its own controls
     /// in its place (`PDFControlsView`), so WebKit's is switched off. `PDFPluginHUDEnabled` is an
     /// embedder-facing feature flag, set through the private feature API; a WebKit without the
     /// flag or the API leaves its own bar in place, and both bars would show.

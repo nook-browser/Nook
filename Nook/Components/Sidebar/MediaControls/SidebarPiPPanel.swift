@@ -727,7 +727,7 @@ final class SidebarPiPCropView: NSView {
 
 // MARK: - Controls
 
-/// The system PiP window's controls: glass circles at its sizes, scaled down below a 300pt-wide
+/// The system PiP window's controls: scrim squircles at its sizes, scaled down below a 300pt-wide
 /// player. Close sends the video back to its tab still playing, which the media bar then holds.
 private struct PiPControls: View {
     weak var controller: SidebarPiPController?
@@ -751,9 +751,9 @@ private struct PiPControls: View {
                 }
 
                 HStack {
-                    button("Close", "xmark", NookDesign.Size.glassControl * scale, action: onClose)
+                    button("Close", "xmark", NookDesign.Size.chromeControl * scale, action: onClose)
                     Spacer()
-                    button(corner.label, corner.symbol, NookDesign.Size.glassControl * scale, action: corner.action)
+                    button(corner.label, corner.symbol, NookDesign.Size.chromeControl * scale, action: corner.action)
                 }
                 .padding(NookDesign.Spacing.sm * scale)
                 .frame(maxHeight: .infinity, alignment: .top)
@@ -776,11 +776,11 @@ private struct PiPControls: View {
                 .font(.system(size: diameter * 0.4, weight: .semibold))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: diameter, height: diameter)
-                .contentShape(Circle())
+                .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
-        .nookMediaGlass(in: Circle())
+        .nookMediaControl(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         .help(label)
         .accessibilityLabel(label)
         .background(GeometryReader {

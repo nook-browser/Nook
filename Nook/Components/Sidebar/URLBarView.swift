@@ -99,12 +99,12 @@ struct URLBarView: View {
                 }
                 .padding(.horizontal, NookDesign.Spacing.rowPadding)
         }
-        .frame(maxWidth: .infinity, minHeight: NookDesign.Size.glassControl, maxHeight: NookDesign.Size.glassControl)
+        .frame(maxWidth: .infinity, minHeight: NookDesign.Size.chromeControl, maxHeight: NookDesign.Size.chromeControl)
         .overlay(alignment: .bottom) {
             PageLoadingProgressBar(session: session)
         }
-        .clipShape(Capsule())
-        .nookControlGlass(in: Capsule())
+        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        .nookControlSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
         // Report the frame in the window space so we can overlay the mini palette above all content
         .background(
             GeometryReader { proxy in

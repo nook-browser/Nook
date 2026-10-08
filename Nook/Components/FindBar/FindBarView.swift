@@ -130,7 +130,7 @@ struct FindBarView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
+                    .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
                     .padding(.trailing, 16)
                 }
                 .padding(.top, 12)
@@ -143,7 +143,7 @@ struct FindBarView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Liquid Glass dissipate effect for visibility changes
+        // Fade and blur out on hide
         .opacity(findManager.isFindBarVisible ? 1 : 0)
         .blur(radius: findManager.isFindBarVisible ? 0 : 8)
         .allowsHitTesting(findManager.isFindBarVisible)

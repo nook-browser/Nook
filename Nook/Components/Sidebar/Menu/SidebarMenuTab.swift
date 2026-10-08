@@ -50,7 +50,7 @@ struct SidebarMenuTab: View {
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
-        // The chosen tab is glass, like the selected sidebar row, so it takes no fill of its own.
+        // The chosen tab takes the selected sidebar row's surface, so it takes no hover fill.
         .background(!isActive && isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.xl))
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
         .nookRowSelection(isActive, radius: NookDesign.Radius.xl)

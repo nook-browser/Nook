@@ -59,7 +59,7 @@ struct SidebarMenuHistoryTab: View {
                 .padding(.horizontal, NookDesign.Spacing.md)
                 .padding(.bottom, NookDesign.Spacing.md)
         }
-        // The rows scroll under the search field and filters, which float as glass with the
+        // The rows scroll under the search field and filters, which float as filled controls with the
         // system's soft blur at the edge behind them, the way a macOS 26 toolbar does.
         .safeAreaBar(edge: .top, spacing: 0) {
             header
@@ -87,7 +87,6 @@ struct SidebarMenuHistoryTab: View {
                 Button {
                     isShowingFilters.toggle()
                 } label: {
-                    // Always glass, like the search field beside it: both float over the list.
                     HStack(spacing: NookDesign.Spacing.xs) {
                         Image(systemName: isShowingFilters ? "line.horizontal.3.decrease.circle.fill" : "line.horizontal.3.decrease.circle")
                             .font(NookDesign.Font.title)
@@ -96,9 +95,9 @@ struct SidebarMenuHistoryTab: View {
                     }
                     .foregroundStyle(isShowingFilters || isFiltersHovered ? .primary : .secondary)
                     .padding(.horizontal, NookDesign.Spacing.lg)
-                    .frame(height: NookDesign.Size.glassControl)
-                    .contentShape(Capsule())
-                    .nookControlGlass(in: Capsule())
+                    .frame(height: NookDesign.Size.chromeControl)
+                    .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+                    .background(isShowingFilters || isFiltersHovered ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
                 }
                 .buttonStyle(.plain)
                 .animation(NookDesign.Motion.quick, value: isShowingFilters)
@@ -450,14 +449,12 @@ struct FiltersSelectView: View {
     }
 }
 
-/// A filter chip. Every chip is glass, since the row floats over the list; the chosen one is
-/// tinted with the space's accent.
+/// A filter chip: a fill on hover, the selected row's surface when chosen.
 struct FiltersSelectButton: View {
     var text: String
     var isActive: Bool
     var action: () -> Void
 
-    @EnvironmentObject var gradientColorManager: GradientColorManager
     @State private var isHovering: Bool = false
 
     var body: some View {
@@ -470,8 +467,9 @@ struct FiltersSelectButton: View {
                 .lineLimit(1)
                 .padding(.horizontal, NookDesign.Spacing.lg)
                 .frame(height: NookDesign.Size.iconButton)
-                .contentShape(Capsule())
-                .nookControlGlass(tint: isActive ? gradientColorManager.accentColor : nil, in: Capsule())
+                .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+                .background(!isActive && isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
+                .nookRowSelection(isActive)
         }
         .buttonStyle(.plain)
         .animation(NookDesign.Motion.quick, value: isHovering)

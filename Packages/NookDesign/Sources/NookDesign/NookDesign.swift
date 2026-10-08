@@ -89,7 +89,7 @@ public enum NookDesign {
         public static let waveLength: CGFloat = 56     // one full cycle of that wave
         public static let dropTail: CGFloat = 100      // empty drop target height below the last row
         public static let dialogMaxWidth: CGFloat = 500
-        public static let glassControl: CGFloat = 36   // sidebar glass controls, the size of a macOS 26 toolbar button
+        public static let chromeControl: CGFloat = 36  // title row, URL bar and search field height
         public static let pipSkip: CGFloat = 48        // PiP skip buttons, as in the system PiP window
         public static let pipPlay: CGFloat = 64        // PiP play/pause, as in the system PiP window
         // Narrowest sidebar: the lights (88), the history pill (110), the inset (8).
@@ -145,6 +145,8 @@ public enum NookDesign {
     public enum Surface {
         public static let fill = Color.primary.opacity(0.045)           // hover, idle tile
         public static let fillPressed = Color.primary.opacity(0.08)
+        public static let tintOpacity: Double = 0.18                       // accent-tinted control: chosen chip, own chat message
+        public static let mediaScrim = Color.black.opacity(0.35)           // controls over video
         public static let hairline = Color.primary.opacity(0.08)
         public static let unloadedOpacity: Double = 0.55
         public static let dropBorderIdle = Color.secondary.opacity(0.3)    // dashed empty-state drop target
@@ -201,7 +203,7 @@ private struct NookElevationModifier: ViewModifier {
         content
             .shadow(color: .black.opacity(level == .floating ? 0.16 : 0), radius: level == .floating ? 32 : 0, y: level == .floating ? 12 : 0)
             // Raised only. A 2pt shadow hugs the shape and reads as a dark stroke, which a
-            // floating glass layer does not want: the material defines its own edge.
+            // floating card does not want: `nookFloatingSurface` draws its own hairline.
             .shadow(color: .black.opacity(level == .raised ? 0.05 : 0), radius: level == .raised ? 2 : 0, y: level == .raised ? 1 : 0)
     }
 }

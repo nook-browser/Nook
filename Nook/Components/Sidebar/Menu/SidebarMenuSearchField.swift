@@ -7,7 +7,7 @@
 import SwiftUI
 import NookDesign
 
-/// The history and downloads search field: a glass capsule the height of the sidebar's controls.
+/// The history and downloads search field: a filled squircle the height of the sidebar's controls.
 struct SidebarMenuSearchField: View {
     let prompt: LocalizedStringKey
     @Binding var text: String
@@ -36,10 +36,10 @@ struct SidebarMenuSearchField: View {
             }
         }
         .padding(.horizontal, NookDesign.Spacing.lg)
-        .frame(height: NookDesign.Size.glassControl)
+        .frame(height: NookDesign.Size.chromeControl)
         .frame(maxWidth: .infinity)
-        .contentShape(Capsule())
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onTapGesture { isFocused = true }
-        .nookControlGlass(in: Capsule())
+        .nookControlSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
     }
 }

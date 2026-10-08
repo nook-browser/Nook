@@ -4,7 +4,7 @@
 //  NookWeb
 //
 //  WebKit shows a PDF in its own viewer. Nook turns that viewer's HUD off (see
-//  `BrowserConfiguration.hidePDFHUD`) and draws glass controls instead; these are what they call.
+//  `BrowserConfiguration.hidePDFHUD`) and draws its own controls instead; these are what they call.
 //  Every private selector here is checked with `responds(to:)`, so a WebKit that drops one
 //  leaves that control doing nothing rather than crashing.
 //

@@ -4,7 +4,7 @@
 //  Nook
 //
 //  The PDF viewer's controls: zoom, open in the default PDF app, print, save. They replace WebKit's own
-//  bar, which BrowserConfiguration switches off, and float over the page as one glass pill.
+//  bar, which BrowserConfiguration switches off, and float over the page as one group.
 //
 
 import SwiftUI
@@ -28,32 +28,28 @@ struct PDFControlsView: View {
     private var isVisible: Bool { !isAutoHidden || isHovered }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: NookDesign.Spacing.xxs) {
             Button("Zoom Out", systemImage: "minus.magnifyingglass") {
                 browserManager.zoomManager.zoomOut(for: webView, tabId: session.itemID)
                 browserManager.shouldShowZoomPopup = true
             }
-            divider
             Button("Zoom In", systemImage: "plus.magnifyingglass") {
                 browserManager.zoomManager.zoomIn(for: webView, tabId: session.itemID)
                 browserManager.shouldShowZoomPopup = true
             }
-            divider
             Button("Open in Preview", systemImage: "arrow.up.forward.app") {
                 session.openPDFInDefaultApp(from: webView)
             }
-            divider
             Button("Print", systemImage: "printer") {
                 webView.nookPrint()
             }
-            divider
             Button("Save PDF", systemImage: "arrow.down.circle") {
                 session.savePDF(from: webView)
             }
         }
-        // Dividers take any height offered; the pill is the buttons' height.
-        .frame(height: NookDesign.Size.glassControl)
-        .nookGlassControls(in: Capsule())
+        .nookIconButtons()
+        .padding(NookDesign.Spacing.xxs)
+        .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
         .opacity(isVisible ? 1 : 0)
         .allowsHitTesting(isVisible)
         .animation(NookDesign.Motion.standard, value: isVisible)
@@ -66,7 +62,4 @@ struct PDFControlsView: View {
         }
     }
 
-    private var divider: some View {
-        Divider().padding(.vertical, NookDesign.Spacing.sm)
-    }
 }

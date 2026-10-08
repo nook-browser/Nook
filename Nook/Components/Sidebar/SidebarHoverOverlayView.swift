@@ -47,9 +47,9 @@ struct SidebarHoverOverlayView: View {
                         .environment(windowState)
                         .environment(commandPalette)
                         .environmentObject(browserManager.gradientColorManager)
-                        .environment(\.nookInsideGlass, true)
                         .frame(maxHeight: .infinity)
-                        .nookGlassEffect(in: NookDesign.Radius.shape(cornerRadius))
+                        .background(sidebarBackground)
+                        .nookFloatingSurface(in: NookDesign.Radius.shape(cornerRadius))
                         .alwaysArrowCursor()
                         .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
@@ -62,5 +62,12 @@ struct SidebarHoverOverlayView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: nookSettings.sidebarPosition == .left ? .topLeading : .topTrailing)
             // Container remains passive; only overlay/hotspot intercept
         }
+    }
+
+    /// The docked sidebar's own background, so the overlay reads as the same sidebar.
+    private var sidebarBackground: some View {
+        let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
+        return NookDesign.Surface.containerGradient(accent: accent, isActive: true)
+            .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
     }
 }

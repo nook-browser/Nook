@@ -87,7 +87,7 @@ struct ZoomPopupView: View {
         }
         .padding(12)
         .frame(maxWidth: 160)
-        .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         .scaleEffect(isVisible ? 1.0 : 0.8)
         .opacity(isVisible ? 1.0 : 0.0)
         .animation(NookDesign.Motion.spring, value: isVisible)

@@ -44,7 +44,7 @@ struct SplitCardView: View {
             Color(currentTextColor)
                 .opacity(0.1)
         )
-        .nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+        .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
         .animation(NookDesign.Motion.standard, value: currentTextColor)
     }
 }

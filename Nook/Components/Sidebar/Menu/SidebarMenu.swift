@@ -75,7 +75,7 @@ struct SidebarMenu: View {
                         windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
                     }
                 }
-                .nookGlassControls(in: Circle())
+                .nookIconButtons()
                 Spacer()
             }
             .padding(.leading, NookDesign.Spacing.md)

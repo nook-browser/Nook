@@ -53,8 +53,7 @@ struct SidebarWindowControlsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // One glass pill, the way the system groups neighbouring toolbar buttons.
-            HStack(spacing: 0) {
+            HStack(spacing: NookDesign.Spacing.xxs) {
                 Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
                     browserManager.toggleSidebar(for: windowState)
                 }
@@ -65,14 +64,14 @@ struct SidebarWindowControlsView: View {
                     }
                 }
             }
-            .nookGlassControls(in: Capsule())
+            .nookIconButtons()
 
             Spacer(minLength: 0)
 
-            // Gives way before the pill: a long name fades out.
+            // Gives way before the buttons: a long name fades out.
             SpaceSwitcherTitle(onNewSpace: onNewSpace)
                 .layoutPriority(1)
         }
-        .frame(height: NookDesign.Size.glassControl)
+        .frame(height: NookDesign.Size.chromeControl)
     }
 }

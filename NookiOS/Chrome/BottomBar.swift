@@ -19,8 +19,8 @@ import NookUI
 import NookWeb
 
 /// Where the bar is drawn. The phone floats it over the page; the iPad puts it
-/// at the foot of the sidebar, where glass over a sidebar material would be
-/// glass on glass and the tabs button would duplicate the visible outline.
+/// at the foot of the sidebar, where a card over the sidebar would double
+/// its background and the tabs button would duplicate the visible outline.
 enum BottomBarStyle {
     case floating
     case sidebar
@@ -144,8 +144,8 @@ struct BottomBar: View {
 }
 
 
-/// Glass when the bar floats over a page; nothing when it sits in the sidebar,
-/// which already has a material behind it.
+/// A floating card when the bar floats over a page; nothing when it sits in the sidebar,
+/// which already has a background behind it.
 private struct BarBackground: ViewModifier {
     let style: BottomBarStyle
     let condensed: Bool
@@ -154,9 +154,9 @@ private struct BarBackground: ViewModifier {
     func body(content: Content) -> some View {
         switch style {
         case .floating where condensed:
-            content.nookGlassEffect(in: Capsule())
+            content.nookFloatingSurface(in: Capsule())
         case .floating:
-            content.nookGlassEffect(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
+            content.nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.xxl))
         case .sidebar:
             content
         }

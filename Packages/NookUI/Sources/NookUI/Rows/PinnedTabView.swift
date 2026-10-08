@@ -81,7 +81,7 @@ public struct PinnedTabView<Icon: View>: View {
     }
 
     //MARK: - Colors
-    /// Clear when selected: the glass is the surface, and a fill in front of it would flatten it.
+    /// Clear when selected: `nookRowSelection` draws the raised surface.
     private var backgroundColor: Color {
         isActive ? .clear : (isHovered ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
     }
