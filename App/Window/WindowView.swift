@@ -124,7 +124,7 @@ struct WindowView: View {
             hoverSidebarManager.windowRegistry = windowRegistry
             hoverSidebarManager.nookSettings = nookSettings
             hoverSidebarManager.start()
-            applyAccent(spaceAccentHex, animate: false)
+            applyAccent(spaceAccentHex)
         }
         .onDisappear {
             hoverSidebarManager.stop()
@@ -152,8 +152,9 @@ struct WindowView: View {
             }
         }
         // The app-wide accent follows the active window's space.
-        .onChange(of: spaceAccentHex) { _, hex in applyAccent(hex, animate: true) }
-        .onChange(of: windowRegistry.activeWindowId) { _, _ in applyAccent(spaceAccentHex, animate: false) }
+        // Immediate, so the colour changes in the same frame as the page and URL.
+        .onChange(of: spaceAccentHex) { _, hex in applyAccent(hex) }
+        .onChange(of: windowRegistry.activeWindowId) { _, _ in applyAccent(spaceAccentHex) }
         // Handle organize tabs notification from keyboard shortcut manager
         .onReceive(NotificationCenter.default.publisher(for: .organizeTabsRequested)) { _ in
             guard windowRegistry.activeWindow?.id == windowState.id,
@@ -175,14 +176,9 @@ struct WindowView: View {
         return tabs.space(spaceID)?.accentHex
     }
 
-    private func applyAccent(_ hex: String?, animate: Bool) {
+    private func applyAccent(_ hex: String?) {
         guard let hex, windowRegistry.activeWindowId == windowState.id else { return }
-        let gradient = SpaceGradient.accent(hex: hex)
-        if animate {
-            browserManager.gradientColorManager.transition(to: gradient)
-        } else {
-            browserManager.gradientColorManager.setImmediate(gradient)
-        }
+        browserManager.gradientColorManager.setImmediate(SpaceGradient.accent(hex: hex))
     }
 
     private var resolvedColorScheme: ColorScheme? {

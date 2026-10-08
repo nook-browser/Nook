@@ -607,8 +607,9 @@ class BrowserManager: ObservableObject {
         isSwitchingSpace = true
         withAnimation(.easeInOut(duration: Self.spaceSwitchDuration)) {
             currentProfile = profile
-            cookieManager.switchDataStore(profile.dataStore, profileId: profile.id)
-            cacheManager.switchDataStore(profile.dataStore, profileId: profile.id)
+            // Settings loads these lists when it opens; reading every cookie and data record here stalled the switch.
+            cookieManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
+            cacheManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
             historyManager.switchProfile(profile.id)
         }
         transitionEndTask?.cancel()
@@ -619,7 +620,7 @@ class BrowserManager: ObservableObject {
         }
     }
 
-    private static let spaceSwitchDuration: TimeInterval = 0.35
+    private static let spaceSwitchDuration: TimeInterval = 0.2
 
     func updateSidebarWidth(_ width: CGFloat) {
         if let activeWindow = windowRegistry?.activeWindow {

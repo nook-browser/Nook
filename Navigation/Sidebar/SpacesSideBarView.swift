@@ -207,6 +207,8 @@ struct SpacesSideBarView: View {
             handleSpaceSelectionChange(newID, spaces: spaces)
         }
         .onChange(of: windowState.spaceID) { _, newID in
+            // A swipe already shows this space; rebuilding every page after it stalled the swipe.
+            guard activeSpaceID != newID else { return }
             activeSpaceID = newID
             activeTabRefreshTrigger.toggle()
         }
@@ -336,6 +338,7 @@ struct SpacesSideBarView: View {
                     spaceID: space.id
                 )
                 .environmentObject(browserManager)
+                .environment(tabs)
                 .environment(windowState)
                 .environment(windowRegistry)
                 .environment(nookSettings)
@@ -348,7 +351,10 @@ struct SpacesSideBarView: View {
                 isActive: windowState.spaceID == space.id,
                 isSidebarHovered: $isSidebarHovered
             )
+            // Pages are separate hosting views and inherit nothing; a split row needs `tabs`.
             .environmentObject(browserManager)
+            .environment(tabs)
+            .environment(\.tabActions, browserManager)
             .environment(windowState)
             .environment(windowRegistry)
             .environment(commandPalette)

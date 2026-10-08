@@ -2,312 +2,233 @@
 
 import SwiftUI
 
-extension PlatformPageView: NSViewControllerRepresentable {
+// Nook: a trackpad pager of its own instead of NSPageController. The system pager eases each
+// swipe out with its own momentum after the fingers lift; here the lift hands off to a short
+// fixed animation.
+extension PlatformPageView: NSViewRepresentable {
 
-    typealias NSViewControllerType = NSPageController
-
-    func makeNSViewController(context: Context) -> NSPageController {
-        let pageController = NSPageController()
-        pageController.view = NSView()
-        pageController.view.wantsLayer = true
-        pageController.delegate = context.coordinator
-        let (arrangedObjects, selectedIndex) = makeArrangedObjects(around: selection)
-        pageController.arrangedObjects = arrangedObjects
-        pageController.selectedIndex = selectedIndex
-        pageController.transitionStyle = configuration.transition.platform
-        context.coordinator.pageController = pageController
-        return pageController
+    func makeNSView(context: Context) -> SwipePagerView {
+        let view = SwipePagerView()
+        view.coordinator = context.coordinator
+        context.coordinator.pager = view
+        context.coordinator.show(selection)
+        return view
     }
 
-    func updateNSViewController(
-        _ pageController: NSPageController,
-        context: Context
-    ) {
-        // Keep selection value in sync with page controller
-        if context.coordinator.selectedValue(in: pageController) != selection {
-            context.coordinator.go(
-                to: selection,
-                in: pageController,
-                animated: context.transaction.animation != nil
-            )
-        }
+    func updateNSView(_ view: SwipePagerView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.refresh(to: selection, animated: context.transaction.animation != nil)
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
-    /// Returns the arranged objects around a given value.
-    ///
-    /// This method also returns the index of the value in the returned array, which can be used to set the
-    /// selected index of the page controller.
-    func makeArrangedObjects(around value: SelectionValue, limit: Int = 3) -> ([Any], Int) {
-        var currentValue = value
-        var previousObjects = [SelectionValue]()
-        while let previousValue = previous(currentValue), previousObjects.count < limit {
-            previousObjects.insert(previousValue, at: 0)
-            currentValue = previousValue
-        }
-        currentValue = value
-        var nextObjects = [value]
-        while let nextValue = next(currentValue), nextObjects.count <= limit {
-            nextObjects.append(nextValue)
-            currentValue = nextValue
-        }
-        let allObjects = previousObjects + nextObjects
-        let selectedIndex = previousObjects.count
-        return (allObjects, selectedIndex)
-    }
-}
+    // MARK: - Coordinator
 
-// MARK: - Coordinator
-
-extension PlatformPageView {
-
-    class Coordinator: NSObject, NSPageControllerDelegate {
-
-        let parent: PlatformPageView
-        var viewCache = [SelectionValue: NSView]()
-        weak var pageController: NSPageController?
-
-        // Haptic feedback during live swipe
-        var hasPlayedSwipeHaptic = false
-        private var swipeAccumulator: CGFloat = 0
+    @MainActor
+    final class Coordinator {
+        var parent: PlatformPageView
+        weak var pager: SwipePagerView?
+        private(set) var current: SelectionValue?
+        private var views: [SelectionValue: HostingView] = [:]
 
         init(_ parent: PlatformPageView) {
             self.parent = parent
         }
 
-        // MARK: - Haptic on Swipe Progress
-
-        /// Track scroll delta to fire haptic at 15% of page width.
-        func trackSwipeHaptic(_ event: NSEvent) {
-            guard event.hasPreciseScrollingDeltas else { return }
-
-            if event.phase.contains(.began) {
-                swipeAccumulator = 0
-                hasPlayedSwipeHaptic = false
-                return
+        func view(for value: SelectionValue) -> HostingView {
+            if let view = views[value] {
+                view.rootView = parent.content(value)
+                return view
             }
-
-            if event.phase.contains(.changed) {
-                guard !hasPlayedSwipeHaptic else { return }
-                swipeAccumulator += event.scrollingDeltaX
-
-                if let pc = pageController {
-                    let pageWidth = pc.view.frame.width
-                    guard pageWidth > 0 else { return }
-                    let threshold = pageWidth * 0.15
-                    if abs(swipeAccumulator) > threshold {
-                        hasPlayedSwipeHaptic = true
-                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                    }
-                }
-            }
-
-            if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
-                swipeAccumulator = 0
-            }
-        }
-
-        // MARK: - Delegate
-
-        func pageController(
-            _ pageController: NSPageController,
-            identifierFor object: Any
-        ) -> NSPageController.ObjectIdentifier {
-            return .container
-        }
-
-        func pageController(
-            _ pageController: NSPageController,
-            viewControllerForIdentifier identifier: NSPageController.ObjectIdentifier
-        ) -> NSViewController {
-            let viewController = PlatformPageView.ContainerViewController()
-            viewController.coordinator = self
-            return viewController
-        }
-
-        func pageController(
-            _ pageController: NSPageController,
-            prepare viewController: NSViewController, with object: Any?
-        ) {
-            guard let viewController = viewController as? PlatformPageView.ContainerViewController else {
-                return
-            }
-            if let value = object as? SelectionValue {
-                viewController.prepare(value)
-            }
-        }
-
-        func pageControllerDidEndLiveTransition(_ pageController: NSPageController) {
-            hasPlayedSwipeHaptic = false
-            pageController.completeTransition()
-            parent.selection = selectedValue(in: pageController) ?? parent.selection
-        }
-
-        func pageController(
-            _ pageController: NSPageController,
-            didTransitionTo object: Any
-        ) {
-            guard let value = object as? SelectionValue else {
-                return
-            }
-            // If we have reached the end, request more arranged objects around
-            // the currently selected value.
-            let lastValue = pageController.arrangedObjects.last as? SelectionValue
-            let firstValue = pageController.arrangedObjects.first as? SelectionValue
-            if value == lastValue || value == firstValue {
-                let (newObjects, selectedIndex) = parent.makeArrangedObjects(around: value)
-                pageController.arrangedObjects = newObjects
-                pageController.selectedIndex = selectedIndex
-                flushViewCache(in: pageController)
-            }
-        }
-
-        // MARK: - View Factory
-
-        /// Returns a hosting view for the specified value.
-        ///
-        /// The view is cached until flushed, so repeated calls will return the same view instance.
-        func makeView(for value: SelectionValue) -> NSView {
-            if let cached = viewCache[value] {
-                if let hostingView = cached as? PlatformPageView.HostingView {
-                    hostingView.rootView = parent.content(value)
-                    hostingView.coordinator = self
-                }
-                return cached
-            }
-            let view = PlatformPageView.HostingView(rootView: parent.content(value))
-            view.coordinator = self
-            viewCache[value] = view
+            let view = HostingView(rootView: parent.content(value))
+            views[value] = view
             return view
         }
 
-        /// Removes cached views that are no longer part of the controller's arranged objects.
-        func flushViewCache(in pageController: NSPageController) {
-            guard let currentValues = pageController.arrangedObjects as? [SelectionValue] else {
+        /// Shows `value` with no animation and drops pages that are no longer neighbours.
+        func show(_ value: SelectionValue) {
+            current = value
+            let keep = Set([value, parent.previous(value), parent.next(value)].compactMap { $0 })
+            views = views.filter { keep.contains($0.key) }
+            pager?.present(view(for: value))
+        }
+
+        func refresh(to value: SelectionValue, animated: Bool) {
+            guard value != current else {
+                if let current { _ = view(for: current) }
                 return
             }
-            for value in viewCache.keys {
-                if currentValues.contains(value) == false {
-                    viewCache.removeValue(forKey: value)
-                }
-            }
+            guard animated, let pager, let from = current else { return show(value) }
+            let forward = parent.next(from) == value
+            pager.animate(to: view(for: value), forward: forward) { [weak self] in self?.show(value) }
         }
 
-        // MARK: - Navigation
-
-        /// Returns the currently selected value as represented by the currently selected view controller.
-        func selectedValue(in pageController: NSPageController) -> SelectionValue? {
-            guard let container = pageController.selectedViewController as? PlatformPageView.ContainerViewController else {
-                return nil
-            }
-            return container.representedValue
+        func neighbour(forward: Bool) -> SelectionValue? {
+            guard let current else { return nil }
+            return forward ? parent.next(current) : parent.previous(current)
         }
 
-        /// Navigates the page controller to the specified value.
-        func go(
-            to value: SelectionValue,
-            in pageController: NSPageController,
-            animated: Bool = false
-        ) {
-            let (arrangedObjects, selectedIndex) = parent.makeArrangedObjects(around: value)
-            pageController.arrangedObjects = arrangedObjects
-            if animated {
-                NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.18
-                    context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1)
-                    pageController.animator().selectedIndex = selectedIndex
-                } completionHandler: {
-                    pageController.completeTransition()
-                }
-            } else {
-                pageController.selectedIndex = selectedIndex
-            }
-        }
-    }
-}
-
-// MARK: - Container
-
-extension PlatformPageView {
-
-    class ContainerViewController: NSViewController {
-
-        weak var coordinator: Coordinator?
-
-        init() {
-            super.init(nibName: nil, bundle: nil)
-        }
-
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        override func loadView() {
-            self.view = NSView()
-            self.view.autoresizingMask = [.width, .height]
-        }
-
-        var representedValue: SelectionValue? {
-            representedObject as? SelectionValue
-        }
-
-        /// Updates the container view to present a hosting controller for the supplied value.
-        func prepare(_ value: SelectionValue) {
-            self.representedObject = value
-            // Clean up old view...
-            for subview in view.subviews {
-                subview.removeFromSuperview()
-            }
-            // Prepare new view...
-            guard let contentView = coordinator?.makeView(for: value) else {
-                return
-            }
-            contentView.autoresizingMask = [.width, .height]
-            contentView.frame = view.bounds
-            contentView.removeFromSuperview()
-            self.view.addSubview(contentView)
+        func commit(_ value: SelectionValue) {
+            show(value)
+            parent.selection = value
         }
     }
 
-    class HostingView: NSHostingView<Content> {
+    // MARK: - Views
 
+    final class SwipePagerView: NSView {
         weak var coordinator: Coordinator?
+        private var page: HostingView?
+        private var incoming: HostingView?
+        private var isTracking = false
 
-        // Forward horizontal scroll events to NSPageController for native
-        // 1:1 tracking swipes (direct manipulation feel).
+        private static var settle: TimeInterval { 0.18 }
+        private static var curve: CAMediaTimingFunction { CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1) }
+
+        override init(frame: NSRect) {
+            super.init(frame: frame)
+            wantsLayer = true
+            layer?.masksToBounds = true
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        func present(_ view: HostingView) {
+            if let incoming, incoming !== view { incoming.removeFromSuperview() }
+            incoming = nil
+            if let page, page !== view { page.removeFromSuperview() }
+            page = view
+            view.frame = bounds
+            view.autoresizingMask = [.width, .height]
+            if view.superview !== self { addSubview(view) }
+        }
+
+        override func layout() {
+            super.layout()
+            if !isTracking { page?.frame = bounds }
+        }
+
+        /// A programmatic change: the new page slides in from its side.
+        func animate(to view: HostingView, forward: Bool, completion: @escaping () -> Void) {
+            guard let page, !isTracking else { return completion() }
+            place(view)
+            setOffset(0, page: page, incoming: view, forward: forward)
+            run(to: forward ? -bounds.width : bounds.width, page: page, incoming: view, forward: forward, completion: completion)
+        }
+
         override func wantsForwardedScrollEvents(for axis: NSEvent.GestureAxis) -> Bool {
-            return axis == .horizontal
+            axis == .horizontal
         }
 
         override func scrollWheel(with event: NSEvent) {
-            // Track horizontal swipe progress for haptic feedback
-            coordinator?.trackSwipeHaptic(event)
-            // Vertical scrolls go to SwiftUI for normal list scrolling
-            super.scrollWheel(with: event)
+            guard !isTracking,
+                  event.phase == .began,
+                  event.hasPreciseScrollingDeltas,
+                  NSEvent.isSwipeTrackingFromScrollEventsEnabled,
+                  abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY),
+                  let coordinator, let page
+            else { return super.scrollWheel(with: event) }
+
+            let previous = coordinator.neighbour(forward: false)
+            let next = coordinator.neighbour(forward: true)
+            guard previous != nil || next != nil else { return super.scrollWheel(with: event) }
+
+            isTracking = true
+            var target: (value: SelectionValue, view: HostingView, forward: Bool)?
+            var samples: [(amount: CGFloat, time: TimeInterval)] = []
+            var playedHaptic = false
+            let width = bounds.width
+
+            // Positive amounts drag the page right, toward the previous space.
+            event.trackSwipeEvent(
+                options: [.lockDirection, .clampGestureAmount],
+                dampenAmountThresholdMin: next == nil ? 0 : -1,
+                max: previous == nil ? 0 : 1
+            ) { [weak self] amount, phase, _, stop in
+                guard let self else { stop.pointee = true; return }
+                let forward = amount < 0
+                if amount != 0, target?.forward != forward, let value = forward ? next : previous {
+                    let view = coordinator.view(for: value)
+                    target = (value, view, forward)
+                    self.place(view)
+                }
+
+                switch phase {
+                case .began, .changed:
+                    samples.append((amount, ProcessInfo.processInfo.systemUptime))
+                    if samples.count > 4 { samples.removeFirst() }
+                    self.setOffset(amount * width, page: page, incoming: target?.view, forward: target?.forward ?? forward)
+                    if !playedHaptic, abs(amount) > 0.15 {
+                        playedHaptic = true
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    }
+                case .ended, .cancelled:
+                    // Take over from the system's momentum with a short animation of our own.
+                    stop.pointee = true
+                    let velocity = Self.velocity(samples)
+                    let commits = phase == .ended && target.map {
+                        $0.forward == (amount < 0)
+                            && (abs(amount) > 0.3 || ($0.forward ? velocity < -0.8 : velocity > 0.8))
+                    } == true
+                    if let target, commits {
+                        self.run(to: target.forward ? -width : width, page: page, incoming: target.view, forward: target.forward) {
+                            self.isTracking = false
+                            coordinator.commit(target.value)
+                        }
+                    } else {
+                        let incoming = target?.view
+                        self.run(to: 0, page: page, incoming: incoming, forward: target?.forward ?? true) {
+                            incoming?.removeFromSuperview()
+                            self.incoming = nil
+                            self.isTracking = false
+                            page.frame = self.bounds
+                        }
+                    }
+                default:
+                    break
+                }
+            }
+        }
+
+        private func place(_ view: HostingView) {
+            if let incoming, incoming !== view { incoming.removeFromSuperview() }
+            incoming = view
+            view.autoresizingMask = []
+            view.frame = bounds
+            if view.superview !== self { addSubview(view) }
+        }
+
+        private func setOffset(_ offset: CGFloat, page: NSView, incoming: NSView?, forward: Bool) {
+            page.frame = bounds.offsetBy(dx: offset, dy: 0)
+            incoming?.frame = bounds.offsetBy(dx: offset + (forward ? bounds.width : -bounds.width), dy: 0)
+        }
+
+        private func run(to offset: CGFloat, page: NSView, incoming: NSView?, forward: Bool,
+                         completion: @escaping () -> Void) {
+            let width = bounds.width
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Self.settle
+                context.timingFunction = Self.curve
+                page.animator().frame = bounds.offsetBy(dx: offset, dy: 0)
+                incoming?.animator().frame = bounds.offsetBy(dx: offset + (forward ? width : -width), dy: 0)
+            } completionHandler: {
+                MainActor.assumeIsolated { completion() }
+            }
+        }
+
+        /// Gesture amount per second over the last few samples, so a quick flick commits.
+        private static func velocity(_ samples: [(amount: CGFloat, time: TimeInterval)]) -> CGFloat {
+            guard let first = samples.first, let last = samples.last, last.time > first.time else { return 0 }
+            return (last.amount - first.amount) / (last.time - first.time)
         }
     }
-}
 
-extension NSPageController.ObjectIdentifier {
-    static let container = "container"
-}
-
-extension PlatformPageViewConfiguration.Transition {
-
-    /// Map to native page controller style.
-    var platform: NSPageController.TransitionStyle {
-        switch self {
-        case .scroll:
-            return .horizontalStrip
-        case .historyStack:
-            return .stackHistory
-        case .bookStack:
-            return .stackBook
-        default:
-            return .horizontalStrip
+    final class HostingView: NSHostingView<Content> {
+        // Scroll views inside forward horizontal swipes up to the pager.
+        override func wantsForwardedScrollEvents(for axis: NSEvent.GestureAxis) -> Bool {
+            axis == .horizontal
         }
     }
 }

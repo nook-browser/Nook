@@ -26,12 +26,4 @@ final class GradientColorManager: ObservableObject {
             accentNSColor = NSColor(gradient.primaryColor)
         }
     }
-
-    /// Animate to a space's accent (active window space switch).
-    func transition(to gradient: SpaceGradient) {
-        withAnimation(NookDesign.Motion.standard) {
-            accentColor = gradient.primaryColor
-            accentNSColor = NSColor(gradient.primaryColor)
-        }
-    }
 }
