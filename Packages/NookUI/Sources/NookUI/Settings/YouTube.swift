@@ -11,14 +11,15 @@ import SwiftUI
 import NookDesign
 import NookTweaks
 
-public struct SettingsYouTubeTab: View {
+/// YouTube's sections of the Tweaks tab; the caller supplies the Form.
+public struct YouTubeSettingsSections: View {
     @Environment(NookSettingsService.self) var nookSettings
 
     public init() {}
 
     public var body: some View {
         @Bindable var settings = nookSettings
-        Form {
+        Group {
             Section {
                 Picker("Videos per row", selection: $settings.youTubeVideosPerRow) {
                     Text("Automatic").tag(0)
@@ -32,12 +33,12 @@ public struct SettingsYouTubeTab: View {
                 Toggle("Disable hover previews", isOn: $settings.youTubeNoHoverPreview)
                 #endif
             } header: {
-                Text("Layout")
+                Text("YouTube")
             } footer: {
                 Text("Videos per row applies to Home, Subscriptions, and channel pages. Frame thumbnails show a still from the video instead of the uploader's thumbnail.")
             }
 
-            Section("Hide") {
+            Section("Hide on YouTube") {
                 Toggle("Shorts", isOn: $settings.youTubeHideShorts)
                 ForEach(YouTubeHomeSection.allCases) { section in
                     Toggle("Home: \(section.displayName)", isOn: Binding(
@@ -57,7 +58,7 @@ public struct SettingsYouTubeTab: View {
             }
 
             if nookSettings.sponsorBlockEnabled {
-                Section("Categories") {
+                Section("SponsorBlock Categories") {
                     ForEach(SponsorBlockCategory.allCases) { category in
                         Picker(selection: Binding(
                             get: {
@@ -91,7 +92,6 @@ public struct SettingsYouTubeTab: View {
                 }
             }
         }
-        .formStyle(.grouped)
     }
 
     private func sponsorBlockCategoryColor(_ category: SponsorBlockCategory) -> Color {

@@ -37,12 +37,10 @@ struct SettingsWindow: View {
             get: { navigation.currentSettingsTab },
             set: { paths[$0] = []; navigation.currentSettingsTab = $0 }
         )
-        // Like System Settings: the sidebar always shows, and the selected page names the window.
-        NavigationSplitView(columnVisibility: .constant(.all)) {
+        // A fixed sidebar beside the page, not a NavigationSplitView, whose sidebar is glass.
+        HStack(spacing: 0) {
             SettingsSidebar(selection: selection, query: $query)
-                .toolbar(removing: .sidebarToggle)
-                .searchable(text: $query, placement: .sidebar, prompt: "Search")
-        } detail: {
+            Divider()
             SettingsDetailPane(
                 tab: tab,
                 path: Binding(get: { paths[tab] ?? [] }, set: { paths[tab] = $0 }),
@@ -57,6 +55,7 @@ struct SettingsWindow: View {
             .environmentObject(gradientColorManager)
             // Rebuilds the pane per tab so each opens scrolled to the top.
             .id(tab)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onChange(of: location) { old, _ in
             if restoring { restoring = false; return }
@@ -66,7 +65,6 @@ struct SettingsWindow: View {
         }
         // System Settings is resizable and remembers its size; a fixed frame is not.
         .frame(minWidth: windowSize.width, minHeight: windowSize.height)
-        .navigationSplitViewStyle(.balanced)
         .toggleStyle(SettingsSwitch())
         .background(UnifiedToolbarWindow())
     }
@@ -96,10 +94,9 @@ private struct SettingsLocation: Hashable {
     let path: [SettingsSubPane]
 }
 
-/// System Settings keeps both buttons showing, disabled when there is nowhere to go.
-/// Applied to the root pane and to every pushed pane, since a push replaces the toolbar.
-/// The `.navigation` group style is what draws System Settings' one capsule with the divider;
-/// a plain ControlGroup collapses into the overflow menu.
+/// Both buttons always show, disabled when there is nowhere to go, as standalone icon buttons
+/// with the toolbar's glass backing hidden. Applied to the root pane and every pushed pane,
+/// since a push replaces the toolbar.
 private struct HistoryToolbar: ViewModifier {
     let canGoBack: Bool
     let canGoForward: Bool
@@ -109,20 +106,15 @@ private struct HistoryToolbar: ViewModifier {
     func body(content: Content) -> some View {
         content.toolbar {
             ToolbarItem(placement: .navigation) {
-                ControlGroup {
-                    Button(action: goBack) {
-                        Image(systemName: "chevron.backward")
-                    }
-                    .disabled(!canGoBack)
-
-                    Button(action: goForward) {
-                        Image(systemName: "chevron.forward")
-                    }
-                    .disabled(!canGoForward)
+                HStack(spacing: NookDesign.Spacing.xxs) {
+                    Button("Back", systemImage: "chevron.backward", action: goBack)
+                        .disabled(!canGoBack)
+                    Button("Forward", systemImage: "chevron.forward", action: goForward)
+                        .disabled(!canGoForward)
                 }
-                .controlGroupStyle(.navigation)
-                .controlSize(.large)
+                .nookIconButtons()
             }
+            .sharedBackgroundVisibility(.hidden)
         }
     }
 }
@@ -154,47 +146,71 @@ private struct SettingsSidebar: View {
     private let sidebarWidth: CGFloat = 230
 
     var body: some View {
-        List(selection: $selection) {
-            ForEach(Array(SettingsTabs.sidebarGroups.enumerated()), id: \.offset) { _, group in
-                let tabs = group.tabs.filter { tab in
-                    guard tab.matches(query) else { return false }
-                    return tab != .extensions || browserManager.extensionManager != nil
-                }
-                if !tabs.isEmpty {
-                    Section {
-                        ForEach(tabs, id: \.self) { tab in
-                            sidebarRow(tab)
+        VStack(spacing: NookDesign.Spacing.md) {
+            SidebarMenuSearchField(prompt: "Search", text: $query)
+            ScrollView {
+                VStack(alignment: .leading, spacing: NookDesign.Spacing.rowGap) {
+                    ForEach(Array(SettingsTabs.sidebarGroups.enumerated()), id: \.offset) { _, group in
+                        let tabs = group.tabs.filter { tab in
+                            guard tab.matches(query) else { return false }
+                            return tab != .extensions || browserManager.extensionManager != nil
                         }
-                    } header: {
-                        // A group header reads as a filter label while searching, so it goes.
-                        if let title = group.title, query.isEmpty {
-                            Text(title)
+                        if !tabs.isEmpty {
+                            // A group header reads as a filter label while searching, so it goes.
+                            if let title = group.title, query.isEmpty {
+                                Text(title)
+                                    .font(NookDesign.Font.captionStrong)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, NookDesign.Spacing.rowPadding)
+                                    .padding(.top, NookDesign.Spacing.sectionGap)
+                            }
+                            ForEach(tabs, id: \.self) { tab in
+                                SettingsSidebarRow(tab: tab, isSelected: selection == tab) {
+                                    selection = tab
+                                }
+                            }
                         }
                     }
                 }
             }
+            .scrollIndicators(.never)
         }
-        .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(sidebarWidth)
+        .padding(NookDesign.Spacing.sidebarInset)
+        .frame(width: sidebarWidth)
     }
+}
 
-    private func sidebarRow(_ tab: SettingsTabs) -> some View {
-        Label {
-            Text(tab.name)
-        } icon: {
-            Image(systemName: tab.icon)
-                .imageScale(.small)
-                .foregroundStyle(.white)
-                .frame(
-                    width: NookDesign.Size.settingsChip,
-                    height: NookDesign.Size.settingsChip
-                )
-                .background(
-                    NookDesign.Radius.shape(NookDesign.Radius.sm)
-                        .fill(tab.iconColor.gradient)
-                )
+/// A settings tab in the sidebar, drawn like a sidebar tab row.
+private struct SettingsSidebarRow: View {
+    let tab: SettingsTabs
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: NookDesign.Spacing.md) {
+                Image(systemName: tab.icon)
+                    .imageScale(.small)
+                    .foregroundStyle(.white)
+                    .frame(width: NookDesign.Size.settingsChip, height: NookDesign.Size.settingsChip)
+                    .background(NookDesign.Radius.shape(NookDesign.Radius.sm).fill(tab.iconColor.gradient))
+                Text(tab.name)
+                    .font(NookDesign.Font.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, NookDesign.Spacing.rowPadding)
+            .frame(height: NookDesign.Size.row)
+            .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+            .background(!isSelected && isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
+            .nookRowSelection(isSelected)
+            .nookElevation(isSelected ? .raised : .flat)
         }
-        .tag(tab)
+        .buttonStyle(.plain)
+        .animation(NookDesign.Motion.quick, value: isHovering)
+        .onHoverTracking { isHovering = $0 }
     }
 }
 
@@ -236,10 +252,8 @@ private struct SettingsDetailPane: View {
                     PrivacySettingsView()
                 case .adBlocker:
                     SettingsAdBlockerTab()
-                case .youTube:
-                    SettingsYouTubeTab()
-                case .socialMedia:
-                    SettingsSocialMediaTab()
+                case .tweaks:
+                    SettingsTweaksTab()
                 case .airTrafficControl:
                     AirTrafficControlSettingsView()
                 case .spaces:
@@ -250,8 +264,6 @@ private struct SettingsDetailPane: View {
                     if let extensionManager = browserManager.extensionManager {
                         ExtensionsSettingsView(extensionManager: extensionManager)
                     }
-                case .advanced:
-                    AdvancedSettingsView()
                 }
             }
             .navigationTitle(tab.name)

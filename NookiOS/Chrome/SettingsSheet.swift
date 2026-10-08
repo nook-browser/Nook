@@ -28,9 +28,8 @@ struct SettingsSheet: View {
                     row(.adBlocker)
                     row(.airTrafficControl)
                 }
-                Section("Tweaks") {
-                    row(.youTube)
-                    row(.socialMedia)
+                Section {
+                    row(.tweaks)
                 }
             }
             .navigationTitle("Settings")
@@ -60,8 +59,7 @@ struct SettingsSheet: View {
         case .spaces: SpacesSettingsView()
         case .adBlocker: SettingsAdBlockerTab()
         case .airTrafficControl: AirTrafficControlSettingsView()
-        case .youTube: SettingsYouTubeTab()
-        case .socialMedia: SettingsSocialMediaTab()
+        case .tweaks: SettingsTweaksTab()
         }
     }
 }

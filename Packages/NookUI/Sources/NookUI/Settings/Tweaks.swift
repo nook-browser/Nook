@@ -1,6 +1,6 @@
 // Licensed under GPL-3.0. See LICENSE.
 //
-//  SocialMedia.swift
+//  Tweaks.swift
 //  Nook
 //
 //  Created by Claude on 15/09/2026.
@@ -10,7 +10,8 @@ import SwiftUI
 import NookDesign
 import NookSettings
 
-public struct SettingsSocialMediaTab: View {
+/// Per-site tweaks: media downloads, Facebook, YouTube and SponsorBlock.
+public struct SettingsTweaksTab: View {
     @Environment(NookSettingsService.self) var nookSettings
     @State private var newSite = ""
     @State private var showingAddSite = false
@@ -55,6 +56,8 @@ public struct SettingsSocialMediaTab: View {
             } footer: {
                 Text("Hide Reels removes the Reels carousel from the news feed. Hide suggested posts removes posts from groups, pages, and people you don't follow, and People You May Know. Friends, followed pages, and groups stay.")
             }
+
+            YouTubeSettingsSections()
         }
         .formStyle(.grouped)
         .alert("Add Site", isPresented: $showingAddSite) {
