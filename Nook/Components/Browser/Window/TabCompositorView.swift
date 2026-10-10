@@ -9,8 +9,9 @@ import NookWeb
 // MARK: - Tab Compositor Manager
 
 /// Unloads pages no window shows: idle timeout, loaded-page budget, memory pressure and app
-/// backgrounding, per the tab management mode. Visible panes, media, capture, pinned tabs and
-/// favorites are exempt.
+/// backgrounding, per the tab management mode. Visible panes, audible media, picture-in-picture,
+/// capture, pinned tabs and favorites are exempt. A hidden page gives up its back/forward page
+/// cache first, pinned or not.
 @MainActor
 class TabCompositorManager: ObservableObject {
     private static let log = Logger(
@@ -41,6 +42,13 @@ class TabCompositorManager: ObservableObject {
     }
 
     private(set) var mode: TabManagementMode = .standard
+
+    /// How long a page stays off screen before its back/forward page cache goes. Measured at
+    /// 3.5 GB across six tabs after three navigations each, none of it freed by WebKit.
+    private static let pageCacheTrimDelay: TimeInterval = 300
+
+    /// First timer stage: the page cache trim, or the unload when that comes sooner.
+    private var firstStageDelay: TimeInterval { min(Self.pageCacheTrimDelay, mode.unloadTimeout) }
 
     private var tabs: TabsController? { browserManager?.tabs }
 
@@ -78,7 +86,7 @@ class TabCompositorManager: ObservableObject {
         // A timer rescheduled within the last minute is close enough; handleTimeout re-arms
         // for any remaining time.
         if let timer = unloadTimers[itemID], timer.isValid,
-           timer.fireDate.timeIntervalSinceNow > mode.unloadTimeout - 60 {
+           timer.fireDate.timeIntervalSinceNow > firstStageDelay - 60 {
             return
         }
         restartTimer(for: itemID)
@@ -122,7 +130,7 @@ class TabCompositorManager: ObservableObject {
 
     private func restartTimer(for itemID: UUID, after interval: TimeInterval? = nil) {
         unloadTimers[itemID]?.invalidate()
-        let timer = Timer.scheduledTimer(withTimeInterval: interval ?? mode.unloadTimeout, repeats: false) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: interval ?? firstStageDelay, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.handleTimeout(itemID)
             }
@@ -147,20 +155,28 @@ class TabCompositorManager: ObservableObject {
             lastAccessTimes.removeValue(forKey: itemID)
             return
         }
+        let idle = lastAccessTimes[itemID].map { Date().timeIntervalSince($0) } ?? mode.unloadTimeout
+        if idle < firstStageDelay - 1 {
+            restartTimer(for: itemID, after: firstStageDelay - idle)
+            return
+        }
+        // Still on screen: look again after another stage, since nothing reports a page leaving.
+        guard tabs?.isOnScreen(itemID) != true else {
+            restartTimer(for: itemID)
+            return
+        }
+        session.clearPageCache()
         // Pinned tabs and favorites are never unloaded automatically, so re-arming would only
         // wake the app.
         if isPinned(itemID) { return }
 
-        if let lastAccess = lastAccessTimes[itemID] {
-            let remaining = mode.unloadTimeout - Date().timeIntervalSince(lastAccess)
-            if remaining > 1 {
-                restartTimer(for: itemID, after: remaining)
-                return
-            }
+        let remaining = mode.unloadTimeout - idle
+        if remaining > 1 {
+            restartTimer(for: itemID, after: remaining)
+            return
         }
-
         guard canUnloadInactive(session) else {
-            restartTimer(for: itemID)
+            restartTimer(for: itemID, after: mode.unloadTimeout)
             return
         }
         evict(session, reason: .timeout)
@@ -180,7 +196,9 @@ class TabCompositorManager: ObservableObject {
     /// unloading one page deliberately bypasses this policy.
     func canUnloadInactive(_ session: PageSession) -> Bool {
         guard let tabs, !session.isUnloaded, !tabs.isOnScreen(session.itemID) else { return false }
-        if session.hasPiPActive || session.hasPlayingVideo || session.hasPlayingAudio || session.hasAudioContent {
+        // A silent video nobody can see is not a reason to keep a page: news sites loop muted
+        // clips forever. Audible media and picture-in-picture are.
+        if session.hasPiPActive || session.hasPlayingAudio || session.hasAudioContent {
             return false
         }
         var views = browserManager?.webViewCoordinator?.getAllWebViews(for: session.itemID) ?? []
@@ -230,7 +248,10 @@ class TabCompositorManager: ObservableObject {
         lastMemoryPressureTime = now
         lastMemoryPressureWasCritical = critical
 
-        guard let sessions = tabs?.sessions else { return }
+        guard let tabs else { return }
+        let sessions = tabs.sessions
+        // Costs nothing the user can see until they press Back, so it goes before any page does.
+        sessions.filter { !tabs.isOnScreen($0.itemID) }.forEach { $0.clearPageCache() }
         let candidates = sessions.filter(canUnloadInactive).sorted { importance($0) < importance($1) }
         guard !candidates.isEmpty else { return }
 

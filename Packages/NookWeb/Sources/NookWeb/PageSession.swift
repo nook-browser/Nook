@@ -218,6 +218,10 @@ public final class PageSession: NSObject, Identifiable {
     /// The existing web view. Never creates one.
     public var webView: WKWebView? { primaryWebView }
 
+    /// Ends the suspended pages WebKit keeps for instant Back and Forward, each a whole
+    /// WebContent process. History stays; Back loads the page again.
+    public func clearPageCache() { primaryWebView?.nookClearBackForwardCache() }
+
     /// The web view, created on first access.
     public var activeWebView: WKWebView {
         if primaryWebView == nil {
@@ -821,5 +825,13 @@ private extension WKWebView {
         guard responds(to: selector) else { return false }
         typealias Getter = @convention(c) (AnyObject, Selector) -> Bool
         return unsafeBitCast(method(for: selector), to: Getter.self)(self, selector)
+    }
+
+    /// `_clearBackForwardCache`, private on both platforms.
+    func nookClearBackForwardCache() {
+        let selector = NSSelectorFromString("_clearBackForwardCache")
+        guard responds(to: selector) else { return }
+        typealias Call = @convention(c) (AnyObject, Selector) -> Void
+        unsafeBitCast(method(for: selector), to: Call.self)(self, selector)
     }
 }
