@@ -35,4 +35,5 @@ sed -i '' -E "s/commit \`[0-9a-f]{40}\`/commit \`$SHA\`/" "$DEST/README.md"
 node scripts/build-scriptlets.mjs
 node scripts/build-redirects.mjs
 node scripts/check-redirects.mjs
+node scripts/check-scriptlet-globals.mjs
 echo "Now run: cd Nook/ThirdParty/AdblockRustFFI && cargo test --test real_lists_scriptlets"
