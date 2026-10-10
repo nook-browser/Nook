@@ -21,7 +21,12 @@ import NookWeb
 @MainActor
 final class DevMCPServer {
     static let shared = DevMCPServer()
-    static let port: NWEndpoint.Port = 47823
+    /// `-NookDevMCPPort 47900` moves the server so a second copy can run beside the installed app.
+    static let port: NWEndpoint.Port = {
+        let arguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        let override = (arguments["NookDevMCPPort"] as? String).flatMap { UInt16($0) }
+        return override.flatMap { NWEndpoint.Port(rawValue: $0) } ?? 47823
+    }()
 
     nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "DevMCP")
     nonisolated private static let maxBody = 8 * 1024 * 1024
@@ -279,6 +284,16 @@ final class DevMCPServer {
             name: "user_scripts",
             description: "User scripts installed in the selected tab: first line, injection time, main frame only, length.",
             parameters: ["type": "object", "properties": [:] as [String: Any]]
+        ),
+        AIToolDefinition(
+            name: "pages",
+            description: "Every live page in every window: url, WebContent pid, loaded, on screen, in a window, document.visibilityState.",
+            parameters: ["type": "object", "properties": [:] as [String: Any]]
+        ),
+        AIToolDefinition(
+            name: "clear_page_cache",
+            description: "Drop the back/forward page cache of every live page that is not on screen (hidden: false for all). Returns how many views were cleared.",
+            parameters: ["type": "object", "properties": ["all": ["type": "boolean"]]]
         )
     ]
 
@@ -457,6 +472,29 @@ final class DevMCPServer {
                 }
                 return text(json(scripts))
 
+            case "pages":
+                var pages: [[String: Any]] = []
+                for page in bm.tabs.sessions {
+                    var entry: [String: Any] = [
+                        "url": page.url.absoluteString,
+                        "loaded": !page.isUnloaded,
+                        "onScreen": bm.tabs.isOnScreen(page.itemID)
+                    ]
+                    if let wv = page.webView {
+                        entry["pid"] = wv.nookWebProcessIdentifier
+                        entry["inWindow"] = wv.window != nil
+                        entry["visibility"] = (try? await wv.evaluateJavaScript("document.visibilityState")) as? String ?? ""
+                    }
+                    pages.append(entry)
+                }
+                return text(json(pages))
+
+            case "clear_page_cache":
+                let all = args["all"] as? Bool ?? false
+                let views = bm.tabs.sessions.filter { !$0.isUnloaded && (all || !bm.tabs.isOnScreen($0.itemID)) }
+                views.forEach { $0.clearPageCache() }
+                return text("Cleared \(views.count)")
+
             default:
                 return text("Unknown tool: \(name)", error: true)
             }
@@ -529,5 +567,15 @@ private struct HTTPRequest {
         path = String(start[1])
         self.headers = headers
         body = buffer.subdata(in: bodyStart..<(bodyStart + length))
+    }
+}
+
+private extension WKWebView {
+    /// `_webProcessIdentifier`: the pid of the WebContent process behind this view, 0 when it has none.
+    var nookWebProcessIdentifier: Int32 {
+        let selector = NSSelectorFromString("_webProcessIdentifier")
+        guard responds(to: selector) else { return 0 }
+        typealias Getter = @convention(c) (AnyObject, Selector) -> Int32
+        return unsafeBitCast(method(for: selector), to: Getter.self)(self, selector)
     }
 }
