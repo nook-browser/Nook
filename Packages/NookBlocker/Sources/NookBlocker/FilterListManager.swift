@@ -179,12 +179,10 @@ public final class FilterListManager {
     /// Runs off the main actor, so the caller passes a snapshot of the enabled set.
     nonisolated func loadFilterSources(enabledFilenames: Set<String>) -> [Source] {
         let optional = Self.optionalLists.filter { enabledFilenames.contains($0.filename) }
-        var sources: [Source] = []
-        for list in Self.defaultLists + optional {
-            if let content = loadCachedList(list) {
-                sources.append(Source(rules: FilterPreprocessor.apply(content), isTrusted: list.isTrusted))
-            }
-        }
+        // Launch waits on this, and the lists are a few large files: one per core.
+        var sources = (Self.defaultLists + optional).concurrentMap { list in
+            loadCachedList(list).map { Source(rules: FilterPreprocessor.apply($0), isTrusted: list.isTrusted) }
+        }.compactMap { $0 }
         for name in Self.bundledOnlyLists {
             if let url = Bundle.module.url(forResource: name, withExtension: "txt", subdirectory: "Resources"),
                let content = try? String(contentsOf: url, encoding: .utf8) {
@@ -196,11 +194,11 @@ public final class FilterListManager {
 
     /// The same rules as `loadFilterSources`, flattened for the content rule list compiler.
     nonisolated static func lines(from sources: [Source]) -> [String] {
-        sources.flatMap { source in
+        sources.concurrentMap { source in
             source.rules.components(separatedBy: "\n")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
-        }
+        }.flatMap { $0 }
     }
 
     // MARK: - Expiry
@@ -209,7 +207,7 @@ public final class FilterListManager {
     /// Defaults to 24h; clamped to 1h...7d.
     nonisolated func updateInterval(for list: FilterList) -> TimeInterval {
         let fallback: TimeInterval = 24 * 3600
-        guard let content = loadCachedList(list) else { return fallback }
+        guard let content = loadCachedListHeader(list) else { return fallback }
         for line in content.split(separator: "\n", maxSplits: 40, omittingEmptySubsequences: true) {
             guard line.hasPrefix("!") else { if !line.hasPrefix("[") { break } else { continue } }
             let lower = line.lowercased()
@@ -238,23 +236,31 @@ public final class FilterListManager {
 
     // MARK: - Private
 
-    private nonisolated func loadCachedList(_ list: FilterList) -> String? {
-        let file = cacheDir.appendingPathComponent(list.filename)
-        if let content = try? String(contentsOf: file, encoding: .utf8) {
-            return content
-        }
-
-        // Fallback: load bundled default copy if available
-        // Try exact filename first, then with "-default" suffix (e.g., nook-filters-default.txt)
+    /// Where a list can be read from: the downloaded copy, then the bundled one under its own
+    /// name or with a "-default" suffix (nook-filters-default.txt).
+    private nonisolated func listFiles(_ list: FilterList) -> [URL] {
         let bundleName = (list.filename as NSString).deletingPathExtension
         let bundleExt = (list.filename as NSString).pathExtension
-        for name in [bundleName, bundleName + "-default"] {
-            if let bundleURL = Bundle.module.url(forResource: name, withExtension: bundleExt, subdirectory: "Resources"),
-               let bundleContent = try? String(contentsOf: bundleURL, encoding: .utf8) {
-                return bundleContent
-            }
+        return [cacheDir.appendingPathComponent(list.filename)] + [bundleName, bundleName + "-default"].compactMap {
+            Bundle.module.url(forResource: $0, withExtension: bundleExt, subdirectory: "Resources")
         }
+    }
 
+    private nonisolated func loadCachedList(_ list: FilterList) -> String? {
+        for file in listFiles(list) {
+            if let content = try? String(contentsOf: file, encoding: .utf8) { return content }
+        }
+        return nil
+    }
+
+    /// The first 4 KB, enough for the header. The expiry check runs on the main actor for every
+    /// list right after activation, and reading each list whole held launch up by 385 ms.
+    private nonisolated func loadCachedListHeader(_ list: FilterList) -> String? {
+        for file in listFiles(list) {
+            guard let handle = try? FileHandle(forReadingFrom: file) else { continue }
+            defer { try? handle.close() }
+            if let data = try? handle.read(upToCount: 4096) { return String(decoding: data, as: UTF8.self) }
+        }
         return nil
     }
 
@@ -415,5 +421,16 @@ public final class FilterListManager {
     private func storedHash(for list: FilterList) -> String? {
         let hashFile = cacheDir.appendingPathComponent(list.filename + ".sha256")
         return try? String(contentsOf: hashFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private extension Array {
+    /// `map` across cores with the order kept. For a few large items, not many small ones.
+    func concurrentMap<T>(_ transform: (Element) -> T) -> [T] {
+        var out = [T?](repeating: nil, count: count)
+        out.withUnsafeMutableBufferPointer { slots in
+            DispatchQueue.concurrentPerform(iterations: count) { slots[$0] = transform(self[$0]) }
+        }
+        return out.map { $0! }
     }
 }

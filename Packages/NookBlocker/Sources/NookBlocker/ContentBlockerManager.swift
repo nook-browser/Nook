@@ -188,14 +188,18 @@ public final class ContentBlockerManager: NSObject {
         }.value
         cbLog.info("Loaded \(rules.count) filter rules in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - loadStart), privacy: .public)s")
 
+        // The four consumers share nothing but the input, and launch waits on all of them.
         let compileStart = CFAbsoluteTimeGetCurrent()
+        let stripper = Task.detached(priority: .userInitiated) { TrackingParamStripper(rules: rules) }
+        let skipper = Task.detached(priority: .userInitiated) { URLSkipper(rules: rules) }
+        async let engineBuilt: Void = advancedRulesEngine.build(sources: sources)
         let result = await ContentRuleListCompiler.compile(rules: rules)
         compiledRuleLists = result.ruleLists
         cbLog.info("Compile completed in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - compileStart), privacy: .public)s")
 
-        await advancedRulesEngine.build(sources: sources)
-        trackingParamStripper = await Task.detached(priority: .userInitiated) { TrackingParamStripper(rules: rules) }.value
-        urlSkipper = await Task.detached(priority: .userInitiated) { URLSkipper(rules: rules) }.value
+        await engineBuilt
+        trackingParamStripper = await stripper.value
+        urlSkipper = await skipper.value
         cbLog.info("urlskip: \(self.urlSkipper?.ruleCount ?? 0, privacy: .public) rules")
         lastRulesHash = result.rulesHash
     }

@@ -484,6 +484,9 @@ class BrowserManager: ObservableObject {
         }
         self.gradientColorManager.setImmediate(.default)
         self.contentBlockerManager.attach(host: self)
+        // Launch waits on the blocker, so it starts here and not when the first window appears,
+        // about 190 ms later. NookApp's own call then finds it already under way.
+        self.contentBlockerManager.setEnabled(settings.blockCrossSiteTracking || settings.adBlockerEnabled)
         self.siteRoutingManager.host = self
         SocialImageTweaks.downloader = self
         // Note: tracking protection will be configured after settingsManager injection
@@ -535,7 +538,7 @@ class BrowserManager: ObservableObject {
     /// when selected.
     private func applyStartupLoadMode(for windowState: BrowserWindowState) {
         // Content blocking should be active before the first navigation, otherwise the startup
-        // page loads without scriptlets/cosmetics. Warm activation is ~0.3s (cache hit); a cold
+        // page loads without scriptlets/cosmetics. Warm activation is ~0.55s (cache hit); a cold
         // compile after a list change is several seconds, so the wait is capped at 2s.
         if !startupWaitedForContentBlocker, !contentBlockerManager.isEnabled,
            let activation = contentBlockerManager.activationTask {
