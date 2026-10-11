@@ -196,6 +196,8 @@ struct NookApp: App {
             settingsManager.lastSeenVersion = version
         }
 
+        EscapeKey.onEscape = { [weak browserManager] in browserManager?.escapePressed(in: $0) }
+
         // Set up window lifecycle callbacks
         windowRegistry.onWindowRegister = { [weak browserManager] windowState in
             browserManager?.setupWindowState(windowState)
@@ -288,6 +290,7 @@ struct BackgroundWindowModifier: NSViewRepresentable {
 
                 // The toolbar makes the title band 66pt tall, most of it over the page.
                 TitlebarDragRegion.letAppKitViewsBlockDrags(in: window)
+                EscapeKey.route(in: window)
 
                 window.minSize = NSSize(width: 470, height: 382)
                 window.contentMinSize = NSSize(width: 470, height: 382)

@@ -104,6 +104,20 @@ extension BrowserManager {
         tabs.activeWindowSession?.requestPictureInPicture()
     }
 
+    /// An Escape the page left alone (`EscapeKey`). Closes the innermost thing the window shows:
+    /// a page's own full screen, then Peek. The window itself stays as it is.
+    func escapePressed(in nsWindow: NSWindow) {
+        guard let state = windowRegistry?.windows.values.first(where: { $0.window === nsWindow }) else { return }
+        let peek = peekManager.windowId == state.id ? peekManager.page : nil
+        let shown = [peek, tabs.selectedSession(in: state)]
+            + [splitManager.leftTabId(for: state.id), splitManager.rightTabId(for: state.id)].map { $0.flatMap(tabs.session(for:)) }
+        if let view = shown.compactMap({ $0?.webView }).first(where: { $0.fullscreenState != .notInFullscreen }) {
+            view.evaluateJavaScript("document.exitFullscreen()")
+        } else if peek != nil {
+            peekManager.dismissPeek()
+        }
+    }
+
     /// Check if the current tab in the active window has video content
     func currentTabHasVideoContent() -> Bool {
         return tabs.activeWindowSession?.hasVideoContent ?? false
