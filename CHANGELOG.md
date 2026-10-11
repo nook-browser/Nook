@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.2
+
+### Changed
+
+- Faster Launch (up to 3x faster in testing)
+- Background tabs use less memory
+- Escape closes Peek
+- Performance pass: memory, CPU and energy measured against other browsers
+
+### Fixed
+
+- Escape leaving full screen
+- High CPU on some sites
+- Pinned tab reset arrow moving on hover
+- Bugs
+
 ## 1.2.1
 
 ### Added
