@@ -58,7 +58,7 @@ public struct PinnedTabView<Icon: View>: View {
                     Button(action: onResetToPinnedURL) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(NookDesign.Font.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                             .frame(width: NookDesign.Size.cornerButton, height: NookDesign.Size.cornerButton)
                             .contentShape(Rectangle())
                     }

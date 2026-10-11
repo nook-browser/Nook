@@ -20,6 +20,7 @@ public struct SpaceTab: View {
 
     @State private var isHovering: Bool = false
     @State private var isCloseHovering: Bool = false
+    @State private var isResetHovering: Bool = false
     @State private var draftName: String = ""
     @FocusState private var isTextFieldFocused: Bool
     @Environment(BrowserWindowState.self) private var windowState
@@ -116,44 +117,45 @@ public struct SpaceTab: View {
                         // Only a rename animates; a page changing its own title swaps without motion.
                         .animation(NookDesign.Motion.spring, value: item.customTitle)
                         // On hover the text ends before the close button.
-                        .nookTrailingFade(reserving: isHovering ? NookDesign.Size.row : 0)
+                        .nookTrailingFade(reserving: isHovering ? NookDesign.Size.row + (showsReset ? NookDesign.Size.rowButton : 0) : 0)
                         .textSelection(.disabled)
-                }
-
-                if tabs.hasLeftHome(item.id) {
-                    // Shows the page moved away from the pinned URL and resets to it. Shifts left
-                    // while the hover close button covers the trailing edge.
-                    Button { tabs.resetToHome(item.id) } label: {
-                        Image(systemName: "arrow.uturn.backward")
-                            .font(NookDesign.Font.caption)
-                            .foregroundStyle(.tertiary)
-                            .frame(width: NookDesign.Size.cornerButton, height: NookDesign.Size.cornerButton)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Reset to Pinned URL")
-                    .padding(.trailing, isHovering ? NookDesign.Size.rowButton : 0)
                 }
             }
             .overlay(alignment: .trailing) {
                 if isHovering {
-                    // Synced loaded tabs: "-" unloads the page; unloaded synced tabs: "x" removes the item;
-                    // tabs section: "x" closes.
-                    let useUnload = tabs.isSynced(item.id) && !isUnloaded
-                    Button(action: {
-                        if useUnload { tabs.unload(item.id) } else { tabs.remove(item.id) }
-                    }) {
-                        Image(systemName: useUnload ? "minus" : "xmark")
-                            .font(NookDesign.Font.secondary)
-                            .foregroundColor(.primary)
-                            .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
-                            .background(isCloseHovering ? NookDesign.Surface.fillPressed : Color.clear)
-                            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help(useUnload ? "Unload" : "Close")
-                    .onHoverTracking { hovering in
-                        isCloseHovering = hovering
+                    HStack(spacing: 0) {
+                        // Resets a pinned tab whose page left its pinned URL; sits left of close and fades in with it.
+                        if showsReset {
+                            Button { tabs.resetToHome(item.id) } label: {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(NookDesign.Font.secondary)
+                                    .foregroundStyle(.primary)
+                                    .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+                                    .background(isResetHovering ? NookDesign.Surface.fillPressed : Color.clear)
+                                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Reset to Pinned URL")
+                            .onHoverTracking { isResetHovering = $0 }
+                        }
+                        // Synced loaded tabs: "-" unloads the page; unloaded synced tabs: "x" removes the item;
+                        // tabs section: "x" closes.
+                        let useUnload = tabs.isSynced(item.id) && !isUnloaded
+                        Button(action: {
+                            if useUnload { tabs.unload(item.id) } else { tabs.remove(item.id) }
+                        }) {
+                            Image(systemName: useUnload ? "minus" : "xmark")
+                                .font(NookDesign.Font.secondary)
+                                .foregroundColor(.primary)
+                                .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+                                .background(isCloseHovering ? NookDesign.Surface.fillPressed : Color.clear)
+                                .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help(useUnload ? "Unload" : "Close")
+                        .onHoverTracking { hovering in
+                            isCloseHovering = hovering
+                        }
                     }
                 }
             }
@@ -205,6 +207,8 @@ public struct SpaceTab: View {
     private var isCurrentTab: Bool {
         tabs.selectedItemID(in: windowState) == item.id
     }
+
+    private var showsReset: Bool { tabs.hasLeftHome(item.id) }
 
     private var backgroundColor: Color {
         if isCurrentTab {
