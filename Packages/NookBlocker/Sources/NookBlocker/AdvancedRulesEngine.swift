@@ -39,8 +39,8 @@ public final class AdvancedRulesEngine {
 
     /// Build (or rebuild) the lookup engine from the raw filter rules.
     /// adblock-rust parses filter syntax directly, so there is no intermediate
-    /// "advanced rules text" of the kind SafariConverterLib produced, and no
-    /// serialized warm start to reuse.
+    /// "advanced rules text" of the kind SafariConverterLib produced. The parsed
+    /// engine itself is saved and restored by `BlockerEngine`.
     func build(sources: [FilterListManager.Source]) async {
         await engine.build(sources: sources)
     }

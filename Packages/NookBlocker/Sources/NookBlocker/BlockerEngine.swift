@@ -17,6 +17,7 @@
 //  Foundation only; nothing here is AppKit-specific.
 //
 
+import CryptoKit
 import Foundation
 import NookAdblockFFI
 import OSLog
@@ -41,30 +42,24 @@ public final class BlockerEngine {
             return
         }
         let start = CFAbsoluteTimeGetCurrent()
-        let payload = sources.map { ["rules": $0.rules, "trusted": $0.isTrusted] as [String: Any] }
-        guard let data = try? JSONSerialization.data(withJSONObject: payload),
-              let text = String(data: data, encoding: .utf8) else {
-            log.error("Could not encode filter lists for the engine")
-            return
-        }
         let resources = ScriptletResources.json()
-        let built = await Task.detached(priority: .userInitiated) { () -> UnsafeMutableRawPointer? in
-            // Pass the byte count, not strlen: a NUL in one list would otherwise
-            // cut off every list after it.
-            var utf8 = text
-            let engine = utf8.withUTF8 { buf in
-                nook_adblock_engine_from_lists(
-                    UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count)
+        let (built, restored) = await Task.detached(priority: .userInitiated) { () -> (UnsafeMutableRawPointer?, Bool) in
+            let key = Self.cacheKey(for: sources)
+            var engine = Self.restore(matching: key)
+            let restored = engine != nil
+            if engine == nil {
+                engine = Self.parse(sources)
+                if let engine { Self.save(engine, key: key) }
             }
-            guard let engine else { return nil }
-            if var resources {
+            // Resources are not part of the saved bytes, so both paths install them.
+            if let engine, var resources {
                 let ok = resources.withUTF8 { buf in
                     nook_adblock_engine_use_resources(
                         engine, UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count)
                 }
                 if !ok { log.error("Scriptlet resource set rejected by the engine") }
             }
-            return engine
+            return (engine, restored)
         }.value
 
         clear()
@@ -75,7 +70,69 @@ public final class BlockerEngine {
         }
         let trusted = sources.filter(\.isTrusted).count
         log.info("Engine sources: \(sources.count, privacy: .public) list(s), \(trusted, privacy: .public) trusted, resources: \(resources != nil ? "yes" : "no", privacy: .public)")
-        log.info("Blocker engine built in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - start), privacy: .public)s")
+        log.info("Blocker engine \(restored ? "restored" : "built", privacy: .public) in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - start), privacy: .public)s")
+    }
+
+    nonisolated private static func parse(_ sources: [FilterListManager.Source]) -> UnsafeMutableRawPointer? {
+        let payload = sources.map { ["rules": $0.rules, "trusted": $0.isTrusted] as [String: Any] }
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              var text = String(data: data, encoding: .utf8) else {
+            log.error("Could not encode filter lists for the engine")
+            return nil
+        }
+        // Pass the byte count, not strlen: a NUL in one list would otherwise
+        // cut off every list after it.
+        return text.withUTF8 { buf in
+            nook_adblock_engine_from_lists(
+                UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count)
+        }
+    }
+
+    // MARK: - Saved engine
+
+    /// The parsed engine, saved so a launch with unchanged lists skips the parse (0.3 s).
+    /// One file: a 32-byte key, then `Engine::serialize` bytes.
+    nonisolated private static var cacheFile: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("\(Bundle.main.bundleIdentifier ?? "Nook")/ContentBlocker/Cache/engine.dat")
+    }
+
+    /// Everything the parse depends on: each list's text and trust, and the build, since a new
+    /// build can carry a new parser. Bump the leading tag if the Rust side changes without one.
+    nonisolated private static func cacheKey(for sources: [FilterListManager.Source]) -> Data {
+        var hasher = SHA256()
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        hasher.update(data: Data("engine-v1 \(build)".utf8))
+        for source in sources {
+            // The length keeps two lists from hashing like one list split elsewhere.
+            hasher.update(data: Data("\n\(source.isTrusted) \(source.rules.utf8.count)\n".utf8))
+            var rules = source.rules
+            rules.withUTF8 { hasher.update(bufferPointer: UnsafeRawBufferPointer($0)) }
+        }
+        return Data(hasher.finalize())
+    }
+
+    nonisolated private static func restore(matching key: Data) -> UnsafeMutableRawPointer? {
+        guard let saved = try? Data(contentsOf: cacheFile, options: .mappedIfSafe),
+              saved.count > key.count, saved.prefix(key.count) == key else { return nil }
+        // A file the Rust side cannot read comes back nil, and the caller parses.
+        return saved.dropFirst(key.count).withUnsafeBytes { bytes in
+            nook_adblock_engine_deserialize(bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count)
+        }
+    }
+
+    nonisolated private static func save(_ engine: UnsafeMutableRawPointer, key: Data) {
+        var length = 0
+        guard let bytes = nook_adblock_engine_serialize(engine, &length) else { return }
+        defer { nook_adblock_buffer_free(bytes, length) }
+        var file = key
+        file.append(bytes, count: length)
+        do {
+            try FileManager.default.createDirectory(at: cacheFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try file.write(to: cacheFile, options: .atomic)
+        } catch {
+            log.error("Could not save the engine: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func clear() {

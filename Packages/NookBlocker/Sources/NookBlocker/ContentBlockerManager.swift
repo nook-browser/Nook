@@ -190,8 +190,13 @@ public final class ContentBlockerManager: NSObject {
 
         // The four consumers share nothing but the input, and launch waits on all of them.
         let compileStart = CFAbsoluteTimeGetCurrent()
-        let stripper = Task.detached(priority: .userInitiated) { TrackingParamStripper(rules: rules) }
-        let skipper = Task.detached(priority: .userInitiated) { URLSkipper(rules: rules) }
+        let texts = sources.map(\.rules)
+        let stripper = Task.detached(priority: .userInitiated) {
+            TrackingParamStripper(rules: FilterLineSearch.lines(containing: "removeparam", in: texts))
+        }
+        let skipper = Task.detached(priority: .userInitiated) {
+            URLSkipper(rules: FilterLineSearch.lines(containing: "urlskip=", in: texts))
+        }
         async let engineBuilt: Void = advancedRulesEngine.build(sources: sources)
         let result = await ContentRuleListCompiler.compile(rules: rules)
         compiledRuleLists = result.ruleLists

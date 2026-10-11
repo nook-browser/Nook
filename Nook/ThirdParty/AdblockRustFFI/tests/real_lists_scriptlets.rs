@@ -89,3 +89,55 @@ fn redirect_resources_inject_as_scriptlets() {
         out.injected_script.len()
     );
 }
+
+/// The app restores the engine from `Engine::serialize` bytes at launch instead
+/// of parsing the lists again. Resources are not part of those bytes and are
+/// installed again; everything else, trusted permissions included, has to come back.
+#[test]
+fn serialized_engine_answers_like_the_built_one() {
+    let built = engine();
+    let bytes = built.serialize();
+    let mut restored = Engine::default();
+    restored.deserialize(&bytes).expect("own bytes deserialize");
+    let resources: Vec<Resource> =
+        serde_json::from_str(&fs::read_to_string(res_dir().join("scriptlets.json")).unwrap()).unwrap();
+    restored.use_resources(resources);
+
+    for url in [
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://www.cnn.com/",
+        "https://www.facebook.com/",
+        "https://www.reddit.com/r/swift/",
+        "https://www.nytimes.com/",
+        "https://spaste.com/",
+        "https://example.com/",
+    ] {
+        let a = built.url_cosmetic_resources(url);
+        let b = restored.url_cosmetic_resources(url);
+        // adblock-rust emits scriptlets in hash order, new on every call, so compare the lines as a set.
+        let lines = |script: &str| { let mut l: Vec<String> = script.lines().map(String::from).collect(); l.sort(); l };
+        assert!(lines(&a.injected_script) == lines(&b.injected_script), "scriptlets differ for {url}");
+        assert_eq!(a.hide_selectors, b.hide_selectors, "hide selectors differ for {url}");
+        assert_eq!(a.procedural_actions, b.procedural_actions, "procedural filters differ for {url}");
+        assert_eq!(a.exceptions, b.exceptions, "exceptions differ for {url}");
+        assert_eq!(a.generichide, b.generichide, "generichide differs for {url}");
+    }
+    // A trusted-* scriptlet only resolves with the permission bit: it survived.
+    assert!(restored
+        .url_cosmetic_resources("https://www.youtube.com/watch?v=x")
+        .injected_script
+        .contains("trustedReplaceFetchResponse("));
+
+    use adblock::request::Request;
+    for (url, source, kind) in [
+        ("https://securepubads.g.doubleclick.net/tag/js/gpt.js", "https://www.cnn.com/", "script"),
+        ("https://cdn-media.brightline.tv/config/v3/1018.json", "https://www.cnn.com/", "xmlhttprequest"),
+        ("https://t.co/abc", "https://x.com/home", "document"),
+        ("https://www.cnn.com/index.css", "https://www.cnn.com/", "stylesheet"),
+    ] {
+        let request = Request::new(url, source, kind, "GET").unwrap();
+        let (a, b) = (built.check_network_request(&request), restored.check_network_request(&request));
+        assert_eq!(a.should_block(), b.should_block(), "network verdict differs for {url}");
+        assert_eq!(a.redirect, b.redirect, "redirect differs for {url}");
+    }
+}
