@@ -57,12 +57,17 @@ fn youtube_watch_page_gets_ubos_ad_stack() {
         "jsonPruneXhrResponse(",
         "trustedReplaceFetchResponse(",
         "trustedReplaceXhrResponse(",
-        // The inline globals, and uBO's current request-level technique.
+        // The inline globals.
         "setConstant(\"ytInitialPlayerResponse.adPlacements\"",
-        "trustedJsonEditXhrRequest(",
     ] {
         assert!(out.injected_script.contains(needle), "no {needle} for a youtube watch page");
     }
+    // uBO's request-level technique: it edited the player XHR until October 2026 and edits
+    // what goes into JSON.stringify since. Either list vintage must resolve one of them.
+    assert!(
+        ["trustedJsonEditXhrRequest(", "trustedEditInboundObject("].iter().any(|n| out.injected_script.contains(n)),
+        "no request-level edit for a youtube watch page"
+    );
     // The preventFetch/preventXhr assertions that stood here went with the
     // nook-filters-default rules they checked: they faked a successful empty
     // response for ptracking and api/stats/ads, which is a detection surface for
