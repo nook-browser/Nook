@@ -29,6 +29,8 @@ struct CommandPaletteView: View {
     @State private var userTypedText: String = ""
     @State private var isNavigatingSuggestion: Bool = false
     @State private var activeSiteSearch: SiteSearchEntry? = nil
+    /// Set by a deletion, so backspacing out of a completion does not bring it straight back.
+    @State private var completionSuppressed: Bool = false
 
     private var siteSearchMatch: SiteSearchEntry? {
         guard activeSiteSearch == nil else { return nil }
@@ -45,14 +47,31 @@ struct CommandPaletteView: View {
         (NSApp.keyWindow?.firstResponder as? NSTextInputClient)?.hasMarkedText() ?? false
     }
 
+    /// The Return row first, then what the search found. Index -1 means the Return row.
     private var visibleSuggestions: [SearchManager.SearchSuggestion] {
+        var found = searchManager.suggestions
         if activeSiteSearch != nil {
-            return searchManager.suggestions.filter {
+            found = found.filter {
                 if case .search = $0.type { return true }
                 return false
             }
         }
-        return searchManager.suggestions
+        guard let primary = primarySuggestion else { return found }
+        let rest = found.filter { row in
+            switch row.type {
+            case .tab, .history: return true
+            case .url, .search: return row.text.caseInsensitiveCompare(primary.text) != .orderedSame
+            }
+        }
+        return [primary] + rest.prefix(4)
+    }
+
+    /// What Return does with what was typed: the completed host, the address, or a search.
+    private var primarySuggestion: SearchManager.SearchSuggestion? {
+        let typed = userTypedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty else { return nil }
+        if let host = completionHost { return SearchManager.SearchSuggestion(text: host, type: .url) }
+        return SearchManager.SearchSuggestion(text: typed, type: activeSiteSearch == nil && isLikelyURL(typed) ? .url : .search)
     }
 
     let commandPaletteWidth: CGFloat = 765
@@ -148,11 +167,10 @@ struct CommandPaletteView: View {
                                             text = ""
                                             return .handled
                                         }
-                                        // Tab accepts the top suggestion when nothing is selected
-                                        if selectedSuggestionIndex < 0 && !visibleSuggestions.isEmpty {
-                                            selectedSuggestionIndex = 0
-                                            isNavigatingSuggestion = true
-                                            text = displayTextForSuggestion(visibleSuggestions[0])
+                                        if acceptInlineCompletion() { return .handled }
+                                        // With nothing selected, Tab moves to the first row under the Return row.
+                                        if selectedSuggestionIndex < 0 && visibleSuggestions.count > 1 {
+                                            navigateSuggestions(direction: 1)
                                             return .handled
                                         }
                                         // Tab with a selected suggestion = accept it (same as Enter)
@@ -167,6 +185,10 @@ struct CommandPaletteView: View {
                                         if isComposing { return .ignored }
                                         handleReturn()
                                         return .handled
+                                    }
+                                    .onKeyPress(.rightArrow) {
+                                        if isComposing || !caretIsAtEnd { return .ignored }
+                                        return acceptInlineCompletion() ? .handled : .ignored
                                     }
                                     .onKeyPress(.upArrow) {
                                         if isComposing { return .ignored }
@@ -189,8 +211,9 @@ struct CommandPaletteView: View {
                                         commandPalette.close()
                                         return .handled
                                     }
-                                    .onKeyPress(.delete) {
+                                    .onKeyPress(keys: [.delete]) { press in
                                         if isComposing { return .ignored }
+                                        if press.modifiers.contains(.shift), removeSelectedHistoryRow() { return .handled }
                                         if activeSiteSearch != nil && text.isEmpty {
                                             withAnimation(NookDesign.Motion.standard) {
                                                 activeSiteSearch = nil
@@ -199,8 +222,9 @@ struct CommandPaletteView: View {
                                         }
                                         return .ignored
                                     }
-                                    .onKeyPress(characters: CharacterSet(charactersIn: "\u{7F}")) { _ in
+                                    .onKeyPress(characters: CharacterSet(charactersIn: "\u{7F}")) { press in
                                         if isComposing { return .ignored }
+                                        if press.modifiers.contains(.shift), removeSelectedHistoryRow() { return .handled }
                                         if activeSiteSearch != nil && text.isEmpty {
                                             withAnimation(NookDesign.Motion.standard) {
                                                 activeSiteSearch = nil
@@ -214,6 +238,7 @@ struct CommandPaletteView: View {
                                             isNavigatingSuggestion = false
                                             return
                                         }
+                                        completionSuppressed = newValue.count < userTypedText.count
                                         userTypedText = newValue
                                         searchManager.searchSuggestions(
                                             for: newValue
@@ -263,7 +288,7 @@ struct CommandPaletteView: View {
                             if !visibleSuggestions.isEmpty {
                                 CommandPaletteSuggestionsListView(
                                     suggestions: visibleSuggestions,
-                                    selectedIndex: $selectedSuggestionIndex,
+                                    selectedIndex: max(selectedSuggestionIndex, 0),
                                     hoveredIndex: $hoveredSuggestionIndex,
                                     onSelect: { suggestion in
                                         selectSuggestion(suggestion)
@@ -350,9 +375,8 @@ struct CommandPaletteView: View {
 
     // MARK: - Suggestions List Subview
     private struct CommandPaletteSuggestionsListView: View {
-        @EnvironmentObject var gradientColorManager: GradientColorManager
         let suggestions: [SearchManager.SearchSuggestion]
-        @Binding var selectedIndex: Int
+        let selectedIndex: Int
         @Binding var hoveredIndex: Int?
         let onSelect: (SearchManager.SearchSuggestion) -> Void
 
@@ -361,12 +385,13 @@ struct CommandPaletteView: View {
                 ForEach(suggestions.indices, id: \.self) { index in
                     let suggestion = suggestions[index]
                     let isHovered = hoveredIndex == index
-                    row(for: suggestion, isSelected: selectedIndex == index)
+                    // Rows keep the text roles on a neutral fill, so the chosen row reads on any accent.
+                    row(for: suggestion, isSelected: false)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 11)
                         .background(
                             selectedIndex == index
-                                ? gradientColorManager.accentColor
+                                ? NookDesign.Surface.fillPressed
                                 : isHovered
                                     ? NookDesign.Surface.fill
                                     : .clear
@@ -375,7 +400,7 @@ struct CommandPaletteView: View {
                             NookDesign.Radius.shape(NookDesign.Radius.sm)
                         )
                         .font(NookDesign.Font.label)
-                        .foregroundStyle(selectedIndex == index ? .white : .primary)
+                        .foregroundStyle(.primary)
                         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
                         .onHoverTracking { hovering in
                             withAnimation(NookDesign.Motion.quick) {
@@ -448,15 +473,8 @@ struct CommandPaletteView: View {
         {
             let suggestion = visibleSuggestions[selectedSuggestionIndex]
             selectSuggestion(suggestion)
-        } else if let host = autofillTarget {
-            // The inline completion is showing, so Return takes the host it shows, not a search.
-            selectSuggestion(SearchManager.SearchSuggestion(text: host, type: .url))
-        } else {
-            let newSuggestion = SearchManager.SearchSuggestion(
-                text: text,
-                type: isLikelyURL(text) ? .url : .search
-            )
-            selectSuggestion(newSuggestion)
+        } else if let primary = primarySuggestion {
+            selectSuggestion(primary)
         }
     }
 
@@ -494,13 +512,27 @@ struct CommandPaletteView: View {
         browserManager.tabs.open(url: url, in: windowState, placement: navigateCurrent ? .replaceCurrent : .newTab)
     }
 
+    /// Makes the inline completion the field's text. False when none is showing.
+    private func acceptInlineCompletion() -> Bool {
+        guard let host = autofillTarget else { return false }
+        text = host
+        return true
+    }
+
+    private var caretIsAtEnd: Bool {
+        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return true }
+        return editor.selectedRange().location >= (editor.string as NSString).length
+    }
+
     private func navigateSuggestions(direction: Int) {
         let maxIndex = visibleSuggestions.count - 1
 
+        // Row 0 is the Return row, which index -1 already stands for.
         if direction > 0 {
-            selectedSuggestionIndex = min(selectedSuggestionIndex + 1, maxIndex)
+            guard maxIndex >= 1 else { return }
+            selectedSuggestionIndex = min(max(selectedSuggestionIndex, 0) + 1, maxIndex)
         } else {
-            selectedSuggestionIndex = max(selectedSuggestionIndex - 1, -1)
+            selectedSuggestionIndex = selectedSuggestionIndex <= 1 ? -1 : selectedSuggestionIndex - 1
         }
 
         // Update text field to show selected suggestion's info
@@ -539,86 +571,36 @@ struct CommandPaletteView: View {
         return isLikelyURL(text) || autofillTarget != nil ? "globe" : "magnifyingglass"
     }
 
-    /// Host the field completes to inline, once it still prefixes what was typed. Nil while a
-    /// suggestion is selected by hand, since the field then holds that row's text instead.
-    private var autofillTarget: String? {
+    /// Host that what was typed completes to, while it still prefixes it.
+    private var completionHost: String? {
         guard activeSiteSearch == nil,
-              !text.isEmpty,
-              selectedSuggestionIndex == -1,
-              text == userTypedText,
+              !completionSuppressed,
+              !userTypedText.isEmpty,
               let host = searchManager.autofillHost,
-              host.count > text.count,
-              host.lowercased().hasPrefix(text.lowercased()) else { return nil }
+              host.count > userTypedText.count,
+              host.lowercased().hasPrefix(userTypedText.lowercased()) else { return nil }
         return host
+    }
+
+    /// The completion shown in the field. Nil while a suggestion is selected by hand, since the
+    /// field then holds that row's text instead.
+    private var autofillTarget: String? {
+        guard selectedSuggestionIndex == -1, text == userTypedText else { return nil }
+        return completionHost
+    }
+
+    /// Shift-Delete on a history row forgets that page and puts the typed text back.
+    private func removeSelectedHistoryRow() -> Bool {
+        guard selectedSuggestionIndex >= 0, selectedSuggestionIndex < visibleSuggestions.count,
+              case .history(let entry) = visibleSuggestions[selectedSuggestionIndex].type else { return false }
+        browserManager.historyManager.deleteHistoryEntry(entry.id)
+        selectedSuggestionIndex = -1
+        text = userTypedText
+        searchManager.searchSuggestions(for: userTypedText)
+        return true
     }
 
     private var inlineCompletionSuffix: String? {
         autofillTarget.map { String($0.dropFirst(text.count)) }
-    }
-
-    private func iconForSuggestion(_ suggestion: SearchManager.SearchSuggestion)
-        -> Image
-    {
-        switch suggestion.type {
-        case .tab(let tab):
-            return tab.favicon
-        case .history:
-            return Image(systemName: "globe")
-        case .url:
-            return Image(systemName: "link")
-        case .search:
-            return Image(systemName: "magnifyingglass")
-        }
-    }
-
-    @ViewBuilder
-    private func suggestionRow(
-        for suggestion: SearchManager.SearchSuggestion,
-        isSelected: Bool
-    ) -> some View {
-        switch suggestion.type {
-        case .tab(let tab):
-            TabSuggestionItem(tab: tab, isSelected: isSelected)
-                .foregroundStyle(AppColors.textPrimary)
-        case .history(let entry):
-            HistorySuggestionItem(entry: entry, isSelected: isSelected)
-                .foregroundStyle(AppColors.textPrimary)
-        case .url:
-            GenericSuggestionItem(
-                icon: Image(systemName: "link"),
-                text: suggestion.text,
-                isSelected: isSelected
-            )
-            .foregroundStyle(AppColors.textPrimary)
-        case .search:
-            GenericSuggestionItem(
-                icon: Image(systemName: "magnifyingglass"),
-                text: suggestion.text,
-                isSelected: isSelected
-            )
-            .foregroundStyle(AppColors.textPrimary)
-        }
-    }
-
-    private func urlForSuggestion(_ suggestion: SearchManager.SearchSuggestion)
-        -> URL?
-    {
-        switch suggestion.type {
-        case .history(let entry):
-            return entry.url
-        default:
-            return nil
-        }
-    }
-
-    private func isTabSuggestion(_ suggestion: SearchManager.SearchSuggestion)
-        -> Bool
-    {
-        switch suggestion.type {
-        case .tab:
-            return true
-        case .search, .url, .history:
-            return false
-        }
     }
 }

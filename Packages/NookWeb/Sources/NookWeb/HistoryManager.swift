@@ -194,6 +194,8 @@ actor HistoryStore {
         // stopping once this page plus its lookahead is satisfied.
         let start = offset
         let pageSize = limit
+        // Every word has to appear, in the title or the URL, in any order.
+        let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
         var matches: [HistoryEntry] = []
         var descriptor = FetchDescriptor<HistoryEntity>(predicate: visible(to: profile), sortBy: [SortDescriptor(\.lastVisited, order: .reverse)])
         descriptor.fetchLimit = 128
@@ -203,7 +205,7 @@ actor HistoryStore {
                 descriptor.fetchOffset = offset
                 descriptor.fetchLimit = min(128, 5000 - offset)
                 let entries = try modelContext.fetch(descriptor)
-                for entry in entries where entry.title.localizedCaseInsensitiveContains(query) || entry.url.localizedCaseInsensitiveContains(query) {
+                for entry in entries where words.allSatisfy({ entry.title.localizedCaseInsensitiveContains($0) || entry.url.localizedCaseInsensitiveContains($0) }) {
                     matches.append(HistoryEntry(from: entry))
                     if matches.count > start + pageSize {
                         return (Array(matches.dropFirst(start).prefix(pageSize)), true)
