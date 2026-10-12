@@ -3,8 +3,8 @@
 //  FavoritePreview.swift
 //  Nook
 //
-//  The card under a favorite the pointer rests on: the pages last visited on its site, and on
-//  github.com the person's open pull requests. Nothing is fetched until the pointer rests.
+//  The card under a favorite the pointer rests on: on github.com, the person's open pull
+//  requests. Nothing is fetched until the pointer rests.
 //
 
 import SwiftUI
@@ -21,7 +21,6 @@ final class FavoritePreview {
     struct Row: Identifiable, Hashable {
         let url: URL
         let title: String
-        let isPullRequest: Bool
         var id: URL { url }
     }
 
@@ -41,7 +40,7 @@ final class FavoritePreview {
     /// Time to travel from the tile into the card.
     private static let closeDelay: Duration = .milliseconds(200)
     private static let cacheAge: TimeInterval = 60
-    private static let rowLimit = 6
+    private static let rowLimit = 8
 
     func tileHover(_ item: Item, hovering: Bool, in window: BrowserWindowState, tabs: TabsController) {
         guard hovering else {
@@ -90,20 +89,10 @@ final class FavoritePreview {
 
     private func load(_ item: Item, tabs: TabsController) async -> [Row] {
         if let cached = cache[item.id], Date().timeIntervalSince(cached.at) < Self.cacheAge { return cached.rows }
-        guard let home = item.url, let host = home.host else { return [] }
-        var rows: [Row] = []
-        if host == "github.com", let spaceID = tabs.spaceID(of: item.id) {
-            rows = await tabs.pullRequests(inSpace: spaceID).map { Row(url: $0.url, title: $0.title, isPullRequest: true) }
-        }
-        let visited = await tabs.history?.searchHistory(query: host, offset: 0, limit: 40).entries ?? []
-        var seen = Set(rows.map(\.url) + [home])
-        var titles = Set(rows.map(\.title))
-        for entry in visited where entry.url.host == host && entry.url.path.count > 1 {
-            // One row per page: a site that puts state in the query gives many URLs one title.
-            guard seen.insert(entry.url).inserted, titles.insert(entry.displayTitle).inserted else { continue }
-            rows.append(Row(url: entry.url, title: entry.displayTitle, isPullRequest: false))
-        }
-        rows = Array(rows.prefix(Self.rowLimit))
+        // Only sites with something of their own to show get a card. github.com is the one so far.
+        guard item.url?.host == "github.com", let spaceID = tabs.spaceID(of: item.id) else { return [] }
+        let pulls = await tabs.pullRequests(inSpace: spaceID)
+        let rows = pulls.prefix(Self.rowLimit).map { Row(url: $0.url, title: $0.title) }
         cache[item.id] = (Date(), rows)
         return rows
     }
@@ -138,7 +127,7 @@ struct FavoritePreviewOverlay: View {
                             open(row.url, in: itemID)
                         } label: {
                             HStack(spacing: NookDesign.Spacing.md) {
-                                Image(systemName: row.isPullRequest ? "arrow.triangle.pull" : "clock")
+                                Image(systemName: "arrow.triangle.pull")
                                     .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                                     .foregroundStyle(.secondary)
                                 Text(row.title)
