@@ -60,6 +60,14 @@ extension PlatformImage {
 
 /// Hands a URL WebKit cannot load (mailto:, tel:, an app's own scheme) to the app registered for it.
 @MainActor func openWithSystem(_ url: URL) { NSWorkspace.shared.open(url) }
+
+/// Whether any installed app handles `url`.
+@MainActor func canOpenWithSystem(_ url: URL) -> Bool { NSWorkspace.shared.urlForApplication(toOpen: url) != nil }
+
+/// Display name of the app that would open `url`.
+@MainActor func systemAppName(for url: URL) -> String? {
+    NSWorkspace.shared.urlForApplication(toOpen: url)?.deletingPathExtension().lastPathComponent
+}
 #else
 import UIKit
 
@@ -109,6 +117,10 @@ extension PlatformImage {
 }
 
 @MainActor func openWithSystem(_ url: URL) { UIApplication.shared.open(url) }
+
+// canOpenURL needs every scheme declared in Info.plist, so iOS always asks and names no app.
+@MainActor func canOpenWithSystem(_ url: URL) -> Bool { true }
+@MainActor func systemAppName(for url: URL) -> String? { nil }
 #endif
 
 extension PlatformImage {

@@ -25,7 +25,17 @@ private func hostPortion(_ input: String) -> String {
   // Strip any path or query
   let beforePath = input.split(separator: "/", maxSplits: 1).first.map(String.init) ?? input
   let beforeQuery = beforePath.split(separator: "?", maxSplits: 1).first.map(String.init) ?? beforePath
-  return beforeQuery
+  return beforeQuery.split(separator: "#", maxSplits: 1).first.map(String.init) ?? beforeQuery
+}
+
+/// True when schemeless input names a host: localhost, an IP address, or dotted labels ending in
+/// a top-level domain. "3.14", "what." and "asp.net core" are searches.
+private func looksLikeHost(_ input: String) -> Bool {
+  if isLocalhost(input) { return true }
+  guard !input.contains(where: \.isWhitespace) else { return false }
+  let host = hostPortion(input)
+  if isIPAddress(host) { return true }
+  return host.wholeMatch(of: #/([\p{L}\p{N}-]+\.)+\p{L}[\p{L}\p{N}-]+(:\d+)?/#) != nil
 }
 
 public func normalizeURL(_ input: String, queryTemplate: String) -> String {
@@ -45,7 +55,7 @@ public func normalizeURL(_ input: String, queryTemplate: String) -> String {
     return "http://\(trimmed)"
   }
 
-  if trimmed.contains(".") && !trimmed.contains(" ") {
+  if looksLikeHost(trimmed) {
     // Local/private IP addresses default to http:// since they rarely serve HTTPS
     if isIPAddress(hostPortion(trimmed)) {
       return "http://\(trimmed)"
@@ -64,14 +74,6 @@ public func isLikelyURL(_ text: String) -> Bool {
 
   if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") { return true }
 
-  // localhost and IP addresses are URLs, not search queries
-  if isLocalhost(trimmed) { return true }
-
-  guard trimmed.contains(".") else { return false }
-
-  if isIPAddress(hostPortion(trimmed)) { return true }
-
-  return trimmed.contains(".com") || trimmed.contains(".org") ||
-    trimmed.contains(".net") || trimmed.contains(".io") ||
-    trimmed.contains(".co") || trimmed.contains(".dev")
+  // The same test normalizeURL navigates on, so the row shown is what Return does.
+  return looksLikeHost(trimmed)
 }

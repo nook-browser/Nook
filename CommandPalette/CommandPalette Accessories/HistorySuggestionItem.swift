@@ -9,7 +9,6 @@
 import SwiftUI
 import NookDesign
 import NookWeb
-import FaviconFinder
 import NookUI
 
 struct HistorySuggestionItem: View {
@@ -75,12 +74,8 @@ struct HistorySuggestionItem: View {
 
     private func fetchFavicon(for url: URL) async -> NSImage? {
         guard url.scheme == "http" || url.scheme == "https", let cacheKey = url.host else { return nil }
-        if let cached = await FaviconCache.shared.cachedImage(for: cacheKey) { return cached }
-        guard let image = try? await FaviconFinder(url: url).fetchFaviconURLs().download().largest().image?.image,
-              !Task.isCancelled
-        else { return nil }
-        FaviconCache.shared.store(image, for: cacheKey)
-        return image
+        // Cache only: a row shown for one keystroke must not start a network fetch.
+        return await FaviconCache.shared.cachedImage(for: cacheKey)
     }
 }
 

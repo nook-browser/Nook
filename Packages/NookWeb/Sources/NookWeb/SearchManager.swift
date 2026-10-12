@@ -125,22 +125,21 @@ public class SearchManager {
         }
 
         let tabs = Array(searchTabs(for: query).prefix(2))
-        let urlSuggestion: SearchSuggestion? = isLikelyURL(query)
-            ? SearchSuggestion(text: query, type: .url) : nil
-        let urlRows = urlSuggestion.map { [$0] } ?? []
-        // Paint what is already known for this keystroke, carrying each leg's last rows.
-        compose(urlRows: urlRows, tabs: tabs)
+        // Paint what is already known for this keystroke, carrying each leg's last rows. The
+        // palette puts its own row for the typed text above these.
+        compose(tabs: tabs)
 
         // History is a local lookup, so it runs on this keystroke rather than waiting for a pause
         // in typing. Only the network request is debounced.
         // ponytail: the scan is bounded at 5k rows; move it behind an index if a large history drags.
         historyTask = Task { [weak self] in
             guard let self else { return }
-            let history = Array(await self.searchHistory(for: query).prefix(3))
+            // Two spare rows, for when the first three turn out to be open tabs.
+            let history = Array(await self.searchHistory(for: query).prefix(5))
             guard !Task.isCancelled, self.searchGeneration == generation,
                   self.window?.spaceID == space else { return }
             self.historyRows = history
-            self.compose(urlRows: urlRows, tabs: tabs)
+            self.compose(tabs: tabs)
         }
 
         isLoading = true
@@ -151,25 +150,52 @@ public class SearchManager {
             guard !Task.isCancelled, self.searchGeneration == generation,
                   self.window?.spaceID == space else { return }
             self.webRows = webSuggestions
-            self.compose(urlRows: urlRows, tabs: tabs)
+            self.compose(tabs: tabs)
             self.isLoading = false
         }
     }
 
     /// Rebuilds the visible list from the query's local rows plus whatever each leg last returned.
-    @MainActor private func compose(urlRows: [SearchSuggestion], tabs: [SearchSuggestion]) {
-        updateSuggestionsIfNeeded(Array((urlRows + tabs + historyRows + webRows).prefix(5)))
+    @MainActor private func compose(tabs: [SearchSuggestion]) {
+        // A page that is already an open tab shows once, as the tab.
+        let open = Set(tabs.compactMap { row -> String? in
+            if case .tab(let match) = row.type { return Self.pageKey(match.url) }
+            return nil
+        })
+        let history = historyRows.filter { row in
+            if case .history(let entry) = row.type { return !open.contains(Self.pageKey(entry.url)) }
+            return true
+        }
+        updateSuggestionsIfNeeded(Array((tabs + Array(history.prefix(3)) + webRows).prefix(5)))
+    }
+
+    /// One key for a page however its URL was written: no scheme, `www.` or trailing slash.
+    private static func pageKey(_ url: URL) -> String {
+        var key = (url.host ?? "") + url.path + (url.query.map { "?" + $0 } ?? "")
+        if key.hasPrefix("www.") { key.removeFirst(4) }
+        if key.hasSuffix("/") { key.removeLast() }
+        return key.lowercased()
+    }
+
+    /// The words of a query. A row matches when every word is in its title or URL, in any order.
+    static func words(of query: String) -> [String] {
+        query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
     }
 
     @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
-        guard let tabs, let spaceID = window?.spaceID else { return [] }
-        let lowercaseQuery = query.lowercased()
-        let matches: [TabMatch] = tabs.items(inSpace: spaceID).compactMap { item in
+        guard let tabs, let window, let spaceID = window.spaceID else { return [] }
+        let words = Self.words(of: query)
+        // This space's tabs first, then the other spaces'. The page being looked at is not a
+        // tab to switch to.
+        let spaces = [spaceID] + tabs.spaces(visibleIn: window).map(\.id).filter { $0 != spaceID }
+        let items = spaces.flatMap { tabs.items(inSpace: $0) }.filter { $0.id != window.selectedItemID }
+        let here = Set(tabs.items(inSpace: spaceID).map(\.id))
+        let matches: [TabMatch] = items.compactMap { item in
             let session = tabs.session(for: item.id)
             guard let url = session?.url ?? tabs.device.openPages[item.id]?.url ?? item.url else { return nil }
             let title = item.customTitle.flatMap { $0.isEmpty ? nil : $0 } ?? session?.title ?? item.displayTitle
-            guard title.lowercased().contains(lowercaseQuery)
-                    || url.absoluteString.lowercased().contains(lowercaseQuery) else { return nil }
+            let haystack = title.lowercased() + " " + url.absoluteString.lowercased()
+            guard words.allSatisfy(haystack.contains) else { return nil }
             let favicon = session?.favicon
                 ?? url.host.flatMap { FaviconCache.shared.swiftUIImage(for: $0) }
                 ?? SwiftUI.Image(systemName: "globe")
@@ -177,9 +203,11 @@ public class SearchManager {
         }
         // Title matches first, then shorter titles.
         let sorted = matches.sorted { lhs, rhs in
-            let lhsTitle = lhs.title.lowercased().contains(lowercaseQuery)
-            let rhsTitle = rhs.title.lowercased().contains(lowercaseQuery)
+            let lhsTitle = words.allSatisfy(lhs.title.lowercased().contains)
+            let rhsTitle = words.allSatisfy(rhs.title.lowercased().contains)
             if lhsTitle != rhsTitle { return lhsTitle }
+            let lhsHere = here.contains(lhs.itemID), rhsHere = here.contains(rhs.itemID)
+            if lhsHere != rhsHere { return lhsHere }
             return lhs.title.count < rhs.title.count
         }
         return sorted.prefix(3).map { SearchSuggestion(text: $0.title, type: .tab($0)) }
@@ -188,8 +216,9 @@ public class SearchManager {
     @MainActor private func searchHistory(for query: String) async -> [SearchSuggestion] {
         guard let historyManager = historyManager else { return [] }
         
-        let lowercaseQuery = query.lowercased()
-        let historyEntries = await historyManager.searchHistory(query: query, offset: 0, limit: 20)
+        let words = Self.words(of: query)
+        // Enough matches that the sort below, not recency alone, picks the rows shown.
+        let historyEntries = await historyManager.searchHistory(query: query, offset: 0, limit: 100)
         
         let matchingHistory = historyEntries.entries.map {
             SearchSuggestion(text: $0.displayTitle, type: .history($0))
@@ -198,8 +227,8 @@ public class SearchManager {
         // Sort by relevance (title matches first, then URL matches, then by visit count and recency)
         let sortedHistory = matchingHistory.sorted { (lhs: SearchSuggestion, rhs: SearchSuggestion) -> Bool in
             if case .history(let lhsHistory) = lhs.type, case .history(let rhsHistory) = rhs.type {
-                let lhsTitleMatch = lhsHistory.title.lowercased().contains(lowercaseQuery)
-                let rhsTitleMatch = rhsHistory.title.lowercased().contains(lowercaseQuery)
+                let lhsTitleMatch = words.allSatisfy(lhsHistory.title.lowercased().contains)
+                let rhsTitleMatch = words.allSatisfy(rhsHistory.title.lowercased().contains)
                 
                 // First prioritize title matches
                 if lhsTitleMatch && !rhsTitleMatch {
