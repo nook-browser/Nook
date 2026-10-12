@@ -281,13 +281,20 @@ extension PageSession: WKNavigationDelegate {
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
         // mailto:, tel: and app schemes go to the system. A subframe needs a click, so an ad
-        // iframe cannot launch an app on its own.
+        // iframe cannot launch an app on its own; a page that was not clicked has to ask.
         if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
            !WKWebView.handlesURLScheme(scheme), scheme != "webkit-extension", scheme != "safari-web-extension"
         {
             decisionHandler(.cancel)
-            if navigationAction.targetFrame?.isMainFrame != false || navigationAction.navigationType == .linkActivated {
+            let clicked = navigationAction.navigationType == .linkActivated
+            guard navigationAction.targetFrame?.isMainFrame != false || clicked, canOpenWithSystem(url) else { return }
+            if clicked || scheme == "mailto" || scheme == "tel" {
                 openWithSystem(url)
+            } else if let alerts = controller?.alerts {
+                let message = systemAppName(for: url).map { "Open this link in \($0)?" } ?? "Open this link in another app?"
+                alerts.presentConfirm(
+                    message: message, host: webView.url?.host ?? "", over: webView, onSuppress: nil
+                ) { if $0 { openWithSystem(url) } }
             }
             return
         }

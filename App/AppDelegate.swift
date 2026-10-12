@@ -207,6 +207,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// through here, so this is the one place that guarantees the final save. Pages are not
     /// closed first: the WebContent processes exit with the app anyway.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if let count = browserManager?.downloadManager.activeDownloads.count, count > 0 {
+            let alert = NSAlert()
+            alert.messageText = "Quit while downloading?"
+            alert.informativeText = count == 1 ? "1 download will stop." : "\(count) downloads will stop."
+            alert.addButton(withTitle: "Quit")
+            alert.addButton(withTitle: "Cancel")
+            if alert.runModal() != .alertFirstButtonReturn { return .terminateCancel }
+        }
         let start = CFAbsoluteTimeGetCurrent()
         if let manager = browserManager {
             manager.tabs.flushSync()

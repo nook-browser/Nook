@@ -190,6 +190,14 @@ public struct TabContextMenu: View {
             }
 
             Button {
+                let title = tabs.title(for: item)
+                    .replacingOccurrences(of: "[", with: "\\[").replacingOccurrences(of: "]", with: "\\]")
+                actions?.copyToPasteboard("[\(title)](\(url.absoluteString))")
+            } label: {
+                Label("Copy Link as Markdown", systemImage: "link")
+            }
+
+            Button {
                 actions?.share(url)
             } label: {
                 Label("Share", systemImage: "square.and.arrow.up")
