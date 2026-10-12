@@ -7,6 +7,8 @@ import WebKit
 import AppKit
 import CoreAudio
 
+let appDidBecomeActive = NSApplication.didBecomeActiveNotification
+
 public enum PlatformUserAgent {
     /// Desktop Safari, so sites serve what they serve Safari on a Mac.
     public static let custom: String? =
@@ -60,6 +62,8 @@ extension PlatformImage {
 @MainActor func openWithSystem(_ url: URL) { NSWorkspace.shared.open(url) }
 #else
 import UIKit
+
+let appDidBecomeActive = UIApplication.didBecomeActiveNotification
 
 public enum PlatformUserAgent {
     /// nil keeps WebKit's own iPhone or iPad string, completed by applicationNameForUserAgent

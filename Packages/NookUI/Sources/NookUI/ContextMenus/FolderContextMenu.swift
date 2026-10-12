@@ -30,6 +30,14 @@ struct FolderContextMenu: View {
 
     var body: some View {
         Group {
+            if tabs.item(itemID)?.live != nil {
+                Button {
+                    tabs.refreshLiveFolder(itemID, force: true)
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                Divider()
+            }
             Button(action: onRename) {
                 Label("Rename Folder", systemImage: "pencil")
             }

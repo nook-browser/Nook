@@ -272,6 +272,16 @@ struct SpacesSideBarView: View {
                 Label("New Folder", systemImage: "folder.badge.plus")
             }
 
+            if !windowState.isIncognito {
+                Button {
+                    if let spaceID = windowState.spaceID {
+                        tabs.createPullRequestsFolder(in: spaceID)
+                    }
+                } label: {
+                    Label("New Pull Requests Folder", systemImage: "arrow.triangle.pull")
+                }
+            }
+
             Divider()
 
             Menu {

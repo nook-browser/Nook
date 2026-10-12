@@ -315,6 +315,7 @@ extension TabsController {
     private func remove(_ itemID: UUID, promotingChildren: Bool) {
         guard let owner = owner(ofItem: itemID) else { return }
         let ids = promotingChildren ? [itemID] : tree(owner).subtree(of: itemID)
+        if let item = tree(owner).item(itemID) { dismissFromLiveFolder(item) }
         moveSelectionOff(Set(ids))
         var closedEntry: ClosedEntry?
         let change = perform(owner, "remove") { tree in
@@ -451,7 +452,9 @@ extension TabsController {
         // ponytail: only the moved item is reported, not tabs inside a moved folder.
         let oldWindow = regularWindows.first { displayOrder(in: $0).contains(itemID) }
         let oldIndex = oldWindow.flatMap { displayOrder(in: $0).firstIndex(of: itemID) }
+        let before = tree(owner).item(itemID)
         guard perform(owner, "move", { try $0.move(itemID, to: parent, after: after, currentURL: currentURL) }) != nil else { return }
+        if let before, before.parent != parent { dismissFromLiveFolder(before) }
         guard case .main = owner else { return }
         let isSynced = tree.scope(of: itemID) == .synced
         if current != nil {

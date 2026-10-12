@@ -33,11 +33,11 @@ extension TabTree {
     }
 
     @discardableResult
-    public mutating func createFolder(id: UUID = UUID(), title: String, in parent: Parent, after: UUID?, now: Date = Date()) throws -> Change {
+    public mutating func createFolder(id: UUID = UUID(), title: String, in parent: Parent, after: UUID?, live: LiveSource? = nil, now: Date = Date()) throws -> Change {
         try validate(parent: parent, placing: nil, isFolder: true)
         var change = Change()
         let order = placeKey(in: parent, after: after, excluding: id, change: &change, now: now)
-        record(&change, item: Item(id: id, parent: parent, order: order, kind: .folder, customTitle: title, modifiedAt: now))
+        record(&change, item: Item(id: id, parent: parent, order: order, kind: .folder, customTitle: title, modifiedAt: now, live: live))
         return change
     }
 

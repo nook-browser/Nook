@@ -73,6 +73,14 @@ struct SidebarBottomBar: View {
                     tabs.createFolderForRename(in: .tabs(spaceID: spaceID), after: nil)
                 }
             }
+
+            if !windowState.isIncognito {
+                Button("New Pull Requests Folder", systemImage: "arrow.triangle.pull") {
+                    if let spaceID = windowState.spaceID {
+                        tabs.createPullRequestsFolder(in: spaceID)
+                    }
+                }
+            }
             
             Divider()
             

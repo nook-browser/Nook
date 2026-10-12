@@ -52,7 +52,7 @@ public struct TabFolderView: View {
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
                     .animation(NookDesign.Motion.standard, value: isOpen)
 
-                Image(systemName: isOpen ? "folder.fill" : "folder")
+                Image(systemName: item.live != nil ? "arrow.triangle.pull" : (isOpen ? "folder.fill" : "folder"))
                     .font(.system(size: NookDesign.Size.spaceIcon, weight: .medium))
                     .foregroundStyle(tabs.space(spaceID)?.accentColor ?? .secondary)
 
@@ -78,6 +78,13 @@ public struct TabFolderView: View {
                 }
 
                 Spacer(minLength: NookDesign.Spacing.xs)
+
+                if let status = tabs.liveStatus[item.id] {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(NookDesign.Font.caption)
+                        .foregroundStyle(.secondary)
+                        .help(status == .signedOut ? "Sign in to GitHub" : "Couldn't load pull requests")
+                }
 
                 if !isHovering {
                     Text("\(tabs.children(of: .folder(itemID: item.id)).count)")

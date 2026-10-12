@@ -50,6 +50,15 @@ public enum ItemKind: Codable, Hashable, Sendable {
     case folder
 }
 
+/// What fills a live folder. A struct, so a source a newer build adds still decodes here.
+public struct LiveSource: RawRepresentable, Codable, Hashable, Sendable {
+    public var rawValue: String
+    public init(rawValue: String) { self.rawValue = rawValue }
+
+    /// The person's open pull requests on github.com.
+    public static let githubPulls = LiveSource(rawValue: "githubPulls")
+}
+
 public struct Item: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
     public var parent: Parent
@@ -58,13 +67,16 @@ public struct Item: Identifiable, Codable, Hashable, Sendable {
     public var customTitle: String?
     public var modifiedAt: Date
     public var deletedAt: Date?
+    /// Set on a folder whose tabs follow a source (`reconcileLive`).
+    public var live: LiveSource?
 
-    public init(id: UUID = UUID(), parent: Parent, order: OrderKey, kind: ItemKind, customTitle: String? = nil, modifiedAt: Date = Date(), deletedAt: Date? = nil) {
+    public init(id: UUID = UUID(), parent: Parent, order: OrderKey, kind: ItemKind, customTitle: String? = nil, modifiedAt: Date = Date(), deletedAt: Date? = nil, live: LiveSource? = nil) {
         self.id = id
         self.parent = parent
         self.order = order
         self.kind = kind
         self.customTitle = customTitle
+        self.live = live
         self.modifiedAt = modifiedAt
         self.deletedAt = deletedAt
     }

@@ -43,6 +43,10 @@ public final class TabsController {
     private var pageOwners: [UUID: UUID] = [:]
     /// Open folders of private windows, kept apart so their ids never reach device.json.
     private var privateOpenFolders: Set<UUID> = []
+    /// Live folders whose last refresh failed, and why. No entry when it worked.
+    public internal(set) var liveStatus: [UUID: LiveFolderStatus] = [:]
+    @ObservationIgnored var liveRefreshed: [UUID: Date] = [:]
+    @ObservationIgnored var liveRefreshing: Set<UUID> = []
 
     /// One `Profile` (website data store) per space, made on first use and kept for the session.
     @ObservationIgnored private var spaceProfiles: [UUID: Profile] = [:]
@@ -135,6 +139,9 @@ public final class TabsController {
         if case .firstLaunch = loaded.outcome { save() }
         if !loaded.migratedSpaceIDs.isEmpty {
             log.info("Merged profiles into \(self.tree.orderedSpaces.count) spaces")
+        }
+        NotificationCenter.default.addObserver(forName: appDidBecomeActive, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshLiveFolders() }
         }
     }
 
@@ -534,6 +541,7 @@ public final class TabsController {
     /// keep their home URL and store the open page instead.
     func pageCommitted(itemID: UUID, url: URL) {
         guard let owner = owner(ofItem: itemID) else { return }
+        if case .main = owner { livePageCommitted(url, itemID: itemID) }
         guard tree(owner).scope(of: itemID) == .synced else {
             perform(owner, "setURL", undoable: false) { try $0.setURL(itemID, url) }
             return
@@ -572,9 +580,18 @@ public final class TabsController {
         case .main:
             if open { device.openFolders.insert(folderID) } else { device.openFolders.remove(folderID) }
             save()
+            if open { refreshLiveFolder(folderID) }
         case .privateWindow:
             if open { privateOpenFolders.insert(folderID) } else { privateOpenFolders.remove(folderID) }
         }
+    }
+
+    func setLiveDismissed(_ folderID: UUID, _ urls: Set<URL>) {
+        guard (device.liveDismissed?[folderID] ?? []) != urls else { return }
+        var all = device.liveDismissed ?? [:]
+        all[folderID] = urls.isEmpty ? nil : urls
+        device.liveDismissed = all
+        save()
     }
 
     func recordClosed(_ entry: ClosedEntry) {
@@ -630,6 +647,7 @@ public final class TabsController {
         if window.spaceID == nil {
             window.spaceID = tree.orderedSpaces.first?.id
         }
+        refreshLiveFolders()
         if let spaceID = window.spaceID, window.selectedItemBySpace[spaceID] == nil,
            let first = displayOrder(in: window).first {
             window.selectedItemBySpace[spaceID] = first
