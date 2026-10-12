@@ -81,6 +81,14 @@ extension TabsController {
         }
     }
 
+    /// The open pull requests of a space's github.com login, for a favorite's hover card. Empty
+    /// when signed out or when the list could not be read.
+    public func pullRequests(inSpace spaceID: UUID) async -> [LivePage] {
+        guard let profile = profile(forSpace: spaceID) else { return [] }
+        let cookies = await profile.dataStore.httpCookieStore.allCookies()
+        return (try? await GitHubPulls.fetch(cookies: cookies)) ?? []
+    }
+
     /// A tab the person took out of a live folder stays out until its page leaves the source.
     func dismissFromLiveFolder(_ item: Item) {
         guard case .folder(let folderID) = item.parent, tree.item(folderID)?.live != nil, let url = item.url else { return }

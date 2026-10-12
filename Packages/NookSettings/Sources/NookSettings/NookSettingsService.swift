@@ -43,6 +43,7 @@ public final class NookSettingsService {
     private let webSearchMaxResultsKey = "settings.webSearchMaxResults"
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
+    private let favoritePreviewsKey = "settings.favoritePreviews"
     private let hideWebContentBorderKey = "settings.hideWebContentBorder"
     private let siteSearchEntriesKey = "settings.siteSearchEntries"
     private let didFinishOnboardingKey = "settings.didFinishOnboarding"
@@ -313,6 +314,13 @@ public final class NookSettingsService {
         }
     }
 
+    /// The card under a favorite the pointer rests on.
+    public var favoritePreviews: Bool {
+        didSet {
+            userDefaults.set(favoritePreviews, forKey: favoritePreviewsKey)
+        }
+    }
+
     /// The inset, rounded corners and shadow around the web view.
     public var hideWebContentBorder: Bool {
         didSet {
@@ -444,6 +452,7 @@ public final class NookSettingsService {
             webSearchMaxResultsKey: 5,
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
+            favoritePreviewsKey: true,
             hideWebContentBorderKey: false,
             didFinishOnboardingKey: false,
             tabLayoutKey: TabLayout.sidebar.rawValue,
@@ -542,6 +551,7 @@ public final class NookSettingsService {
         self.webSearchMaxResults = userDefaults.integer(forKey: webSearchMaxResultsKey)
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
+        self.favoritePreviews = userDefaults.bool(forKey: favoritePreviewsKey)
         self.hideWebContentBorder = userDefaults.bool(forKey: hideWebContentBorderKey)
         self.tabLayout = TabLayout(rawValue: userDefaults.string(forKey: tabLayoutKey) ?? TabLayout.sidebar.rawValue) ?? .sidebar
         self.appearanceMode = AppearanceMode(rawValue: userDefaults.string(forKey: appearanceModeKey) ?? AppearanceMode.system.rawValue) ?? .system

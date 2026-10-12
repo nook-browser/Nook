@@ -187,9 +187,15 @@ private struct PinnedTile: View {
                 isUnloaded: session?.isUnloaded ?? true,
                 hasLeftPinnedURL: tabs.hasLeftHome(item.id),
                 onResetToPinnedURL: { tabs.resetToHome(item.id) },
-                action: { tabs.select(item.id, in: windowState) }
+                action: {
+                    FavoritePreview.shared.dismiss()
+                    tabs.select(item.id, in: windowState)
+                }
             )
             .frame(maxWidth: .infinity)
+            .anchorPreference(key: FavoritePreviewAnchorKey.self, value: .bounds) {
+                FavoritePreview.shared.itemID == item.id && FavoritePreview.shared.windowID == windowState.id ? $0 : nil
+            }
             .contextMenu {
                 TabContextMenu(itemID: item.id, context: .favorite)
                     .environment(windowState)
@@ -198,6 +204,7 @@ private struct PinnedTile: View {
             }
             .onHoverTracking { hovering in
                 browserManager.hoveredPinnedTabId = hovering ? item.id : nil
+                FavoritePreview.shared.tileHover(item, hovering: hovering, in: windowState, tabs: tabs)
             }
         }
     }

@@ -67,6 +67,10 @@ struct WindowView: View {
             ExtensionLibraryOverlay(anchor: anchor)
                 .zIndex(9000)
         }
+        .overlayPreferenceValue(FavoritePreviewAnchorKey.self) { anchor in
+            FavoritePreviewOverlay(anchor: anchor)
+                .zIndex(7000)
+        }
         // System notification toasts - top trailing corner
         .overlay(alignment: .topTrailing) {
             VStack(spacing: 8) {
