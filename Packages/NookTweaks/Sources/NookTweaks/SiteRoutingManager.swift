@@ -5,6 +5,7 @@
 //
 
 import Foundation
+import NookBlocker
 import NookSettings
 import OSLog
 
@@ -22,29 +23,14 @@ public final class SiteRoutingManager {
     // MARK: - Matching
 
     public func resolve(url: URL) -> SiteRoutingRule? {
-        var host = url.host?.lowercased() ?? ""
-        if host.hasPrefix("www.") { host = String(host.dropFirst(4)) }
-        guard !host.isEmpty else { return nil }
-
-        let rules = settings.siteRoutingRules.filter { $0.isEnabled && $0.domain == host }
-        guard !rules.isEmpty else { return nil }
-
-        let path = url.path
-        // Most-specific rule wins: longest matching pathPrefix takes priority
-        let pathMatches = rules.filter { rule in
-            guard let pp = rule.pathPrefix, !pp.isEmpty else { return false }
-            return path.hasPrefix(pp)
-        }
-        if let specific = pathMatches.max(by: { ($0.pathPrefix?.count ?? 0) < ($1.pathPrefix?.count ?? 0) }) {
-            return specific
-        }
-        // Fall back to domain-only rule (no pathPrefix)
-        return rules.first(where: { $0.pathPrefix == nil || $0.pathPrefix?.isEmpty == true })
+        SiteRoutingRule.best(for: url, in: settings.siteRoutingRules)
     }
 
     /// Opens `url` as a new tab in the rule's target space, in the window showing `page`
     /// (or the active window for external URLs). Private windows never route.
     public func applyRoute(url: URL, from page: AnyObject?) -> Bool {
+        // A sign-in started by a page has to finish in that page's space, where the login belongs.
+        if page != nil, OAuthDetector.isLikelyOAuthURL(url) { return false }
         guard let host, let rule = resolve(url: url) else { return false }
         guard host.route(url: url, toSpace: rule.targetSpaceId, from: page) else { return false }
         logger.info("Route matched: \(url.host ?? "", privacy: .public) → space \(rule.targetSpaceId, privacy: .public)")
