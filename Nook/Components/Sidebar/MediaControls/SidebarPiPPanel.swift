@@ -33,7 +33,15 @@ final class SidebarPiPController: PictureInPictureHolder {
     private(set) var isOverDock = false
     @ObservationIgnored private var floatWindow: NSPanel?
     @ObservationIgnored weak var dockZoneView: NSView?
-    @ObservationIgnored private static var lastFloatWidth: CGFloat = 420
+    /// The float panel's width and place, kept across launches. Height follows the video.
+    private static var lastFloatWidth: CGFloat {
+        get { UserDefaults.standard.object(forKey: "sidebarPiP.floatWidth") as? CGFloat ?? 420 }
+        set { UserDefaults.standard.set(newValue, forKey: "sidebarPiP.floatWidth") }
+    }
+    private static var lastFloatOrigin: CGPoint? {
+        get { UserDefaults.standard.string(forKey: "sidebarPiP.floatOrigin").map(NSPointFromString) }
+        set { UserDefaults.standard.set(newValue.map(NSStringFromPoint), forKey: "sidebarPiP.floatOrigin") }
+    }
     /// Bumped on every enter and exit, so a late script reply for an earlier video is dropped.
     @ObservationIgnored private var generation = 0
     /// Only the newest `next()` wait may act.
@@ -234,7 +242,12 @@ final class SidebarPiPController: PictureInPictureHolder {
         guard let webView, isReady, !isFloating else { return }
         let size = CGSize(width: Self.lastFloatWidth, height: Self.lastFloatWidth / aspect)
         let mouse = NSEvent.mouseLocation
-        let free = CGRect(origin: CGPoint(x: mouse.x - size.width / 2, y: mouse.y - size.height / 2), size: size)
+        var free = CGRect(origin: CGPoint(x: mouse.x - size.width / 2, y: mouse.y - size.height / 2), size: size)
+        // Back where it last floated, unless that screen is gone.
+        if let origin = Self.lastFloatOrigin {
+            let last = CGRect(origin: origin, size: size)
+            if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(last) }) { free = last }
+        }
         // Opens over the docked video: a drag starts snapped into the dock box it is leaving.
         let docked = webView.superview.flatMap { view in
             view.window.map { $0.convertToScreen(view.convert(view.bounds, to: nil)) }
@@ -268,15 +281,23 @@ final class SidebarPiPController: PictureInPictureHolder {
 
     /// Back into the sidebar: the docked host adopts the view once it is orphaned. A hidden
     /// sidebar has no host, so the video stays afloat.
-    func dock() {
+    /// `remember` is false when the panel sits snapped in the dock box, which is not its place.
+    func dock(remember: Bool = true) {
         guard isFloating, windowState?.isSidebarVisible == true else { return }
-        closeFloat()
+        closeFloat(remember: remember)
         isFloating = false
     }
 
-    private func closeFloat() {
-        guard let floatWindow else { return }
+    /// Called when the panel comes to rest: after a drag, a resize, or as it closes.
+    func rememberFloat() {
+        guard let floatWindow, !isOverDock else { return }
         Self.lastFloatWidth = floatWindow.frame.width
+        Self.lastFloatOrigin = floatWindow.frame.origin
+    }
+
+    private func closeFloat(remember: Bool = true) {
+        guard let floatWindow else { return }
+        if remember { rememberFloat() }
         webView?.removeFromSuperview()
         floatWindow.close()
         self.floatWindow = nil
@@ -291,7 +312,7 @@ final class SidebarPiPController: PictureInPictureHolder {
             if isOverDock {
                 isDragging = false
                 isOverDock = false
-                dock()
+                dock(remember: false)
             }
             return
         }
@@ -309,9 +330,12 @@ final class SidebarPiPController: PictureInPictureHolder {
                 self.isDragging = false
                 self.isOverDock = false
                 if shouldDock {
-                    self.dock()
-                    // Docking from the snapped size must not make the next pop-out that small.
+                    self.dock(remember: false)
+                    // A resize before the drag still counts; the snapped size does not.
                     Self.lastFloatWidth = size.width
+                } else {
+                    self.rememberFloat()
+                    (window.contentView as? FloatRootView)?.syncHover()
                 }
                 return
             }
@@ -369,6 +393,23 @@ final class SidebarPiPController: PictureInPictureHolder {
     func seek(_ seconds: Int) {
         webView?.evaluateJavaScript(
             "(() => { const v = window.__nookPiP?.video(); if (v) v.currentTime = Math.max(0, Math.min(v.duration || Infinity, v.currentTime + (\(seconds)))); })();",
+            in: nil, in: Self.world)
+    }
+
+    /// Position and length in seconds; nil for a live stream, which has no length.
+    func playback(_ reply: @escaping ((time: Double, duration: Double)?) -> Void) {
+        webView?.evaluateJavaScript(
+            "(() => { const v = window.__nookPiP?.video(); return v && isFinite(v.duration) && v.duration > 0 ? [v.currentTime, v.duration] : null; })();",
+            in: nil, in: Self.world
+        ) { result in
+            let pair = (try? result.get()) as? [Double]
+            reply(pair?.count == 2 ? (pair![0], pair![1]) : nil)
+        }
+    }
+
+    func scrub(to seconds: Double) {
+        webView?.evaluateJavaScript(
+            "(() => { const v = window.__nookPiP?.video(); if (v) v.currentTime = \(seconds); })();",
             in: nil, in: Self.world)
     }
 
@@ -622,7 +663,8 @@ struct SidebarPiPView: View {
                 .overlay {
                     if isHovering, controller.isReady { controls(controller) }
                 }
-                .onHoverTracking { hovering in
+                // The video is watched from other apps, so hover must not wait for a click.
+                .onHoverTracking(always: true) { hovering in
                     withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
                 }
                 .gesture(DragGesture(minimumDistance: NookDesign.Spacing.md)
@@ -744,8 +786,14 @@ private struct PiPControls: View {
     let onClose: () -> Void
     /// Each button's frame, so the float panel can keep every other click for its drag.
     var onButtonFrames: ([CGRect]) -> Void = { _ in }
+    /// False while the float panel keeps the controls hidden.
+    var isActive = true
 
     private let referenceWidth: CGFloat = 300
+
+    @State private var playback: (time: Double, duration: Double)?
+    /// The time under the pointer during a drag; the video seeks on release.
+    @State private var scrubTime: Double?
 
     var body: some View {
         GeometryReader { proxy in
@@ -768,6 +816,20 @@ private struct PiPControls: View {
                 }
                 .padding(NookDesign.Spacing.sm * scale)
                 .frame(maxHeight: .infinity, alignment: .top)
+
+                if let playback {
+                    scrubber(playback, scale: scale)
+                        .padding(NookDesign.Spacing.sm * scale)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }
+            }
+        }
+        // ponytail: asked twice a second while the pointer is over the video; switch to the
+        // page's timeupdate events if this ever shows in a profile.
+        .task(id: isActive) {
+            while isActive, !Task.isCancelled {
+                controller?.playback { playback = $0 }
+                try? await Task.sleep(for: .milliseconds(500))
             }
         }
         // Media controls stay dark over any video, whatever the app's appearance.
@@ -778,6 +840,45 @@ private struct PiPControls: View {
     private var isPlaying: Bool {
         guard let session = controller?.session else { return false }
         return session.hasPlayingVideo || session.hasPlayingAudio
+    }
+
+    private func scrubber(_ playback: (time: Double, duration: Double), scale: CGFloat) -> some View {
+        let time = scrubTime ?? playback.time
+        let shape = NookDesign.Radius.shape(NookDesign.Size.pipScrub / 2)
+        return HStack(spacing: NookDesign.Spacing.sm * scale) {
+            Text(Self.clock(time))
+            GeometryReader { proxy in
+                let at = { (x: CGFloat) in playback.duration * min(1, max(0, x / proxy.size.width)) }
+                ZStack(alignment: .leading) {
+                    shape.fill(.tertiary)
+                    shape.fill(.white).frame(width: proxy.size.width * min(1, time / playback.duration))
+                }
+                .frame(height: NookDesign.Size.pipScrub)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0)
+                    .onChanged { scrubTime = at($0.location.x) }
+                    .onEnded {
+                        let target = at($0.location.x)
+                        controller?.scrub(to: target)
+                        self.playback?.time = target
+                        scrubTime = nil
+                    })
+            }
+            Text(Self.clock(playback.duration))
+        }
+        .font(NookDesign.Font.caption.monospacedDigit())
+        .foregroundStyle(.white)
+        .frame(height: NookDesign.Size.rowButton * scale)
+        .padding(.horizontal, NookDesign.Spacing.sm * scale)
+        .nookMediaControl(in: NookDesign.Radius.shape(NookDesign.Radius.md))
+        .background(GeometryReader {
+            Color.clear.preference(key: PiPButtonFrames.self, value: [$0.frame(in: .global)])
+        })
+    }
+
+    private static func clock(_ seconds: Double) -> String {
+        Duration.seconds(Int(seconds)).formatted(.time(pattern: seconds >= 3600 ? .hourMinuteSecond : .minuteSecond))
     }
 
     private func button(_ label: String, _ symbol: String, _ diameter: CGFloat,
@@ -839,7 +940,7 @@ private final class SidebarPiPFloatPanel: NSPanel {
 
 /// The panel's content: the cropped video, hover controls, and the mouse-down that starts a drag.
 private final class FloatRootView: NSView {
-    weak var controller: SidebarPiPController? { didSet { controls.rootView = makeControls() } }
+    weak var controller: SidebarPiPController? { didSet { controls.rootView = makeControls(active: !controls.isHidden) } }
     let container = SidebarPiPCropView(frame: .zero)
     private lazy var controls = FirstMouseHostingView(rootView: makeControls())
     /// In the controls' flipped space; a click anywhere else starts a drag.
@@ -864,12 +965,13 @@ private final class FloatRootView: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    private func makeControls() -> PiPControls {
+    private func makeControls(active: Bool = false) -> PiPControls {
         PiPControls(
             controller: controller,
             corner: ("Return to Sidebar", "pip.enter", { [weak self] in self?.controller?.dock() }),
             onClose: { [weak self] in self?.controller?.exit() },
-            onButtonFrames: { [weak self] in self?.buttonFrames = $0 }
+            onButtonFrames: { [weak self] in self?.buttonFrames = $0 },
+            isActive: active
         )
     }
 
@@ -895,11 +997,25 @@ private final class FloatRootView: NSView {
                                        owner: self))
     }
 
-    override func mouseEntered(with event: NSEvent) {
-        controls.isHidden = false
+    override func mouseEntered(with event: NSEvent) { setHovered(true) }
+    override func mouseExited(with event: NSEvent) { setHovered(false) }
+
+    /// A panel that opens or stops under the pointer gets no mouseEntered.
+    func syncHover() {
+        guard let window else { return }
+        setHovered(bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)))
     }
 
-    override func mouseExited(with event: NSEvent) { controls.isHidden = true }
+    private func setHovered(_ hovered: Bool) {
+        guard controls.isHidden == hovered else { return }
+        controls.isHidden = !hovered
+        controls.rootView = makeControls(active: hovered)
+    }
+
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        controller?.rememberFloat()
+    }
 }
 
 // MARK: - Transition

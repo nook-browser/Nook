@@ -92,6 +92,7 @@ public enum NookDesign {
         public static let chromeControl: CGFloat = 36  // title row, URL bar and search field height
         public static let pipSkip: CGFloat = 48        // PiP skip buttons, as in the system PiP window
         public static let pipPlay: CGFloat = 64        // PiP play/pause, as in the system PiP window
+        public static let pipScrub: CGFloat = 4        // PiP scrubber track
         // Narrowest sidebar: the lights (88), the history pill (110), the inset (8).
         public static let sidebarMin: CGFloat = 206
 

@@ -17,10 +17,12 @@ import AppKit
 // MARK: - NSViewRepresentable
 
 struct HoverTrackingView: NSViewRepresentable {
+    var always = false
     let onHover: (Bool) -> Void
 
     func makeNSView(context: Context) -> HoverTrackingNSView {
         let view = HoverTrackingNSView()
+        view.always = always
         view.onHover = onHover
         return view
     }
@@ -32,6 +34,8 @@ struct HoverTrackingView: NSViewRepresentable {
 
 final class HoverTrackingNSView: NSView {
     var onHover: ((Bool) -> Void)?
+    /// Tracks in a window that is not key, and while another app is in front.
+    var always = false
     private var trackingArea: NSTrackingArea?
     private var isHovered = false
 
@@ -42,7 +46,7 @@ final class HoverTrackingNSView: NSView {
         }
         let area = NSTrackingArea(
             rect: bounds,
-            options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            options: [.mouseEnteredAndExited, always ? .activeAlways : .activeInKeyWindow, .inVisibleRect],
             owner: self,
             userInfo: nil
         )
@@ -60,7 +64,7 @@ final class HoverTrackingNSView: NSView {
 
     /// Derives hover from where the pointer actually is, for the cases no enter/exit arrives.
     private func resyncHover() {
-        guard let window, window.isKeyWindow else {
+        guard let window, always || window.isKeyWindow else {
             setHover(false, deferred: true)
             return
         }
@@ -95,11 +99,12 @@ final class HoverTrackingNSView: NSView {
 // MARK: - View Modifier
 
 struct HoverTrackingModifier: ViewModifier {
+    var always = false
     let onHover: (Bool) -> Void
 
     func body(content: Content) -> some View {
         content.background(
-            HoverTrackingView(onHover: onHover)
+            HoverTrackingView(always: always, onHover: onHover)
         )
     }
 }
@@ -109,6 +114,7 @@ struct HoverTrackingModifier: ViewModifier {
 /// Hover is a pointer notion; on iOS SwiftUI's own `.onHover` is cheap and only fires
 /// with a connected pointer.
 private struct HoverTrackingModifier: ViewModifier {
+    var always = false
     let onHover: (Bool) -> Void
 
     func body(content: Content) -> some View {
@@ -121,7 +127,8 @@ private struct HoverTrackingModifier: ViewModifier {
 extension View {
     /// Drop-in replacement for `.onHover` that uses `NSTrackingArea` instead of
     /// SwiftUI's built-in hover hit-testing, avoiding expensive view-tree traversal.
-    public func onHoverTracking(perform action: @escaping (Bool) -> Void) -> some View {
-        modifier(HoverTrackingModifier(onHover: action))
+    /// `always` keeps tracking while the window is not key, for controls used from another app.
+    public func onHoverTracking(always: Bool = false, perform action: @escaping (Bool) -> Void) -> some View {
+        modifier(HoverTrackingModifier(always: always, onHover: action))
     }
 }
