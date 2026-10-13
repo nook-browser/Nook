@@ -35,6 +35,20 @@ public struct SiteRoutingRule: Codable, Identifiable, Equatable {
         case legacyProfileId = "targetProfileId"
     }
 
+    /// The enabled rule for `url`: a rule covers its domain and every subdomain, the longest
+    /// domain wins, then the longest path prefix.
+    public static func best(for url: URL, in rules: [SiteRoutingRule]) -> SiteRoutingRule? {
+        guard let host = url.host?.lowercased(), !host.isEmpty else { return nil }
+        let path = url.path
+        return rules
+            .filter { rule in
+                rule.isEnabled && !rule.domain.isEmpty
+                    && (host == rule.domain || host.hasSuffix("." + rule.domain))
+                    && path.hasPrefix(rule.pathPrefix ?? "")
+            }
+            .max { ($0.domain.count, $0.pathPrefix?.count ?? 0) < ($1.domain.count, $1.pathPrefix?.count ?? 0) }
+    }
+
     public static func normalizeDomain(_ input: String) -> String {
         var d = input
             .lowercased()

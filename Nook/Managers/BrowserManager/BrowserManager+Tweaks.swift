@@ -30,7 +30,9 @@ extension BrowserManager: SiteRoutingHost {
             tweaksLog.debug("Route skipped: target space \(spaceID) no longer exists")
             return false
         }
-        guard window.spaceID != spaceID else { return false }
+        // A page already in the target space loads in place. A link from another app has no
+        // page, and still opens as a tab there.
+        guard session == nil || window.spaceID != spaceID else { return false }
 
         // Deferred: callers are WebKit policy callbacks. Selecting the new tab shows its space.
         Task { @MainActor [tabs] in
