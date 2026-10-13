@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.2.3
+
+### Added
+
+- Pull Requests live folder for GitHub
+- Pull request card on GitHub favorites
+- Seek bar and time on the PiP player
+
+### Changed
+
+- Command bar: top row is what Return does, better matching
+- Air Traffic Control rules cover subdomains
+- Floating video remembers its size and place
+- Pages ask before opening another app
+
+### Fixed
+
+- PiP controls not showing until clicked
+- Outside links to a routed site opening in the mini window
+- Bugs
+
 ## 1.2.2
 
 ### Changed
