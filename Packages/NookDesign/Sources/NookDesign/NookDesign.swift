@@ -176,7 +176,16 @@ public enum NookDesign {
             let end = windowBackground
             let topBlend = isActive ? 0.55 : 0.8
             #if os(macOS)
-            let top = Color(nsColor: NSColor(accent).blended(withFraction: topBlend, of: .windowBackgroundColor) ?? NSColor(accent))
+            // Blend per appearance: `blended` freezes `.windowBackgroundColor` to whatever
+            // appearance is current when the body runs, which flips the top light/dark.
+            let base = NSColor(accent)
+            let top = Color(nsColor: NSColor(name: nil) { appearance in
+                var color = base
+                appearance.performAsCurrentDrawingAppearance {
+                    color = base.blended(withFraction: topBlend, of: .windowBackgroundColor) ?? base
+                }
+                return color
+            })
             #else
             // ponytail: iOS not built yet; NSColor.blended(withFraction:of:) has no UIKit
             // equivalent. Flat opacity tint stands in until an iOS window chrome exists.

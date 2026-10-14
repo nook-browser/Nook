@@ -510,7 +510,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         containerView.wantsLayer = true
         // Use windowBackgroundColor instead of clear to prevent black flashes during
         // video playback when the WKWebView's GPU compositing layer briefly shows through.
-        containerView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        containerView.viewDidChangeEffectiveAppearance()
         applyCornerRadius(to: containerView)
         containerView.postsFrameChangedNotifications = true
 
@@ -830,6 +830,14 @@ private extension WebsiteView {
 // MARK: - Container View that forwards right-clicks to webviews
 
 private class ContainerView: NSView {
+    // A CGColor is frozen at creation; re-resolve it when light/dark changes.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        }
+    }
+
     // Don't intercept events - let them pass through to webviews
     override var acceptsFirstResponder: Bool { false }
 

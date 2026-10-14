@@ -15,8 +15,6 @@ struct NavigationHistoryContextMenu: View {
     let historyType: HistoryType
     let windowState: BrowserWindowState
     @EnvironmentObject var browserManager: BrowserManager
-    @State private var historyItems: [NavigationHistoryContextMenuItem] = []
-    @State private var refreshID = UUID()
 
     enum HistoryType {
         case back
@@ -24,6 +22,8 @@ struct NavigationHistoryContextMenu: View {
     }
 
     var body: some View {
+        // Built on every render: a snapshot kept in @State went stale after in-tab navigation.
+        let historyItems = loadHistoryItemsFresh()
         Group {
             if !historyItems.isEmpty {
                 ForEach(Array(historyItems.enumerated()), id: \.element.id) { index, item in
@@ -62,17 +62,6 @@ struct NavigationHistoryContextMenu: View {
                 .disabled(true)
             }
         }
-        .id(refreshID) // Force view refresh
-        .onAppear {
-            loadHistoryItems()
-        }
-        .onChange(of: windowState.selectedItemID) { _, _ in
-            refreshHistory()
-        }
-    }
-
-    private func loadHistoryItems() {
-        historyItems = loadHistoryItemsFresh()
     }
 
     private func loadHistoryItemsFresh() -> [NavigationHistoryContextMenuItem] {
@@ -81,6 +70,8 @@ struct NavigationHistoryContextMenu: View {
               let webView = browserManager.webViewCoordinator?.getWebView(for: tab.itemID, in: windowState.id) ?? tab.assignedWebView else {
             return []
         }
+        // Observed so the menu rebuilds on each navigation; the back list itself is not observable.
+        _ = (tab.url, tab.canGoBack, tab.canGoForward)
 
         let backForwardList = webView.backForwardList
         var items: [NavigationHistoryContextMenuItem] = []
@@ -102,12 +93,6 @@ struct NavigationHistoryContextMenu: View {
         return items
     }
 
-    private func refreshHistory() {
-        // Force refresh by changing the ID and reloading data
-        refreshID = UUID()
-        loadHistoryItems()
-    }
-
     private func navigateToHistoryItem(_ item: NavigationHistoryContextMenuItem) {
         guard let tab = browserManager.tabs.controllableSession(in: windowState),
               // Use assignedWebView as fallback to avoid triggering lazy initialization
@@ -116,12 +101,6 @@ struct NavigationHistoryContextMenu: View {
         // Use WebKit's proper navigation history API to jump to the specific item
         // This preserves the back/forward state correctly
         webView.go(to: item.backForwardItem)
-
-        // Force a refresh of navigation button states after a brief delay
-        // to ensure the UI updates with the new navigation state
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            refreshHistory()
-        }
     }
 
     private func urlDisplayString(_ url: URL) -> String {
@@ -137,13 +116,13 @@ struct NavigationHistoryContextMenu: View {
 /// A wrapper around WKBackForwardListItem that preserves the original WebKit navigation item
 /// for proper navigation state management when jumping through history
 struct NavigationHistoryContextMenuItem: Identifiable {
-    let id: UUID
+    let id: ObjectIdentifier
     let url: URL?
     let title: String
     let backForwardItem: WKBackForwardListItem
 
     init(from backForwardItem: WKBackForwardListItem) {
-        self.id = UUID()
+        self.id = ObjectIdentifier(backForwardItem)
         self.url = backForwardItem.url
         self.title = backForwardItem.title ?? backForwardItem.url.host ?? "Untitled"
         self.backForwardItem = backForwardItem

@@ -16,6 +16,14 @@ import NookUI
 import NookWeb
 
 final class SplitPaneView: NSView {
+    // A CGColor is frozen at creation; re-resolve it when light/dark changes.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        }
+    }
+
     let side: SplitViewManager.Side
     let itemID: UUID
     /// The page view's parent. It fills the pane; the controls float over it.
@@ -29,8 +37,8 @@ final class SplitPaneView: NSView {
         self.settings = browserManager.nookSettings
         super.init(frame: frame)
         wantsLayer = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         layer?.mask = maskLayer
+        viewDidChangeEffectiveAppearance()
         content.frame = bounds
         content.autoresizingMask = [.width, .height]
         addSubview(content)

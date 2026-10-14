@@ -40,22 +40,28 @@ extension TabsController {
 
     /// Where a new tab goes: right below `anchor` when it is a tab in the window's tabs section,
     /// else the top of that section. A pinned tab or favorite keeps its section to itself.
+    /// A new tab is no one's child, so an anchor inside a trail places it below the trail's top tab.
     func newTabPosition(in window: BrowserWindowState, after anchor: UUID?) -> (Parent, UUID?)? {
         guard let spaceID = window.spaceID else { return nil }
         let source = tree(owner(of: window))
-        if let anchor, let item = source.item(anchor), !item.isFolder,
+        if let anchor, var item = source.item(anchor), !item.isFolder,
            source.scope(of: anchor) == .device, source.spaceID(of: anchor) == spaceID {
-            return (item.parent, anchor)
+            while let host = source.trailParent(of: item.id).flatMap(source.item) { item = host }
+            return (item.parent, item.id)
         }
         return (.tabs(spaceID: spaceID), nil)
     }
 
     /// Where a tab opened from `opener`'s page goes: its last child, so a run of links keeps its
-    /// order under it (a trail). A pinned tab, a favorite, or a tab at the depth limit takes no
-    /// children; the tab then goes right below it (`newTabPosition`).
+    /// order under it (a trail). A tab at the depth limit gets it as its next sibling; a pinned
+    /// tab or favorite takes no children, so the tab goes to the top of the tabs section.
     func childTabPosition(in window: BrowserWindowState, opener: UUID) -> (Parent, UUID?)? {
         let source = tree(owner(of: window))
         guard source.spaceID(of: opener) == window.spaceID, source.canTakeChild(opener) else {
+            if let item = source.item(opener), source.scope(of: opener) == .device,
+               source.spaceID(of: opener) == window.spaceID {
+                return (item.parent, opener)
+            }
             return newTabPosition(in: window, after: opener)
         }
         let trail = Parent.folder(itemID: opener)
