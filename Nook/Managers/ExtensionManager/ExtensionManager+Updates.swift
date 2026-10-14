@@ -3,7 +3,7 @@
 //  ExtensionManager+Updates.swift
 //  Nook
 //
-//  Automatic updates for extensions installed from the Chrome Web Store or Edge Add-ons.
+//  Automatic updates for extensions installed from the Chrome Web Store, Edge Add-ons or Firefox Add-ons.
 //
 
 import AppKit

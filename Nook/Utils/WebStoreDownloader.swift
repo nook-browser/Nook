@@ -3,14 +3,19 @@
 //  WebStoreDownloader.swift
 //  Nook
 //
-//  Chrome Web Store and Edge Add-ons extension downloader
+//  Chrome Web Store, Edge Add-ons and Firefox Add-ons extension downloader
 //
 
+import CryptoKit
 import Foundation
 
 enum ExtensionStore: String {
     case chrome
     case edge
+    case firefox
+
+    /// Nook's ID for a Firefox Add-ons install: "amo-" plus AMO's numeric add-on id.
+    static func firefoxID(_ amoID: Int) -> String { "amo-\(amoID)" }
 
     /// Store extension IDs are 32 characters in the range a-p.
     static func isValidExtensionID(_ id: String) -> Bool {
@@ -23,6 +28,7 @@ enum ExtensionStore: String {
         switch self {
         case .chrome: base = "https://clients2.google.com/service/update2/crx"
         case .edge: base = "https://edge.microsoft.com/extensionwebstorebase/v1/crx"
+        case .firefox: return nil  // AMO has its own API, see `amoAddon`
         }
         // Every interpolated value is a-p, digits, or dots, so no further escaping is needed.
         guard Self.isValidExtensionID(extensionId),
@@ -40,12 +46,20 @@ struct WebStoreDownloader {
 
     static let fallbackChromeVersion = "141.0.7390.78"
 
-    /// Download the current CRX for `extensionId` and return a temporary ZIP file.
+    /// Download the current package for `extensionId` and return a temporary file plus the ID
+    /// to install it under. For Firefox, `extensionId` is an AMO slug or a Nook "amo-" ID.
     static func downloadExtension(
         extensionId: String,
         store: ExtensionStore = .chrome,
-        completionHandler: @escaping (Result<URL, Error>) -> Void
+        completionHandler: @escaping (Result<(file: URL, id: String), Error>) -> Void
     ) {
+        if store == .firefox {
+            Task {
+                do { completionHandler(.success(try await downloadFirefoxAddon(extensionId))) }
+                catch { completionHandler(.failure(error)) }
+            }
+            return
+        }
         guard ExtensionStore.isValidExtensionID(extensionId) else {
             completionHandler(.failure(WebStoreError.invalidURL))
             return
@@ -69,7 +83,7 @@ struct WebStoreDownloader {
                 let tempFile = FileManager.default.temporaryDirectory
                     .appendingPathComponent("\(extensionId)-\(UUID().uuidString).zip")
                 try zipData.write(to: tempFile)
-                completionHandler(.success(tempFile))
+                completionHandler(.success((tempFile, extensionId)))
             } catch {
                 completionHandler(.failure(error))
             }
@@ -82,6 +96,10 @@ struct WebStoreDownloader {
         store: ExtensionStore,
         currentVersion: String
     ) async -> String? {
+        if store == .firefox {
+            guard let version = try? await amoAddon(extensionId).current_version.version else { return nil }
+            return isVersion(version, newerThan: currentVersion) ? version : nil
+        }
         let prodVersion = await latestChromeVersion()
         guard let url = store.updateServiceURL(
             response: "updatecheck", extensionId: extensionId, version: currentVersion, prodVersion: prodVersion
@@ -113,6 +131,52 @@ struct WebStoreDownloader {
         return false
     }
 
+    // MARK: - Firefox Add-ons
+
+    private struct AMOAddon: Decodable {
+        struct Version: Decodable {
+            struct File: Decodable { let url: String; let hash: String }
+            let version: String
+            let file: File
+        }
+        let id: Int
+        let type: String
+        let current_version: Version
+    }
+
+    /// Look up an add-on by slug, numeric id, or Nook "amo-" ID.
+    private static func amoAddon(_ idOrSlug: String) async throws -> AMOAddon {
+        var key = idOrSlug
+        if key.hasPrefix("amo-"), Int(key.dropFirst(4)) != nil { key = String(key.dropFirst(4)) }
+        guard !key.isEmpty, key != ".", key != "..",
+              let escaped = key.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_"))),
+              let url = URL(string: "https://addons.mozilla.org/api/v5/addons/addon/\(escaped)/")
+        else { throw WebStoreError.invalidURL }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw WebStoreError.noData }
+        return try JSONDecoder().decode(AMOAddon.self, from: data)
+    }
+
+    /// Download an add-on's current .xpi from AMO and check it against the hash the API lists.
+    private static func downloadFirefoxAddon(_ idOrSlug: String) async throws -> (file: URL, id: String) {
+        let addon = try await amoAddon(idOrSlug)
+        guard addon.type == "extension",
+              let fileURL = URL(string: addon.current_version.file.url),
+              fileURL.scheme == "https", fileURL.host == "addons.mozilla.org",
+              addon.current_version.file.hash.hasPrefix("sha256:")
+        else { throw WebStoreError.invalidURL }
+        let (data, response) = try await URLSession.shared.data(from: fileURL)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw WebStoreError.noData }
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard "sha256:\(digest)" == addon.current_version.file.hash.lowercased() else {
+            throw WebStoreError.conversionFailed
+        }
+        let id = ExtensionStore.firefoxID(addon.id)
+        let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("\(id)-\(UUID().uuidString).xpi")
+        try data.write(to: tempFile)
+        return (tempFile, id)
+    }
+
     private static var cachedChromeVersion: String?
 
     /// The update server filters by browser version, so report a current stable Chrome.
@@ -127,7 +191,7 @@ struct WebStoreDownloader {
     }
 
     /// Convert CRX file to ZIP by stripping the CRX header
-    private static func convertCRXtoZIP(_ crxData: Data) -> Data? {
+    static func convertCRXtoZIP(_ crxData: Data) -> Data? {
         guard crxData.count > 16 else { return nil }
 
         let bytes = [UInt8](crxData)

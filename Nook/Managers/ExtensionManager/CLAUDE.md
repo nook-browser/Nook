@@ -12,7 +12,7 @@ Deployment target is macOS 26.0, so WKWebExtension (15.4+) and content scripts (
 |------|---------|
 | `ExtensionManager.swift` | Core facade: properties, controller setup, context identity, `attach(browserManager:)` |
 | `ExtensionManager+Installation.swift` | Install/update pipeline with consent sheet, stable IDs, `registerContext`, persistence, Safari discovery, enable/disable/uninstall |
-| `ExtensionManager+Updates.swift` | Daily store update check for Web Store / Edge installs (on load and app activation, no timer) |
+| `ExtensionManager+Updates.swift` | Daily store update check for Web Store / Edge / Firefox Add-ons installs (on load and app activation, no timer) |
 | `ExtensionManager+Delegate.swift` | All `WKWebExtensionControllerDelegate` methods: popup, permissions, tabs/windows, options page, native messaging |
 | `ExtensionManager+ExternallyConnectable.swift` | `externally_connectable` polyfill and bridge content scripts, manifest patching for WebKit |
 | `ExtensionManager+Diagnostics.swift` | Debug-only background health probes and per-navigation state diagnosis |
@@ -29,7 +29,7 @@ Deployment target is macOS 26.0, so WKWebExtension (15.4+) and content scripts (
 | `Nook/Components/Extensions/ExtensionPermissionView.swift` | Permission grant/deny dialogs |
 | `Nook/Components/Extensions/PopupConsoleWindow.swift` | Debug console for extension popups |
 | `Nook/Utils/ExtensionUtils.swift` | Manifest validation, `ExtensionError` |
-| `Nook/Utils/WebStoreDownloader.swift` | `ExtensionStore` (chrome/edge), CRX download, update-check protocol |
+| `Nook/Utils/WebStoreDownloader.swift` | `ExtensionStore` (chrome/edge/firefox), CRX download, update-check protocol, AMO API |
 | `Nook/Utils/WebStoreScriptHandler.swift` | "Add to Nook" handler; isolated content world, store-origin checks |
 
 ## Critical: WebView Config Derivation
@@ -48,7 +48,7 @@ See `BrowserConfig.swift:webViewConfiguration(for:)`.
 
 ## Installation Flow
 
-Supported formats: `.zip`, `.appex` (Safari extension bundle), `.app` (scans `Contents/PlugIns/` for `.appex`), bare directories. Every path (file picker, Safari discovery, Web Store, automatic update) goes through `installExtension(from:store:extensionId:interactive:)`.
+Supported formats: `.zip`, `.xpi` (a plain zip), `.crx` (header stripped, signature not checked), `.appex` (Safari extension bundle), `.app` (scans `Contents/PlugIns/` for `.appex`), bare directories. Every path (file picker, Safari discovery, Web Store, automatic update) goes through `installExtension(from:store:extensionId:interactive:)`.
 
 1. Stage in `Extensions/temp_<uuid>` (deleted on any failure). Packages containing symbolic links are rejected.
 2. `ExtensionUtils.validateManifest()`, MV3 service-worker check, `patchManifestForWebKit()`.
@@ -62,6 +62,10 @@ Supported formats: `.zip`, `.appex` (Safari extension bundle), `.app` (scans `Co
 ## Chrome Web Store
 
 `WebStoreInjector.js` and the `nookWebStore` handler are added only after a navigation to an exact `https` store host, and both live in the `NookWebStore` content world, so page scripts cannot reach the handler. The handler also requires main frame, store origin, and an a-p ID; clicks must be `isTrusted`. The native consent sheet is the final gate.
+
+## Firefox Add-ons
+
+`addons.mozilla.org` gets the same injector and handler. The page sends the add-on's slug; `WebStoreDownloader` resolves it through `api/v5/addons/addon/<slug>/`, refuses anything whose `type` is not `extension`, downloads `current_version.file.url` only from `addons.mozilla.org`, and checks it against the API's `sha256:` hash. The install ID is `amo-<numeric id>`, which the daily update check queries the same API with. WebKit ignores Firefox-only permissions (`webRequestBlocking`, `contextualIdentities`) and loads MV3 `background.scripts` as a non-persistent background page, so a Firefox build of uBlock Origin installs but cannot block requests.
 
 ## Externally Connectable Bridge
 

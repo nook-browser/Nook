@@ -199,8 +199,16 @@ extension ExtensionManager {
         defer { try? fm.removeItem(at: tempDir) }
 
         switch sourceURL.pathExtension.lowercased() {
-        case "zip":
+        case "zip", "xpi":  // a Firefox .xpi is a plain zip
             try await extractZip(from: sourceURL, to: tempDir)
+        case "crx":
+            guard let zip = WebStoreDownloader.convertCRXtoZIP(try Data(contentsOf: sourceURL)) else {
+                throw ExtensionError.installationFailed("Not a valid CRX file")
+            }
+            let zipURL = extensionsDir.appendingPathComponent("temp_\(UUID().uuidString).zip")
+            defer { try? fm.removeItem(at: zipURL) }
+            try zip.write(to: zipURL)
+            try await extractZip(from: zipURL, to: tempDir)
         case "appex", "app":
             try fm.copyItem(at: try resolveSafariExtensionResources(at: sourceURL), to: tempDir)
         default:
@@ -705,7 +713,7 @@ extension ExtensionManager {
     func showExtensionInstallDialog() {
         let openPanel = NSOpenPanel()
         openPanel.title = "Install Extension"
-        openPanel.message = "Select an extension folder, ZIP file, or Safari extension (.app/.appex)"
+        openPanel.message = "Select an extension folder, ZIP, XPI or CRX file, or Safari extension (.app/.appex)"
         openPanel.canChooseFiles = true
         openPanel.canChooseDirectories = true
         openPanel.allowsMultipleSelection = false
@@ -714,7 +722,7 @@ extension ExtensionManager {
             .directory,
             .application,
             .applicationExtension,
-        ]
+        ] + ["xpi", "crx"].compactMap { UTType(filenameExtension: $0) }
 
         if openPanel.runModal() == .OK, let url = openPanel.url {
             installExtension(from: url) { result in
@@ -885,7 +893,7 @@ extension ExtensionManager {
 
     // MARK: - Chrome Web Store Integration
 
-    /// Install (or update) an extension from the Chrome Web Store or Edge Add-ons by store ID.
+    /// Install (or update) an extension from the Chrome Web Store, Edge Add-ons or Firefox Add-ons by store ID.
     func installFromWebStore(
         extensionId: String,
         store: ExtensionStore = .chrome,
@@ -895,11 +903,11 @@ extension ExtensionManager {
         WebStoreDownloader.downloadExtension(extensionId: extensionId, store: store) { [weak self] result in
             guard let self else { return }
             switch result {
-            case .success(let zipURL):
+            case .success(let download):
                 self.installExtension(
-                    from: zipURL, store: store, extensionId: extensionId, interactive: interactive
+                    from: download.file, store: store, extensionId: download.id, interactive: interactive
                 ) { installResult in
-                    try? FileManager.default.removeItem(at: zipURL)
+                    try? FileManager.default.removeItem(at: download.file)
                     completionHandler(installResult)
                 }
             case .failure(let error):

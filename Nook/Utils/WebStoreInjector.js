@@ -1,5 +1,5 @@
 // WebStoreInjector.js
-// Injects "Add to Nook" functionality into Chrome Web Store pages
+// Injects "Add to Nook" into Chrome Web Store, Edge Add-ons and Firefox Add-ons pages
 
 (function () {
   "use strict";
@@ -14,6 +14,10 @@
 
   const EDGE_STORE_PATTERN =
     /^https?:\/\/microsoftedge\.microsoft\.com\/addons\/detail\/.+?\/([a-z]{32})(?=[\/#?]|$)/;
+
+  // The slug; Nook resolves it through the AMO API.
+  const FIREFOX_STORE_PATTERN =
+    /^https:\/\/addons\.mozilla\.org\/[^\/]+\/firefox\/addon\/([^\/?#]+)/;
 
   function getExtensionId() {
     const url = window.location.href;
@@ -30,6 +34,11 @@
     const edgeMatch = EDGE_STORE_PATTERN.exec(url);
     if (edgeMatch && edgeMatch[1]) {
       return { id: edgeMatch[1], store: "edge" };
+    }
+
+    const firefoxMatch = FIREFOX_STORE_PATTERN.exec(url);
+    if (firefoxMatch && firefoxMatch[1]) {
+      return { id: decodeURIComponent(firefoxMatch[1]), store: "firefox" };
     }
 
     return null;
@@ -102,7 +111,20 @@
       return;
     }
 
-    // Selectors for Chrome Web Store buttons
+    // Firefox Add-ons renders late: wait for its "Download Firefox" button rather than fall back.
+    if (extensionInfo.store === "firefox") {
+      const cta = document.querySelector(".GetFirefoxButton-button");
+      if (cta && cta.parentElement) {
+        cta.parentElement.insertBefore(
+          createNookButton(extensionInfo.id, extensionInfo.store),
+          cta
+        );
+        cta.style.display = "none";
+      }
+      return;
+    }
+
+    // Selectors for store buttons
     const selectors = [
       'div[role="button"]', // New Chrome Web Store
       "button", // Generic buttons

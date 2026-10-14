@@ -22,12 +22,18 @@ final class WebStoreScriptHandler: NSObject, WKScriptMessageHandler {
         "chromewebstore.google.com": .chrome,
         "chrome.google.com": .chrome,
         "microsoftedge.microsoft.com": .edge,
+        "addons.mozilla.org": .firefox,
     ]
 
     /// The store for a URL whose host is exactly a known store host, or nil.
     static func store(for url: URL) -> ExtensionStore? {
         guard url.scheme == "https", let host = url.host?.lowercased() else { return nil }
         return storeHosts[host]
+    }
+
+    /// AMO slugs are short and never contain a path separator; the API call escapes the rest.
+    private static func isValidAMOSlug(_ slug: String) -> Bool {
+        (1...200).contains(slug.count) && !slug.contains("/") && slug != "." && slug != ".."
     }
 
     private weak var browserManager: BrowserManager?
@@ -48,7 +54,7 @@ final class WebStoreScriptHandler: NSObject, WKScriptMessageHandler {
               let body = message.body as? [String: Any],
               body["action"] as? String == "installExtension",
               let extensionId = body["extensionId"] as? String,
-              ExtensionStore.isValidExtensionID(extensionId)
+              store == .firefox ? Self.isValidAMOSlug(extensionId) : ExtensionStore.isValidExtensionID(extensionId)
         else { return }
 
         guard let extensionManager = browserManager?.extensionManager else {
