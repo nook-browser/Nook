@@ -215,6 +215,9 @@ public final class PageSession: NSObject, Identifiable {
 
     public var isUnloaded: Bool { primaryWebView == nil }
 
+    /// Console and network log while Developer Mode is on; nil otherwise.
+    public internal(set) var devCapture: DevCapture?
+
     /// The existing web view. Never creates one.
     public var webView: WKWebView? { primaryWebView }
 
@@ -371,6 +374,7 @@ public final class PageSession: NSObject, Identifiable {
         // Let the web content control its own background so extension styles (like Dark
         // Reader) can paint dark backgrounds. The themed background shows only while loading.
         webView.setDrawsPageBackground(true)
+        if developerModeOn { attachDevCaptureHandler(to: webView) }
         webView.isInspectable = true
         webView.allowsLinkPreview = true
         webView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true
@@ -429,6 +433,7 @@ public final class PageSession: NSObject, Identifiable {
         profileAwaitCancellable?.cancel()
         profileAwaitCancellable = nil
         webStoreHandler = nil
+        devCapture = nil
         loadingState = .idle
         hasPiPActive = false
         hasPlayingVideo = false
@@ -464,6 +469,7 @@ public final class PageSession: NSObject, Identifiable {
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
         self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
+        detachDevCaptureHandler(from: webView)
         controller.removeScriptMessageHandler(
             forName: AdvancedRulesEngine.messageHandlerName, contentWorld: .page)
 

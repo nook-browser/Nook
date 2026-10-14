@@ -53,6 +53,17 @@ public final class AdvancedRulesEngine {
         engine.configuration(for: pageUrl, topUrl: topUrl)
     }
 
+    /// What the engine applies to a page beyond the compiled rule lists, for the DevPanel's Blocker tab:
+    /// procedural selectors as text, and the scriptlet code.
+    public func pageRules(for pageUrl: URL) -> (procedural: [String], scriptlets: String) {
+        let config = engine.configuration(for: pageUrl, topUrl: nil) ?? [:]
+        let procedural = (config["extendedCss"] as? [[String: Any]] ?? []).map { entry -> String in
+            guard let data = try? JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys]) else { return "" }
+            return String(decoding: data, as: UTF8.self)
+        }
+        return (procedural, config["scriptlets"] as? String ?? "")
+    }
+
     /// Main-frame fast path: embed the configuration so the runtime applies it synchronously
     /// at document start instead of round-tripping through the message handler.
     /// Always returns a script: `null` when nothing applies, so the runtime skips its async lookup.

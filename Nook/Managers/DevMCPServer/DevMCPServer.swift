@@ -34,6 +34,8 @@ final class DevMCPServer {
 
     private weak var browserManager: BrowserManager?
     private var listener: NWListener?
+    /// Last snapshot per page and selector, so the next call can answer with a diff.
+    private var snapshots: [String: String] = [:]
     private var token = ""
     private let queue = DispatchQueue(label: "com.gstudios.nook.devmcp")
 
@@ -75,7 +77,6 @@ final class DevMCPServer {
             }
             listener.start(queue: queue)
             self.listener = listener
-            installConsoleCapture()
         } catch {
             Self.log.error("start failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -235,8 +236,41 @@ final class DevMCPServer {
         ),
         AIToolDefinition(
             name: "console",
-            description: "Console messages, uncaught errors and failed resource loads (a blocked script or image shows here) captured in the selected tab's main frame since its last load. Tabs loaded before the server started need a reload. clear: true empties the buffer after reading.",
-            parameters: ["type": "object", "properties": ["clear": ["type": "boolean"]]]
+            description: "Console messages, uncaught errors and failed resource loads from every frame of the selected tab since its last load. Pass the returned cursor as since to get only newer entries. clear: true empties the log after reading.",
+            parameters: ["type": "object", "properties": ["since": ["type": "integer"], "clear": ["type": "boolean"]]]
+        ),
+        AIToolDefinition(
+            name: "blocker_log",
+            description: "What the content blocker did to the selected tab since its last load: loads and cookies blocked, loads made HTTPS, navigations rewritten by $removeparam or urlskip, plus the page's procedural cosmetic rules and scriptlet names. Pass the returned cursor as since for only newer actions. The rule list that blocked a load is not known.",
+            parameters: ["type": "object", "properties": ["since": ["type": "integer"]]]
+        ),
+        AIToolDefinition(
+            name: "snapshot",
+            description: "Accessibility outline of the selected tab under a CSS selector (the body when omitted): one line per role with its name and state, generic wrappers flattened, hidden content left out. A repeat call for the same page and selector returns only the lines that changed; pass full: true for the whole outline. maxNodes defaults to 300, maxDepth to 12.",
+            parameters: ["type": "object", "properties": [
+                "selector": ["type": "string"], "full": ["type": "boolean"],
+                "maxNodes": ["type": "integer"], "maxDepth": ["type": "integer"],
+            ]]
+        ),
+        AIToolDefinition(
+            name: "perf",
+            description: "The selected tab's load timings (TTFB, FCP, LCP with its element, DOMContentLoaded, load) and Interaction to Next Paint with the worst interaction's target and its input delay, processing and presentation delay, plus the WebContent process's memory footprint. WebKit cannot measure CLS. Interactions only count after the person clicks or types.",
+            parameters: ["type": "object", "properties": [:] as [String: Any]]
+        ),
+        AIToolDefinition(
+            name: "pick",
+            description: "Start the element picker in the selected tab and wait up to 25 seconds for the person to click an element, then return it as selection does. Use it to ask the person which element they mean.",
+            parameters: ["type": "object", "properties": [:] as [String: Any]]
+        ),
+        AIToolDefinition(
+            name: "selection",
+            description: "What the person last handed to the agent from the selected tab: an element picked with Pick Element (selector, role, HTML, styles that differ from defaults, React or Vue component names and source when the page exposes them, recent errors and failed requests) or a console line or request sent with Send to Agent. Markdown, plus the element's screenshot when there is one.",
+            parameters: ["type": "object", "properties": [:] as [String: Any]]
+        ),
+        AIToolDefinition(
+            name: "network",
+            description: "Requests from the selected tab since its last load: fetch and XHR with status, plus every other load from Resource Timing. Pass the returned cursor as since for only new or updated entries. detail: true adds headers and bodies for fetch and XHR.",
+            parameters: ["type": "object", "properties": ["since": ["type": "integer"], "detail": ["type": "boolean"]]]
         ),
         AIToolDefinition(
             name: "reload",
@@ -382,14 +416,114 @@ final class DevMCPServer {
                 }
                 return ["content": [["type": "image", "data": jpeg.base64EncodedString(), "mimeType": "image/jpeg"]]]
 
-            case "console":
-                guard let wv = webView else { return text("No active tab", error: true) }
-                let clear = args["clear"] as? Bool == true
-                let result = try await wv.callAsyncJavaScript(
-                    "const b = globalThis.__nookDevConsole; if (!b) return null; const out = JSON.stringify(b, null, 1); if (clear) b.length = 0; return out;",
-                    arguments: ["clear": clear], contentWorld: .page
-                )
-                return text(result as? String ?? "No capture in this page. Reload it (the capture script installs at document start).")
+            case "pick":
+                guard let session, session.devCapture != nil else {
+                    return text("No capture for this tab. Reload it: it loaded before Developer Mode turned on.", error: true)
+                }
+                let before = session.devCapture?.lastPick?.date
+                session.startDevPicker()
+                let deadline = Date().addingTimeInterval(25)
+                // ponytail: 200 ms poll bounded by 25 s; a continuation on onDevPick if this ever matters.
+                while Date() < deadline, session.devCapture?.lastPick?.date == before {
+                    try await Task.sleep(for: .milliseconds(200))
+                }
+                guard session.devCapture?.lastPick?.date != before else {
+                    return text("No element picked within 25 seconds.", error: true)
+                }
+                return await callTool("selection", [:])
+
+            case "selection":
+                guard let pick = session?.devCapture?.lastPick else {
+                    return text("Nothing picked in this tab. Ask the person to press Cmd+Shift+X and click an element.", error: true)
+                }
+                var content: [[String: Any]] = [["type": "text", "text": pick.markdown]]
+                if let path = pick.imagePath, let png = FileManager.default.contents(atPath: path) {
+                    content.append(["type": "image", "data": png.base64EncodedString(), "mimeType": "image/png"])
+                }
+                return ["content": content, "isError": false]
+
+            case "snapshot":
+                guard let session else { return text("No active tab", error: true) }
+                let selector = args["selector"] as? String ?? ""
+                let maxNodes = (args["maxNodes"] as? NSNumber).flatMap(Self.wholeNumber).map { min(max($0, 1), 2_000) } ?? 300
+                let maxDepth = (args["maxDepth"] as? NSNumber).flatMap(Self.wholeNumber).map { min(max($0, 1), 40) } ?? 12
+                guard let outline = try await session.devSnapshot(selector, maxDepth: maxDepth, maxNodes: maxNodes) else {
+                    return text(session.devCapture == nil ? "Developer Mode is off." : "Nothing matches \(selector).", error: true)
+                }
+                let key = "\(session.itemID)|\(session.url.absoluteString)|\(selector)"
+                defer { snapshots[key] = outline }
+                if args["full"] as? Bool != true, let previous = snapshots[key] {
+                    return text(DevHandoff.snapshotDiff(old: previous, new: outline))
+                }
+                return text(outline)
+
+            case "perf":
+                guard let session, let capture = session.devCapture else {
+                    return text("No capture for this tab. Reload it: it loaded before Developer Mode turned on.", error: true)
+                }
+                var summary = capture.perf.summary
+                var usage = rusage_info_v6()
+                let pid = session.webProcessID
+                let ok = withUnsafeMutablePointer(to: &usage) {
+                    $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V6, $0) }
+                }
+                if pid > 0, ok == 0 { summary += "\nWebContent memory footprint: \(usage.ri_phys_footprint / 1_048_576) MB" }
+                if !capture.perf.advice.isEmpty { summary += "\n\n" + capture.perf.advice.joined(separator: "\n") }
+                return text(summary)
+
+            case "blocker_log":
+                guard let capture = session?.devCapture else {
+                    return text("No capture for this tab. Reload it: it loaded before Developer Mode turned on.", error: true)
+                }
+                let since = (args["since"] as? NSNumber).flatMap(Self.wholeNumber) ?? 0
+                let actions = capture.blocked.since(since).map { e -> [String: Any] in
+                    var o: [String: Any] = ["action": e.action.rawValue, "url": e.url]
+                    if let t = e.target { o["target"] = t }
+                    return o
+                }
+                var result: [String: Any] = ["actions": actions, "cursor": capture.blocked.lastSeq,
+                                             "dropped": capture.blocked.dropped,
+                                             "blockedByHost": capture.blockedHosts.map { [$0.host: $0.count] }]
+                if let rules = capture.pageRules {
+                    result["scriptlets"] = rules.scriptlets
+                    result["scriptletBytes"] = rules.scriptletBytes
+                    result["procedural"] = rules.procedural
+                }
+                return text(json(result))
+
+            case "console", "network":
+                guard let capture = session?.devCapture else {
+                    return text("No capture for this tab. Reload it: it loaded before Developer Mode turned on.", error: true)
+                }
+                let since = (args["since"] as? NSNumber).flatMap(Self.wholeNumber) ?? 0
+                if name == "console" {
+                    let entries = capture.console.since(since).map { e -> [String: Any] in
+                        var o: [String: Any] = ["level": e.level, "msg": e.message]
+                        if let at = e.location { o["at"] = at }
+                        if let frame = e.frameURL { o["frame"] = frame }
+                        if e.repeatCount > 1 { o["repeat"] = e.repeatCount }
+                        return o
+                    }
+                    let result: [String: Any] = ["entries": entries, "cursor": capture.console.lastSeq,
+                                                 "dropped": capture.droppedMessages + capture.console.dropped]
+                    if args["clear"] as? Bool == true { capture.clearConsole() }
+                    return text(json(result))
+                }
+                let entries = capture.network.since(since).map { e -> [String: Any] in
+                    var o: [String: Any] = ["kind": e.kind, "method": e.method, "url": e.url, "state": e.state.rawValue]
+                    if let v = e.status { o["status"] = v }
+                    if let v = e.duration { o["ms"] = Int(v.rounded()) }
+                    if let v = e.size { o["size"] = v }
+                    if let v = e.error { o["error"] = v }
+                    if args["detail"] as? Bool == true, e.hasDetail {
+                        o["requestHeaders"] = e.requestHeaders
+                        o["responseHeaders"] = e.responseHeaders
+                        if let b = e.requestBody { o["requestBody"] = b }
+                        if let b = e.responseBody { o["responseBody"] = b }
+                    }
+                    return o
+                }
+                return text(json(["entries": entries, "cursor": capture.network.lastSeq, "dropped": capture.network.dropped]))
 
             case "reload", "wait_for_load":
                 guard let wv = webView else { return text("No active tab", error: true) }
@@ -501,41 +635,6 @@ final class DevMCPServer {
         } catch {
             return text("\(name) failed: \(error.localizedDescription)", error: true)
         }
-    }
-
-    // MARK: - Console capture
-
-    /// Buffers console output, uncaught errors and failed resource loads for the `console` tool.
-    /// Added to the shared configuration, so it reaches tabs created (or reloaded) after start.
-    private func installConsoleCapture() {
-        let source = """
-        // Nook Dev MCP console capture
-        (function () {
-          if (globalThis.__nookDevConsole) return;
-          const buf = globalThis.__nookDevConsole = [];
-          const MAX = 500;
-          const push = (e) => { e.t = Math.round(performance.now()); buf.push(e); if (buf.length > MAX) buf.shift(); };
-          const fmt = (a) => { try { return typeof a === 'string' ? a : (a instanceof Error ? a.stack || String(a) : JSON.stringify(a)); } catch (_) { return String(a); } };
-          for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
-            const orig = console[level];
-            console[level] = function (...args) {
-              try { push({ level, msg: args.map(fmt).join(' ').slice(0, 2000) }); } catch (_) {}
-              return orig.apply(this, args);
-            };
-          }
-          addEventListener('error', (ev) => {
-            const el = ev.target;
-            if (el && el !== window && el.tagName) {
-              push({ level: 'loadError', tag: el.tagName.toLowerCase(), url: el.src || el.href || el.currentSrc || '' });
-            } else {
-              push({ level: 'uncaught', msg: String(ev.message), at: (ev.filename || '') + ':' + ev.lineno });
-            }
-          }, true);
-          addEventListener('unhandledrejection', (ev) => push({ level: 'unhandledRejection', msg: fmt(ev.reason).slice(0, 2000) }));
-        })();
-        """
-        let script = WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page)
-        BrowserConfiguration.shared.webViewConfiguration.userContentController.addUserScript(script)
     }
 }
 

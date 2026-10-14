@@ -19,6 +19,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
     case spaces
     case shortcuts
     case extensions
+    case developer
 
     var name: String {
         switch self {
@@ -32,6 +33,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .spaces: return "Spaces"
         case .shortcuts: return "Shortcuts"
         case .extensions: return "Extensions"
+        case .developer: return "Developer"
         }
     }
 
@@ -47,6 +49,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .spaces: return "square.on.square"
         case .shortcuts: return "keyboard"
         case .extensions: return "puzzlepiece.extension"
+        case .developer: return "hammer"
         }
     }
 
@@ -55,7 +58,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         switch self {
         case .general: return ["startup", "search engine", "tabs", "quit", "update"]
         case .appearance: return ["theme", "dark", "light", "sidebar"]
-        case .ai: return ["gemini", "openrouter", "ollama", "mcp", "browser control"]
+        case .ai: return ["gemini", "openrouter", "ollama", "mcp"]
         case .privacy: return ["cookies", "cache", "tracking", "website data"]
         case .adBlocker: return ["ads", "filters", "blocking", "allowlist", "whitelist"]
         case .tweaks: return ["youtube", "shorts", "thumbnails", "sponsorblock", "facebook", "instagram", "reels", "download", "social media"]
@@ -63,6 +66,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .spaces: return ["accent", "colour", "color", "rename"]
         case .shortcuts: return ["keyboard", "keys", "hotkeys"]
         case .extensions: return ["web extensions", "chrome", "add-ons"]
+        case .developer: return ["devtools", "inspector", "console", "network", "mcp", "browser control"]
         }
     }
 
@@ -85,6 +89,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .spaces: return .cyan
         case .shortcuts: return .indigo
         case .extensions: return .teal
+        case .developer: return .gray
         }
     }
 
@@ -94,7 +99,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
             (nil, [.general, .appearance]),
             (nil, [.ai]),
             (nil, [.privacy, .adBlocker, .airTrafficControl]),
-            (nil, [.spaces, .shortcuts, .extensions]),
+            (nil, [.spaces, .shortcuts, .extensions, .developer]),
             (nil, [.tweaks]),
         ]
     }

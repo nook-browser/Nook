@@ -66,6 +66,8 @@ public final class TabsController {
     /// Set once the SwiftData context has produced it; nil in a host without history.
     @ObservationIgnored public var history: HistoryManager?
     @ObservationIgnored public weak var webViews: WebViewProvider?
+    /// The app takes the screenshot, writes the clipboard and shows the toast.
+    @ObservationIgnored public var onDevPick: ((PageSession, DevPickedElement) -> Void)?
     @ObservationIgnored public weak var sessionDelegate: PageSessionDelegate?
     @ObservationIgnored public weak var tabEvents: TabEventObserver?
     @ObservationIgnored public weak var alerts: AlertPresenter?

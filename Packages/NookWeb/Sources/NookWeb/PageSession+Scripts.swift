@@ -266,6 +266,10 @@ extension PageSession: WKScriptMessageHandler {
     ) {
         // WKScriptMessageHandler callbacks run on main thread; no dispatch needed
 
+        // The dev capture handler only appends log lines, so every frame may post to it.
+        if message.name == DevCaptureScript.handlerName { receiveDevCapture(message); return }
+        if message.name == DevPickerScript.handlerName { receiveDevPick(message); return }
+
         // These handlers live in the page world, so any frame can post to them. Every script
         // that feeds them runs in the main frame only; media state is the exception, since a
         // player can sit in a subframe.

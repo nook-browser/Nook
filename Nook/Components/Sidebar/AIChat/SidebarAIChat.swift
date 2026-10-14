@@ -120,6 +120,7 @@ struct SidebarAIChat: View {
         .safeAreaPadding(.top, 8)
         .safeAreaPadding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: windowState.agentDraft, initial: true) { takeAgentDraft() }
         .onAppear {
             isTextFieldFocused = true
 
@@ -408,6 +409,13 @@ struct SidebarAIChat: View {
         Task {
             await aiService.sendMessage(text, windowState: windowState)
         }
+    }
+
+    private func takeAgentDraft() {
+        guard let draft = windowState.agentDraft else { return }
+        windowState.agentDraft = nil
+        messageText = messageText.isEmpty ? draft : messageText + "\n\n" + draft
+        isTextFieldFocused = true
     }
 
     private func showSettings() {

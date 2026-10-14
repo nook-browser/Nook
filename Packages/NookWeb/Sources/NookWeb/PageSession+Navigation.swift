@@ -50,6 +50,13 @@ extension PageSession: WKNavigationDelegate {
     ) {
         loadingState = .didCommit
         pdfLoadStateChanged(webView)
+        if let capture = devCapture {
+            capture.reset()
+            if let url = webView.url, controller?.blocker.isEnabled == true {
+                let rules = controller?.blocker.advancedRulesEngine.pageRules(for: url)
+                capture.pageRules = rules.map { DevPageRules(procedural: $0.procedural, scriptletCode: $0.scriptlets) }
+            }
+        }
         // First commit of the process is the launch-to-first-paint mark; later ones no-op.
         LaunchMetrics.markFirstPaint()
         controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
@@ -302,6 +309,7 @@ extension PageSession: WKNavigationDelegate {
         if let url = navigationAction.request.url,
             navigationAction.targetFrame?.isMainFrame == true
         {
+            devCapture?.markNavigationStart()
             // urlskip= goes past a known redirector; $removeparam restarts without tracking
             // parameters. Either way the replacement comes back through here.
             if navigationAction.navigationType != .backForward,
@@ -309,6 +317,11 @@ extension PageSession: WKNavigationDelegate {
                let replacement = controller?.blocker.urlSkipTarget(for: url, from: self.url, tab: self)
                    ?? controller?.blocker.strippedTrackingParams(for: url, tab: self)
             {
+                if let capture = devCapture {
+                    let skipped = replacement.host != url.host
+                    capture.recordBlock(DevBlockEntry(action: skipped ? .skippedRedirect : .strippedParams,
+                                                      url: url.absoluteString, target: replacement.absoluteString))
+                }
                 decisionHandler(.cancel)
                 webView.load(URLRequest(url: replacement))
                 return

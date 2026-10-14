@@ -45,6 +45,19 @@ struct URLBarView: View {
                                 }
                                 .font(NookDesign.Font.secondary)
                                 .lineLimit(1)
+                                if let errors = devErrorCount(for: session) {
+                                    Button {
+                                        browserManager.toggleDevPanel(.console)
+                                    } label: {
+                                        Text("\(errors)")
+                                            .font(NookDesign.Font.micro.monospacedDigit())
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, NookDesign.Spacing.xs)
+                                            .background(Capsule().fill(.red))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Console")
+                                }
                             }
                         } else {
                             HStack(spacing: NookDesign.Spacing.xs) {
@@ -146,7 +159,20 @@ struct URLBarView: View {
     private func displayPath(for session: PageSession?) -> String {
         guard let url = session?.url, url.host != nil else { return "" }
         let path = url.path
+        // A developer's own server shows its query too: it is usually what is being tested.
+        if isDevPage(session), let query = url.query { return path + "?" + query }
         return path == "/" ? "" : path
+    }
+
+    private func isDevPage(_ session: PageSession?) -> Bool {
+        guard let session, browserManager.nookSettings?.developerModeEnabled == true else { return false }
+        return DevHosts.isDevHost(session.url)
+    }
+
+    /// Errors since load on a developer's own server, for the badge; nil hides it.
+    private func devErrorCount(for session: PageSession?) -> Int? {
+        guard isDevPage(session), let count = session?.devCapture?.errorCount, count > 0 else { return nil }
+        return count
     }
 
 

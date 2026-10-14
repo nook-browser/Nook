@@ -81,7 +81,7 @@ struct WindowView: View {
 
                 // Copy URL toast
                 if windowState.isShowingCopyURLToast {
-                    CopyURLToast()
+                    CopyURLToast(title: windowState.copyToastText)
                         .environment(windowState)
                 }
                 
@@ -326,7 +326,7 @@ struct WindowView: View {
     private func AISidebar() -> some View {
         let handleAlignment: Alignment = nookSettings.sidebarPosition == .left ? .leading : .trailing
         
-        SidebarAIChat()
+        DevPanelColumn()
             .frame(width: windowState.aiSidebarWidth)
             .overlay(alignment: handleAlignment) {
                 AISidebarResizeView()

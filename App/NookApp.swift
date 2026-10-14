@@ -186,7 +186,9 @@ struct NookApp: App {
             guard settingsManager.autoRenamePinnedTabs, let tabs = browserManager?.tabs else { return }
             tabOrganizerManager.autoRename(itemIDs, using: tabs)
         }
-        DevMCPServer.shared.configure(browserManager: browserManager, enabled: settingsManager.browserControlServerEnabled)
+        DevMCPServer.shared.configure(browserManager: browserManager, enabled: settingsManager.developerModeEnabled && settingsManager.browserControlServerEnabled)
+        browserManager.tabs.setDeveloperMode(settingsManager.developerModeEnabled)
+        browserManager.installDevPickHandler()
 
         // A fresh install has no stored version and shows nothing.
         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {

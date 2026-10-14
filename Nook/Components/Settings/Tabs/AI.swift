@@ -429,30 +429,6 @@ struct SettingsAITab: View {
                     }
                 }
             }
-
-            // MARK: - Browser Control
-            Section {
-                Toggle(isOn: $settings.browserControlServerEnabled) {
-                    VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
-                        Text("Allow agents to control this browser")
-                            .font(NookDesign.Font.body)
-                        Text("Serves MCP on 127.0.0.1:47823 so a coding agent can drive Nook")
-                            .font(NookDesign.Font.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                // The setting lives in NookSettings, which cannot reach the server; start and
-                // stop it from here so the toggle still takes effect without a relaunch.
-                .onChange(of: settings.browserControlServerEnabled) {
-                    DevMCPServer.shared.applyEnabledSetting($1)
-                }
-            } header: {
-                Text("Browser Control")
-            } footer: {
-                Text("A client must send the token from Application Support/com.gstudios.nook/dev-mcp-token. Any program on this Mac can read that file, and with it run JavaScript in your tabs and read pages you are signed in to. Leave this off unless you are driving Nook from an agent.")
-                    .font(NookDesign.Font.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
         .formStyle(.grouped)
     }

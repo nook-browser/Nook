@@ -178,14 +178,16 @@ extension BrowserManager {
             return
         }
 
+        // `_inspector` is WebKit SPI with no public spelling; the alert covers a WebKit without it.
         let webView = currentTab.activeWebView
-
-        // Ensure the webview is inspectable
-        webView.isInspectable = true
-
-        // There is no public API to programmatically open the Web Inspector
-        // Show an alert instructing the user how to open it manually
-        showWebInspectorAlert()
+        let selector = NSSelectorFromString("_inspector")
+        guard webView.responds(to: selector),
+              let inspector = webView.perform(selector)?.takeUnretainedValue() as? NSObject else {
+            showWebInspectorAlert()
+            return
+        }
+        inspector.perform(NSSelectorFromString("show"))
+        inspector.perform(NSSelectorFromString("attach"))
     }
 
     private func showWebInspectorAlert() {

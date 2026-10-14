@@ -259,6 +259,19 @@ struct NookCommands: Commands {
             .modifier(dynamicShortcut(.openDevTools))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
+            if nookSettings.developerModeEnabled {
+                Button("Developer Panel") {
+                    browserManager.toggleDevPanel(.console)
+                }
+                .modifier(dynamicShortcut(.openDevPanel))
+
+                Button("Pick Element") {
+                    browserManager.startElementPicker()
+                }
+                .modifier(dynamicShortcut(.pickElement))
+                .disabled(browserManager.tabs.activeWindowSession == nil)
+            }
+
             Divider()
 
             Button(browserManager.tabs.activeWindowSession?.isAudioMuted == true ? "Unmute Audio" : "Mute Audio") {

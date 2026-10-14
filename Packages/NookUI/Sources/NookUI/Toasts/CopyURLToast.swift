@@ -13,7 +13,11 @@ import NookWeb
 public struct CopyURLToast: View {
     @Environment(BrowserWindowState.self) private var windowState
 
-    public init() {}
+    private let title: String
+
+    public init(title: String? = nil) {
+        self.title = title ?? "Copied Current URL"
+    }
 
     public var body: some View {
         ToastView {
@@ -30,7 +34,7 @@ public struct CopyURLToast: View {
                             .stroke(NookDesign.Surface.hairline, lineWidth: 1)
                     }
 
-                Text("Copied Current URL")
+                Text(title)
                     .font(NookDesign.Font.secondary)
                     .foregroundStyle(.primary)
             }

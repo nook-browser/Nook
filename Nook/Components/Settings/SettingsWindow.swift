@@ -264,6 +264,8 @@ private struct SettingsDetailPane: View {
                     if let extensionManager = browserManager.extensionManager {
                         ExtensionsSettingsView(extensionManager: extensionManager)
                     }
+                case .developer:
+                    SettingsDeveloperTab()
                 }
             }
             .navigationTitle(tab.name)

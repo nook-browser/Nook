@@ -70,6 +70,8 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
     // Tools & Features
     case openCommandPalette = "open_command_palette"
     case openDevTools = "open_dev_tools"
+    case openDevPanel = "open_dev_panel"
+    case pickElement = "pick_element"
     case viewDownloads = "view_downloads"
     case viewHistory = "view_history"
     case expandAllFolders = "expand_all_folders"
@@ -123,6 +125,8 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .toggleFullScreen: return "Toggle Full Screen"
         case .openCommandPalette: return "Open Command Palette"
         case .openDevTools: return "Developer Tools"
+        case .openDevPanel: return "Developer Panel"
+        case .pickElement: return "Pick Element"
         case .viewDownloads: return "View Downloads"
         case .viewHistory: return "View History"
         case .expandAllFolders: return "Expand All Folders"
@@ -154,7 +158,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
             return .spaces
         case .newWindow, .closeWindow, .closeBrowser, .toggleFullScreen:
             return .window
-        case .openCommandPalette, .openDevTools, .viewDownloads, .viewHistory, .expandAllFolders:
+        case .openCommandPalette, .openDevTools, .openDevPanel, .pickElement, .viewDownloads, .viewHistory, .expandAllFolders:
             return .tools
         case .focusAddressBar, .findInPage:
             return .navigation
@@ -336,6 +340,8 @@ extension KeyboardShortcut {
             // Tools & Features
             KeyboardShortcut(action: .openCommandPalette, keyCombination: KeyCombination(key: "p", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .openDevTools, keyCombination: KeyCombination(key: "i", modifiers: [.command, .option])),
+            KeyboardShortcut(action: .openDevPanel, keyCombination: KeyCombination(key: "j", modifiers: [.command, .option])),
+            KeyboardShortcut(action: .pickElement, keyCombination: KeyCombination(key: "x", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .viewDownloads, keyCombination: KeyCombination(key: "j", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .viewHistory, keyCombination: KeyCombination(key: "y", modifiers: [.command])),
             KeyboardShortcut(action: .expandAllFolders, keyCombination: KeyCombination(key: "e", modifiers: [.command, .shift])),

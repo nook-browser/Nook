@@ -18,7 +18,7 @@ class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
-    private let currentVersion = 6 // Increment when adding new shortcuts; 6 added Print (Cmd+P)
+    private let currentVersion = 8 // Increment when adding new shortcuts; 8 added Pick Element (Cmd+Shift+X)
 
     /// Hash-based storage for O(1) lookup: ["cmd+t": KeyboardShortcut]
     private var shortcutMap: [String: KeyboardShortcut] = [:]
@@ -517,6 +517,10 @@ class KeyboardShortcutManager {
                 self.windowRegistry?.activeWindow?.commandPalette?.open()
             case .openDevTools:
                 browserManager.openWebInspector()
+            case .openDevPanel:
+                browserManager.toggleDevPanel(.console)
+            case .pickElement:
+                browserManager.startElementPicker()
             case .viewDownloads:
                 browserManager.showDownloads()
             case .viewHistory:

@@ -51,6 +51,11 @@ public class BrowserWindowState {
     /// Whether the AI chat panel is visible in this window
     public var isSidebarAIChatVisible: Bool = false
 
+    /// The right column's tab while Developer Mode is on. The column is the AI chat otherwise.
+    public var devPanelTab: DevPanelTab = .agent
+    /// Text a pick or Send to Agent put in the Agent tab's compose box; the chat takes it and clears it.
+    public var agentDraft: String?
+
     /// Whether the command palette is visible in this window
     public var isCommandPaletteVisible: Bool = false
 
@@ -77,6 +82,8 @@ public class BrowserWindowState {
 
     /// Presentation flag for the copy URL toast
     public var isShowingCopyURLToast: Bool = false
+    /// Replaces the copy toast's text for one showing; nil is the URL wording.
+    public var copyToastText: String?
 
     /// Presentation flag for the shortcut conflict toast
     public var isShowingShortcutConflictToast: Bool = false

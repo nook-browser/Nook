@@ -33,6 +33,7 @@ public final class NookSettingsService {
     private let geminiModelKey = "settings.geminiModel"
     private let showAIAssistantKey = "settings.showAIAssistant"
     private let browserControlServerKey = "settings.browserControlServer"
+    private let developerModeKey = "settings.developerMode"
     private let aiProviderKey = "settings.aiProvider"
     private let openRouterApiKeyKey = "settings.openRouterApiKey"
     private let openRouterModelKey = "settings.openRouterModel"
@@ -255,6 +256,13 @@ public final class NookSettingsService {
     public var browserControlServerEnabled: Bool {
         didSet {
             userDefaults.set(browserControlServerEnabled, forKey: browserControlServerKey)
+        }
+    }
+
+    /// Gates every developer tool: capture scripts, the DevPanel tabs and Browser Control.
+    public var developerModeEnabled: Bool {
+        didSet {
+            userDefaults.set(developerModeEnabled, forKey: developerModeKey)
         }
     }
 
@@ -540,7 +548,10 @@ public final class NookSettingsService {
         self.geminiApiKey = ""  // In-memory only; persistent storage via AIKeychainStorage
         self.geminiModel = GeminiModel(rawValue: userDefaults.string(forKey: geminiModelKey) ?? GeminiModel.flash.rawValue) ?? .flash
         self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
-        self.browserControlServerEnabled = userDefaults.bool(forKey: browserControlServerKey)
+        let browserControlOn = userDefaults.bool(forKey: browserControlServerKey)
+        self.browserControlServerEnabled = browserControlOn
+        // Browser Control predates Developer Mode, so anyone who had it on keeps it reachable.
+        self.developerModeEnabled = userDefaults.object(forKey: developerModeKey) as? Bool ?? browserControlOn
         self.aiProvider = AIProvider(rawValue: userDefaults.string(forKey: aiProviderKey) ?? AIProvider.gemini.rawValue) ?? .gemini
         self.openRouterApiKey = ""  // In-memory only; persistent storage via AIKeychainStorage
         self.openRouterModel = OpenRouterModel(rawValue: userDefaults.string(forKey: openRouterModelKey) ?? OpenRouterModel.gpt4o.rawValue) ?? .gpt4o
