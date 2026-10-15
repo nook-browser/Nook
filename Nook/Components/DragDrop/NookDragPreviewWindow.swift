@@ -169,6 +169,8 @@ private struct NookMorphingPreview: View {
     let folderDepth: Int
 
     private let sidebarHorizontalPadding: CGFloat = 16
+    /// A lifted row narrows a little so the rows under it show.
+    private let liftedWidthFraction: CGFloat = 0.85
     private let insideFolderWidthFraction: CGFloat = 0.55
     private let perLevelWidthFraction: CGFloat = 0.08
     private let minimumWidthFraction: CGFloat = 0.3
@@ -303,7 +305,7 @@ private struct NookMorphingPreview: View {
     }
 
     private var rowWidth: CGFloat {
-        guard folderDepth > 0 else { return effectiveWidth }
+        guard folderDepth > 0 else { return style == .tabRow ? effectiveWidth * liftedWidthFraction : effectiveWidth }
         let fraction = insideFolderWidthFraction - CGFloat(folderDepth - 1) * perLevelWidthFraction
         return effectiveWidth * max(minimumWidthFraction, fraction)
     }

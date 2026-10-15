@@ -58,7 +58,8 @@ struct SpaceView: View {
 
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: NookDesign.Spacing.sectionGap) {
-                if !pinned.isEmpty {
+                // An empty pinned section shows a drop slot only while a drag is on.
+                if !pinned.isEmpty || dragSession.isDragging {
                     sectionList(.pinned(spaceID: spaceID), rows: pinned, split: split, showsTail: false)
                         .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
                 }
@@ -68,7 +69,7 @@ struct SpaceView: View {
                     sectionList(.tabs(spaceID: spaceID), rows: regular, split: split, showsTail: true)
                 }
             }
-            .animation(NookDesign.Motion.standard, value: pinned.isEmpty)
+            .animation(NookDesign.Motion.standard, value: pinned.isEmpty && !dragSession.isDragging)
             .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
         }
         .contentShape(Rectangle())
@@ -114,6 +115,10 @@ struct SpaceView: View {
                     }
                 }
 
+                if allRows.isEmpty, !showsTail {
+                    emptySectionSlot(isActive: dragSession.activeZone == zone)
+                }
+
                 if showsTail {
                     Color.clear
                         .contentShape(Rectangle())
@@ -132,6 +137,15 @@ struct SpaceView: View {
                 }
             }
         }
+    }
+
+    private func emptySectionSlot(isActive: Bool) -> some View {
+        NookDesign.Radius.shape(NookDesign.Radius.md)
+            .strokeBorder(style: StrokeStyle(lineWidth: NookDesign.Size.hairlineWidth, dash: [NookDesign.Spacing.sm, NookDesign.Spacing.xs]))
+            .foregroundStyle(isActive ? NookDesign.Surface.dropBorderActive : NookDesign.Surface.dropBorderIdle)
+            .background(NookDesign.Radius.shape(NookDesign.Radius.md).fill(isActive ? NookDesign.Surface.fillPressed : Color.clear))
+            .frame(height: NookDesign.Size.row)
+            .animation(NookDesign.Motion.quick, value: isActive)
     }
 
     /// Leading inset of a drop line. The overlay spans the row including its depth padding.
