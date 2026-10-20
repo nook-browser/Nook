@@ -547,14 +547,17 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
         // A page picked this URL for a one-click save; anything but an image or video is dropped.
         if download.mediaOnly {
             let mimeType = response.mimeType?.lowercased() ?? ""
-            guard mimeType.hasPrefix("image/") || mimeType.hasPrefix("video/") else {
+            // The server also names the file, and it can claim image/jpeg for "photo.jpg.dmg".
+            let named = UTType(filenameExtension: (cleanName as NSString).pathExtension)
+            let namedMedia = named?.conforms(to: .image) == true || named?.conforms(to: .audiovisualContent) == true
+            // S3-backed CDNs (ShootProof) send media as octet-stream; the media file name decides then.
+            let untyped = mimeType.isEmpty || mimeType == "application/octet-stream"
+            guard mimeType.hasPrefix("image/") || mimeType.hasPrefix("video/") || (untyped && namedMedia) else {
                 downloadManager?.updateDownloadState(download.id, state: .cancelled)
                 completion(.cancel)
                 return
             }
-            // The server also names the file, and it can claim image/jpeg for "photo.jpg.dmg".
-            let named = UTType(filenameExtension: (cleanName as NSString).pathExtension)
-            if named?.conforms(to: .image) != true, named?.conforms(to: .audiovisualContent) != true {
+            if !namedMedia {
                 cleanName += "." + (UTType(mimeType: mimeType)?.preferredFilenameExtension ?? "media")
                 // Again, since the added extension can take it past the length cap.
                 cleanName = DownloadManager.sanitizedFilename(cleanName)

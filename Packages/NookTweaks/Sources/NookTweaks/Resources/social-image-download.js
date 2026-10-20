@@ -38,7 +38,8 @@
             // Instagram omits the space after each comma; split only where a URL starts.
             for (const candidate of (set || '').split(/,\s*(?=https:|\/)/)) {
                 const [src, descriptor = '1x'] = candidate.trim().split(/\s+/);
-                const url = mediaURL(src);
+                // An empty src would resolve to the page itself.
+                const url = src && mediaURL(src);
                 const score = parseFloat(descriptor) * (descriptor.endsWith('x') ? img.naturalWidth || 1 : 1);
                 if (url && score > bestScore) { best = url; bestScore = score; }
             }
