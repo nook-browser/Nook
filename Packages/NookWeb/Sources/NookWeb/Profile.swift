@@ -12,6 +12,7 @@
 import Foundation
 import WebKit
 import Observation
+import OSLog
 
 @MainActor
 @Observable
@@ -35,6 +36,9 @@ public final class Profile: NSObject, Identifiable {
     public var cookieCount: Int { cachedCookieCount }
     public var hasStoredData: Bool { cachedCookieCount > 0 || cachedRecordCount > 0 }
 
+    @ObservationIgnored private var sessionCookieSave: Task<Void, Never>?
+    @ObservationIgnored private var savedSessionCookies: Data?
+
     public init(
         id: UUID = UUID(),
         name: String = "Default Profile",
@@ -46,6 +50,8 @@ public final class Profile: NSObject, Identifiable {
         // A persistent store identified by the space's UUID, so it is stable across launches.
         self.dataStore = WKWebsiteDataStore(forIdentifier: id)
         super.init()
+        restoreSessionCookies()
+        dataStore.httpCookieStore.add(self)
     }
 
     /// Initialize with a custom data store (used for ephemeral profiles)
@@ -147,6 +153,69 @@ public final class Profile: NSObject, Identifiable {
                 
                 completion?()
             }
+        }
+    }
+}
+
+// MARK: - Session Cookies
+
+/// WebKit keeps cookies without an expiry in memory only, so a relaunch signed people out of
+/// sites like App Store Connect. Each space saves its session cookies on change and restores them
+/// before its first page loads, as Chrome does with session restore.
+extension Profile: WKHTTPCookieStoreObserver {
+    private var sessionCookiesURL: URL {
+        TabsController.defaultDirectory.deletingLastPathComponent()
+            .appendingPathComponent("SessionCookies", isDirectory: true)
+            .appendingPathComponent("\(id.uuidString).plist")
+    }
+
+    /// Queued on the store's connection ahead of any load, so the first page already sends them.
+    fileprivate func restoreSessionCookies() {
+        guard let data = try? Data(contentsOf: sessionCookiesURL),
+              let list = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [[String: Any]]
+        else { return }
+        savedSessionCookies = data
+        for properties in list {
+            let keyed = Dictionary(uniqueKeysWithValues: properties.map { (HTTPCookiePropertyKey($0.key), $0.value) })
+            if let cookie = HTTPCookie(properties: keyed) {
+                dataStore.httpCookieStore.setCookie(cookie)
+            }
+        }
+    }
+
+    public func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
+        sessionCookieSave?.cancel()
+        sessionCookieSave = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled, let self else { return }
+            let cookies = await self.dataStore.httpCookieStore.allCookies()
+            guard !Task.isCancelled else { return }
+            self.writeSessionCookies(cookies.filter(\.isSessionOnly))
+        }
+    }
+
+    private func writeSessionCookies(_ cookies: [HTTPCookie]) {
+        let url = sessionCookiesURL
+        guard !cookies.isEmpty else {
+            if savedSessionCookies != nil { try? FileManager.default.removeItem(at: url) }
+            savedSessionCookies = nil
+            return
+        }
+        let list = cookies.compactMap { cookie in
+            cookie.properties.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.key.rawValue, $0.value) }) }
+        }
+        guard let data = try? PropertyListSerialization.data(fromPropertyList: list, format: .binary, options: 0),
+              data != savedSessionCookies
+        else { return }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url, options: [.atomic])
+            // Login tokens: owner only.
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            savedSessionCookies = data
+        } catch {
+            Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Tabs")
+                .error("Saving session cookies failed: \(String(describing: error), privacy: .public)")
         }
     }
 }
