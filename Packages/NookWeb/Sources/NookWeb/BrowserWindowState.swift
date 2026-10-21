@@ -117,8 +117,12 @@ public class BrowserWindowState {
     /// Whether this window is an incognito/private browsing window
     public var isIncognito: Bool = false
 
-    /// The ephemeral, non-persistent data store this incognito window's pages use.
-    /// Only set when isIncognito is true.
+    /// The DevMCP agent's own window: hidden, never saved, never the active window.
+    /// Its tabs live in `privateTree` like a private window's.
+    public var isAgent: Bool = false
+
+    /// The data store a private-tree window's pages use: a non-persistent one for incognito,
+    /// the human's space store for the agent window (so logins match).
     public var ephemeralProfile: Profile?
 
     /// Whether the download warning has been shown in this incognito session

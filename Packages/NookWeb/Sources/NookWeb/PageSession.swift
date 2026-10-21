@@ -26,7 +26,8 @@ public final class PageSession: NSObject, Identifiable {
     public let itemID: UUID
     public var id: UUID { itemID }
     @ObservationIgnored static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "PageSession")
-    /// A session in a private window: ephemeral profile, never saved, no extensions.
+    /// A session in a private-tree window (incognito or the DevMCP agent's): never saved, no
+    /// history, no extensions. Incognito pages also get an ephemeral store.
     public let isPrivate: Bool
 
     @ObservationIgnored public weak var controller: TabsController?
@@ -328,11 +329,13 @@ public final class PageSession: NSObject, Identifiable {
             return
         }
 
-        // Private (ephemeral) profiles never get the extension controller: extensions do not
-        // run in private pages.
-        if configuration.webExtensionController == nil,
-           resolvedProfile?.isEphemeral != true,
-           let extensionController = controller?.tabEvents?.nativeController {
+        // Private pages never get the extension controller: extensions do not run in private
+        // pages, nor in the agent window's (also `isPrivate`, on the person's persistent store),
+        // which extensions are never told about.
+        if isPrivate {
+            configuration.webExtensionController = nil
+        } else if configuration.webExtensionController == nil,
+                  let extensionController = controller?.tabEvents?.nativeController {
             configuration.webExtensionController = extensionController
         }
 

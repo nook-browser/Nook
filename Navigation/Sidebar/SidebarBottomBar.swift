@@ -26,16 +26,16 @@ struct SidebarBottomBar: View {
         HStack(alignment: .center, spacing: NookDesign.Spacing.xxs) {
             menuButton
 
-            // Hide spaces list in incognito windows (only one ephemeral space)
-            if !windowState.isIncognito {
+            // Hide spaces list in private-tree windows (one temporary space)
+            if !windowState.isIncognito, !windowState.isAgent {
                 SpacesList()
                     .frame(maxWidth: .infinity)
                     .environmentObject(browserManager)
                     .environment(windowState)
             }
 
-            // Hide new space button in incognito windows
-            if !windowState.isIncognito {
+            // Hide new space button in private-tree windows
+            if !windowState.isIncognito, !windowState.isAgent {
                 newSpaceButton
             }
         }
@@ -74,7 +74,7 @@ struct SidebarBottomBar: View {
                 }
             }
 
-            if !windowState.isIncognito {
+            if !windowState.isIncognito, !windowState.isAgent {
                 ForEach(LiveFolderMenuItem.all, id: \.title) { entry in
                     Button(entry.title, systemImage: entry.symbol) {
                         if let spaceID = windowState.spaceID {

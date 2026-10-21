@@ -59,6 +59,17 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// WebKit throttles a page whose window it thinks is occluded (1 Hz timers, no rendering or
+    /// lazy loading). The agent window is transparent on purpose, so its pages opt out through
+    /// the `_setWindowOcclusionDetectionEnabled:` SPI; skipped if WebKit drops it.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        let selector = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        guard window is AgentNSWindow, responds(to: selector) else { return }
+        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method(for: selector), to: Setter.self)(self, selector, false)
+    }
+
     /// Keeps a mini window page's fixed content clear of the window's glass toolbar while the
     /// page scrolls underneath it. Synced in `layout()` so it survives resize, full screen and
     /// toolbar changes; in a browser window the inset stays zero.

@@ -45,6 +45,8 @@ struct SettingsDeveloperTab: View {
                 .onChange(of: settings.browserControlServerEnabled) {
                     DevMCPServer.shared.applyEnabledSetting($1 && settings.developerModeEnabled)
                 }
+                Toggle("Agent uses its own window", isOn: $settings.agentWindowEnabled)
+                    .disabled(!settings.developerModeEnabled || !settings.browserControlServerEnabled)
             } header: {
                 Text("Browser Control")
             } footer: {

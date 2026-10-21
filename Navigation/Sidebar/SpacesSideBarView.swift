@@ -114,6 +114,13 @@ struct SpacesSideBarView: View {
                 .environmentObject(browserManager)
                 .environment(windowState)
 
+            if !windowState.isAgent, let agent = tabs.agentWindow, !tabs.displayOrder(in: agent).isEmpty {
+                AgentWindowRow(tabCount: tabs.displayOrder(in: agent).count, busy: tabs.agentCallsInFlight > 0) {
+                    browserManager.setAgentWindowShown(!browserManager.isAgentWindowShown)
+                }
+                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+            }
+
             // Media controls. Hides itself while the video is showing above it.
             MediaControlsView()
                 .environmentObject(browserManager)
@@ -427,5 +434,38 @@ struct SpacesSideBarView: View {
     private var menuTransition: AnyTransition {
         .move(edge: nookSettings.sidebarPosition == .left ? .leading : .trailing)
             .combined(with: .opacity)
+    }
+}
+
+/// The DevMCP agent's window, while it has tabs: a click shows or hides it, and the icon
+/// pulses while a tool call runs.
+private struct AgentWindowRow: View {
+    let tabCount: Int
+    let busy: Bool
+    let toggle: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: NookDesign.Spacing.md) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                    .frame(width: NookDesign.Size.favicon)
+                    .symbolEffect(.pulse, isActive: busy)
+                Text("Agent · \(tabCount) \(tabCount == 1 ? "tab" : "tabs")")
+                    .font(NookDesign.Font.body)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isHovering ? .secondary : .tertiary)
+            .padding(.horizontal, NookDesign.Spacing.rowPadding)
+            .frame(height: NookDesign.Size.row)
+            .background(isHovering ? NookDesign.Surface.fill : Color.clear)
+            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+            .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        }
+        .buttonStyle(.plain)
+        .onHoverTracking { hovering in
+            withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
+        }
     }
 }

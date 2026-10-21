@@ -62,13 +62,15 @@ public class WindowRegistry {
 
         // If this was the active window, switch to another
         if activeWindowId == id {
-            activeWindowId = windows.keys.first
+            activeWindowId = windows.values.first { !$0.isAgent }?.id
         }
 
     }
 
     /// Set the active (focused) window
     public func setActive(_ window: BrowserWindowState) {
+        // The agent window is the agent's; the human's window stays the active one.
+        guard !window.isAgent else { return }
         activeWindowId = window.id
         onActiveWindowChange?(window)
     }

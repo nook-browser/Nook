@@ -159,7 +159,7 @@ final class DevMCPServer {
                 "protocolVersion": params["protocolVersion"] as? String ?? "2025-06-18",
                 "capabilities": ["tools": [:] as [String: Any]],
                 "serverInfo": ["name": "nook-dev", "version": "1"],
-                "instructions": "Drives the running Debug build of Nook. Page tools act on the selected tab of the active window."
+                "instructions": "Drives the running Debug build of Nook. Page tools act on the selected tab of the agent's own hidden window (agent_window shows it), or of the active window when Settings > Developer turns that off. pick and selection always use the active window."
             ]
         case "ping":
             result = [:]
@@ -168,7 +168,11 @@ final class DevMCPServer {
         case "tools/call":
             let name = params["name"] as? String ?? ""
             let args = params["arguments"] as? [String: Any] ?? [:]
-            guard let called = await withTimeout(Self.toolTimeout, operation: { await self.callTool(name, args) }) else {
+            // Counted here, not in callTool, so a call the deadline abandons stops the pulse.
+            browserManager?.tabs.agentCallsInFlight += 1
+            let called = await withTimeout(Self.toolTimeout, operation: { await self.callTool(name, args) })
+            browserManager?.tabs.agentCallsInFlight -= 1
+            guard let called else {
                 return (200, rpcError(id: id, code: -32001, message: "Tool \(name) did not answer within \(Int(Self.toolTimeout))s"))
             }
             result = called
@@ -331,6 +335,11 @@ final class DevMCPServer {
             parameters: ["type": "object", "properties": [:] as [String: Any]]
         ),
         AIToolDefinition(
+            name: "agent_window",
+            description: "Page tools run in the agent's own Nook window, hidden and click-through so the person's windows and focus stay theirs; it shares their logins. show: true puts it in front (without taking focus) so the person can watch, false hides it again. Returns enabled, open, shown and tab count.",
+            parameters: ["type": "object", "properties": ["show": ["type": "boolean"]]]
+        ),
+        AIToolDefinition(
             name: "pages",
             description: "Every live page in every window: url, WebContent pid, loaded, on screen, in a window, document.visibilityState.",
             parameters: ["type": "object", "properties": [:] as [String: Any]]
@@ -349,19 +358,21 @@ final class DevMCPServer {
         ["name": $0.name, "description": $0.description, "inputSchema": $0.parameters]
     }
 
-    private var window: BrowserWindowState? {
+    /// About the human's own page, so they stay on the active window in agent mode.
+    private static let humanTools: Set<String> = ["pick", "selection"]
+    /// Need no page, so they never open the agent window.
+    private static let windowlessTools: Set<String> = ["pages", "clear_page_cache", "check_urls", "agent_window"]
+
+    private var humanWindow: BrowserWindowState? {
         guard let registry = browserManager?.windowRegistry else { return nil }
-        return registry.activeWindow ?? registry.windows.values.first
+        return registry.activeWindow ?? registry.windows.values.first { !$0.isAgent }
     }
 
-    private var session: PageSession? {
-        guard let bm = browserManager, let window else { return nil }
-        return bm.tabs.controllableSession(in: window)
-    }
-
-    private var webView: WKWebView? {
-        guard let bm = browserManager, let window, let id = window.selectedItemID else { return nil }
-        return bm.getWebView(for: id, in: window.id) ?? session?.webView
+    /// The window `tool` acts on: the agent's own (made on first use) unless the setting is off
+    /// or the tool is about the human's page.
+    private func window(for tool: String) -> BrowserWindowState? {
+        guard let bm = browserManager, bm.tabs.settings.agentWindowEnabled, !Self.humanTools.contains(tool) else { return humanWindow }
+        return Self.windowlessTools.contains(tool) ? bm.tabs.agentWindow ?? humanWindow : bm.agentWindow()
     }
 
     private func text(_ s: String, error: Bool = false) -> [String: Any] {
@@ -383,12 +394,22 @@ final class DevMCPServer {
     }
 
     private func callTool(_ rawName: String, _ args: [String: Any]) async -> [String: Any] {
-        guard let bm = browserManager, let window else { return text("No browser window", error: true) }
-
         // The chat's executeJavaScript evaluates an expression, so `return` (which
         // every agent writes) is a syntax error. Here it is another name for
         // `evaluate`, which runs the code as an async function body.
         let name = rawName == "executeJavaScript" ? "evaluate" : rawName
+        guard let bm = browserManager, let window = window(for: name) else { return text("No browser window", error: true) }
+        var session: PageSession? { bm.tabs.controllableSession(in: window) }
+        var webView: WKWebView? {
+            guard let id = window.selectedItemID else { return nil }
+            return bm.getWebView(for: id, in: window.id) ?? session?.webView
+        }
+        // Agent mode off: badge the human's tab this call drove (after it, so a new tab counts).
+        defer {
+            if !window.isAgent, !Self.humanTools.contains(name), !Self.windowlessTools.contains(name) {
+                bm.tabs.markAgentTouched(window.selectedItemID)
+            }
+        }
 
         do {
             if BrowserTools.toolsByName[name] != nil {
@@ -398,6 +419,16 @@ final class DevMCPServer {
             }
 
             switch name {
+            case "agent_window":
+                if let show = args["show"] as? Bool {
+                    if show, bm.agentWindow() == nil { return text("No browser window", error: true) }
+                    bm.setAgentWindowShown(show)
+                }
+                return text(json([
+                    "enabled": bm.tabs.settings.agentWindowEnabled, "open": bm.tabs.agentWindow != nil,
+                    "shown": bm.isAgentWindowShown, "tabs": bm.tabs.agentWindow.map { bm.tabs.displayOrder(in: $0).count } ?? 0
+                ]))
+
             case "evaluate":
                 guard let wv = webView else { return text("No active tab", error: true) }
                 let code = args["code"] as? String ?? ""

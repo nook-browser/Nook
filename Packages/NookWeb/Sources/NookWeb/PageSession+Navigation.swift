@@ -132,7 +132,7 @@ extension PageSession: WKNavigationDelegate {
                 if let currentURL = webView.url {
                     let profile = self?.profile
                     let profileId = profile?.id ?? self?.controller?.sessionDelegate?.currentProfile?.id
-                    let isEphemeral = profile?.isEphemeral ?? false
+                    let isEphemeral = self?.isPrivate == true || profile?.isEphemeral == true
                     self?.controller?.history?.addVisit(
                         url: currentURL,
                         title: title,

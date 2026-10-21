@@ -74,6 +74,17 @@ public struct SpaceTab: View {
                 ItemFavicon(item: item, session: session)
                     .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
+                    .overlay(alignment: .bottomTrailing) {
+                        // The agent's tabs, and the person's tabs an agent drove in the last 30 s.
+                        if windowState.isAgent || tabs.agentTouched.contains(item.id) {
+                            Image(systemName: "sparkle")
+                                .font(NookDesign.Font.micro)
+                                .foregroundStyle(.primary)
+                                .padding(NookDesign.Spacing.xxs / 2)
+                                .background(.background, in: Circle())
+                                .offset(x: NookDesign.Spacing.xs, y: NookDesign.Spacing.xs)
+                        }
+                    }
                 if let session, session.hasAudioContent || session.hasPlayingAudio || session.isAudioMuted {
                     Button(action: { session.toggleMute() }) {
                         Image(systemName: session.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
