@@ -223,11 +223,22 @@ final class DevMCPServer {
     private static let devTools: [AIToolDefinition] = [
         AIToolDefinition(
             name: "evaluate",
-            description: "Run JavaScript as an async function body in the selected tab and return the JSON of its return value. Use `return` and `await` freely. world: 'page' (default) or 'isolated'.",
+            description: "Run JavaScript as an async function body in the selected tab and return the JSON of its return value. Use `return` and `await` freely. world: 'page' (default) or 'isolated'. saveTo: a path relative to ~/Downloads/Nook MCP; the result is written there instead of returned (a string as is, anything else as JSON), and append: true adds it to the end of the file.",
             parameters: ["type": "object", "properties": [
                 "code": ["type": "string"],
-                "world": ["type": "string", "enum": ["page", "isolated"]]
+                "world": ["type": "string", "enum": ["page", "isolated"]],
+                "saveTo": ["type": "string"],
+                "append": ["type": "boolean"]
             ], "required": ["code"]]
+        ),
+        AIToolDefinition(
+            name: "download",
+            description: "Save https URLs (plain http fails App Transport Security) as files in dir, a path relative to ~/Downloads/Nook MCP, fetched with the selected tab's cookies and user agent and its URL as Referer. urls: a list, and/or urlsFile: a file under the same root with one URL per line (write one with evaluate saveTo). Files are named <hash>-<last path component>; ones already there are skipped. Each URL adds a line to dir/manifest.jsonl (url, file, status ok|exists|http|error|tooLarge, httpStatus, contentType, bytes). Answers when all are done or after 20 s; the rest keep downloading, so read the manifest for the outcome.",
+            parameters: ["type": "object", "properties": [
+                "urls": ["type": "array", "items": ["type": "string"]],
+                "urlsFile": ["type": "string"],
+                "dir": ["type": "string"]
+            ], "required": ["dir"]]
         ),
         AIToolDefinition(
             name: "screenshot",
@@ -391,16 +402,69 @@ final class DevMCPServer {
                 guard let wv = webView else { return text("No active tab", error: true) }
                 let code = args["code"] as? String ?? ""
                 let world: WKContentWorld = args["world"] as? String == "isolated" ? .defaultClient : .page
+                var saveURL: URL?
+                if let saveTo = args["saveTo"] as? String {
+                    guard let url = DevMCPFiles.resolve(saveTo) else {
+                        return text("saveTo must be a relative path inside \(DevMCPFiles.root.path)", error: true)
+                    }
+                    saveURL = url
+                }
                 // Serialize in the page so DOM nodes, undefined and cycles come back readable.
+                // A string being saved is written as is, not as a JSON string literal.
                 let wrapped = """
                 const __v = await (async () => { \(code)
                 })();
                 if (__v === undefined) return 'undefined';
+                if (\(saveURL != nil) && typeof __v === 'string') return __v;
                 try { const s = JSON.stringify(__v, null, 2); return s === undefined ? String(__v) : s; }
                 catch (e) { return String(__v); }
                 """
                 let result = try await wv.callAsyncJavaScript(wrapped, contentWorld: world)
-                return text(result as? String ?? String(describing: result))
+                let output = result as? String ?? String(describing: result)
+                guard let saveURL else { return text(output) }
+                try FileManager.default.createDirectory(at: saveURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                let data = Data(output.utf8)
+                if args["append"] as? Bool == true, let handle = try? FileHandle(forWritingTo: saveURL) {
+                    defer { try? handle.close() }
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                } else {
+                    try data.write(to: saveURL)
+                }
+                return text("Saved \(data.count) bytes to \(saveURL.path)")
+
+            case "download":
+                guard let wv = webView else { return text("No active tab", error: true) }
+                guard let dir = (args["dir"] as? String).flatMap({ DevMCPFiles.resolve($0) }) else {
+                    return text("dir must be a relative path inside \(DevMCPFiles.root.path)", error: true)
+                }
+                var list = args["urls"] as? [String] ?? []
+                if let file = args["urlsFile"] as? String {
+                    guard let source = DevMCPFiles.resolve(file), let body = try? String(contentsOf: source, encoding: .utf8) else {
+                        return text("urlsFile must be a readable file inside \(DevMCPFiles.root.path)", error: true)
+                    }
+                    list += body.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
+                }
+                var seen = Set<URL>()
+                let urls = list.compactMap(URL.init(string:)).filter { ["http", "https"].contains($0.scheme) && seen.insert($0).inserted }
+                guard !urls.isEmpty else { return text("No http(s) URLs given", error: true) }
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                let job = DevMCPDownload(
+                    urls: urls, dir: dir,
+                    cookies: await wv.configuration.websiteDataStore.httpCookieStore.allCookies(),
+                    userAgent: (try? await wv.evaluateJavaScript("navigator.userAgent")) as? String,
+                    referer: wv.url?.absoluteString
+                )
+                Task.detached { await job.run() }
+                let deadline = Date().addingTimeInterval(20)
+                // ponytail: 250 ms poll bounded by 20 s; the job itself keeps running past it.
+                while !job.progress.finished, Date() < deadline { try await Task.sleep(for: .milliseconds(250)) }
+                let progress = job.progress
+                let done = progress.counts.values.reduce(0, +)
+                return text(json([
+                    "dir": dir.path, "manifest": dir.appendingPathComponent("manifest.jsonl").path,
+                    "total": urls.count, "done": done, "finished": progress.finished, "counts": progress.counts
+                ]))
 
             case "screenshot":
                 guard let wv = webView else { return text("No active tab", error: true) }
