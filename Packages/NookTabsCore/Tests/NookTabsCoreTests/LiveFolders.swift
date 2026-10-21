@@ -75,6 +75,10 @@ struct LiveFolderTests {
         json["live"] = "somethingNewer"
         let newer = try JSONDecoder().decode(Item.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(newer.live?.rawValue == "somethingNewer")
+        #expect(newer.live?.feedURL == nil)
+        let feedURL = URL(string: "https://example.com/feed.xml?a=1")!
+        #expect(LiveSource.feed(feedURL).feedURL == feedURL)
+        #expect(LiveSource(rawValue: "feed:file:///etc/passwd").feedURL == nil)
 
         // device.json from before live folders has no liveDismissed key.
         var device = try JSONSerialization.jsonObject(with: JSONEncoder().encode(DeviceState())) as! [String: Any]

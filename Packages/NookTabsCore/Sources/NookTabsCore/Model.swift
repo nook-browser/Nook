@@ -57,6 +57,21 @@ public struct LiveSource: RawRepresentable, Codable, Hashable, Sendable {
 
     /// The person's open pull requests on github.com.
     public static let githubPulls = LiveSource(rawValue: "githubPulls")
+    /// Open issues assigned to the person on github.com.
+    public static let githubIssues = LiveSource(rawValue: "githubIssues")
+    /// Unread github.com notification threads.
+    public static let githubNotifications = LiveSource(rawValue: "githubNotifications")
+    /// The person's incomplete Asana tasks.
+    public static let asanaTasks = LiveSource(rawValue: "asanaTasks")
+
+    /// An RSS or Atom feed, stored as "feed:<absolute url>".
+    public static func feed(_ url: URL) -> LiveSource { LiveSource(rawValue: "feed:" + url.absoluteString) }
+
+    public var feedURL: URL? {
+        guard rawValue.hasPrefix("feed:"), let url = URL(string: String(rawValue.dropFirst(5))),
+              url.scheme == "http" || url.scheme == "https", url.host != nil else { return nil }
+        return url
+    }
 }
 
 public struct Item: Identifiable, Codable, Hashable, Sendable {

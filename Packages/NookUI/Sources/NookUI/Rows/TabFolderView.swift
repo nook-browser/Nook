@@ -52,7 +52,7 @@ public struct TabFolderView: View {
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
                     .animation(NookDesign.Motion.standard, value: isOpen)
 
-                Image(systemName: item.live != nil ? "arrow.triangle.pull" : (isOpen ? "folder.fill" : "folder"))
+                Image(systemName: liveSymbol ?? (isOpen ? "folder.fill" : "folder"))
                     .font(.system(size: NookDesign.Size.spaceIcon, weight: .medium))
                     .foregroundStyle(tabs.space(spaceID)?.accentColor ?? .secondary)
 
@@ -83,7 +83,7 @@ public struct TabFolderView: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
-                        .help(status == .signedOut ? "Sign in to GitHub" : "Couldn't load pull requests")
+                        .help(liveStatusHelp(status))
                 }
 
                 if !isHovering {
@@ -129,6 +129,29 @@ public struct TabFolderView: View {
 
     private var folderMenu: some View {
         FolderContextMenu(itemID: item.id, onRename: startRenaming)
+    }
+
+    // MARK: - Live
+
+    private var liveSymbol: String? {
+        switch item.live {
+        case nil: return nil
+        case .githubIssues?: return "smallcircle.filled.circle"
+        case .githubNotifications?: return "bell"
+        case .asanaTasks?: return "checkmark.circle"
+        case let source?: return source.feedURL != nil ? "dot.radiowaves.up.forward" : "arrow.triangle.pull"
+        }
+    }
+
+    private func liveStatusHelp(_ status: TabsController.LiveFolderStatus) -> String {
+        let signedOut = status == .signedOut
+        switch item.live {
+        case .githubIssues?: return signedOut ? "Sign in to GitHub" : "Couldn't load issues"
+        case .githubNotifications?: return signedOut ? "Sign in to GitHub" : "Couldn't load notifications"
+        case .asanaTasks?: return signedOut ? "Sign in to Asana" : "Couldn't load tasks"
+        case let source? where source.feedURL != nil: return "Couldn't load feed"
+        default: return signedOut ? "Sign in to GitHub" : "Couldn't load pull requests"
+        }
     }
 
     // MARK: - Rename

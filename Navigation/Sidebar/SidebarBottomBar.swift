@@ -75,9 +75,16 @@ struct SidebarBottomBar: View {
             }
 
             if !windowState.isIncognito {
-                Button("New Pull Requests Folder", systemImage: "arrow.triangle.pull") {
+                ForEach(LiveFolderMenuItem.all, id: \.title) { entry in
+                    Button(entry.title, systemImage: entry.symbol) {
+                        if let spaceID = windowState.spaceID {
+                            tabs.createLiveFolder(entry.source, in: spaceID)
+                        }
+                    }
+                }
+                Button("New Feed Folder…", systemImage: "dot.radiowaves.up.forward") {
                     if let spaceID = windowState.spaceID {
-                        tabs.createPullRequestsFolder(in: spaceID)
+                        browserManager.presentFeedFolderPrompt(in: spaceID)
                     }
                 }
             }
@@ -93,4 +100,18 @@ struct SidebarBottomBar: View {
         .menuStyle(.button)
         .nookIconButtons()
     }
+}
+
+/// The live folder sources the sidebar's create menus offer, besides feeds.
+struct LiveFolderMenuItem {
+    let title: String
+    let symbol: String
+    let source: LiveSource
+
+    static let all = [
+        LiveFolderMenuItem(title: "New Pull Requests Folder", symbol: "arrow.triangle.pull", source: .githubPulls),
+        LiveFolderMenuItem(title: "New Issues Folder", symbol: "smallcircle.filled.circle", source: .githubIssues),
+        LiveFolderMenuItem(title: "New Notifications Folder", symbol: "bell", source: .githubNotifications),
+        LiveFolderMenuItem(title: "New Asana Tasks Folder", symbol: "checkmark.circle", source: .asanaTasks),
+    ]
 }

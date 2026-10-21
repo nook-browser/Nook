@@ -273,12 +273,21 @@ struct SpacesSideBarView: View {
             }
 
             if !windowState.isIncognito {
+                ForEach(LiveFolderMenuItem.all, id: \.title) { entry in
+                    Button {
+                        if let spaceID = windowState.spaceID {
+                            tabs.createLiveFolder(entry.source, in: spaceID)
+                        }
+                    } label: {
+                        Label(entry.title, systemImage: entry.symbol)
+                    }
+                }
                 Button {
                     if let spaceID = windowState.spaceID {
-                        tabs.createPullRequestsFolder(in: spaceID)
+                        browserManager.presentFeedFolderPrompt(in: spaceID)
                     }
                 } label: {
-                    Label("New Pull Requests Folder", systemImage: "arrow.triangle.pull")
+                    Label("New Feed Folder…", systemImage: "dot.radiowaves.up.forward")
                 }
             }
 
