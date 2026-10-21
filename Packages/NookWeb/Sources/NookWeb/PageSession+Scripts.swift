@@ -284,6 +284,11 @@ extension PageSession: WKScriptMessageHandler {
             let href = message.body as? String
             self.onCommandHover?(href)
 
+        case Self.translateHandlerName where message.world == Self.translateWorld:
+            if let body = message.body as? [String: Any], let nodes = body["nodes"] as? [[String: Any]] {
+                translationFeed?.yield(nodes)
+            }
+
         case "pipStateChange":
             if let dict = message.body as? [String: Any], let active = dict["active"] as? Bool {
                 self.hasPiPActive = active
@@ -351,6 +356,7 @@ extension PageSession: WKScriptMessageHandler {
                     // The store coalesces writes, so SPA URL changes report directly.
                     controller?.pageCommitted(itemID: itemID, url: url)
                     controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
+                    if let webView = message.webView { schedulePageTextCapture(in: webView, sameDocument: true) }
                 }
             }
 

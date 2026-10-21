@@ -274,6 +274,17 @@ struct WebsiteView: View {
                 BlockedPageView(session: session)
             }
 
+            if let session = browserManager.tabs.controllableSession(in: windowState) {
+                TranslationTaskHost(session: session)
+                if let language = session.translationOffer, !session.isTranslated {
+                    VStack {
+                        TranslateOfferView(session: session, language: language)
+                            .padding(.top, NookDesign.Spacing.lg)
+                        Spacer()
+                    }
+                }
+            }
+
             // Split preview overlay - shows cards during drag operations
             if splitManager.getSplitState(for: windowState.id).isPreviewActive {
                 SplitPreviewOverlay()

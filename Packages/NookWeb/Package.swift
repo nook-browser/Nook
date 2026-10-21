@@ -28,6 +28,7 @@ let package = Package(
                 .product(name: "NookTweaks", package: "NookTweaks"),
                 .product(name: "FaviconFinder", package: "FaviconFinder"),
             ],
+            resources: [.copy("Resources")],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]

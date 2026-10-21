@@ -223,6 +223,11 @@ struct NookCommands: Commands {
             .modifier(dynamicShortcut(.refresh))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
+            Button(browserManager.tabs.activeWindowSession?.isTranslated == true ? "Show Original" : "Translate Page") {
+                browserManager.tabs.activeWindowSession?.toggleTranslation()
+            }
+            .disabled(browserManager.tabs.activeWindowSession?.canTranslate != true)
+
             Divider()
 
             Button("Zoom In") {

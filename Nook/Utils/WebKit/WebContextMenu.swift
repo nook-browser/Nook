@@ -16,6 +16,7 @@ enum WebContextMenuItem {
     case pageForward
     case pageReload
     case pageCopyAddress
+    case pageTranslate
 
     case linkOpenInNewTab
     case linkCopy
@@ -48,7 +49,7 @@ enum WebContextMenuItem {
     private static func content(for payload: WebContextMenuPayload) -> [WebContextMenuItem] {
         switch payload {
         case .page:
-            return [.pageBack, .pageForward, .pageReload, .separator, .pageCopyAddress, .separator, .systemInspect]
+            return [.pageBack, .pageForward, .pageReload, .separator, .pageCopyAddress, .pageTranslate, .separator, .systemInspect]
         case .textSelection:
             return [.systemLookUp, .systemTranslate, .textCopy, .separator, .systemShare, .separator, .systemInspect]
         case .link:
@@ -110,7 +111,7 @@ enum WebContextMenuItem {
             else { return nil }
             return existing
         default:
-            guard let title = title else { return nil }
+            guard let title = title(on: webView) else { return nil }
             let item = HandlerMenuItem(title: title) { [weak webView] _ in
                 guard let webView else { return }
                 self.performAction(on: webView, payload: payload)
@@ -120,12 +121,14 @@ enum WebContextMenuItem {
         }
     }
 
-    private var title: String? {
+    @MainActor
+    private func title(on webView: FocusableWKWebView) -> String? {
         switch self {
         case .pageBack: return "Back"
         case .pageForward: return "Forward"
         case .pageReload: return "Reload Page"
         case .pageCopyAddress: return "Copy Page Address"
+        case .pageTranslate: return webView.owningSession?.isTranslated == true ? "Show Original" : "Translate Page"
         case .linkOpenInNewTab: return "Open Link in New Tab"
         case .linkCopy: return "Copy Link"
         case .imageOpenInNewTab: return "Open Image in New Tab"
@@ -154,6 +157,7 @@ enum WebContextMenuItem {
         switch self {
         case .pageBack: return context.canGoBack || context.owningSession?.canGoBackOrReturn == true
         case .pageForward: return context.canGoForward
+        case .pageTranslate: return context.owningSession?.canTranslate == true
         default: return true
         }
     }
@@ -165,6 +169,8 @@ enum WebContextMenuItem {
             if let session = webView.owningSession { session.goBack(in: webView) } else { webView.goBack() }
         case .pageForward:
             webView.goForward()
+        case .pageTranslate:
+            webView.owningSession?.toggleTranslation()
         case .pageReload:
             webView.reload()
         case .pageCopyAddress:

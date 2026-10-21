@@ -451,7 +451,10 @@ class BrowserManager: ObservableObject {
         self.downloadManager = DownloadManager.shared
         self.authenticationManager = AuthenticationManager()
         // Initialize managers with the current space's data store for isolation
-        self.historyManager = HistoryManager(context: modelContext, profileId: initialProfile?.id)
+        self.historyManager = HistoryManager(
+            context: modelContext, profileId: initialProfile?.id,
+            pageTextURL: TabsController.defaultDirectory.deletingLastPathComponent()
+                .appendingPathComponent("History/page-text.sqlite"))
         self.cookieManager = CookieManager(dataStore: initialProfile?.dataStore)
         self.cacheManager = CacheManager(dataStore: initialProfile?.dataStore)
         self.compositorManager = TabCompositorManager()

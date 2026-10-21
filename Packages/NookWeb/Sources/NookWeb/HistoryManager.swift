@@ -26,17 +26,20 @@ public struct HistoryVisit: Sendable {
 public final class HistoryManager {
     @ObservationIgnored private let storeTask: Task<HistoryStore, Never>
     @ObservationIgnored private var pendingWrite: Task<Void, Never>?
+    /// Visited pages' text for the command palette. Nil leaves the feature out entirely.
+    @ObservationIgnored private let pageText: HistoryTextIndex?
     public var currentProfileId: UUID?
     /// Visits older than this are pruned at launch, so "All time" in the history panel means this.
     nonisolated public static let retentionDays = 100
 
-    public init(context: ModelContext, profileId: UUID? = nil) {
+    public init(context: ModelContext, profileId: UUID? = nil, pageTextURL: URL? = nil) {
         currentProfileId = profileId
+        pageText = pageTextURL.map(HistoryTextIndex.init(fileURL:))
         let container = context.container
         // Construct the model executor off the main actor as well as calling it there.
         storeTask = Task.detached { HistoryStore(modelContainer: container) }
         // Every space's rows, not only the launch space's.
-        enqueue { await $0.clear(days: Self.retentionDays, profile: nil) }
+        clear(days: Self.retentionDays, profile: nil)
     }
 
     public func switchProfile(_ profileId: UUID?) { currentProfileId = profileId }
@@ -87,12 +90,47 @@ public final class HistoryManager {
     }
 
     public func clearHistory(olderThan days: Int = 0, profileId: UUID? = nil) {
-        let profile = profileId ?? currentProfileId
-        enqueue { await $0.clear(days: days, profile: profile) }
+        clear(days: days, profile: profileId ?? currentProfileId)
+    }
+
+    private func clear(days: Int, profile: UUID?) {
+        let pageText = pageText
+        enqueue { store in
+            await store.clear(days: days, profile: profile)
+            // Page text goes with its history row, whichever space cleared it.
+            if let pageText { await pageText.retain(only: await store.allURLs()) }
+        }
     }
 
     public func deleteHistoryEntry(_ entryId: UUID) {
-        enqueue { await $0.delete(entryId) }
+        let pageText = pageText
+        enqueue { store in
+            if let url = await store.delete(entryId) { await pageText?.delete(url: url) }
+        }
+    }
+
+    // MARK: - Page Text
+
+    /// Queued behind history writes, so a Clear issued after a capture also removes it.
+    public func recordPageText(url: URL, title: String, body: String) {
+        guard let pageText, url.scheme == "http" || url.scheme == "https" else { return }
+        let key = url.absoluteString, date = Date()
+        enqueue { _ in await pageText.record(url: key, title: title, body: body, visitedAt: date) }
+    }
+
+    /// History rows whose page text matches every word of `query`, best match first.
+    public func searchPageText(query: String, limit: Int) async -> [HistoryEntry] {
+        guard let pageText else { return [] }
+        let profile = currentProfileId
+        let urls = await pageText.search(query, limit: limit * 3).map(\.url)
+        guard !Task.isCancelled, !urls.isEmpty else { return [] }
+        // Through the history store, so only rows this space can see come back.
+        return Array(await storeTask.value.entries(forURLs: urls, profile: profile).prefix(limit))
+    }
+
+    public func erasePageText() {
+        let pageText = pageText
+        enqueue { _ in await pageText?.erase() }
     }
 }
 
@@ -269,12 +307,41 @@ actor HistoryStore {
         } catch { Self.logger.error("History clear failed: \(error.localizedDescription, privacy: .public)") }
     }
 
-    func delete(_ id: UUID) {
+    /// Deletes one row and returns its URL.
+    @discardableResult
+    func delete(_ id: UUID) -> String? {
         do {
+            var descriptor = FetchDescriptor<HistoryEntity>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            let url = try modelContext.fetch(descriptor).first?.url
             try modelContext.delete(model: HistoryEntity.self, where: #Predicate { $0.id == id })
             try modelContext.save()
             autofillCache = nil
-        } catch { Self.logger.error("History deletion failed: \(error.localizedDescription, privacy: .public)") }
+            return url
+        } catch {
+            Self.logger.error("History deletion failed: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    /// Every URL still in history, across spaces.
+    func allURLs() -> Set<String> {
+        var descriptor = FetchDescriptor<HistoryEntity>()
+        descriptor.propertiesToFetch = [\.url]
+        return Set(((try? modelContext.fetch(descriptor)) ?? []).map(\.url))
+    }
+
+    /// The rows `profile` sees for `urls`, in the order given, one per URL.
+    func entries(forURLs urls: [String], profile: UUID?) -> [HistoryEntry] {
+        let predicate: Predicate<HistoryEntity>
+        if let profile {
+            predicate = #Predicate { urls.contains($0.url) && ($0.profileId == profile || $0.profileId == nil) }
+        } else {
+            predicate = #Predicate { urls.contains($0.url) }
+        }
+        let rows = (try? modelContext.fetch(FetchDescriptor(predicate: predicate))) ?? []
+        let byURL = Dictionary(rows.map { ($0.url, $0) }, uniquingKeysWith: { $0.lastVisited >= $1.lastVisited ? $0 : $1 })
+        return urls.compactMap { byURL[$0].map(HistoryEntry.init) }
     }
 }
 

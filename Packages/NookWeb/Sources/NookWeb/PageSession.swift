@@ -15,6 +15,7 @@ import NookTabsCore
 import NookSettings
 import OSLog
 import SwiftUI
+import Translation
 import WebKit
 
 @MainActor
@@ -130,10 +131,26 @@ public final class PageSession: NSObject, Identifiable {
         if isDisplayingPDF { pdfControlsReveal &+= 1 }
     }
 
+    // MARK: - Translation
+
+    /// The page's text is shown translated, or a translation is under way.
+    public internal(set) var isTranslated = false
+    /// The detected language while the window offers to translate the page.
+    public internal(set) var translationOffer: Locale.Language?
+    /// Set when the language pair still needs downloading; the window's `.translationTask` runs it.
+    public internal(set) var translationRequest: TranslationSession.Configuration?
+    @ObservationIgnored var translationSource: Locale.Language?
+    @ObservationIgnored var translationGeneration = 0
+    @ObservationIgnored var translationFeed: AsyncStream<[[String: Any]]>.Continuation?
+    @ObservationIgnored var installedTranslation: Task<Void, Never>?
+
     // MARK: - Web Process Crash Tracking
 
     public var webProcessCrashCount: Int = 0
     public var lastWebProcessCrashDate: Date = .distantPast
+
+    /// The last page whose text went to history search, so a re-commit does not read it again.
+    @ObservationIgnored var lastTextCapture: (url: URL, at: Date)?
 
     // MARK: - Media State
 
@@ -370,6 +387,8 @@ public final class PageSession: NSObject, Identifiable {
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
         controller.add(self, contentWorld: Self.pipStateWorld, name: "pipStateChange")
+        controller.removeScriptMessageHandler(forName: Self.translateHandlerName, contentWorld: Self.translateWorld)
+        controller.add(self, contentWorld: Self.translateWorld, name: Self.translateHandlerName)
         webView.customUserAgent = PlatformUserAgent.custom
         // Let the web content control its own background so extension styles (like Dark
         // Reader) can paint dark backgrounds. The themed background shows only while loading.
@@ -434,6 +453,7 @@ public final class PageSession: NSObject, Identifiable {
         profileAwaitCancellable = nil
         webStoreHandler = nil
         devCapture = nil
+        resetTranslation()
         loadingState = .idle
         hasPiPActive = false
         hasPlayingVideo = false
@@ -468,6 +488,7 @@ public final class PageSession: NSObject, Identifiable {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
+        controller.removeScriptMessageHandler(forName: Self.translateHandlerName, contentWorld: Self.translateWorld)
         self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
         detachDevCaptureHandler(from: webView)
         controller.removeScriptMessageHandler(

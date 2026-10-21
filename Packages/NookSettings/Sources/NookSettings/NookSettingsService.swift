@@ -45,6 +45,7 @@ public final class NookSettingsService {
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     private let favoritePreviewsKey = "settings.favoritePreviews"
+    private let searchPageTextInHistoryKey = "settings.searchPageTextInHistory"
     private let hideWebContentBorderKey = "settings.hideWebContentBorder"
     private let siteSearchEntriesKey = "settings.siteSearchEntries"
     private let didFinishOnboardingKey = "settings.didFinishOnboarding"
@@ -329,6 +330,13 @@ public final class NookSettingsService {
         }
     }
 
+    /// Keep visited pages' text so the command palette can find them by their words.
+    public var searchPageTextInHistory: Bool {
+        didSet {
+            userDefaults.set(searchPageTextInHistory, forKey: searchPageTextInHistoryKey)
+        }
+    }
+
     /// The inset, rounded corners and shadow around the web view.
     public var hideWebContentBorder: Bool {
         didSet {
@@ -461,6 +469,7 @@ public final class NookSettingsService {
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
             favoritePreviewsKey: true,
+            searchPageTextInHistoryKey: true,
             hideWebContentBorderKey: false,
             didFinishOnboardingKey: false,
             tabLayoutKey: TabLayout.sidebar.rawValue,
@@ -538,7 +547,7 @@ public final class NookSettingsService {
            let optDecoded = try? JSONDecoder().decode([String].self, from: optData) {
             self.enabledOptionalFilterLists = optDecoded
         } else {
-            self.enabledOptionalFilterLists = []
+            self.enabledOptionalFilterLists = ["ublock-annoyances-cookies.txt"]
         }
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.lastSeenVersion = userDefaults.string(forKey: lastSeenVersionKey)
@@ -563,6 +572,7 @@ public final class NookSettingsService {
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
         self.favoritePreviews = userDefaults.bool(forKey: favoritePreviewsKey)
+        self.searchPageTextInHistory = userDefaults.bool(forKey: searchPageTextInHistoryKey)
         self.hideWebContentBorder = userDefaults.bool(forKey: hideWebContentBorderKey)
         self.tabLayout = TabLayout(rawValue: userDefaults.string(forKey: tabLayoutKey) ?? TabLayout.sidebar.rawValue) ?? .sidebar
         self.appearanceMode = AppearanceMode(rawValue: userDefaults.string(forKey: appearanceModeKey) ?? AppearanceMode.system.rawValue) ?? .system

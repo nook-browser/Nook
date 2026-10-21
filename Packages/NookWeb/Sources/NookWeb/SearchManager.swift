@@ -30,6 +30,7 @@ public class SearchManager {
     /// kept across a keystroke so a leg that is still running does not blank its own rows.
     private var historyRows: [SearchSuggestion] = []
     private var webRows: [SearchSuggestion] = []
+    private var textRows: [SearchSuggestion] = []
     private var searchGeneration = UUID()
     private weak var tabs: TabsController?
     private weak var window: BrowserWindowState?
@@ -109,6 +110,7 @@ public class SearchManager {
             autofillTask?.cancel()
             autofillHost = nil
             historyRows = []
+            textRows = []
             webRows = []
             updateSuggestionsIfNeeded([])
             return
@@ -140,6 +142,12 @@ public class SearchManager {
                   self.window?.spaceID == space else { return }
             self.historyRows = history
             self.compose(tabs: tabs)
+            // Page text second, so title and URL matches paint without waiting on it.
+            let text = await self.searchPageText(for: query)
+            guard !Task.isCancelled, self.searchGeneration == generation,
+                  self.window?.spaceID == space else { return }
+            self.textRows = text
+            self.compose(tabs: tabs)
         }
 
         isLoading = true
@@ -162,11 +170,30 @@ public class SearchManager {
             if case .tab(let match) = row.type { return Self.pageKey(match.url) }
             return nil
         })
-        let history = historyRows.filter { row in
+        let history = Array(historyRows.filter { row in
             if case .history(let entry) = row.type { return !open.contains(Self.pageKey(entry.url)) }
             return true
+        }.prefix(3))
+        // Page text matches come after, minus any page already shown above.
+        let shown = open.union(history.compactMap { row -> String? in
+            if case .history(let entry) = row.type { return Self.pageKey(entry.url) }
+            return nil
+        })
+        let text = textRows.filter { row in
+            if case .history(let entry) = row.type { return !shown.contains(Self.pageKey(entry.url)) }
+            return false
         }
-        updateSuggestionsIfNeeded(Array((tabs + Array(history.prefix(3)) + webRows).prefix(5)))
+        updateSuggestionsIfNeeded(Array((tabs + history + Array(text.prefix(3)) + webRows).prefix(5)))
+    }
+
+    /// History rows found by words in the page's text, when that setting is on.
+    @MainActor private func searchPageText(for query: String) async -> [SearchSuggestion] {
+        guard let historyManager, tabs?.settings.searchPageTextInHistory == true,
+              query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 else { return [] }
+        // Spare rows for the ones the dedupe in compose drops.
+        return await historyManager.searchPageText(query: query, limit: 8).map {
+            SearchSuggestion(text: $0.displayTitle, type: .history($0))
+        }
     }
 
     /// One key for a page however its URL was written: no scheme, `www.` or trailing slash.
@@ -312,6 +339,7 @@ public class SearchManager {
         autofillTask?.cancel()
         autofillHost = nil
         historyRows = []
+        textRows = []
         webRows = []
         searchGeneration = UUID()
         if !suggestions.isEmpty {

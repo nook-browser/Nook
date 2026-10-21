@@ -63,6 +63,7 @@ extension PageSession: WKNavigationDelegate {
         // A new page gets its dialogs back.
         jsDialogCount = 0
         jsDialogsSuppressed = false
+        resetTranslation()
 
         if let newURL = webView.url {
             self.url = newURL
@@ -140,6 +141,7 @@ extension PageSession: WKNavigationDelegate {
                         profileId: profileId,
                         isEphemeral: isEphemeral
                     )
+                    self?.schedulePageTextCapture(in: webView, sameDocument: false)
                 }
             }
         }
@@ -152,6 +154,7 @@ extension PageSession: WKNavigationDelegate {
         }
 
         injectPageObservers(into: webView)
+        offerTranslationIfNeeded()
         updateNavigationStateEnhanced(source: "didCommit")
 
         // Trigger background color extraction after page fully loads
@@ -443,6 +446,36 @@ extension PageSession: WKNavigationDelegate {
 
         controller?.sessionDelegate?.addDownload(
             download, originalURL: originalURL, suggestedFilename: suggestedFilename)
+    }
+}
+
+// MARK: - Page Text for History Search
+extension PageSession {
+    private static let pageTextWorld = WKContentWorld.world(name: "NookHistoryText")
+    private static let pageTextScript = """
+        (() => [document.title, ((document.body && document.body.innerText) || '').trim().slice(0, 20000)])()
+        """
+
+    /// Reads the page's text into history search once it has settled. A same-document
+    /// navigation reads again only when the path changed.
+    func schedulePageTextCapture(in webView: WKWebView, sameDocument: Bool) {
+        guard let url = webView.url, url.scheme == "http" || url.scheme == "https",
+              !isPrivate, controller?.settings.searchPageTextInHistory == true else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (sameDocument ? 1.5 : 1)) { [weak self, weak webView] in
+            guard let self, let webView, webView.url == url, !webView.isLoading, !self.isDisplayingPDF,
+                  self.profile?.isEphemeral != true,
+                  self.controller?.settings.searchPageTextInHistory == true else { return }
+            if let last = self.lastTextCapture {
+                if sameDocument, last.url.host == url.host, last.url.path == url.path { return }
+                if !sameDocument, last.url == url, Date().timeIntervalSince(last.at) < 5 { return }
+            }
+            self.lastTextCapture = (url, Date())
+            webView.evaluateJavaScript(Self.pageTextScript, in: nil, in: Self.pageTextWorld) { [weak self] result in
+                guard case .success(let value) = result, let parts = value as? [String], parts.count == 2,
+                      parts[1].utf16.count >= 100 else { return }
+                self?.controller?.history?.recordPageText(url: url, title: parts[0], body: parts[1])
+            }
+        }
     }
 }
 
