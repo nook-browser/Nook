@@ -206,15 +206,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// Every quit path (Cmd+Q with or without the warning, Dock, logout, restart) comes
     /// through here, so this is the one place that guarantees the final save. Pages are not
     /// closed first: the WebContent processes exit with the app anyway.
-    /// The hidden agent window counts as visible to AppKit, so a Dock click after the last
-    /// human window closed would open nothing: open a window ourselves then.
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        guard flag, let manager = browserManager, let agent = manager.tabs.agentWindow?.window,
-              !sender.windows.contains(where: { $0.isVisible && $0 !== agent && $0.canBecomeMain }) else { return true }
-        manager.createNewWindow()
-        return false
-    }
-
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if let count = browserManager?.downloadManager.activeDownloads.count, count > 0 {
             let alert = NSAlert()

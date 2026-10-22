@@ -26,8 +26,7 @@ public final class PageSession: NSObject, Identifiable {
     public let itemID: UUID
     public var id: UUID { itemID }
     @ObservationIgnored static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "PageSession")
-    /// A session in a private-tree window (incognito or the DevMCP agent's): never saved, no
-    /// history, no extensions. Incognito pages also get an ephemeral store.
+    /// A session in a private window: ephemeral profile, never saved, no extensions.
     public let isPrivate: Bool
 
     @ObservationIgnored public weak var controller: TabsController?
@@ -329,16 +328,21 @@ public final class PageSession: NSObject, Identifiable {
             return
         }
 
-        // Private pages never get the extension controller: extensions do not run in private
-        // pages, nor in the agent window's (also `isPrivate`, on the person's persistent store),
-        // which extensions are never told about.
-        if isPrivate {
+        // Private and Agent pages never get the extension controller: extensions could open
+        // windows and activate the app from an Agent page.
+        if isPrivate || isAgentPage {
             configuration.webExtensionController = nil
         } else if configuration.webExtensionController == nil,
                   let extensionController = controller?.tabEvents?.nativeController {
             configuration.webExtensionController = extensionController
         }
 
+        // An agent page cannot take the person's screen for element full screen. Its own copy of
+        // the preferences, so other pages keep full screen.
+        if isAgentPage, let preferences = configuration.preferences.copy() as? WKPreferences {
+            preferences.isElementFullscreenEnabled = false
+            configuration.preferences = preferences
+        }
         let created = controller?.webViews?.makeWebView(configuration: configuration)
         (created as? SessionWebView)?.contextMenuBridge = WebContextMenuBridge(session: self, configuration: configuration)
         primaryWebView = created

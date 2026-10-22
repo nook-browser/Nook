@@ -57,17 +57,30 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
         super.rightMouseDown(with: event)
     }
 
-    override var acceptsFirstResponder: Bool { true }
+    /// Never while hidden under the person's page as the agent's: it would take their typing.
+    override var acceptsFirstResponder: Bool { !(superview is AgentPageHostView) }
 
-    /// WebKit throttles a page whose window it thinks is occluded (1 Hz timers, no rendering or
-    /// lazy loading). The agent window is transparent on purpose, so its pages opt out through
-    /// the `_setWindowOcclusionDetectionEnabled:` SPI; skipped if WebKit drops it.
+    /// WebKit throttles a page whose window it thinks is occluded (1 Hz timers, no rendering), and
+    /// the agent's page usually sits under the person's. `_setWindowOcclusionDetectionEnabled:`
+    /// opts it out, and only takes if set before the view enters an already occluded window.
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        let selector = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        if newWindow != nil, owningSession?.isAgentPage == true, responds(to: selector) {
+            typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
+            unsafeBitCast(method(for: selector), to: Setter.self)(self, selector, false)
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
+    /// The agent's page leaving a window (the person left the Agent space) goes back under
+    /// their page, once the compositor has finished moving views.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        let selector = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
-        guard window is AgentNSWindow, responds(to: selector) else { return }
-        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
-        unsafeBitCast(method(for: selector), to: Setter.self)(self, selector, false)
+        guard window == nil, let session = owningSession, session.isAgentPage else { return }
+        DispatchQueue.main.async { [weak session] in
+            guard let session else { return }
+            session.controller?.onAgentPage?(session)
+        }
     }
 
     /// Keeps a mini window page's fixed content clear of the window's glass toolbar while the

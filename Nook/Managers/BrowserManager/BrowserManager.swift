@@ -958,7 +958,7 @@ class BrowserManager: ObservableObject {
         windowState.urlBarFrame = urlBarFrame
 
         tabs.attach(window: windowState)
-        guard !windowState.isIncognito, !windowState.isAgent else { return }
+        guard !windowState.isIncognito else { return }
         windowSpaceChanged(windowState)
         applyStartupLoadMode(for: windowState)
         restoreSavedWindows()
@@ -1040,12 +1040,13 @@ class BrowserManager: ObservableObject {
 
     /// A browser window created in code, styled like the SwiftUI main window up front so the
     /// first frame already has the hidden, transparent title bar.
-    private func makeBrowserNSWindow(title: String, agent: Bool = false) -> NSWindow {
-        let rect = NSRect(x: 0, y: 0, width: 1200, height: 800)
-        let mask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        let window = agent
-            ? AgentNSWindow(contentRect: rect, styleMask: mask, backing: .buffered, defer: false)
-            : NSWindow(contentRect: rect, styleMask: mask, backing: .buffered, defer: false)
+    private func makeBrowserNSWindow(title: String) -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
         // ARC owns this window. AppKit's default release on close over-releases it and crashes
         // in the next autorelease pool drain.
         window.isReleasedWhenClosed = false
@@ -1100,45 +1101,6 @@ class BrowserManager: ObservableObject {
         windowRegistry.setActive(windowState)
 
         newWindow.makeKeyAndOrderFront(nil)
-    }
-
-    // MARK: - Agent Window
-
-    /// The DevMCP agent's window, made on first use. Its pages use the human's space store, so
-    /// logins match; it never takes focus and stays invisible and click-through until shown.
-    func agentWindow() -> BrowserWindowState? {
-        if let existing = tabs.agentWindow { return existing }
-        guard let windowRegistry, let webViewCoordinator else { return nil }
-        let human = windowRegistry.activeWindow ?? tabs.regularWindows.first
-        guard let spaceID = human?.spaceID ?? tabs.orderedSpaces.first?.id,
-              let profile = tabs.profile(forSpace: spaceID) else { return nil }
-        let windowState = BrowserWindowState()
-        windowState.isAgent = true
-        windowState.ephemeralProfile = profile
-        windowRegistry.register(windowState)
-
-        let window = makeBrowserNSWindow(title: "Agent - Nook", agent: true)
-        window.contentView = NSHostingView(rootView: windowContent(ContentView(windowState: windowState), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator))
-        window.isExcludedFromWindowsMenu = true
-        window.isRestorable = false
-        if let frame = human?.window?.frame { window.setFrame(frame, display: false) } else { window.center() }
-        windowState.window = window
-        setAgentWindowShown(false)
-        return windowState
-    }
-
-    var isAgentWindowShown: Bool { tabs.agentWindow?.window?.ignoresMouseEvents == false }
-
-    /// Shows the agent window in front without activating Nook or making it key, or hides it:
-    /// still ordered in (so WebKit keeps rendering) but transparent, click-through and out of
-    /// Cmd-` and Mission Control.
-    func setAgentWindowShown(_ shown: Bool) {
-        guard let window = tabs.agentWindow?.window else { return }
-        window.alphaValue = shown ? 1 : 0
-        window.ignoresMouseEvents = !shown
-        window.collectionBehavior = shown ? [.managed, .participatesInCycle] : [.transient, .ignoresCycle, .canJoinAllSpaces]
-        // orderFront alone leaves an inactive app's window behind the active app's.
-        if shown { window.orderFrontRegardless() } else { window.orderBack(nil) }
     }
 
     /// Destroys a closed incognito window's ephemeral data store. Its pages were already ended by
@@ -1310,11 +1272,4 @@ extension Array {
     subscript(safe index: Int) -> Element? {
         return indices.contains(index) ? self[index] : nil
     }
-}
-
-/// The agent's window can take key only while shown, so AppKit never hands it focus when the
-/// human's window closes.
-final class AgentNSWindow: NSWindow {
-    override var canBecomeKey: Bool { !ignoresMouseEvents }
-    override var canBecomeMain: Bool { !ignoresMouseEvents }
 }

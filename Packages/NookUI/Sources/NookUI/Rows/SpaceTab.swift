@@ -75,8 +75,8 @@ public struct SpaceTab: View {
                     .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                     .overlay(alignment: .bottomTrailing) {
-                        // The agent's tabs, and the person's tabs an agent drove in the last 30 s.
-                        if windowState.isAgent || tabs.agentTouched.contains(item.id) {
+                        // The tab DevMCP page tools act on.
+                        if tabs.agentItemID == item.id {
                             Image(systemName: "sparkle")
                                 .font(NookDesign.Font.micro)
                                 .foregroundStyle(.primary)

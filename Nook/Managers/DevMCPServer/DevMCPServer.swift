@@ -159,7 +159,7 @@ final class DevMCPServer {
                 "protocolVersion": params["protocolVersion"] as? String ?? "2025-06-18",
                 "capabilities": ["tools": [:] as [String: Any]],
                 "serverInfo": ["name": "nook-dev", "version": "1"],
-                "instructions": "Drives the running Debug build of Nook. Page tools act on the selected tab of the agent's own hidden window (agent_window shows it), or of the active window when Settings > Developer turns that off. pick and selection always use the active window."
+                "instructions": "Drives the running Debug build of Nook. Page and tab tools act on the Agent space: a space in the person's window, made on first use, with the logins of the space they had open. Agent activity never changes the space they see; they open the Agent space to watch. Popups from its pages open as Agent space tabs. pick and selection use the person's active tab."
             ]
         case "ping":
             result = [:]
@@ -318,7 +318,7 @@ final class DevMCPServer {
         ),
         AIToolDefinition(
             name: "closeTabs",
-            description: "Close tabs in the active window. indices: positions from getTabList. Or regular: true to delete every tab and folder in the active space's regular tabs section, leaving favorites and pinned tabs.",
+            description: "Close Agent space tabs. indices: positions from getTabList. Or regular: true to delete every tab and folder in its regular tabs section, leaving favorites and pinned tabs.",
             parameters: ["type": "object", "properties": [
                 "indices": ["type": "array", "items": ["type": "integer"]],
                 "regular": ["type": "boolean"]
@@ -326,18 +326,13 @@ final class DevMCPServer {
         ),
         AIToolDefinition(
             name: "pinTab",
-            description: "Pin the tab at a getTabList index to the active space's pinned section.",
+            description: "Pin the tab at a getTabList index to the Agent space's pinned section.",
             parameters: ["type": "object", "properties": ["index": ["type": "integer"]], "required": ["index"]]
         ),
         AIToolDefinition(
             name: "user_scripts",
             description: "User scripts installed in the selected tab: first line, injection time, main frame only, length.",
             parameters: ["type": "object", "properties": [:] as [String: Any]]
-        ),
-        AIToolDefinition(
-            name: "agent_window",
-            description: "Page tools run in the agent's own Nook window, hidden and click-through so the person's windows and focus stay theirs; it shares their logins. show: true puts it in front (without taking focus) so the person can watch, false hides it again. Returns enabled, open, shown and tab count.",
-            parameters: ["type": "object", "properties": ["show": ["type": "boolean"]]]
         ),
         AIToolDefinition(
             name: "pages",
@@ -358,21 +353,14 @@ final class DevMCPServer {
         ["name": $0.name, "description": $0.description, "inputSchema": $0.parameters]
     }
 
-    /// About the human's own page, so they stay on the active window in agent mode.
+    /// About the person's own page, so they act on the active window's tab, not the Agent space.
     private static let humanTools: Set<String> = ["pick", "selection"]
-    /// Need no page, so they never open the agent window.
-    private static let windowlessTools: Set<String> = ["pages", "clear_page_cache", "check_urls", "agent_window"]
+    /// Need no Agent page, so they neither create the Agent space nor load its tab.
+    private static let readOnlyTools: Set<String> = ["pages", "clear_page_cache", "check_urls", "getTabList"]
 
     private var humanWindow: BrowserWindowState? {
         guard let registry = browserManager?.windowRegistry else { return nil }
-        return registry.activeWindow ?? registry.windows.values.first { !$0.isAgent }
-    }
-
-    /// The window `tool` acts on: the agent's own (made on first use) unless the setting is off
-    /// or the tool is about the human's page.
-    private func window(for tool: String) -> BrowserWindowState? {
-        guard let bm = browserManager, bm.tabs.settings.agentWindowEnabled, !Self.humanTools.contains(tool) else { return humanWindow }
-        return Self.windowlessTools.contains(tool) ? bm.tabs.agentWindow ?? humanWindow : bm.agentWindow()
+        return registry.activeWindow ?? registry.windows.values.first
     }
 
     private func text(_ s: String, error: Bool = false) -> [String: Any] {
@@ -398,37 +386,43 @@ final class DevMCPServer {
         // every agent writes) is a syntax error. Here it is another name for
         // `evaluate`, which runs the code as an async function body.
         let name = rawName == "executeJavaScript" ? "evaluate" : rawName
-        guard let bm = browserManager, let window = window(for: name) else { return text("No browser window", error: true) }
-        var session: PageSession? { bm.tabs.controllableSession(in: window) }
-        var webView: WKWebView? {
-            guard let id = window.selectedItemID else { return nil }
-            return bm.getWebView(for: id, in: window.id) ?? session?.webView
+        // Everything but pick and selection works in the Agent space, whatever the window shows,
+        // through a regular window: a private one holds no Agent space. No window is ever opened.
+        let forPerson = Self.humanTools.contains(name)
+        let active = humanWindow
+        guard let bm = browserManager,
+              let window = forPerson ? active : (active?.privateTree == nil ? active : bm.tabs.regularWindows.first)
+        else { return text("No browser window", error: true) }
+        // Tools that only read never create the Agent space; with none yet, it has no tabs.
+        let agentSpace = forPerson ? nil
+            : Self.readOnlyTools.contains(name) ? bm.tabs.agentSpaceID : bm.tabs.ensureAgentSpace(loginsFrom: window)
+        if agentSpace == nil, !forPerson {
+            if name == "getTabList" { return text("No tabs available") }
+            if !Self.readOnlyTools.contains(name) { return text("No space to borrow logins from", error: true) }
         }
-        // Agent mode off: badge the human's tab this call drove (after it, so a new tab counts).
-        defer {
-            if !window.isAgent, !Self.humanTools.contains(name), !Self.windowlessTools.contains(name) {
-                bm.tabs.markAgentTouched(window.selectedItemID)
-            }
-        }
+        let space = forPerson ? window.spaceID : agentSpace
+        let order = space.map(bm.tabs.displayOrder(inSpace:)) ?? []
 
         do {
             if BrowserTools.toolsByName[name] != nil {
-                let executor = BrowserToolExecutor(browserManager: bm, windowState: window)
+                let executor = BrowserToolExecutor(browserManager: bm, windowState: window, agentSpace: agentSpace)
                 let r = try await executor.execute(AIToolCall(name: name, arguments: args))
                 return text(r.content, error: r.isError)
             }
+            // The agent's page, loaded and hosted once for this call; a read-only tool loads nothing.
+            let agentView: WKWebView? = forPerson || Self.readOnlyTools.contains(name) || agentSpace == nil
+                ? nil : try bm.agentWebView()
+            var webView: WKWebView? {
+                if !forPerson { return agentView }
+                guard let id = window.selectedItemID else { return nil }
+                return bm.getWebView(for: id, in: window.id) ?? bm.tabs.controllableSession(in: window)?.webView
+            }
+            var session: PageSession? {
+                guard !forPerson else { return bm.tabs.controllableSession(in: window) }
+                return agentView == nil ? nil : bm.tabs.agentItem.flatMap(bm.tabs.session(for:))
+            }
 
             switch name {
-            case "agent_window":
-                if let show = args["show"] as? Bool {
-                    if show, bm.agentWindow() == nil { return text("No browser window", error: true) }
-                    bm.setAgentWindowShown(show)
-                }
-                return text(json([
-                    "enabled": bm.tabs.settings.agentWindowEnabled, "open": bm.tabs.agentWindow != nil,
-                    "shown": bm.isAgentWindowShown, "tabs": bm.tabs.agentWindow.map { bm.tabs.displayOrder(in: $0).count } ?? 0
-                ]))
-
             case "evaluate":
                 guard let wv = webView else { return text("No active tab", error: true) }
                 let code = args["code"] as? String ?? ""
@@ -667,12 +661,11 @@ final class DevMCPServer {
 
             case "closeTabs":
                 if args["regular"] as? Bool == true {
-                    guard let spaceID = window.spaceID else { return text("Window has no space", error: true) }
+                    guard let spaceID = space else { return text("Window has no space", error: true) }
                     let roots = bm.tabs.children(of: .tabs(spaceID: spaceID))
                     for item in roots { bm.tabs.remove(item.id) }
                     return text("Removed \(roots.count) items from the regular tabs section")
                 }
-                let order = bm.tabs.displayOrder(in: window)
                 let indices = (args["indices"] as? [NSNumber] ?? []).compactMap(Self.wholeNumber)
                 guard !indices.isEmpty, indices.count == (args["indices"] as? [Any])?.count,
                       indices.allSatisfy(order.indices.contains) else {
@@ -682,9 +675,8 @@ final class DevMCPServer {
                 return text("Closed \(indices.count) tabs")
 
             case "pinTab":
-                let order = bm.tabs.displayOrder(in: window)
                 guard let index = (args["index"] as? NSNumber).flatMap(Self.wholeNumber), order.indices.contains(index),
-                      let spaceID = window.spaceID else { return text("index must be a position from getTabList", error: true) }
+                      let spaceID = space else { return text("index must be a position from getTabList", error: true) }
                 bm.tabs.pin(order[index], to: .pinned(spaceID: spaceID))
                 return text("Pinned: \(bm.tabs.item(order[index])?.displayTitle ?? "")")
 

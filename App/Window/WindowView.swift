@@ -193,6 +193,10 @@ struct WindowView: View {
         }
     }
 
+    private var showsAgentSpace: Bool {
+        windowState.spaceID != nil && windowState.spaceID == tabs.agentSpaceID
+    }
+
     // MARK: - Layout Components
 
     @ViewBuilder
@@ -204,6 +208,8 @@ struct WindowView: View {
         NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)
             // Private windows tint all chrome so they are never mistaken for a regular window.
             .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
+            // So is the Agent space, with its fixed gradient.
+            .overlay(Rectangle().fill(NookDesign.Surface.agentGradient).opacity(showsAgentSpace ? NookDesign.Surface.agentChromeOpacity : 0))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .backgroundDraggable()
             .environment(windowState)

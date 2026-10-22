@@ -41,8 +41,8 @@ extension TabsController {
     /// Where a new tab goes: right below `anchor` when it is a tab in the window's tabs section,
     /// else the top of that section. A pinned tab or favorite keeps its section to itself.
     /// A new tab is no one's child, so an anchor inside a trail places it below the trail's top tab.
-    func newTabPosition(in window: BrowserWindowState, after anchor: UUID?) -> (Parent, UUID?)? {
-        guard let spaceID = window.spaceID else { return nil }
+    func newTabPosition(in window: BrowserWindowState, space: UUID? = nil, after anchor: UUID?) -> (Parent, UUID?)? {
+        guard let spaceID = space ?? window.spaceID else { return nil }
         let source = tree(owner(of: window))
         if let anchor, var item = source.item(anchor), !item.isFolder,
            source.scope(of: anchor) == .device, source.spaceID(of: anchor) == spaceID {
@@ -57,12 +57,14 @@ extension TabsController {
     /// tab or favorite takes no children, so the tab goes to the top of the tabs section.
     func childTabPosition(in window: BrowserWindowState, opener: UUID) -> (Parent, UUID?)? {
         let source = tree(owner(of: window))
-        guard source.spaceID(of: opener) == window.spaceID, source.canTakeChild(opener) else {
+        // An agent page's tabs stay in the Agent space whatever the window shows.
+        let spaceID = isInAgentSpace(opener) ? agentSpaceID : window.spaceID
+        guard source.spaceID(of: opener) == spaceID, source.canTakeChild(opener) else {
             if let item = source.item(opener), source.scope(of: opener) == .device,
-               source.spaceID(of: opener) == window.spaceID {
+               source.spaceID(of: opener) == spaceID {
                 return (item.parent, opener)
             }
-            return newTabPosition(in: window, after: opener)
+            return newTabPosition(in: window, space: spaceID, after: opener)
         }
         let trail = Parent.folder(itemID: opener)
         return (trail, source.children(of: trail).last?.id)
@@ -189,6 +191,11 @@ extension TabsController {
         if item.isFolder {
             toggleFolder(itemID)
             return
+        }
+        // An agent tab never pulls a window into the Agent space; the person opens it to watch.
+        if isInAgentSpace(itemID) {
+            guard window.spaceID == agentSpaceID else { return selectForAgent(itemID) }
+            agentItemID = itemID
         }
         let movedSpace = source.spaceID(of: itemID).map { $0 != window.spaceID } ?? false
         if let spaceID = source.spaceID(of: itemID) {
@@ -602,8 +609,9 @@ extension TabsController {
         return id
     }
 
+    /// The Agent space keeps its name and look, so it never passes for an ordinary space.
     public func updateSpace(_ spaceID: UUID, name: String?, icon: String?, accentHex: String?) {
-        guard let owner = owner(ofSpace: spaceID) else { return }
+        guard let owner = owner(ofSpace: spaceID), spaceID != agentSpaceID else { return }
         perform(owner, "updateSpace") { try $0.updateSpace(spaceID, name: name, icon: icon, accentHex: accentHex) }
     }
 
@@ -630,8 +638,10 @@ extension TabsController {
                    + source.children(of: .pinned(spaceID: spaceID))
                    + source.children(of: .tabs(spaceID: spaceID)))
             .flatMap { source.subtree(of: $0.id) }
-        // The data store has to be taken while the space still exists.
-        let deleted = profile(forSpace: spaceID)
+        // Read while the space still exists. The Agent space's data store is borrowed from the
+        // person's space, so it is never cleared, and its tabs stay out of the reopen history.
+        let isAgent = source.space(spaceID)?.isAgent == true
+        let deleted = isAgent ? nil : profile(forSpace: spaceID)
         var closed: [ClosedEntry] = []
         guard perform(owner, "deleteSpace", { tree in
             let result = try tree.deleteSpace(spaceID)
@@ -639,10 +649,11 @@ extension TabsController {
             return result.change
         }) != nil else { return }
         for id in ids { endSession(id) }
-        if case .main = owner {
+        if case .main = owner, !isAgent {
             for entry in closed { recordClosed(entry) }
         }
-        let remaining = tree(owner).orderedSpaces
+        let spaces = tree(owner).orderedSpaces
+        let remaining = spaces.filter { !$0.isAgent } + spaces.filter(\.isAgent)
         for window in allWindows where window.spaceID == spaceID {
             window.selectedItemBySpace[spaceID] = nil
             if let next = remaining.first {
@@ -654,6 +665,8 @@ extension TabsController {
             // Its cookies and logins go with it. Nothing else shares this data store.
             forgetProfile(spaceID)
             Task { await profile.clearAllData() }
+            // The Agent space may have borrowed its logins from this one.
+            if let agent = agentSpaceID { unloadPagesOnWrongDataStore(items(inSpace: agent).map(\.id)) }
         }
     }
 

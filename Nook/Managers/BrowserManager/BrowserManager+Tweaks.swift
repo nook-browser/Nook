@@ -21,7 +21,8 @@ private let tweaksLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook"
 extension BrowserManager: SiteRoutingHost {
     func route(url: URL, toSpace spaceID: UUID, from page: AnyObject?) -> Bool {
         let session = page as? PageSession
-        guard session?.isPrivate != true else { return false }
+        // An agent page stays in the Agent space: routing would show the person a new tab.
+        guard session?.isPrivate != true, session?.isAgentPage != true else { return false }
         guard let window = session.flatMap({ tabs.window(for: $0) }) ?? windowRegistry?.activeWindow,
               !window.isIncognito
         else { return false }

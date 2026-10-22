@@ -53,9 +53,13 @@ struct SpaceSwitcherTitle: View {
 
     private func label(_ space: SpaceRecord) -> some View {
         let isDropTarget = dragSession.isDragging && dragSession.activeZone == .target(.pinned(spaceID: space.id))
-        let title = Text(space.name)
+        let title = HStack(spacing: NookDesign.Spacing.xs) {
+            if space.isAgent {
+                Image(systemName: "sparkles").foregroundStyle(NookDesign.Surface.agentGradient)
+            }
+            Text(space.name).foregroundStyle(.primary)
+        }
             .font(NookDesign.Font.label)
-            .foregroundStyle(.primary)
             .lineLimit(1)
             .fixedSize()
         // A name too long for the title row fades out, the way a tab row's title does.

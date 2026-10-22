@@ -22,10 +22,13 @@ public struct SpacesSettingsView: View {
 
     public init() {}
 
+    private var spaces: [SpaceRecord] { tabs.orderedSpaces.filter { !$0.isAgent } }
+
     public var body: some View {
         Form {
             Section {
-                ForEach(tabs.orderedSpaces) { space in
+                // The Agent space keeps its look and borrows another space's data, so it has no row.
+                ForEach(spaces) { space in
                     row(space)
                 }
             } header: {
@@ -79,7 +82,7 @@ public struct SpacesSettingsView: View {
                 Button("Clear Website Data", systemImage: "trash") {
                     Task { await clearData(space) }
                 }
-                if tabs.orderedSpaces.count > 1 {
+                if spaces.count > 1 {
                     Divider()
                     Button("Delete Space…", systemImage: "trash", role: .destructive) {
                         showDeleteDialog(space)
@@ -96,7 +99,7 @@ public struct SpacesSettingsView: View {
     // MARK: - Data
 
     private func refreshStats() async {
-        for space in tabs.orderedSpaces {
+        for space in spaces {
             guard let profile = tabs.profile(forSpace: space.id) else { continue }
             await profile.refreshDataStoreStats()
             stats[space.id] = profile.estimatedDataSize
@@ -126,7 +129,7 @@ public struct SpacesSettingsView: View {
         actions?.confirmSpaceDeletion(
             spaceName: space.name,
             tabCount: tabs.tabCount(inSpace: space.id),
-            isLastSpace: tabs.orderedSpaces.count <= 1,
+            isLastSpace: spaces.count <= 1,
             onDelete: { tabs.deleteSpace(space.id) }
         )
     }

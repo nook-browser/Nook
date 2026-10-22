@@ -215,7 +215,9 @@ public class SearchManager {
         // This space's tabs first, then the other spaces'. The page being looked at is not a
         // tab to switch to.
         let spaces = [spaceID] + tabs.spaces(visibleIn: window).map(\.id).filter { $0 != spaceID }
-        let items = spaces.flatMap { tabs.items(inSpace: $0) }.filter { $0.id != window.selectedItemID }
+        // The agent's tabs are not the person's to switch to.
+        let items = spaces.filter { $0 != tabs.agentSpaceID }.flatMap { tabs.items(inSpace: $0) }
+            .filter { $0.id != window.selectedItemID }
         let here = Set(tabs.items(inSpace: spaceID).map(\.id))
         let matches: [TabMatch] = items.compactMap { item in
             let session = tabs.session(for: item.id)

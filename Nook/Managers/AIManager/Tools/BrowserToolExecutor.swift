@@ -9,6 +9,7 @@
 import Foundation
 import OSLog
 import WebKit
+import NookTabsCore
 import NookWeb
 
 @MainActor
@@ -17,10 +18,13 @@ class BrowserToolExecutor {
 
     weak var browserManager: BrowserManager?
     weak var windowState: BrowserWindowState?
+    /// DevMCP's Agent space: tools act on its tabs instead of what the window shows.
+    let agentSpace: UUID?
 
-    init(browserManager: BrowserManager? = nil, windowState: BrowserWindowState? = nil) {
+    init(browserManager: BrowserManager? = nil, windowState: BrowserWindowState? = nil, agentSpace: UUID? = nil) {
         self.browserManager = browserManager
         self.windowState = windowState
+        self.agentSpace = agentSpace
     }
 
     // MARK: - Tool Definitions
@@ -98,8 +102,19 @@ class BrowserToolExecutor {
     }
 
     private func getWebView(browserManager: BrowserManager, windowState: BrowserWindowState) -> WKWebView? {
+        if agentSpace != nil { return (try? browserManager.agentWebView()) ?? nil }
         guard let itemID = windowState.selectedItemID else { return nil }
         return browserManager.getWebView(for: itemID, in: windowState.id)
+    }
+
+    private func tabOrder(_ tabs: TabsController, _ windowState: BrowserWindowState) -> [UUID] {
+        agentSpace.map(tabs.displayOrder(inSpace:)) ?? tabs.displayOrder(in: windowState)
+    }
+
+    /// A new selected tab: in the Agent space when there is one, without showing it.
+    @discardableResult
+    private func openTab(_ url: URL, _ tabs: TabsController, _ windowState: BrowserWindowState) -> UUID? {
+        tabs.open(url: url, in: windowState, placement: .newTab, parent: agentSpace.map { .tabs(spaceID: $0) })
     }
 
     /// JSON-encodes a string for interpolation into a script. `JSONSerialization` raises an
@@ -130,6 +145,16 @@ class BrowserToolExecutor {
         }
 
         let newTab = args["newTab"] as? Bool ?? false
+        let tabs = browserManager.tabs
+        if agentSpace != nil {
+            if !newTab, let id = tabs.agentItem, let session = tabs.ensureSession(for: id) {
+                tabs.select(id, in: windowState)
+                session.load(url)
+            } else {
+                openTab(url, tabs, windowState)
+            }
+            return "Navigated to \(urlString)\(newTab ? " in new tab" : "")"
+        }
 
         guard browserManager.tabs.open(url: url, in: windowState, placement: newTab ? .newTab : .replaceCurrent) != nil else {
             return "No active tab"
@@ -431,7 +456,7 @@ class BrowserToolExecutor {
 
     private func executeGetTabList(browserManager: BrowserManager, windowState: BrowserWindowState) -> String {
         let controller = browserManager.tabs
-        let order = controller.displayOrder(in: windowState)
+        let order = tabOrder(controller, windowState)
         guard !order.isEmpty else {
             return "No tabs available"
         }
@@ -442,7 +467,7 @@ class BrowserToolExecutor {
                 "index": index,
                 "title": tabTitle(itemID, in: controller),
                 "url": (controller.session(for: itemID)?.url ?? controller.item(itemID)?.url)?.absoluteString ?? "",
-                "isActive": itemID == windowState.selectedItemID
+                "isActive": itemID == (agentSpace != nil ? controller.agentItem : windowState.selectedItemID)
             ])
         }
 
@@ -456,7 +481,7 @@ class BrowserToolExecutor {
         }
 
         let controller = browserManager.tabs
-        let order = controller.displayOrder(in: windowState)
+        let order = tabOrder(controller, windowState)
         guard !order.isEmpty else {
             return "No tabs available"
         }
@@ -464,7 +489,7 @@ class BrowserToolExecutor {
             return "Tab index \(index) out of range (0-\(order.count - 1))"
         }
 
-        controller.select(index: index, in: windowState)
+        controller.select(order[index], in: windowState)
         return "Switched to tab: \(tabTitle(order[index], in: controller))"
     }
 
@@ -473,11 +498,11 @@ class BrowserToolExecutor {
             guard let url = webURL(urlString) else {
                 return "Invalid URL: only http and https URLs are allowed"
             }
-            browserManager.tabs.open(url: url, in: windowState, placement: .newTab)
+            openTab(url, browserManager.tabs, windowState)
             return "Created new tab with URL: \(urlString)"
         }
 
-        browserManager.tabs.open(url: TabsController.homeURL, in: windowState, placement: .newTab)
+        openTab(TabsController.homeURL, browserManager.tabs, windowState)
 
         return "Created new empty tab"
     }

@@ -132,7 +132,7 @@ extension PageSession: WKNavigationDelegate {
                 if let currentURL = webView.url {
                     let profile = self?.profile
                     let profileId = profile?.id ?? self?.controller?.sessionDelegate?.currentProfile?.id
-                    let isEphemeral = self?.isPrivate == true || profile?.isEphemeral == true
+                    let isEphemeral = self?.isPrivate == true || self?.isAgentPage == true || profile?.isEphemeral == true
                     self?.controller?.history?.addVisit(
                         url: currentURL,
                         title: title,
@@ -274,7 +274,8 @@ extension PageSession: WKNavigationDelegate {
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-        if controller?.sessionDelegate?.handleAuthenticationChallenge(
+        // An agent page gets no sign-in dialog over the person's window.
+        if !isAgentPage, controller?.sessionDelegate?.handleAuthenticationChallenge(
             challenge,
             for: self,
             completionHandler: completionHandler
@@ -296,6 +297,8 @@ extension PageSession: WKNavigationDelegate {
            !WKWebView.handlesURLScheme(scheme), scheme != "webkit-extension", scheme != "safari-web-extension"
         {
             decisionHandler(.cancel)
+            // An agent page never opens another app or asks the person to.
+            if isAgentPage { return }
             let clicked = navigationAction.navigationType == .linkActivated
             guard navigationAction.targetFrame?.isMainFrame != false || clicked, canOpenWithSystem(url) else { return }
             if clicked || scheme == "mailto" || scheme == "tel" {
@@ -460,7 +463,7 @@ extension PageSession {
     /// navigation reads again only when the path changed.
     func schedulePageTextCapture(in webView: WKWebView, sameDocument: Bool) {
         guard let url = webView.url, url.scheme == "http" || url.scheme == "https",
-              !isPrivate, controller?.settings.searchPageTextInHistory == true else { return }
+              !isPrivate, !isAgentPage, controller?.settings.searchPageTextInHistory == true else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + (sameDocument ? 1.5 : 1)) { [weak self, weak webView] in
             guard let self, let webView, webView.url == url, !webView.isLoading, !self.isDisplayingPDF,
                   self.profile?.isEphemeral != true,

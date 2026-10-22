@@ -60,6 +60,8 @@ extension PageSession {
     /// The page waits on `completionHandler`, so it cannot close or rewrite itself mid-print.
     @objc(_webView:printFrame:pdfFirstPageSize:completionHandler:)
     func webView(_ webView: WKWebView, printFrame frame: AnyObject, pdfFirstPageSize: CGSize, completionHandler: @escaping () -> Void) {
+        // The print panel is modal; an agent page's print does nothing.
+        if isAgentPage { return completionHandler() }
         webView.nookPrint(frame: frame, completion: completionHandler)
     }
 }

@@ -181,7 +181,8 @@ extension TabTree {
     /// Deletes a space and closes everything in it as one closed entry per section root.
     public mutating func deleteSpace(_ id: UUID, now: Date = Date()) throws -> (change: Change, closed: [ClosedEntry]) {
         guard var target = space(id) else { throw TreeError.missingSpace }
-        guard orderedSpaces.count > 1 else { throw TreeError.lastSpace }
+        // The Agent space borrows another space's logins, so it is never the last one left.
+        guard orderedSpaces.contains(where: { $0.id != id && !$0.isAgent }) else { throw TreeError.lastSpace }
         var change = Change()
         var closed: [ClosedEntry] = []
         for section in [Parent.favorites(spaceID: id), .pinned(spaceID: id), .tabs(spaceID: id)] {

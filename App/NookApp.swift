@@ -189,6 +189,7 @@ struct NookApp: App {
         DevMCPServer.shared.configure(browserManager: browserManager, enabled: settingsManager.developerModeEnabled && settingsManager.browserControlServerEnabled)
         browserManager.tabs.setDeveloperMode(settingsManager.developerModeEnabled)
         browserManager.installDevPickHandler()
+        browserManager.installAgentPageHost()
 
         // A fresh install has no stored version and shows nothing.
         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {

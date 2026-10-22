@@ -35,6 +35,7 @@ extension PageSession {
     /// Option always peeks. Otherwise only a favorite or pinned tab peeks, for a link to another
     /// site, so the page it keeps in the sidebar stays put; a regular tab opens a new tab.
     func shouldRedirectToPeek(url: URL) -> Bool {
+        if isAgentPage { return false }
         if isOptionKeyDown { return true }
         guard controller?.isSynced(itemID) == true, let from = self.url.host, let to = Self.destinationHost(of: url)
         else { return false }
@@ -92,7 +93,8 @@ extension PageSession: WKUIDelegate {
 
         // A sign-in popup shows in a mini window as a real popup, so `window.opener` carries the
         // result back to this page the way the site expects.
-        if !isFromExtension, let url, isLikelyOAuthOrExternalWindow(url: url, windowFeatures: windowFeatures) {
+        // An agent page's popups, sign-in ones too, open as tabs in the Agent space (adoptPopup).
+        if !isFromExtension, !isAgentPage, let url, isLikelyOAuthOrExternalWindow(url: url, windowFeatures: windowFeatures) {
             guard let popup = controller?.openDetachedPopup(configuration: popupConfiguration(), url: url, opener: self)
             else { return nil }
             delegate.presentPopupWindow(popup)
@@ -186,7 +188,9 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping () -> Void
     ) {
-        guard !jsDialogsSuppressed, let alerts = controller?.alerts else { return completionHandler() }
+        // An agent page's dialogs answer at once: a sheet would cover the person's window and
+        // hold the agent's next call until it times out.
+        guard !jsDialogsSuppressed, !isAgentPage, let alerts = controller?.alerts else { return completionHandler() }
         alerts.presentAlert(
             message: message, host: frame.securityOrigin.host, over: webView,
             onSuppress: nextDialogSuppressor(), completion: completionHandler)
@@ -198,7 +202,7 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (Bool) -> Void
     ) {
-        guard !jsDialogsSuppressed, let alerts = controller?.alerts else { return completionHandler(false) }
+        guard !jsDialogsSuppressed, !isAgentPage, let alerts = controller?.alerts else { return completionHandler(false) }
         alerts.presentConfirm(
             message: message, host: frame.securityOrigin.host, over: webView,
             onSuppress: nextDialogSuppressor(), completion: completionHandler)
@@ -211,7 +215,7 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (String?) -> Void
     ) {
-        guard !jsDialogsSuppressed, let alerts = controller?.alerts else { return completionHandler(nil) }
+        guard !jsDialogsSuppressed, !isAgentPage, let alerts = controller?.alerts else { return completionHandler(nil) }
         alerts.presentPrompt(
             prompt: prompt, defaultText: defaultText, host: frame.securityOrigin.host, over: webView,
             onSuppress: nextDialogSuppressor(), completion: completionHandler)
@@ -230,7 +234,7 @@ extension PageSession: WKUIDelegate {
         completionHandler: @escaping ([URL]?) -> Void
     ) {
 
-        guard let alerts = controller?.alerts else { return completionHandler(nil) }
+        guard !isAgentPage, let alerts = controller?.alerts else { return completionHandler(nil) }
         alerts.presentOpenPanel(
             allowsMultipleSelection: parameters.allowsMultipleSelection,
             allowsDirectories: parameters.allowsDirectories,
@@ -244,7 +248,7 @@ extension PageSession: WKUIDelegate {
         enterFullScreenForVideoWith completionHandler: @escaping (Bool, Error?) -> Void
     ) {
 
-        guard controller?.sessionDelegate?.toggleFullScreen(for: webView) == true else {
+        guard !isAgentPage, controller?.sessionDelegate?.toggleFullScreen(for: webView) == true else {
             completionHandler(
                 false,
                 NSError(
@@ -301,7 +305,8 @@ extension PageSession: WKUIDelegate {
         }
         let policies = needed.map { settings.permission($0, for: origin.host) }
         // A combined request needs every part allowed, and one block denies the whole thing.
-        if policies.contains(.block) {
+        // No capture prompt for an agent page: nobody may be watching it.
+        if policies.contains(.block) || (isAgentPage && !policies.allSatisfy({ $0 == .allow })) {
             decisionHandler(.deny)
         } else if policies.allSatisfy({ $0 == .allow }) {
             decisionHandler(.grant)

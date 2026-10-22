@@ -114,9 +114,10 @@ struct SpacesSideBarView: View {
                 .environmentObject(browserManager)
                 .environment(windowState)
 
-            if !windowState.isAgent, let agent = tabs.agentWindow, !tabs.displayOrder(in: agent).isEmpty {
-                AgentWindowRow(tabCount: tabs.displayOrder(in: agent).count, busy: tabs.agentCallsInFlight > 0) {
-                    browserManager.setAgentWindowShown(!browserManager.isAgentWindowShown)
+            if !windowState.isIncognito, let agent = tabs.agentSpaceID, windowState.spaceID != agent,
+               !tabs.displayOrder(inSpace: agent).isEmpty {
+                AgentSpaceRow(tabCount: tabs.displayOrder(inSpace: agent).count, busy: tabs.agentCallsInFlight > 0) {
+                    withAnimation(NookDesign.Motion.standard) { tabs.setSpace(agent, in: windowState) }
                 }
                 .padding(.horizontal, NookDesign.Spacing.sidebarInset)
             }
@@ -437,9 +438,9 @@ struct SpacesSideBarView: View {
     }
 }
 
-/// The DevMCP agent's window, while it has tabs: a click shows or hides it, and the icon
-/// pulses while a tool call runs.
-private struct AgentWindowRow: View {
+/// The Agent space while the window shows another: a click opens it, and the icon pulses while a
+/// tool call runs.
+private struct AgentSpaceRow: View {
     let tabCount: Int
     let busy: Bool
     let toggle: () -> Void
@@ -448,8 +449,9 @@ private struct AgentWindowRow: View {
     var body: some View {
         Button(action: toggle) {
             HStack(spacing: NookDesign.Spacing.md) {
-                Image(systemName: "sparkle")
+                Image(systemName: "sparkles")
                     .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                    .foregroundStyle(NookDesign.Surface.agentGradient)
                     .frame(width: NookDesign.Size.favicon)
                     .symbolEffect(.pulse, isActive: busy)
                 Text("Agent · \(tabCount) \(tabCount == 1 ? "tab" : "tabs")")

@@ -297,10 +297,35 @@ struct WebsiteView: View {
                         value: splitManager.getSplitState(for: windowState.id).isPreviewActive
                     )
             }
-            
+
+            // A glance or a screenshot of the window shows that an agent drives this page.
+            if windowState.spaceID != nil, windowState.spaceID == browserManager.tabs.agentSpaceID {
+                AgentFrame(shape: webViewClipShape, busy: browserManager.tabs.agentCallsInFlight > 0)
+            }
         }
     }
 
+}
+
+/// The Agent space's frame and label over its page. Never takes a click.
+private struct AgentFrame: View {
+    let shape: AnyShape
+    let busy: Bool
+
+    var body: some View {
+        shape.stroke(NookDesign.Surface.agentGradient, lineWidth: NookDesign.Surface.agentFrameWidth)
+            .overlay(alignment: .top) {
+                Label("Agent", systemImage: "sparkles")
+                    .font(NookDesign.Font.captionStrong)
+                    .foregroundStyle(.white)
+                    .symbolEffect(.pulse, isActive: busy)
+                    .padding(.horizontal, NookDesign.Spacing.md)
+                    .padding(.vertical, NookDesign.Spacing.xs)
+                    .background(NookDesign.Surface.agentGradient, in: Capsule())
+                    .padding(.top, NookDesign.Spacing.md)
+            }
+            .allowsHitTesting(false)
+    }
 }
 
 // MARK: - Split Preview Overlay

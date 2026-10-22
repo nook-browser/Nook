@@ -46,14 +46,13 @@ public final class TabsController {
     /// Live folders whose last refresh failed, and why. No entry when it worked.
     public internal(set) var liveStatus: [UUID: LiveFolderStatus] = [:]
     @ObservationIgnored var liveRefreshed: [UUID: Date] = [:]
-    /// The DevMCP agent's window while it is open (see `BrowserWindowState.isAgent`).
-    public private(set) var agentWindow: BrowserWindowState?
+    @ObservationIgnored var liveRefreshing: Set<UUID> = []
+    /// The tab DevMCP page tools act on, in the Agent space (see `TabsController+Agent.swift`).
+    public internal(set) var agentItemID: UUID?
     /// DevMCP tool calls running now; the sidebar's agent row pulses while it is above zero.
     public var agentCallsInFlight = 0
-    /// Tabs in the human's windows a DevMCP call touched in the last 30 s.
-    public private(set) var agentTouched: Set<UUID> = []
-    @ObservationIgnored private var agentTouchTokens: [UUID: UUID] = [:]
-    @ObservationIgnored var liveRefreshing: Set<UUID> = []
+    /// The agent's page changed or lost its window; the app keeps it rendering.
+    @ObservationIgnored public var onAgentPage: ((PageSession) -> Void)?
 
     /// One `Profile` (website data store) per space, made on first use and kept for the session.
     @ObservationIgnored private var spaceProfiles: [UUID: Profile] = [:]
@@ -386,8 +385,12 @@ public final class TabsController {
 
     /// Favorites of the window's space, then its rows in sidebar order.
     public func displayOrder(in window: BrowserWindowState) -> [UUID] {
-        guard let spaceID = window.spaceID else { return [] }
-        let favorites = tree(owner(of: window)).favorites(of: spaceID).map(\.id)
+        window.spaceID.map(displayOrder(inSpace:)) ?? []
+    }
+
+    public func displayOrder(inSpace spaceID: UUID) -> [UUID] {
+        guard let owner = owner(ofSpace: spaceID) else { return [] }
+        let favorites = tree(owner).favorites(of: spaceID).map(\.id)
         return favorites + rows(space: spaceID).filter { !$0.item.isFolder }.map(\.item.id)
     }
 
@@ -453,6 +456,8 @@ public final class TabsController {
 
     /// The website data store of a space, made on first use. Its name and icon follow the space.
     public func profile(forSpace spaceID: UUID) -> Profile? {
+        // The Agent space has no store of its own: it uses the one it borrows logins from.
+        if let login = tree.loginSpace(for: spaceID), login != spaceID { return profile(forSpace: login) }
         guard let space = tree.space(spaceID) else { return nil }
         if let existing = spaceProfiles[spaceID] {
             existing.name = space.name
@@ -604,6 +609,8 @@ public final class TabsController {
     }
 
     func recordClosed(_ entry: ClosedEntry) {
+        // The agent's closed tabs stay out of the person's Reopen Closed Tab.
+        if let agent = agentSpaceID, entry.section.spaceID == agent { return }
         device.pushClosed(entry)
         save()
     }
@@ -630,18 +637,13 @@ public final class TabsController {
     /// Sets up a newly registered window: a private window gets its own tree; a regular window
     /// takes an unclaimed saved window record, else the first space. Loads no pages.
     public func attach(window: BrowserWindowState) {
-        if window.isIncognito || window.isAgent, window.ephemeralProfile != nil {
+        if window.isIncognito, window.ephemeralProfile != nil {
             if window.privateTree == nil {
                 // One temporary space, never written to disk. Its pages use the window's
-                // `ephemeralProfile`, not a store keyed by this id.
+                // ephemeral data store, not one keyed by this id.
                 var privateTree = TabTree()
                 let spaceID = UUID()
-                if window.isAgent {
-                    privateTree.createSpace(id: spaceID, name: "Agent", icon: "sparkle", accentHex: "#3A3A3C", after: nil)
-                    agentWindow = window
-                } else {
-                    privateTree.createSpace(id: spaceID, name: "Private", icon: "eyeglasses", accentHex: "#3A3A3C", after: nil)
-                }
+                privateTree.createSpace(id: spaceID, name: "Private", icon: "eyeglasses", accentHex: "#3A3A3C", after: nil)
                 window.privateTree = privateTree
                 window.spaceID = spaceID
             }
@@ -675,7 +677,6 @@ public final class TabsController {
         if window.privateTree != nil {
             for itemID in Array(window.privateSessions.keys) { endSession(itemID) }
             window.privateTree = nil
-            if agentWindow === window { agentWindow = nil }
             return
         }
         let others = regularWindows.filter { $0.id != window.id }
@@ -684,20 +685,6 @@ public final class TabsController {
         guard !others.isEmpty else { return mirror(window) }
         device.windows.removeAll { $0.id == window.id }
         save()
-    }
-
-    /// Badges a human-window tab a DevMCP call touched, for 30 s after the last touch.
-    public func markAgentTouched(_ itemID: UUID?) {
-        guard let itemID else { return }
-        let token = UUID()
-        agentTouchTokens[itemID] = token
-        agentTouched.insert(itemID)
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(30))
-            guard let self, self.agentTouchTokens[itemID] == token else { return }
-            self.agentTouchTokens[itemID] = nil
-            self.agentTouched.remove(itemID)
-        }
     }
 
     /// Saved window records no open regular window has claimed; the app opens a window for each.

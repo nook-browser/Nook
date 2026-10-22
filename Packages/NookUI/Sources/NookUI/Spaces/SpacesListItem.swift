@@ -74,6 +74,16 @@ struct SpacesListItem: View {
 
     @ViewBuilder
     private var spaceDot: some View {
+        if space.isAgent {
+            Image(systemName: "sparkles")
+                .font(.system(size: NookDesign.Size.spaceIcon, weight: .semibold))
+                .foregroundStyle(NookDesign.Surface.agentGradient)
+        } else {
+            plainDot
+        }
+    }
+
+    private var plainDot: some View {
         Circle()
             .fill(isActive ? AnyShapeStyle(space.accentColor) : AnyShapeStyle(.tertiary))
             .frame(width: isActive ? activeDotSize : dotSize, height: isActive ? activeDotSize : dotSize)

@@ -67,7 +67,9 @@ struct SidebarHoverOverlayView: View {
     /// The docked sidebar's own background, so the overlay reads as the same sidebar.
     private var sidebarBackground: some View {
         let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
+        let isAgent = windowState.spaceID != nil && windowState.spaceID == browserManager.tabs.agentSpaceID
         return NookDesign.Surface.containerGradient(accent: accent, isActive: true)
             .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
+            .overlay(Rectangle().fill(NookDesign.Surface.agentGradient).opacity(isAgent ? NookDesign.Surface.agentChromeOpacity : 0))
     }
 }

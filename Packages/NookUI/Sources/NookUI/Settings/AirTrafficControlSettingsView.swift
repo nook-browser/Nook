@@ -52,7 +52,7 @@ public struct AirTrafficControlSettingsView: View {
         .formStyle(.grouped)
         .sheet(isPresented: $showingAddSheet) {
             RuleEditSheet(
-                spaces: tabs.orderedSpaces,
+                spaces: tabs.orderedSpaces.filter { !$0.isAgent },
                 rules: nookSettings.siteRoutingRules,
                 onSave: { rule in
                     siteRouting?.addRule(rule)
@@ -61,7 +61,7 @@ public struct AirTrafficControlSettingsView: View {
         }
         .sheet(item: $editingRule) { rule in
             RuleEditSheet(
-                spaces: tabs.orderedSpaces,
+                spaces: tabs.orderedSpaces.filter { !$0.isAgent },
                 rules: nookSettings.siteRoutingRules,
                 existingRule: rule,
                 onSave: { updated in

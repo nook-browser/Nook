@@ -159,6 +159,13 @@ public enum NookDesign {
         /// The neutral accent a private window's chrome uses in place of a space's. Keep in step
         /// with `SpaceGradient.incognito`, which is the persisted form of the same color.
         public static let incognitoAccent = Color(hex: "#8E8E93")
+        /// The Agent space's fixed identity, amber to magenta: its chrome, switcher icon, and the
+        /// frame around its pages. No space accent comes close, so it never reads as a user space.
+        public static let agentGradient = LinearGradient(
+            colors: [Color(hex: "#FFB000"), Color(hex: "#FF5A1F"), Color(hex: "#E5177E")],
+            startPoint: .topLeading, endPoint: .bottomTrailing)
+        public static let agentChromeOpacity: Double = 0.45   // over the sidebar's own background
+        public static let agentFrameWidth: CGFloat = 3        // frame around the Agent space's page
 
         #if os(macOS)
         public static let windowBackground = Color(nsColor: .windowBackgroundColor)

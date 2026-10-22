@@ -16,8 +16,10 @@ extension ExtensionManager {
 
     // MARK: - Adapters
 
-    /// Adapter for a tab item extensions may see; nil for folders, unknown ids and private items.
+    /// Adapter for a tab item extensions may see; nil for folders, unknown ids, private items
+    /// and Agent space items.
     func adapter(for itemID: UUID) -> ExtensionTabAdapter? {
+        if browserManagerRef?.tabs.isInAgentSpace(itemID) == true { return nil }
         if let existing = tabAdapters[itemID] { return existing }
         guard let bm = browserManagerRef, let item = bm.tabs.item(itemID), !item.isFolder,
               bm.tabs.session(for: itemID)?.isPrivate != true,

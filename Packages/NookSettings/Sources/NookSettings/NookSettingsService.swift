@@ -34,7 +34,6 @@ public final class NookSettingsService {
     private let showAIAssistantKey = "settings.showAIAssistant"
     private let browserControlServerKey = "settings.browserControlServer"
     private let developerModeKey = "settings.developerMode"
-    private let agentWindowKey = "settings.agentWindow"
     private let aiProviderKey = "settings.aiProvider"
     private let openRouterApiKeyKey = "settings.openRouterApiKey"
     private let openRouterModelKey = "settings.openRouterModel"
@@ -261,13 +260,6 @@ public final class NookSettingsService {
         }
     }
 
-    /// DevMCP page tools run in the agent's own hidden window instead of the active one.
-    public var agentWindowEnabled: Bool {
-        didSet {
-            userDefaults.set(agentWindowEnabled, forKey: agentWindowKey)
-        }
-    }
-
     /// Gates every developer tool: capture scripts, the DevPanel tabs and Browser Control.
     public var developerModeEnabled: Bool {
         didSet {
@@ -467,7 +459,6 @@ public final class NookSettingsService {
             geminiModelKey: GeminiModel.flash.rawValue,
             showAIAssistantKey: true,
             browserControlServerKey: false,
-            agentWindowKey: true,
             aiProviderKey: AIProvider.gemini.rawValue,
             openRouterModelKey: OpenRouterModel.gpt4o.rawValue,
             ollamaEndpointKey: "http://localhost:11434",
@@ -568,9 +559,10 @@ public final class NookSettingsService {
         self.showAIAssistant = userDefaults.bool(forKey: showAIAssistantKey)
         let browserControlOn = userDefaults.bool(forKey: browserControlServerKey)
         self.browserControlServerEnabled = browserControlOn
-        self.agentWindowEnabled = userDefaults.bool(forKey: agentWindowKey)
         // Browser Control predates Developer Mode, so anyone who had it on keeps it reachable.
         self.developerModeEnabled = userDefaults.object(forKey: developerModeKey) as? Bool ?? browserControlOn
+        // "Agent uses its own window" is gone: agents always browse in the Agent space now.
+        userDefaults.removeObject(forKey: "settings.agentWindow")
         self.aiProvider = AIProvider(rawValue: userDefaults.string(forKey: aiProviderKey) ?? AIProvider.gemini.rawValue) ?? .gemini
         self.openRouterApiKey = ""  // In-memory only; persistent storage via AIKeychainStorage
         self.openRouterModel = OpenRouterModel(rawValue: userDefaults.string(forKey: openRouterModelKey) ?? OpenRouterModel.gpt4o.rawValue) ?? .gpt4o
