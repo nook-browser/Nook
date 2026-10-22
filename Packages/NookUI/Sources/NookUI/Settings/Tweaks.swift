@@ -10,7 +10,7 @@ import SwiftUI
 import NookDesign
 import NookSettings
 
-/// Per-site tweaks: media downloads, Facebook, YouTube and SponsorBlock.
+/// Per-site tweaks: media downloads, Facebook, Reddit, YouTube and SponsorBlock.
 public struct SettingsTweaksTab: View {
     @Environment(NookSettingsService.self) var nookSettings
     @State private var newSite = ""
@@ -55,6 +55,14 @@ public struct SettingsTweaksTab: View {
                 Text("Facebook")
             } footer: {
                 Text("Hide Reels removes the Reels carousel from the news feed. Hide suggested posts removes posts from groups, pages, and people you don't follow, and People You May Know. Friends, followed pages, and groups stay.")
+            }
+
+            Section {
+                Toggle("Sort feeds by Hot", isOn: $settings.redditSortHot)
+            } header: {
+                Text("Reddit")
+            } footer: {
+                Text("Opens the home feed, subreddits and custom feeds sorted by Hot instead of Best. Choosing another sort still works.")
             }
 
             YouTubeSettingsSections()

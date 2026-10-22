@@ -333,6 +333,12 @@ extension PageSession: WKNavigationDelegate {
                 return
             }
 
+            if let settings = controller?.settings, let hot = RedditTweaks.hotURL(for: url, settings: settings) {
+                decisionHandler(.cancel)
+                webView.load(URLRequest(url: hot))
+                return
+            }
+
             // Grant extension access to this URL BEFORE navigation starts
             // so content scripts can inject at document_start
             controller?.tabEvents?.grantAccess(to: url)
@@ -346,6 +352,7 @@ extension PageSession: WKNavigationDelegate {
                 YouTubeTweaks.apply(for: url, in: webView, settings: settings)
                 SocialImageTweaks.apply(for: url, in: webView, settings: settings)
                 FacebookTweaks.apply(for: url, in: webView, settings: settings)
+                RedditTweaks.apply(in: webView, settings: settings)
             }
         }
 

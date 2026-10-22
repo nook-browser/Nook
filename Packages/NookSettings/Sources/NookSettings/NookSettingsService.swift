@@ -68,6 +68,7 @@ public final class NookSettingsService {
     private let mediaDownloadSitesKey = "settings.mediaDownloadSites"
     private let facebookHideReelsKey = "settings.facebookHideReels"
     private let facebookHideSuggestedKey = "settings.facebookHideSuggested"
+    private let redditSortHotKey = "settings.redditSortHot"
 
     public var searchEngineId: String {
         didSet {
@@ -444,6 +445,11 @@ public final class NookSettingsService {
         didSet { userDefaults.set(facebookHideSuggested, forKey: facebookHideSuggestedKey) }
     }
 
+    /// Open Reddit feeds sorted by Hot instead of Best.
+    public var redditSortHot: Bool {
+        didSet { userDefaults.set(redditSortHot, forKey: redditSortHotKey) }
+    }
+
     public init() {
         // Register default values
         userDefaults.register(defaults: [
@@ -597,6 +603,7 @@ public final class NookSettingsService {
         self.mediaDownloadSites = userDefaults.stringArray(forKey: mediaDownloadSitesKey) ?? []
         self.facebookHideReels = userDefaults.bool(forKey: facebookHideReelsKey)
         self.facebookHideSuggested = userDefaults.bool(forKey: facebookHideSuggestedKey)
+        self.redditSortHot = userDefaults.bool(forKey: redditSortHotKey)
 
         if let data = userDefaults.data(forKey: siteSearchEntriesKey),
            let decoded = try? JSONDecoder().decode([SiteSearchEntry].self, from: data) {
