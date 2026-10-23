@@ -3,10 +3,9 @@
 //  Profile.swift
 //  Nook
 //
-//  One space's login context: the persistent, isolated WKWebsiteDataStore keyed by the space's
-//  id, plus its stats and cleanup. There is no profile as a user-facing concept; spaces own
-//  their data. `TabsController.profile(forSpace:)` vends these, one per space, and a private
-//  window holds an ephemeral one that is destroyed when the window closes.
+//  A persistent login context keyed by its profile UUID. Spaces may share this store;
+//  TabsController vends one cached instance per identifier. Private windows use an ephemeral
+//  profile that is destroyed when they close.
 //
 
 import Foundation

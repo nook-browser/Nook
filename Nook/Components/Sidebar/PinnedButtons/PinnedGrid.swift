@@ -34,50 +34,30 @@ struct PinnedGrid: View {
         let effectiveSpaceID = spaceID ?? windowState.spaceID
         let items: [Item] = effectiveSpaceID.map { tabs.favorites(of: $0) } ?? []
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
-        let columns: [GridItem] = makeColumns(count: colsCount)
 
         let shouldAnimate = (windowRegistry.activeWindow?.id == windowState.id) && !browserManager.isSwitchingSpace
 
         if let spaceID = effectiveSpaceID {
             let zone = DropZoneID.favorites(spaceID: spaceID)
             if items.isEmpty {
-                let isDragging = dragSession.isDragging
-
-                NookDropZoneHostView(
-                    zoneID: zone,
-                    layout: .grid(count: 0, columns: colsCount),
-                    manager: dragSession,
-                    onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
-                ) {
-                    VStack(spacing: NookDesign.Spacing.md) {
-                        Image(systemName: "star.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-
-                        VStack(spacing: NookDesign.Spacing.xxs) {
+                if dragSession.isDragging {
+                    NookDropZoneHostView(
+                        zoneID: zone,
+                        layout: .grid(count: 0, columns: colsCount),
+                        manager: dragSession,
+                        onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
+                    ) {
+                        HStack(spacing: NookDesign.Spacing.md) {
+                            Image(systemName: "star")
                             Text("Drag to add Favorites")
-                                .font(NookDesign.Font.label)
-                                .foregroundStyle(.secondary)
-
-                            Text("Favorites keep your most\nused sites and apps close")
-                                .font(NookDesign.Font.secondary)
-                                .foregroundStyle(.tertiary)
-                                .multilineTextAlignment(.center)
                         }
+                        .font(NookDesign.Font.secondary)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: NookDesign.Size.essentialsTile)
+                        .nookFavoriteSurface(selected: false, hovered: dragSession.activeZone == zone)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, NookDesign.Spacing.xl)
-                    .padding(.horizontal, NookDesign.Spacing.lg)
-                    .background {
-                        NookDesign.Radius.shape(NookDesign.Radius.lg)
-                            .strokeBorder(style: StrokeStyle(lineWidth: NookDesign.Size.hairlineWidth, dash: [NookDesign.Spacing.sm, NookDesign.Spacing.xs]))
-                            .foregroundStyle(isDragging ? NookDesign.Surface.dropBorderActive : NookDesign.Surface.dropBorderIdle)
-                    }
-                    .background {
-                        NookDesign.Radius.shape(NookDesign.Radius.lg)
-                            .fill(isDragging ? NookDesign.Surface.fillPressed : Color.clear)
-                    }
-                    .animation(NookDesign.Motion.quick, value: isDragging)
+                    .transition(.opacity)
                 }
             } else {
                 NookDropZoneHostView(
@@ -86,25 +66,21 @@ struct PinnedGrid: View {
                     manager: dragSession,
                     onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
                 ) {
-                    LazyVGrid(columns: columns, alignment: .center, spacing: NookDesign.Spacing.sm) {
-                        let insertionIdx = insertionIndex(in: zone, items: items)
-
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            let isDraggedItem = dragSession.draggedItem?.tabId == item.id
-
-                            if let ins = insertionIdx, ins == index, !isDraggedItem {
+                    let preview = favoritePreview(in: zone, items: items)
+                    let displayedIDs = preview?.itemIDs ?? items.map(\.id)
+                    let previewColumns = columnCount(for: width, itemCount: displayedIDs.count)
+                    LazyVGrid(columns: makeColumns(count: previewColumns), alignment: .center, spacing: NookDesign.Spacing.xs) {
+                        ForEach(displayedIDs, id: \.self) { id in
+                            if preview?.placeholderID == id {
                                 essentialsPlaceholder
+                            } else if let item = items.first(where: { $0.id == id }) {
+                                PinnedTile(item: item, zone: zone)
+                                    .opacity(dragSession.draggedItem?.tabId == id ? 0.0 : 1.0)
                             }
-
-                            PinnedTile(item: item, zone: zone)
-                                .opacity(isDraggedItem ? 0.0 : 1.0)
-                        }
-
-                        if let ins = insertionIdx, ins >= items.count {
-                            essentialsPlaceholder
                         }
                     }
-                    .animation(NookDesign.Motion.spring, value: insertionIndex(in: zone, items: items))
+                    .animation(NookDesign.Motion.spring, value: displayedIDs)
+
                 }
                 .contentShape(Rectangle())
                 .fixedSize(horizontal: false, vertical: true)
@@ -115,24 +91,18 @@ struct PinnedGrid: View {
         }
     }
 
-    /// The insertion index for the grid during a drag, or nil when no placeholder should show.
-    private func insertionIndex(in zone: DropZoneID, items: [Item]) -> Int? {
+    /// Preview the committed order, including its column count, without changing the
+    /// original grid's drop boundaries or mutating the favorites while dragging.
+    private func favoritePreview(in zone: DropZoneID, items: [Item]) -> FavoriteDropPreview? {
         guard dragSession.isDragging, dragSession.activeZone == zone,
-              let position = dragSession.dropPosition, position.zone == zone else {
-            return nil
-        }
-        // Reordering within the grid: no placeholder at the dragged tile's own slot.
-        if dragSession.sourceZone == zone,
-           let dragged = dragSession.draggedItem?.tabId,
-           let from = items.firstIndex(where: { $0.id == dragged }),
-           position.index == from || position.index == from + 1 {
-            return nil
-        }
-        return position.index
+              let position = dragSession.dropPosition, position.zone == zone,
+              let draggedID = dragSession.draggedItem?.tabId else { return nil }
+        return FavoriteDropPreview(itemIDs: items.map(\.id), draggedID: draggedID,
+                                   destinationBoundary: position.index)
     }
 
     private var essentialsPlaceholder: some View {
-        NookDesign.Radius.shape(NookDesign.Radius.lg)
+        NookDesign.Radius.shape(NookDesign.Tab.radius)
             .fill(NookDesign.Surface.fillPressed)
             .frame(minWidth: NookDesign.Size.essentialsTile, minHeight: NookDesign.Size.essentialsTile)
     }
@@ -141,7 +111,7 @@ struct PinnedGrid: View {
         guard width > 0, itemCount > 0 else { return 1 }
         var cols = min(maxColumns, itemCount)
         while cols > 1 {
-            let needed = CGFloat(cols) * NookDesign.Size.essentialsTile + CGFloat(cols - 1) * NookDesign.Spacing.sm
+            let needed = CGFloat(cols) * NookDesign.Size.essentialsTile + CGFloat(cols - 1) * NookDesign.Spacing.xs
             if needed <= width { break }
             cols -= 1
         }
@@ -152,7 +122,7 @@ struct PinnedGrid: View {
         Array(
             repeating: GridItem(
                 .flexible(minimum: NookDesign.Size.essentialsTile),
-                spacing: NookDesign.Spacing.sm,
+                spacing: NookDesign.Spacing.xs,
                 alignment: .center
             ),
             count: count
@@ -169,6 +139,17 @@ private struct PinnedTile: View {
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
     private var tabs: TabsController { browserManager.tabs }
+    @Environment(\.colorScheme) private var colorScheme
+    private var appearance: SpaceAppearance {
+        windowState.spaceID.flatMap { tabs.space($0)?.resolvedAppearance } ?? SpaceAppearance(accentHex: "#7C7C7C")
+    }
+    private var favoriteScheme: ColorScheme {
+        appearance.mode == .system ? colorScheme : (appearance.mode == .dark ? .dark : .light)
+    }
+    private var favoritePrimaryColor: Color {
+        let nodes = appearance.normalized.nodes
+        return Color(hex: nodes[nodes.count / 2].colorHex)
+    }
 
     var body: some View {
         let session = tabs.session(for: item.id)
@@ -184,6 +165,7 @@ private struct PinnedTile: View {
                 tabURL: url,
                 tabIcon: ItemFavicon(item: item, session: session),
                 isActive: tabs.selectedItemID(in: windowState) == item.id,
+                primaryColor: favoritePrimaryColor,
                 isUnloaded: session?.isUnloaded ?? true,
                 hasLeftPinnedURL: tabs.hasLeftHome(item.id),
                 onResetToPinnedURL: { tabs.resetToHome(item.id) },
@@ -192,6 +174,7 @@ private struct PinnedTile: View {
                     tabs.select(item.id, in: windowState)
                 }
             )
+            .environment(\.colorScheme, favoriteScheme)
             .frame(maxWidth: .infinity)
             .anchorPreference(key: FavoritePreviewAnchorKey.self, value: .bounds) {
                 FavoritePreview.shared.itemID == item.id && FavoritePreview.shared.windowID == windowState.id ? $0 : nil

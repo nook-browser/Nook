@@ -62,6 +62,10 @@ public class BrowserWindowState {
     /// Whether the extension library panel is visible in this window
     public var isExtensionLibraryVisible: Bool = false
 
+    /// Draft appearance is local to this window and is discarded on cancel or space switch.
+    public var isCreatingSpace: Bool = false
+    public var spaceCreationAppearance: SpaceAppearance?
+
     // MARK: - App-side objects
     //
     // Typed accessors live in the app (`BrowserWindowState+macOS.swift`); the storage is here so

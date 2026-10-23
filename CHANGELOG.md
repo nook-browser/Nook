@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Space themes with gradients, grain and light/dark modes
+- Inline space creation with a profile choice
+- Searchable icon and emoji tabs for spaces
+
+### Changed
+
+- Zen-inspired sidebar, tab cards and favorites
+- Address editing with an anchored suggestions panel
+- Shared theme across the sidebar, window frame and split gutter
+
+### Fixed
+
+- Favorite drop previews match the final grid layout
+- Duplicate drag and space-switch haptics
+- Window-frame double-click behavior
+
 ## 1.2.4
 
 ### Added

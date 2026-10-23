@@ -15,10 +15,6 @@ import NookWeb
 public struct SpacesList: View {
     @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
-    @State private var hoveredSpaceId: UUID?
-    @State private var showPreview: Bool = false
-    @State private var isHoveringList: Bool = false
-
     private var visibleSpaces: [SpaceRecord] {
         tabs.switchableSpaces(for: windowState)
     }
@@ -26,31 +22,14 @@ public struct SpacesList: View {
     public init() {}
 
     public var body: some View {
-        Color.clear
-            .overlay{
-                    HStack(spacing: NookDesign.Spacing.xxs) {
+        GeometryReader { geometry in
+            ScrollView(.horizontal) {
+                    HStack(spacing: 3) {
                         ForEach(visibleSpaces, id: \.id) { space in
                             SpacesListItem(
                                 space: space,
                                 isActive: windowState.spaceID == space.id,
-                                isFaded: false,
-                                onHoverChange: { isHovering in
-                                    if isHovering {
-                                        hoveredSpaceId = space.id
-                                        if showPreview {
-                                        } else {
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                                                if hoveredSpaceId == space.id && isHoveringList {
-                                                    withAnimation(NookDesign.Motion.standard) {
-                                                        showPreview = true
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else if hoveredSpaceId == space.id {
-                                        hoveredSpaceId = nil
-                                    }
-                                }
+                                isFaded: false
                             )
                             .environment(windowState)
                             .id(space.id)
@@ -60,29 +39,14 @@ public struct SpacesList: View {
                             ))
                         }
                     }
-                    .onHoverTracking { hovering in
-                        isHoveringList = hovering
-                        if !hovering {
-                            showPreview = false
-                            hoveredSpaceId = nil
-                        }
-                    }
-                    .overlay(alignment: .top) {
-                        if showPreview,
-                           let hoveredId = hoveredSpaceId,
-                           hoveredId != windowState.spaceID,
-                           let hoveredSpace = visibleSpaces.first(where: { $0.id == hoveredId }) {
-                            Text(hoveredSpace.name)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .id(hoveredSpace.id)
-                                .transition(.blur.animation(NookDesign.Motion.standard))
-                                .offset(y: -NookDesign.Spacing.xxl)
-                        }
-                    }
+                    .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
+
             }
-            .animation(NookDesign.Motion.standard, value: visibleSpaces.count)
+            .scrollIndicators(.hidden)
+            .defaultScrollAnchor(.center)
+
+        }
+        .animation(NookDesign.Motion.standard, value: visibleSpaces.count)
     }
 
 

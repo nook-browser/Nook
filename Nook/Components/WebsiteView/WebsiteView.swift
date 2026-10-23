@@ -682,7 +682,8 @@ struct TabCompositorWrapper: NSViewRepresentable {
         if isCurrentPane, let leftId, let rightId,
            let leftSession = tabs.ensureSession(for: leftId),
            let rightSession = tabs.ensureSession(for: rightId) {
-            let gap: CGFloat = 8
+            (containerView as? ContainerView)?.showsSplit = true
+            let gap = NookDesign.Chrome.splitGap
             let total = containerView.bounds
             let leftWidth = floor(total.width * split.dividerFraction(for: windowState.id))
             let leftRect = NSRect(x: total.minX, y: total.minY,
@@ -708,6 +709,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
                 pane.show(pageView(for: session, reusing: pane.content.subviews))
             }
         } else {
+            (containerView as? ContainerView)?.showsSplit = false
             // Single tab (most common path during video playback)
             if let session = selected, !session.isUnloaded {
                 setSingleWebView(pageView(for: session, reusing: contentSubviews), in: containerView, replacing: contentSubviews)
@@ -873,12 +875,28 @@ private extension WebsiteView {
 // MARK: - Container View that forwards right-clicks to webviews
 
 private class ContainerView: NSView {
-    // A CGColor is frozen at creation; re-resolve it when light/dark changes.
+    var showsSplit = false {
+        didSet { if showsSplit != oldValue { updateBackground() } }
+    }
+
+    // Only the actual pages need the opaque video fallback. The split gutter must show
+    // the single window-coordinate theme underneath, including its gradient and grain.
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
+        updateBackground()
+    }
+
+    private func updateBackground() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            layer?.backgroundColor = showsSplit ? NSColor.clear.cgColor : NSColor.windowBackgroundColor.cgColor
         }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let target = super.hitTest(point)
+        // Exposed gutter belongs to the window frame; panes and their controls still
+        // receive their own clicks, context menus and page selection normally.
+        return target === self ? nil : target
     }
 
     // Don't intercept events - let them pass through to webviews

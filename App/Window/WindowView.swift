@@ -11,6 +11,7 @@ import AppKit
 import SwiftUI
 import NookDesign
 import NookWeb
+import NookTabsCore
 import NookUI
 
 /// Main window view that orchestrates the browser UI layout
@@ -185,7 +186,21 @@ struct WindowView: View {
         browserManager.gradientColorManager.setImmediate(SpaceGradient.accent(hex: hex))
     }
 
+    private var spaceAppearance: SpaceAppearance {
+        guard !windowState.isIncognito, let id = windowState.spaceID else {
+            return SpaceAppearance(accentHex: "#8E8E93")
+        }
+        return windowState.spaceCreationAppearance ?? tabs.space(id)?.resolvedAppearance ?? SpaceAppearance(accentHex: "#7C7C7C")
+    }
+
     private var resolvedColorScheme: ColorScheme? {
+        if !windowState.isIncognito {
+            switch spaceAppearance.mode {
+            case .light: return .light
+            case .dark: return .dark
+            case .system: break
+            }
+        }
         switch nookSettings.appearanceMode {
         case .light: return .light
         case .dark: return .dark
@@ -194,7 +209,7 @@ struct WindowView: View {
     }
 
     private var showsAgentSpace: Bool {
-        windowState.spaceID != nil && windowState.spaceID == tabs.agentSpaceID
+        !windowState.isCreatingSpace && windowState.spaceID != nil && windowState.spaceID == tabs.agentSpaceID
     }
 
     // MARK: - Layout Components
@@ -202,10 +217,9 @@ struct WindowView: View {
     @ViewBuilder
     private func WindowBackground() -> some View {
         // Private windows keep the neutral incognito accent, never the space's color.
-        let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
         let isActive = windowRegistry.activeWindowId == windowState.id
 
-        NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)
+        SpaceThemeSurface(appearance: spaceAppearance, isActive: isActive)
             // Private windows tint all chrome so they are never mistaken for a regular window.
             .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
             // So is the Agent space, with its fixed gradient.
@@ -228,6 +242,7 @@ struct WindowView: View {
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
                 SpacesSidebar()
+                    .zIndex(10)
                 WebContent()
                 if aiVisible {
                     AISidebar()
@@ -238,12 +253,13 @@ struct WindowView: View {
                 }
                 WebContent()
                 SpacesSidebar()
+                    .zIndex(10)
             }
         }
         // Apply padding similar to regular sidebar: remove padding when sidebar/AI is visible on that side
         // When sidebar is on left, AI appears on right (trailing); when sidebar is on right, AI appears on left (leading)
-        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : 8)
-        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : 8)
+        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : NookDesign.Chrome.pageInset)
+        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : NookDesign.Chrome.pageInset)
     }
 
     @ViewBuilder
@@ -324,7 +340,7 @@ struct WindowView: View {
                     .allowsHitTesting(false)
             }
         }
-        .padding(.bottom, bordered ? 8 : 0)
+        .padding(.bottom, bordered ? NookDesign.Chrome.pageInset : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

@@ -67,65 +67,73 @@ struct SpacesSideBarView: View {
     private var mainSidebarContent: some View {
         return VStack(spacing: NookDesign.Spacing.sectionGap) {
             // History buttons: share the traffic-light row on the left, their own row on the right.
-            if nookSettings.sidebarPosition != .left && !nookSettings.topBarAddressView {
+            if nookSettings.sidebarPosition != .left {
                 titleRow
                     .padding(.horizontal, NookDesign.Spacing.sidebarInset)
             }
 
-            // Header (window controls, nav buttons, URL bar)
-            SidebarHeader(isSidebarHovered: isSidebarHovered, onNewSpace: showSpaceCreationDialog)
-                .environmentObject(browserManager)
-                .environment(windowState)
+            if windowState.isCreatingSpace {
+                SidebarSpaceCreationView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+            } else {
+                // Inline address field and its anchored suggestions
+                SidebarHeader(isSidebarHovered: isSidebarHovered)
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+                    .zIndex(10)
 
-            // Spaces page view with draggable spacer
-            ZStack {
-                spacesPageView
-                    .zIndex(1)
+                // Spaces page view with draggable spacer
+                ZStack {
+                    spacesPageView
+                        .zIndex(1)
 
-                // Bottom spacer for window dragging
-                Color.clear
-                    .contentShape(Rectangle())
-                    .conditionalWindowDrag()
-                    .frame(minHeight: NookDesign.Size.bottomBar)
-                    .zIndex(0)
-            }
-
-            // Downloads menu hover overlay
-            if showDownloadsMenu, !browserManager.downloadManager.recentDownloads.isEmpty {
-                downloadsMenuOverlay
-            }
-
-            // Update notification
-            SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
-                .environmentObject(browserManager)
-                .environment(windowState)
-                .environment(nookSettings)
-                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
-                .padding(.bottom, NookDesign.Spacing.sidebarInset)
-
-            SidebarWhatsNewCard()
-                .environmentObject(browserManager)
-                .environment(windowState)
-                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
-                .padding(.bottom, NookDesign.Spacing.sidebarInset)
-
-            // Video left playing in another tab, directly above the media controls
-            SidebarPiPView()
-                .environmentObject(browserManager)
-                .environment(windowState)
-
-            if !windowState.isIncognito, let agent = tabs.agentSpaceID, windowState.spaceID != agent,
-               !tabs.displayOrder(inSpace: agent).isEmpty {
-                AgentSpaceRow(tabCount: tabs.displayOrder(inSpace: agent).count, busy: tabs.agentCallsInFlight > 0) {
-                    withAnimation(NookDesign.Motion.standard) { tabs.setSpace(agent, in: windowState) }
+                    // Bottom spacer for window dragging
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .conditionalWindowDrag()
+                        .frame(minHeight: NookDesign.Size.bottomBar)
+                        .zIndex(0)
                 }
-                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
-            }
 
-            // Media controls. Hides itself while the video is showing above it.
-            MediaControlsView()
-                .environmentObject(browserManager)
-                .environment(windowState)
+                // Downloads menu hover overlay
+                if showDownloadsMenu, !browserManager.downloadManager.recentDownloads.isEmpty {
+                    downloadsMenuOverlay
+                }
+
+                // Update notification
+                SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+                    .environment(nookSettings)
+                    .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                    .padding(.bottom, NookDesign.Spacing.sidebarInset)
+
+                SidebarWhatsNewCard()
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+                    .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                    .padding(.bottom, NookDesign.Spacing.sidebarInset)
+
+                // Video left playing in another tab, directly above the media controls
+                SidebarPiPView()
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+
+                if !windowState.isIncognito, let agent = tabs.agentSpaceID, windowState.spaceID != agent,
+                   !tabs.displayOrder(inSpace: agent).isEmpty {
+                    AgentSpaceRow(tabCount: tabs.displayOrder(inSpace: agent).count, busy: tabs.agentCallsInFlight > 0) {
+                        withAnimation(NookDesign.Motion.standard) { tabs.setSpace(agent, in: windowState) }
+                    }
+                    .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                }
+
+                // Media controls. Hides itself while the video is showing above it.
+                MediaControlsView()
+                    .environmentObject(browserManager)
+                    .environment(windowState)
+
+            }
 
             // Bottom bar (menu, spaces indicators, new space)
             SidebarBottomBar(
@@ -143,7 +151,7 @@ struct SpacesSideBarView: View {
             if nookSettings.sidebarPosition == .left {
                 titleRow
                     .frame(height: NookDesign.Spacing.sidebarTop)
-                    .padding(.leading, NookDesign.Spacing.trafficLights)
+                    .padding(.leading, NookDesign.SidebarChrome.trafficLightsInset)
                     .padding(.trailing, NookDesign.Spacing.sidebarInset)
             }
         }
@@ -359,7 +367,7 @@ struct SpacesSideBarView: View {
     @ViewBuilder
     private func makeSpaceView(for space: SpaceRecord) -> some View {
         VStack(spacing: 0) {
-            if !windowState.isIncognito {
+            if !windowState.isIncognito, !tabs.favorites(of: space.id).isEmpty || dragSession.isDragging {
                 PinnedGrid(
                     width: windowState.sidebarContentWidth,
                     spaceID: space.id
@@ -396,7 +404,11 @@ struct SpacesSideBarView: View {
 
     /// Back, forward and reload at the trailing edge, unless the URL bar mode has them.
     private var titleRow: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: NookDesign.SidebarChrome.gap) {
+            Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
+                browserManager.toggleSidebar(for: windowState)
+            }
+            .nookSidebarIconButtons()
             Spacer(minLength: 0)
             if !nookSettings.topBarAddressView {
                 SidebarHistoryButtons()
@@ -409,24 +421,13 @@ struct SpacesSideBarView: View {
     // MARK: - Dialogs
 
     private func showSpaceCreationDialog() {
-        browserManager.dialogManager.showDialog(
-            SpaceCreationDialog(
-                onCreate: { name, accentHex in
-                    if let spaceID = tabs.createSpace(
-                        name: name.isEmpty ? "New Space" : name,
-                        icon: "square.grid.2x2",
-                        accentHex: accentHex,
-                        after: tabs.orderedSpaces.last?.id
-                    ) {
-                        tabs.setSpace(spaceID, in: windowState)
-                    }
-                    browserManager.dialogManager.closeDialog()
-                },
-                onCancel: {
-                    browserManager.dialogManager.closeDialog()
-                }
-            )
-        )
+        guard !windowState.isIncognito, !windowState.isCreatingSpace else { return }
+        withAnimation(NookDesign.Motion.standard) {
+            windowState.spaceCreationAppearance = windowState.spaceID
+                .flatMap { tabs.space($0)?.resolvedAppearance } ?? SpaceAppearance(accentHex: SpaceAccent.defaultHex)
+            windowState.isSidebarMenuVisible = false
+            windowState.isCreatingSpace = true
+        }
     }
 
 

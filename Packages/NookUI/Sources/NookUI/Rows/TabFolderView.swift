@@ -58,7 +58,7 @@ public struct TabFolderView: View {
 
                 if isRenaming {
                     TextField("", text: $draftName)
-                        .font(NookDesign.Font.label)
+                        .font(NookDesign.Tab.font)
                         .foregroundStyle(.primary)
                         .textFieldStyle(PlainTextFieldStyle())
                         .autocorrectionDisabled()
@@ -71,7 +71,7 @@ public struct TabFolderView: View {
                         .onEscapeKey { cancelRename() }
                 } else {
                     Text(item.displayTitle)
-                        .font(NookDesign.Font.label)
+                        .font(NookDesign.Tab.font)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -102,16 +102,12 @@ public struct TabFolderView: View {
                 }
             }
             .padding(.horizontal, NookDesign.Spacing.rowPadding)
-            .frame(height: NookDesign.Size.row)
+            .frame(height: NookDesign.Tab.height)
             .frame(maxWidth: .infinity)
-            .background(
-                NookDesign.Radius.shape(NookDesign.Radius.md)
-                    .fill(isDropTarget ? NookDesign.Surface.fillPressed : (isHovering ? NookDesign.Surface.fill : Color.clear))
-            )
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+            .nookTabSurface(selected: isDropTarget, hovered: isHovering)
         }
-        .buttonStyle(PlainButtonStyle())
-        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        .buttonStyle(NookTabButtonStyle())
+        .padding(.vertical, NookDesign.Tab.verticalInset)
         .onHoverTracking { hovering in
             withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering

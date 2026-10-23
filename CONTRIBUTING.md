@@ -39,7 +39,7 @@ Please be respectful to maintainers and disclose AI assistance.
 
 ### Compatibility & OS Versions
 
-- **Minimum deployment target is macOS 26.0.** Nook tracks the current macOS release and does not support older systems; do not add `#available` guards for versions below the deployment target.
+- **Minimum deployment target is macOS 15.5 (Sequoia), on Apple Silicon.** Building requires macOS 15.6 or later with Xcode 26 or later. Guard newer APIs and keep a Sequoia fallback; guards below the deployment target are unnecessary.
 - **New features requiring a newer OS** than the deployment target should use `#available` checks until the target is raised.
 
 ## 📋 Pull Request Process
@@ -52,10 +52,10 @@ Please be respectful to maintainers and disclose AI assistance.
 
 ### Creating Pull Requests
 
-1. **Create your branch from `main`**:
+1. **Create your branch from `develop`**:
    ```bash
-   git checkout main
-   git pull origin main
+   git checkout develop
+   git pull origin develop
    git checkout -b feature/your-feature-name
    ```
 
@@ -66,7 +66,7 @@ Please be respectful to maintainers and disclose AI assistance.
    git push origin feature/your-feature-name
    ```
 
-4. **Open a Pull Request to `main`**
+4. **Open a Pull Request to `develop`**
    - Provide a clear description of the changes
    - Reference any related issues
    - Include screenshots or videos for UI changes

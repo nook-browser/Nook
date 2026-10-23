@@ -454,29 +454,32 @@ public final class TabsController {
         }
     }
 
-    /// The website data store of a space, made on first use. Its name and icon follow the space.
+    /// The website data store of a space, shared when the creator chose an existing profile.
     public func profile(forSpace spaceID: UUID) -> Profile? {
-        // The Agent space has no store of its own: it uses the one it borrows logins from.
-        if let login = tree.loginSpace(for: spaceID), login != spaceID { return profile(forSpace: login) }
-        guard let space = tree.space(spaceID) else { return nil }
-        if let existing = spaceProfiles[spaceID] {
-            existing.name = space.name
-            existing.icon = space.icon
-            return existing
-        }
-        let profile = Profile(id: spaceID, name: space.name, icon: space.icon)
-        spaceProfiles[spaceID] = profile
+        guard let profileID = tree.profileIdentifier(for: spaceID),
+              let space = tree.space(spaceID) else { return nil }
+        if let existing = spaceProfiles[profileID] { return existing }
+        let profile = Profile(id: profileID, name: space.name, icon: space.icon)
+        spaceProfiles[profileID] = profile
         return profile
     }
 
-    /// Every space's data store, made if it does not exist yet. For whole-app cleanup only.
-    var allSpaceProfiles: [Profile] {
-        tree.orderedSpaces.compactMap { profile(forSpace: $0.id) }
+    public func profileIdentifier(forSpace spaceID: UUID) -> UUID? {
+        tree.profileIdentifier(for: spaceID)
     }
 
-    /// Drops the cached data store of a deleted space.
-    func forgetProfile(_ spaceID: UUID) {
-        spaceProfiles[spaceID] = nil
+    /// Every distinct data store. For whole-app cleanup only.
+    var allSpaceProfiles: [Profile] {
+        var seen = Set<UUID>()
+        return tree.orderedSpaces.compactMap { space in
+            guard let profile = profile(forSpace: space.id), seen.insert(profile.id).inserted else { return nil }
+            return profile
+        }
+    }
+
+    /// Drops the cached data store after its last ordinary space is deleted.
+    func forgetProfile(_ profileID: UUID) {
+        spaceProfiles[profileID] = nil
     }
 
     /// The data store a session's page uses: the private window's ephemeral one, else the store

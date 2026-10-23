@@ -1,22 +1,31 @@
 // Licensed under GPL-3.0. See LICENSE.
 import Foundation
 
-/// A space: one login context (its own website data store), one favorites grid, one pinned
-/// section and one tabs section. There is no separate profile record.
+/// A space groups tabs and favorites. Its website data store is isolated by default;
+/// an explicit profileID lets spaces share cookies and logins.
 public struct SpaceRecord: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
     public var name: String
     public var icon: String
     public var accentHex: String
+    public var appearance: SpaceAppearance?
+    /// Stable website data store identifier. nil preserves the legacy space-owned profile.
+    public var profileID: UUID?
+
+    public var resolvedAppearance: SpaceAppearance {
+        (appearance ?? SpaceAppearance(accentHex: accentHex)).normalized
+    }
     public var order: OrderKey
     public var modifiedAt: Date
     public var deletedAt: Date?
 
-    public init(id: UUID = UUID(), name: String, icon: String, accentHex: String, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil) {
+    public init(id: UUID = UUID(), name: String, icon: String, accentHex: String, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil, appearance: SpaceAppearance? = nil, profileID: UUID? = nil) {
         self.id = id
         self.name = name
         self.icon = icon
         self.accentHex = accentHex
+        self.appearance = appearance
+        self.profileID = profileID
         self.order = order
         self.modifiedAt = modifiedAt
         self.deletedAt = deletedAt

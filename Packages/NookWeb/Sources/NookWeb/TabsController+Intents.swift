@@ -256,6 +256,8 @@ extension TabsController {
     public func setSpace(_ spaceID: UUID, in window: BrowserWindowState) {
         let source = tree(owner(of: window))
         guard source.space(spaceID) != nil else { return }
+        window.isCreatingSpace = false
+        window.spaceCreationAppearance = nil
         let previous = selectedSession(in: window)
         let changed = window.spaceID != spaceID
         window.spaceID = spaceID
@@ -599,12 +601,12 @@ extension TabsController {
 
     // MARK: - Spaces
 
-    /// A new space with its own (empty) website data store, so it starts logged out.
+    /// A new space, isolated by default or sharing the explicitly selected profile.
     @discardableResult
-    public func createSpace(name: String, icon: String, accentHex: String, after: UUID?) -> UUID? {
+    public func createSpace(name: String, icon: String, accentHex: String, after: UUID?, appearance: SpaceAppearance? = nil, profileID: UUID? = nil) -> UUID? {
         let id = UUID()
         guard perform(.main, "createSpace", {
-            $0.createSpace(id: id, name: name, icon: icon, accentHex: accentHex, after: after)
+            $0.createSpace(id: id, name: name, icon: icon, accentHex: accentHex, after: after, appearance: appearance, profileID: profileID)
         }) != nil else { return nil }
         return id
     }
@@ -613,6 +615,12 @@ extension TabsController {
     public func updateSpace(_ spaceID: UUID, name: String?, icon: String?, accentHex: String?) {
         guard let owner = owner(ofSpace: spaceID), spaceID != agentSpaceID else { return }
         perform(owner, "updateSpace") { try $0.updateSpace(spaceID, name: name, icon: icon, accentHex: accentHex) }
+    }
+
+    public func updateSpaceAppearance(_ spaceID: UUID, appearance: SpaceAppearance) {
+        guard let owner = owner(ofSpace: spaceID), spaceID != agentSpaceID else { return }
+        // Appearance is a live setting, not a tab operation. Dragging must not evict tab undo history.
+        perform(owner, "updateSpaceAppearance", undoable: false) { try $0.updateSpaceAppearance(spaceID, appearance: appearance) }
     }
 
     func moveSpace(_ spaceID: UUID, after: UUID?) {
@@ -661,12 +669,15 @@ extension TabsController {
                 setSpace(next.id, in: window)
             }
         }
-        if case .main = owner, let profile = deleted {
-            // Its cookies and logins go with it. Nothing else shares this data store.
-            forgetProfile(spaceID)
+        if case .main = owner, let profile = deleted, !tree.usesProfile(profile.id) {
+            // Keep shared logins until the last ordinary space using this profile is deleted.
+            forgetProfile(profile.id)
             Task { await profile.clearAllData() }
-            // The Agent space may have borrowed its logins from this one.
-            if let agent = agentSpaceID { unloadPagesOnWrongDataStore(items(inSpace: agent).map(\.id)) }
+        }
+        // A deleted owner may change the Agent space's borrowed profile, even if its old
+        // store stays alive through another ordinary space.
+        if case .main = owner, let agent = agentSpaceID {
+            unloadPagesOnWrongDataStore(items(inSpace: agent).map(\.id))
         }
     }
 

@@ -6,6 +6,8 @@
 
 import SwiftUI
 import AppKit
+import NookTabsCore
+import NookWeb
 
 // MARK: - Drag Source Coordinator (NSDraggingSource)
 
@@ -14,6 +16,8 @@ final class NookDragSourceCoordinator: NSObject, NSDraggingSource {
     var item: NookDragItem
     var icon: Image?
     var zoneID: DropZoneID
+    var appearance = SpaceAppearance(accentHex: "#7C7C7C")
+    var colorScheme: ColorScheme = .light
     let manager: NookDragSessionManager
 
     init(item: NookDragItem, icon: Image?, zoneID: DropZoneID, manager: NookDragSessionManager) {
@@ -36,9 +40,7 @@ final class NookDragSourceCoordinator: NSObject, NSDraggingSource {
     }
 
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        if operation == [] {
-            manager.cancelDrag()
-        }
+        manager.nativeDragEnded()
     }
 }
 
@@ -61,7 +63,7 @@ final class NookDragSourceNSView: NSView {
         registrationId = nil
     }
 
-    func initiateDrag(with event: NSEvent) {
+    func initiateDrag(with event: NSEvent, mouseDownEvent: NSEvent?) {
         guard let coordinator = coordinator else { return }
 
         // Capture screen position from the event for preview window positioning
@@ -76,7 +78,12 @@ final class NookDragSourceNSView: NSView {
             item: coordinator.item,
             icon: coordinator.icon,
             from: coordinator.zoneID,
-            cursorScreenPoint: screenPoint
+            cursorScreenPoint: screenPoint,
+            grabScreenPoint: mouseDownEvent.flatMap { window?.convertPoint(toScreen: $0.locationInWindow) } ?? screenPoint,
+            sourceFrame: window?.convertToScreen(convert(bounds, to: nil)) ?? .zero,
+            window: window,
+            appearance: coordinator.appearance,
+            colorScheme: coordinator.colorScheme
         )
 
         let pasteboardItem = NSPasteboardItem()
@@ -104,10 +111,14 @@ private struct DragSourceAnchor: NSViewRepresentable {
     let icon: Image?
     let zoneID: DropZoneID
     let manager: NookDragSessionManager
+    let appearance: SpaceAppearance
+    let colorScheme: ColorScheme
 
     func makeNSView(context: Context) -> NookDragSourceNSView {
         let view = NookDragSourceNSView()
         view.coordinator = context.coordinator
+        context.coordinator.appearance = appearance
+        context.coordinator.colorScheme = colorScheme
         view.registerWithManager()
         return view
     }
@@ -116,6 +127,8 @@ private struct DragSourceAnchor: NSViewRepresentable {
         context.coordinator.item = item
         context.coordinator.icon = icon
         context.coordinator.zoneID = zoneID
+        context.coordinator.appearance = appearance
+        context.coordinator.colorScheme = colorScheme
     }
 
     static func dismantleNSView(_ nsView: NookDragSourceNSView, coordinator: NookDragSourceCoordinator) {
@@ -135,6 +148,14 @@ struct NookDragSourceView<Content: View>: View {
     let zoneID: DropZoneID
     let manager: NookDragSessionManager
     @ViewBuilder let content: () -> Content
+    @Environment(TabsController.self) private var tabs
+    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var appearance: SpaceAppearance {
+        if windowState.isIncognito { return SpaceAppearance(accentHex: "#8E8E93") }
+        return windowState.spaceID.flatMap { tabs.space($0)?.resolvedAppearance } ?? SpaceAppearance(accentHex: "#7C7C7C")
+    }
 
     var body: some View {
         content()
@@ -143,7 +164,9 @@ struct NookDragSourceView<Content: View>: View {
                     item: item,
                     icon: icon,
                     zoneID: zoneID,
-                    manager: manager
+                    manager: manager,
+                    appearance: appearance,
+                    colorScheme: colorScheme
                 )
             )
     }
