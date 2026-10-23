@@ -390,6 +390,7 @@ public class DownloadManager: NSObject {
         }
         if state == .completed {
             completedCount += 1
+            Self.announceFinished(download.destinationURL)
         }
         if state == .completed || state == .failed || state == .cancelled {
             downloadDelegates[id]?.stopProgressObservation()
@@ -441,7 +442,15 @@ public class DownloadManager: NSObject {
         NotificationCenter.default.post(name: .downloadDidStart, object: saved)
         saved.state = .completed
         completedCount += 1
+        Self.announceFinished(destination)
         return saved
+    }
+
+    /// Tells the Dock the file is complete, so its Downloads stack bounces and redraws the item,
+    /// which it otherwise leaves as the gray icon it drew while the file was still being written.
+    private static func announceFinished(_ url: URL?) {
+        guard let url else { return }
+        DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: url.resolvingSymlinksInPath().path)
     }
 
     /// A name safe to create in a folder: one path component, no leading dots or NULs, at most 255
