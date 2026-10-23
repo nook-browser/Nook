@@ -4,6 +4,10 @@
 
 ### Added
 
+- Edit a split page’s address from its title using the address search panel, keeping navigation in that pane
+
+- Resize split-view pages by dragging their divider, with a horizontal resize cursor
+
 - Built-in light/dark gradients over native window transparency when the theme picker has no colors; removing the last color or resetting selects this appearance
 
 - Space themes with gradients, grain and light/dark modes

@@ -168,6 +168,7 @@ struct LinkStatusBar: View {
 }
 
 struct WebsiteView: View {
+    @EnvironmentObject private var hoverManager: HoverSidebarManager
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @EnvironmentObject var splitManager: SplitViewManager
@@ -207,6 +208,7 @@ struct WebsiteView: View {
                     GeometryReader { proxy in
                         TabCompositorWrapper(
                             browserManager: browserManager,
+                            hoverManager: hoverManager,
                             hoveredLink: $hoveredLink,
                             isCommandPressed: $isCommandPressed,
                             splitFraction: splitManager.dividerFraction(for: windowState.id),
@@ -494,6 +496,7 @@ private struct MagneticCardView: View {
 // MARK: - Tab Compositor Wrapper
 struct TabCompositorWrapper: NSViewRepresentable {
     let browserManager: BrowserManager
+    let hoverManager: HoverSidebarManager
     @Binding var hoveredLink: String?
     @Binding var isCommandPressed: Bool
     var splitFraction: CGFloat
@@ -669,8 +672,10 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
         // Identify overlay (always preserved)
         let overlay = containerView.subviews.compactMap { $0 as? SplitDropCaptureView }.first
-        // Content subviews = everything except the overlay
-        let contentSubviews = containerView.subviews.filter { !($0 is SplitDropCaptureView) }
+        // Keep the drop overlay and resize divider separate from page content.
+        let contentSubviews = containerView.subviews.filter {
+            !($0 is SplitDropCaptureView) && !($0 is SplitDividerView)
+        }
 
         // A drag preview leaves the panes alone; the drop cards draw over them.
         let currentId = selected?.itemID
@@ -690,6 +695,27 @@ struct TabCompositorWrapper: NSViewRepresentable {
             let rightRect = NSRect(x: total.minX + leftWidth + gap/2, y: total.minY,
                                    width: max(1, total.width - leftWidth - gap/2), height: total.height)
 
+            let divider: SplitDividerView
+            if let existing = containerView.subviews.compactMap({ $0 as? SplitDividerView }).first {
+                divider = existing
+            } else {
+                divider = SplitDividerView()
+                containerView.addSubview(divider)
+            }
+            divider.isHidden = false
+            divider.frame = NSRect(x: total.minX + leftWidth - gap/2, y: total.minY,
+                                   width: gap, height: total.height)
+            divider.fraction = split.dividerFraction(for: windowState.id)
+            divider.onResize = { [weak windowState] fraction in
+                guard let windowState, var record = windowState.split else { return }
+                record.fraction = Double(fraction)
+                windowState.split = record
+            }
+            divider.onResizeEnded = { [weak browserManager, weak windowState] in
+                guard let windowState else { return }
+                browserManager?.tabs.mirror(windowState)
+            }
+
             // Panes stay while the pair holds: taking a WKWebView out of its superview
             // drops its video surface, so a selection change leaves the panes alone.
             var panes = contentSubviews.compactMap { $0 as? SplitPaneView }
@@ -698,7 +724,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             } else {
                 removeContentViews(contentSubviews)
                 panes = [(SplitViewManager.Side.left, leftId, leftRect), (.right, rightId, rightRect)].map { side, id, rect in
-                    SplitPaneView(frame: rect, side: side, itemID: id, browserManager: browserManager, windowState: windowState)
+                    SplitPaneView(frame: rect, side: side, itemID: id, browserManager: browserManager, windowState: windowState, hoverManager: hoverManager)
                 }
                 panes.forEach { containerView.addSubview($0) }
             }
@@ -709,6 +735,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
             }
         } else {
             (containerView as? ContainerView)?.showsSplit = false
+            containerView.subviews.compactMap { $0 as? SplitDividerView }.forEach { $0.isHidden = true }
             // Single tab (most common path during video playback)
             if let session = selected, !session.isUnloaded {
                 setSingleWebView(pageView(for: session, reusing: contentSubviews), in: containerView, replacing: contentSubviews)
@@ -872,6 +899,42 @@ private extension WebsiteView {
 }
 
 // MARK: - Container View that forwards right-clicks to webviews
+
+/// Native events keep the drag captured when the pointer moves over either web page.
+private final class SplitDividerView: NSView {
+    var fraction: CGFloat = 0.5
+    var onResize: ((CGFloat) -> Void)?
+    var onResizeEnded: (() -> Void)?
+    private var dragStartX: CGFloat?
+    private var dragStartFraction: CGFloat = 0.5
+
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func resetCursorRects() {
+        if !isHidden { addCursorRect(bounds, cursor: .resizeLeftRight) }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let parent = superview else { return }
+        dragStartX = parent.convert(event.locationInWindow, from: nil).x
+        dragStartFraction = fraction
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let parent = superview, let dragStartX, parent.bounds.width > 0 else { return }
+        let x = parent.convert(event.locationInWindow, from: nil).x
+        let minimum = min(0.45, 160 / parent.bounds.width)
+        let proposed = dragStartFraction + (x - dragStartX) / parent.bounds.width
+        onResize?(min(1 - minimum, max(minimum, proposed)))
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard dragStartX != nil else { return }
+        mouseDragged(with: event)
+        dragStartX = nil
+        onResizeEnded?()
+    }
+}
 
 private class ContainerView: NSView {
     var showsSplit = false {
