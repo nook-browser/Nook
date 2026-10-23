@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.4
+
+### Added
+
+- Reddit feeds sort by Hot
+
+### Fixed
+
+- Bitwarden popup not opening
+- Bugs
+
 ## 1.2.3
 
 ### Added
