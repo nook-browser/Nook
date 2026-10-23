@@ -17,8 +17,9 @@ extension TabsController {
     /// `opener`, the tab whose page opened the link (`childTabPosition`); else right below the
     /// window's selected tab (`newTabPosition`). `.newTab` selects it, `.background` leaves
     /// selection alone and loads nothing, `.replaceCurrent` loads `url` in the selected page.
+    /// `title` stands in for the page title until the page loads.
     @discardableResult
-    public func open(url: URL, in window: BrowserWindowState, placement: Placement, parent: Parent? = nil, from opener: UUID? = nil) -> UUID? {
+    public func open(url: URL, in window: BrowserWindowState, placement: Placement, parent: Parent? = nil, from opener: UUID? = nil, title: String? = nil) -> UUID? {
         if placement == .replaceCurrent, let selected = window.selectedItemID, let session = ensureSession(for: selected) {
             session.load(url)
             select(selected, in: window)
@@ -30,7 +31,7 @@ extension TabsController {
         else { return nil }
         let id = UUID()
         let created = perform(owner(of: window), "open") {
-            try $0.createTab(id: id, url: url, title: url.host ?? url.absoluteString, in: position.0, after: position.1)
+            try $0.createTab(id: id, url: url, title: title ?? url.host ?? url.absoluteString, in: position.0, after: position.1)
         }
         guard created != nil else { return nil }
         if opener != nil { revealTrail(position.0) }

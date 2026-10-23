@@ -13,21 +13,22 @@ import SwiftUI
 class ImportManager: ObservableObject {
     
     func importArcSidebarData() async -> ArcImportResult {
-        
-        let fileURL = getArcSidebarFileURL()
-        
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            return ArcImportResult(topTabs: [], spaces: [])
-        }
-        
-        do {
-            let result = try parseArcSidebarData(from: fileURL)
-            return result
-        } catch {
-            return ArcImportResult(topTabs: [], spaces: [])
-        }
+        guard let data = try? Data(contentsOf: arcDirectory.appendingPathComponent("StorableSidebar.json")),
+              let result = try? parseArcSidebarData(data) else { return ArcImportResult() }
+        return result
     }
-    
+
+    /// Arc's member card, with the person's Arc name added, as a JSON object.
+    func arcMembershipCard() -> Data? {
+        guard let data = try? Data(contentsOf: arcDirectory.appendingPathComponent("StorableMembershipCard.json")),
+              var card = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        let auth = (try? Data(contentsOf: arcDirectory.appendingPathComponent("StorableAuthState.json")))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let user = (auth?["session"] as? [String: Any])?["user"] as? [String: Any]
+        if let name = user?["name"] as? String { card["name"] = name }
+        return try? JSONSerialization.data(withJSONObject: card, options: [.prettyPrinted, .sortedKeys])
+    }
+
     func importDiaData() async -> DiaImportResult {
         let fileURL = getDiaFileURL()
 
@@ -56,12 +57,8 @@ class ImportManager: ObservableObject {
         }
     }
 
-    private func getArcSidebarFileURL() -> URL {
-        let url = URL(fileURLWithPath: NSString(string: "~/Library/Application Support/Arc/StorableSidebar.json")
-            .expandingTildeInPath
-        )
-
-        return url
+    private var arcDirectory: URL {
+        URL(fileURLWithPath: NSString(string: "~/Library/Application Support/Arc").expandingTildeInPath)
     }
 
     private func getDiaFileURL() -> URL {

@@ -10,29 +10,30 @@ import NookWeb
 import SwiftUI
 
 extension BrowserManager {
-    /// Import Data from arc
+    /// Arc's spaces in order, each with its pinned and Today sections, its profile's favorites,
+    /// nested folders, custom tab names and theme color. Arc's member card is kept beside the tabs.
     func importArcData() async {
         let result = await importManager.importArcSidebarData()
-        guard let window = importWindow, let targetSpace = importSpaceID(window) else { return }
+        if let card = importManager.arcMembershipCard() {
+            try? card.write(to: TabsController.defaultDirectory.deletingLastPathComponent()
+                .appendingPathComponent("ArcMembershipCard.json"), options: .atomic)
+        }
+        guard let window = importWindow else { return }
 
         var lastSpace = tabs.orderedSpaces.last?.id
         for space in result.spaces {
             guard let spaceID = tabs.createSpace(
                 name: space.title, icon: space.emoji ?? "person.fill",
-                accentHex: "#7C7C7C", after: lastSpace
+                accentHex: space.accentHex ?? "#7C7C7C", after: lastSpace
             ) else { continue }
             lastSpace = spaceID
 
-            importTabs(space.unpinnedTabs.map(\.url), into: .tabs(spaceID: spaceID), window: window)
-            // Folders are opened first so pinned tabs end up above them.
-            for folder in space.folders.reversed() {
-                guard let folderID = tabs.createFolder(title: folder.title, in: .pinned(spaceID: spaceID), after: nil) else { continue }
-                importTabs(folder.tabs.map(\.url), into: .folder(itemID: folderID), window: window)
-            }
-            importTabs(space.pinnedTabs.map(\.url), into: .pinned(spaceID: spaceID), window: window)
+            // Arc shows a profile's favorites in each of its spaces; a Nook space has its own.
+            importArc(result.favorites[space.profile] ?? [], into: .favorites(spaceID: spaceID), window: window)
+            importArc(space.pinned, into: .pinned(spaceID: spaceID), window: window)
+            importArc(space.unpinned, into: .tabs(spaceID: spaceID), window: window)
+            tabs.setAllFolders(open: false, space: spaceID)
         }
-
-        importTabs(result.topTabs.map(\.url), into: .favorites(spaceID: targetSpace), window: window)
     }
 
     func importDiaData() async {
@@ -95,6 +96,26 @@ extension BrowserManager {
 
     private func importSpaceID(_ window: BrowserWindowState) -> UUID? {
         window.spaceID ?? tabs.orderedSpaces.first?.id
+    }
+
+    /// Adds Arc's tree under `parent` in source order. A folder Nook cannot hold there (in
+    /// favorites, or past the depth limit) gives its tabs to the parent instead.
+    private func importArc(_ nodes: [ArcNode], into parent: Parent, window: BrowserWindowState) {
+        for node in nodes.reversed() {
+            switch node {
+            case let .tab(string, title, customTitle):
+                guard let url = URL(string: string), ["http", "https", "file"].contains(url.scheme?.lowercased()),
+                      let id = tabs.open(url: url, in: window, placement: .background, parent: parent, title: title)
+                else { continue }
+                if let customTitle { tabs.rename(id, customTitle) }
+            case let .folder(title, children):
+                if let folderID = tabs.createFolder(title: title, in: parent, after: nil) {
+                    importArc(children, into: .folder(itemID: folderID), window: window)
+                } else {
+                    importArc(children, into: parent, window: window)
+                }
+            }
+        }
     }
 
     /// Adds tabs under `parent` in source order without loading pages or changing selection.
