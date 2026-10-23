@@ -266,6 +266,7 @@ struct WindowView: View {
     private func SpacesSidebar() -> some View {
         if windowState.isSidebarVisible {
             SpacesSideBarView()
+                .scrollIndicators(windowState.isSidebarResizeHovered ? .hidden : .automatic)
                 .frame(width: windowState.sidebarWidth)
                 .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
                     SidebarResizeView()

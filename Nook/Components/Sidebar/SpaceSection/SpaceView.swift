@@ -29,6 +29,8 @@ struct SpaceView: View {
     @Environment(\.nookSettings) private var nookSettings
     @ObservedObject private var dragSession = NookDragSessionManager.shared
     @State private var isNewTabHovering = false
+    @State private var isUserScrolling = false
+    @State private var showsScrollIndicator = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(spaceID: UUID, isActive: Bool, isSidebarHovered: Binding<Bool>) {
@@ -57,7 +59,7 @@ struct SpaceView: View {
         let regular = rows.filter { $0.section == .tabs }
         let split = splitPair(in: rows)
 
-        ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical) {
             VStack(spacing: NookDesign.Spacing.sectionGap) {
                 // An empty pinned section shows a drop slot only while a drag is on.
                 if !pinned.isEmpty {
@@ -72,9 +74,30 @@ struct SpaceView: View {
             }
             .animation(NookDesign.Motion.standard, value: pinned.isEmpty)
             .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
+            // Inset the rows, not the scroll viewport: the indicator belongs at the sidebar edge.
+            .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+        }
+        .contentMargins(.trailing, 0, for: .scrollIndicators)
+        .scrollIndicators(showsScrollIndicator && !windowState.isSidebarResizeHovered ? .visible : .hidden)
+        .onScrollPhaseChange { _, phase in
+            // Tracking alone (a finger resting on the pad) is not scrolling.
+            isUserScrolling = phase == .interacting || phase == .decelerating
+            if isUserScrolling { showsScrollIndicator = true }
+        }
+        .task(id: isUserScrolling) {
+            guard !isUserScrolling else { return }
+            do {
+                try await Task.sleep(for: .milliseconds(650))
+                showsScrollIndicator = false
+            } catch {
+                // A new scroll cancels the pending hide.
+            }
+        }
+        .onDisappear {
+            isUserScrolling = false
+            showsScrollIndicator = false
         }
         .contentShape(Rectangle())
-        .padding(.horizontal, NookDesign.Spacing.sidebarInset)
         .frame(minWidth: 0, maxWidth: outerWidth, alignment: .leading)
     }
 

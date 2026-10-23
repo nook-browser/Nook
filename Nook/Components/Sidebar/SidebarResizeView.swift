@@ -1,123 +1,124 @@
 // Licensed under GPL-3.0. See LICENSE.
-//
-//  SidebarResizeView.swift
-//  Nook
-//
-//  Created by Maciek Bagiński on 30/07/2025.
-//
-
+import AppKit
 import SwiftUI
 import NookDesign
 import NookWeb
 import NookUI
 
+/// Native cursor ownership keeps the resize cursor stable over the sidebar edge.
 struct SidebarResizeView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
-    @Environment(\.nookSettings) var nookSettings
-    @State private var isResizing = false
-    @State private var isHovering = false
+    @Environment(\.nookSettings) private var settings
     @State private var startingWidth: CGFloat = 0
-    @State private var startingMouseX: CGFloat = 0
-    @StateObject private var dragLockManager = DragLockManager.shared
-    @State private var dragSessionID: String = UUID().uuidString
-    @State private var hoverTask: Task<Void, Never>?
-
-    private let minWidth = NookDesign.Size.sidebarMin
-    private let maxWidth: CGFloat = 520
-    private let defaultWidth: CGFloat = 250
-
-    private var sitsOnRight: Bool {
-        nookSettings.sidebarPosition == .right
-    }
-
-    private var indicatorOffset: CGFloat {
-        sitsOnRight ? 3 : -3
-    }
-
-    private var hitAreaOffset: CGFloat {
-        sitsOnRight ? 5 : -5
-    }
+    @State private var sessionID = UUID().uuidString
 
     var body: some View {
-        ZStack {
-            if isHovering || isResizing {
-                Capsule()
-                    .fill(Color.secondary)
-                    .frame(width: 4)
-                    .frame(maxHeight: .infinity)
-                    .offset(x: indicatorOffset)
-                    .animation(NookDesign.Motion.quick, value: isResizing)
-                    .animation(NookDesign.Motion.quick, value: isHovering)
-                    .padding(.vertical, 30)
+        SidebarResizeHandle(
+            color: NSColor(browserManager.accentColor).withAlphaComponent(0.8),
+            onHover: { windowState.isSidebarResizeHovered = $0 },
+            onStart: {
+                guard windowState.isSidebarVisible,
+                      DragLockManager.shared.startDrag(ownerID: sessionID) else { return false }
+                startingWidth = windowState.sidebarWidth
+                return true
+            },
+            onDrag: { delta in
+                let direction: CGFloat = settings.sidebarPosition == .right ? -1 : 1
+                let width = min(520, max(NookDesign.Size.sidebarMin, startingWidth + delta * direction))
+                guard width != windowState.sidebarWidth else { return }
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    // Do not broadcast BrowserManager.objectWillChange on every mouse event.
+                    windowState.sidebarWidth = width
+                    windowState.sidebarContentWidth = max(width - 16, 0)
+                }
+            },
+            onEnd: {
+                browserManager.updateSidebarWidth(windowState.sidebarWidth, for: windowState)
+                browserManager.saveSidebarWidthToDefaults()
+                DragLockManager.shared.endDrag(ownerID: sessionID)
+            },
+            onReset: {
+                browserManager.updateSidebarWidth(250, for: windowState)
+                browserManager.saveSidebarWidthToDefaults()
             }
-
-            Rectangle()
-                .fill(Color.clear)
-                .frame(width: 12)
-                .padding(.vertical, 30)
-                .offset(x: hitAreaOffset)
-                .contentShape(.interaction, .rect)
-                .onTapGesture(count: 2) {
-                    guard windowState.isSidebarVisible else { return }
-                    withAnimation(NookDesign.Motion.spring) {
-                        browserManager.updateSidebarWidth(defaultWidth, for: windowState)
-                    }
-                }
-                .onHoverTracking { hovering in
-                    guard windowState.isSidebarVisible else { return }
-
-                    hoverTask?.cancel()
-
-                    if hovering && !isResizing {
-                        hoverTask = Task {
-                            try? await Task.sleep(for: .seconds(0.1))
-                            guard !Task.isCancelled else { return }
-                            isHovering = true
-                            NSCursor.resizeLeftRight.set()
-                        }
-                    } else {
-                        isHovering = false
-                        if !isResizing {
-                            NSCursor.arrow.set()
-                        }
-                    }
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 2, coordinateSpace: .global)
-                        .onChanged { value in
-                            guard windowState.isSidebarVisible else { return }
-
-                            if !isResizing {
-                                guard dragLockManager.startDrag(ownerID: dragSessionID) else {
-                                    return
-                                }
-
-                                startingWidth = windowState.sidebarWidth
-                                startingMouseX = value.startLocation.x
-                                isResizing = true
-                                NSCursor.resizeLeftRight.set()
-                            }
-
-                            let currentMouseX = value.location.x
-                            let mouseMovement = sitsOnRight ? (startingMouseX - currentMouseX) : (currentMouseX - startingMouseX)
-                            let newWidth = startingWidth + mouseMovement
-                            let clampedWidth = max(minWidth, min(maxWidth, newWidth))
-
-                            browserManager.updateSidebarWidth(clampedWidth, for: windowState)
-                        }
-                        .onEnded { _ in
-                            isResizing = false
-                            dragLockManager.endDrag(ownerID: dragSessionID)
-
-                            if isHovering {
-                                NSCursor.resizeLeftRight.set()
-                            } else {
-                                NSCursor.arrow.set()
-                            }
-                        }
-                )
+        )
+        .frame(width: 8)
+        .padding(.vertical, 10)
+        .onDisappear {
+            windowState.isSidebarResizeHovered = false
+            DragLockManager.shared.endDrag(ownerID: sessionID)
         }
-        .frame(width: 3)
+    }
+}
+
+private struct SidebarResizeHandle: NSViewRepresentable {
+    var color: NSColor
+    var onHover: (Bool) -> Void
+    var onStart: () -> Bool
+    var onDrag: (CGFloat) -> Void
+    var onEnd: () -> Void
+    var onReset: () -> Void
+
+    func makeNSView(context: Context) -> Handle { Handle() }
+    func updateNSView(_ view: Handle, context: Context) {
+        view.callbacks = self
+        view.needsDisplay = true
+    }
+
+    final class Handle: NSView {
+        var callbacks: SidebarResizeHandle?
+        private var tracking: NSTrackingArea?
+        private var hovered = false
+        private var dragging = false
+        private var startX: CGFloat = 0
+        override var mouseDownCanMoveWindow: Bool { false }
+        override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeLeftRight) }
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            if let tracking { removeTrackingArea(tracking) }
+            let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .cursorUpdate, .activeInKeyWindow, .inVisibleRect], owner: self, userInfo: nil)
+            addTrackingArea(area)
+            tracking = area
+        }
+        override func cursorUpdate(with event: NSEvent) { NSCursor.resizeLeftRight.set() }
+        override func mouseEntered(with event: NSEvent) {
+            hovered = true
+            callbacks?.onHover(true)
+            NSCursor.resizeLeftRight.set()
+            needsDisplay = true
+        }
+        override func mouseExited(with event: NSEvent) {
+            hovered = false
+            callbacks?.onHover(dragging)
+            if !dragging { NSCursor.arrow.set() }
+            needsDisplay = true
+        }
+        override func mouseDown(with event: NSEvent) {
+            if event.clickCount == 2 { callbacks?.onReset(); return }
+            dragging = callbacks?.onStart() ?? false
+            startX = NSEvent.mouseLocation.x
+            needsDisplay = true
+        }
+        override func mouseDragged(with event: NSEvent) {
+            guard dragging else { return }
+            NSCursor.resizeLeftRight.set()
+            callbacks?.onDrag(NSEvent.mouseLocation.x - startX)
+        }
+        override func mouseUp(with event: NSEvent) {
+            guard dragging else { return }
+            dragging = false
+            callbacks?.onEnd()
+            callbacks?.onHover(hovered)
+            if !hovered { NSCursor.arrow.set() }
+            needsDisplay = true
+        }
+        override func draw(_ dirtyRect: NSRect) {
+            guard hovered || dragging else { return }
+            callbacks?.color.setFill()
+            NSBezierPath(roundedRect: bounds.insetBy(dx: 2, dy: 0), xRadius: 2, yRadius: 2).fill()
+        }
     }
 }

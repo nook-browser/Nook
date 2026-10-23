@@ -16,6 +16,9 @@
 
 ### Fixed
 
+- Keep space pages alive during sidebar resizing and use a native resize cursor with a tinted handle
+- Compress space switcher gaps before scrolling when the footer fills up
+
 - Settings now opens the inline space creation form; removed the obsolete macOS dialog
 
 - Favorite drop previews match the final grid layout

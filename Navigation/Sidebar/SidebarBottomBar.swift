@@ -24,29 +24,23 @@ struct SidebarBottomBar: View {
     let onMenuHover: (Bool) -> Void
     
     var body: some View {
-        ZStack {
-            HStack(spacing: NookDesign.SidebarChrome.gap) {
-                menuButton
-                if nookSettings.showAIAssistant {
-                    Button("Toggle AI Assistant", systemImage: "sparkle") {
-                        browserManager.toggleAISidebar(for: windowState)
-                    }
-                    .nookSidebarIconButtons()
-                    .help("Toggle AI Assistant")
+        HStack(spacing: NookDesign.SidebarChrome.gap) {
+            menuButton
+            if nookSettings.showAIAssistant {
+                Button("Toggle AI Assistant", systemImage: "sparkle") {
+                    browserManager.toggleAISidebar(for: windowState)
                 }
-                Spacer(minLength: 0)
-                if !windowState.isIncognito {
-                    newSpaceButton
-                }
+                .nookSidebarIconButtons()
+                .help("Toggle AI Assistant")
             }
-
-            // Center the workspace dots on the sidebar itself, independent of the
-            // extra assistant control on the left. Reserve both sides for hit targets.
             if !windowState.isIncognito {
                 SpacesList()
                     .environmentObject(browserManager)
                     .environment(windowState)
-                    .padding(.horizontal, NookDesign.SidebarChrome.footerSideReserve)
+                    .frame(maxWidth: .infinity)
+                newSpaceButton
+            } else {
+                Spacer(minLength: 0)
             }
         }
         .frame(height: NookDesign.Size.bottomBar)

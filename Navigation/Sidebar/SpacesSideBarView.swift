@@ -228,9 +228,6 @@ struct SpacesSideBarView: View {
             activeSpaceID = newID
             activeTabRefreshTrigger.toggle()
         }
-        .onChange(of: windowState.sidebarContentWidth) { _, _ in
-            activeTabRefreshTrigger.toggle()
-        }
     }
 
 
@@ -368,10 +365,7 @@ struct SpacesSideBarView: View {
     private func makeSpaceView(for space: SpaceRecord) -> some View {
         VStack(spacing: 0) {
             if !windowState.isIncognito, !tabs.favorites(of: space.id).isEmpty || dragSession.isDragging {
-                PinnedGrid(
-                    width: windowState.sidebarContentWidth,
-                    spaceID: space.id
-                )
+                ResizableSpaceFavorites(spaceID: space.id)
                 .environmentObject(browserManager)
                 .environment(tabs)
                 .environment(windowState)
@@ -397,7 +391,7 @@ struct SpacesSideBarView: View {
             .environment(nookSettings)
             .environmentObject(browserManager.gradientColorManager)
             .environmentObject(browserManager.splitManager)
-            .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
+            .id(space.id)
             Spacer()
         }
     }
@@ -464,5 +458,15 @@ private struct AgentSpaceRow: View {
         .onHoverTracking { hovering in
             withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
         }
+    }
+}
+
+/// Observe width inside the cached page rather than rebuilding the paging controller.
+private struct ResizableSpaceFavorites: View {
+    @Environment(BrowserWindowState.self) private var windowState
+    let spaceID: UUID
+
+    var body: some View {
+        PinnedGrid(width: windowState.sidebarContentWidth, spaceID: spaceID)
     }
 }

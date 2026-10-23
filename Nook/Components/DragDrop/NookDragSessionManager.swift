@@ -72,7 +72,13 @@ final class NookDragSessionManager: ObservableObject {
     /// Folder levels the current drop lands inside: 0 at a section root, 1 inside a folder.
     @Published var dropDepth = 0
 
-    @Published var sidebarScreenFrame: CGRect = .zero
+    // Layout changes must not invalidate every tab’s drag observer during resizing.
+    // Keep the geometry current; only an active tab drag needs a published update.
+    var sidebarScreenFrame: CGRect = .zero {
+        didSet {
+            if isDragging && oldValue != sidebarScreenFrame { objectWillChange.send() }
+        }
+    }
 
     var isDragging: Bool { draggedItem != nil }
 

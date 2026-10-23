@@ -27,16 +27,18 @@ struct SpacesListItem: View {
     private let dotSize: CGFloat = NookDesign.Spacing.sm
     private let activeDotSize: CGFloat = NookDesign.Spacing.md
     // Match Zen’s macOS workspace target independently of the small dot.
-    private let buttonSize: CGFloat = 32
+    private let buttonSize: CGFloat
 
     init(
         space: SpaceRecord,
         isActive: Bool,
-        isFaded: Bool
+        isFaded: Bool,
+        buttonSize: CGFloat = 32
     ) {
         self.space = space
         self.isActive = isActive
         self.isFaded = isFaded
+        self.buttonSize = buttonSize
     }
 
     var body: some View {
