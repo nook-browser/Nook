@@ -44,6 +44,17 @@ struct ArcImportCheck {
 
         precondition(result.favorites["default"] == [.tab(url: "https://fav.example", title: "Fav", customTitle: nil)])
         precondition(result.favorites["Profile 1"] == [.tab(url: "https://fav2.example", title: nil, customTitle: nil)])
+        let extensions = parseChromiumExtensionIDs([Data("""
+        {"extensions": {"settings": {
+          "ldciclpbkaobfbicjebamaapbfplfjen": {"location": 5, "from_webstore": false},
+          "nngceckbapebfimnlniiiahkandclblb": {"location": 1, "from_webstore": true, "state": 1, "disable_reasons": []},
+          "aeblfdkhhhdcdjpifhhbdiojplfjncoa": {"location": 1, "from_webstore": true, "disable_reasons": [1]},
+          "cjpalhdlnbpafiamejdnhcphjbkeiagm": {"location": 1, "from_webstore": true}
+        }}}
+        """.utf8), Data(#"{"extensions": {"settings": {"cjpalhdlnbpafiamejdnhcphjbkeiagm": {"from_webstore": true}}}}"#.utf8)])
+        precondition(extensions == ["cjpalhdlnbpafiamejdnhcphjbkeiagm", "nngceckbapebfimnlniiiahkandclblb"],
+                     "store installs only, enabled only, once each")
+
         let empty = try parseArcSidebarData(Data("{}".utf8))
         precondition(empty.spaces.isEmpty)
 

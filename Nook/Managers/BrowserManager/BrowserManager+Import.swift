@@ -5,6 +5,7 @@
 //
 
 import Foundation
+import OSLog
 import NookTabsCore
 import NookWeb
 import SwiftUI
@@ -19,6 +20,8 @@ extension BrowserManager {
             try? card.write(to: TabsController.defaultDirectory.deletingLastPathComponent()
                 .appendingPathComponent("ArcMembershipCard.json"), options: .atomic)
         }
+        pendingExtensionImports += importManager.arcExtensionIDs()
+        installPendingExtensionImports()
         guard let window = importWindow else { return }
 
         var lastSpace = tabs.orderedSpaces.last?.id
@@ -88,6 +91,26 @@ extension BrowserManager {
             })
         }
     }
+
+    /// Installs imported extensions from the Chrome Web Store one at a time, each through its
+    /// permission sheet. Onboarding has no browser window to show one, so it waits for the first.
+    func installPendingExtensionImports() {
+        guard !pendingExtensionImports.isEmpty, !tabs.regularWindows.isEmpty, let manager = extensionManager else { return }
+        let ids = pendingExtensionImports
+        pendingExtensionImports = []
+        Task { @MainActor in
+            for id in ids where !manager.installedExtensions.contains(where: { $0.id == id }) {
+                let result = await withCheckedContinuation { continuation in
+                    manager.installFromWebStore(extensionId: id) { continuation.resume(returning: $0) }
+                }
+                if case .failure(let error) = result {
+                    Self.importLog.error("Extension \(id, privacy: .public) not imported: \(String(describing: error), privacy: .public)")
+                }
+            }
+        }
+    }
+
+    private static let importLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Import")
 
     // MARK: - Helpers
 

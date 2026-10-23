@@ -98,6 +98,23 @@ private func list(_ value: Any?) -> [Any] {
     (value as? [Any]) ?? (value as? [String: Any]).map { Array($0.values) } ?? []
 }
 
+/// Chrome Web Store ids of the extensions a Chromium profile has enabled, from its
+/// `Preferences` and `Secure Preferences` files. Arc's own and Chromium's built-in ones are left out.
+func parseChromiumExtensionIDs(_ preferenceFiles: [Data]) -> [String] {
+    var ids: [String] = []
+    for data in preferenceFiles {
+        let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        let settings = (root?["extensions"] as? [String: Any])?["settings"] as? [String: Any] ?? [:]
+        for (id, value) in settings.sorted(by: { $0.key < $1.key }) {
+            guard let entry = value as? [String: Any], entry["from_webstore"] as? Bool == true,
+                  (entry["disable_reasons"] as? [Any] ?? []).isEmpty, entry["state"] as? Int != 0,
+                  !ids.contains(id) else { continue }
+            ids.append(id)
+        }
+    }
+    return ids
+}
+
 /// `[key, id, key, id]`, as in a space's `containerIDs` or `topAppsContainerIDs`.
 private func pairs(_ value: Any?) -> [(String, String)] {
     let array = value as? [Any] ?? []

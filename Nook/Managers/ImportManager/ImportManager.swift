@@ -26,6 +26,18 @@ class ImportManager: ObservableObject {
         return result
     }
 
+    /// Web Store ids of the extensions enabled in any Arc profile.
+    func arcExtensionIDs() -> [String] {
+        let userData = arcDirectory.appendingPathComponent("User Data")
+        let profiles = (try? FileManager.default.contentsOfDirectory(atPath: userData.path)) ?? []
+        let files = profiles.filter { $0 == "Default" || $0.hasPrefix("Profile ") }.sorted().flatMap { profile in
+            ["Secure Preferences", "Preferences"].compactMap {
+                try? Data(contentsOf: userData.appendingPathComponent(profile).appendingPathComponent($0))
+            }
+        }
+        return parseChromiumExtensionIDs(files)
+    }
+
     /// Arc's member card, with the person's Arc name added, as a JSON object.
     func arcMembershipCard() -> Data? {
         guard let data = try? Data(contentsOf: arcDirectory.appendingPathComponent("StorableMembershipCard.json")),
