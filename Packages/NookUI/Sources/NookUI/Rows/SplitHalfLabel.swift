@@ -34,7 +34,7 @@ public struct SplitHalfLabel: View {
                     .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
                     .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                 Text(title)
-                    .font(NookDesign.Font.body)
+                    .font(NookDesign.Tab.font)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)

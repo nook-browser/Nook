@@ -11,6 +11,7 @@ import AppKit
 import SwiftUI
 import NookDesign
 import NookWeb
+import NookTabsCore
 import NookUI
 
 /// Main window view that orchestrates the browser UI layout
@@ -172,6 +173,7 @@ struct WindowView: View {
         .environmentObject(browserManager.splitManager)
         .environmentObject(hoverSidebarManager)
         .preferredColorScheme(resolvedColorScheme)
+        .environment(\.nookUsesDefaultSpaceTheme, spaceAppearance.usesDefaultTheme)
     }
 
     /// Accent of the space this window shows; nil for private windows, which keep their own look.
@@ -185,7 +187,21 @@ struct WindowView: View {
         browserManager.gradientColorManager.setImmediate(SpaceGradient.accent(hex: hex))
     }
 
+    private var spaceAppearance: SpaceAppearance {
+        guard !windowState.isIncognito, let id = windowState.spaceID else {
+            return SpaceAppearance(accentHex: "#8E8E93")
+        }
+        return windowState.spaceCreationAppearance ?? tabs.space(id)?.resolvedAppearance ?? SpaceAppearance(accentHex: "#7C7C7C")
+    }
+
     private var resolvedColorScheme: ColorScheme? {
+        if !windowState.isIncognito {
+            switch spaceAppearance.mode {
+            case .light: return .light
+            case .dark: return .dark
+            case .system: break
+            }
+        }
         switch nookSettings.appearanceMode {
         case .light: return .light
         case .dark: return .dark
@@ -194,7 +210,7 @@ struct WindowView: View {
     }
 
     private var showsAgentSpace: Bool {
-        windowState.spaceID != nil && windowState.spaceID == tabs.agentSpaceID
+        !windowState.isCreatingSpace && windowState.spaceID != nil && windowState.spaceID == tabs.agentSpaceID
     }
 
     // MARK: - Layout Components
@@ -202,10 +218,9 @@ struct WindowView: View {
     @ViewBuilder
     private func WindowBackground() -> some View {
         // Private windows keep the neutral incognito accent, never the space's color.
-        let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
         let isActive = windowRegistry.activeWindowId == windowState.id
 
-        NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)
+        SpaceThemeSurface(appearance: spaceAppearance, isActive: isActive)
             // Private windows tint all chrome so they are never mistaken for a regular window.
             .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
             // So is the Agent space, with its fixed gradient.
@@ -228,6 +243,7 @@ struct WindowView: View {
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
                 SpacesSidebar()
+                    .zIndex(10)
                 WebContent()
                 if aiVisible {
                     AISidebar()
@@ -238,26 +254,30 @@ struct WindowView: View {
                 }
                 WebContent()
                 SpacesSidebar()
+                    .zIndex(10)
             }
         }
         // Apply padding similar to regular sidebar: remove padding when sidebar/AI is visible on that side
         // When sidebar is on left, AI appears on right (trailing); when sidebar is on right, AI appears on left (leading)
-        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : 8)
-        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : 8)
+        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : NookDesign.Chrome.pageInset)
+        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : NookDesign.Chrome.pageInset)
     }
 
     @ViewBuilder
     private func SpacesSidebar() -> some View {
         if windowState.isSidebarVisible {
             SpacesSideBarView()
+                .scrollIndicators(windowState.isSidebarResizeHovered ? .hidden : .automatic)
                 .frame(width: windowState.sidebarWidth)
                 .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
-                    SidebarResizeView()
-                        .frame(maxHeight: .infinity)
-                        .environmentObject(browserManager)
-                        .environment(windowState)
-                        .zIndex(2000)
-                        .environment(windowState)
+                    // The expanded address panel extends across this edge. Suspend the
+                    // native resize target so it cannot paint or steal clicks over the panel.
+                    if !windowState.isAddressEditing {
+                        SidebarResizeView()
+                            .frame(maxHeight: .infinity)
+                            .environmentObject(browserManager)
+                            .environment(windowState)
+                    }
                 }
                 .environmentObject(browserManager)
                 .environment(windowState)
@@ -268,9 +288,7 @@ struct WindowView: View {
 
     @ViewBuilder
     private func WebContent() -> some View {
-        let cornerRadius: CGFloat = {
-            return 8
-        }()
+        let cornerRadius = NookDesign.Radius.md
         
         let hasTopBar = nookSettings.topBarAddressView
         let bordered = !nookSettings.hideWebContentBorder
@@ -282,33 +300,23 @@ struct WindowView: View {
                         .zIndex(3000)
                 }
 
-                if hasTopBar {
-                    TopBarView()
-                        .environmentObject(browserManager)
-                        .environment(windowState)
-                        .zIndex(2500)
+                VStack(spacing: 0) {
+                    if hasTopBar {
+                        TopBarView()
+                            .environmentObject(browserManager)
+                            .environment(windowState)
+                            .zIndex(2500)
+                    }
+
+                    WebsiteView()
+                        .zIndex(2000)
                 }
-
-                WebsiteView()
-                    .zIndex(2000)
-            }
-
-            // Shadow shape positioned behind both top bar and webview
-            // The webview will block the bottom shadow, leaving only top/left/right shadows visible
-            if hasTopBar && bordered {
-                UnevenRoundedRectangle(
-                    topLeadingRadius: cornerRadius + 1,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: cornerRadius + 1,
-                    style: .continuous
+                // The loading indicator occupies the window's top inset, outside
+                // the page frame whose edges cast the shadow.
+                .nookWebPageShadow(
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+                    enabled: bordered
                 )
-                .frame(height: TopBarMetrics.height)
-                .frame(maxWidth: .infinity)
-                .offset(y: 8)
-                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
-                .allowsHitTesting(false)
-                .zIndex(-1)
             }
 
             // No inset to sit in, so it floats over the page's top edge.
@@ -324,7 +332,7 @@ struct WindowView: View {
                     .allowsHitTesting(false)
             }
         }
-        .padding(.bottom, bordered ? 8 : 0)
+        .padding(.bottom, bordered ? NookDesign.Chrome.pageInset : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

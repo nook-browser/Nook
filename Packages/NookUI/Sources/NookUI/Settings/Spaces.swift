@@ -17,6 +17,7 @@ public struct SpacesSettingsView: View {
     @Environment(\.tabActions) private var actions
 
     /// Cookie and record counts per space, filled in as each store answers.
+    @State private var showIconPickerFor: UUID?
     @State private var stats: [UUID: String] = [:]
     @State private var showAccentPickerFor: UUID?
 
@@ -34,7 +35,7 @@ public struct SpacesSettingsView: View {
             } header: {
                 Text("Spaces")
             } footer: {
-                Text("Each space keeps its own cookies and logins. Sites you sign into in one space stay signed out in the others.")
+                Text("Spaces organize your tabs. Spaces using the same profile share cookies and logins; a new profile keeps them separate.")
             }
 
             Section {
@@ -51,20 +52,37 @@ public struct SpacesSettingsView: View {
             Button {
                 showAccentPickerFor = space.id
             } label: {
-                Circle()
-                    .fill(space.accentColor)
+                SpaceThemeSurface(appearance: space.resolvedAppearance)
+                    .clipShape(Circle())
                     .frame(width: NookDesign.Size.iconButton, height: NookDesign.Size.iconButton)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Customize appearance for \(space.name)")
+            .help("Customize space appearance")
             .popover(isPresented: Binding(
                 get: { showAccentPickerFor == space.id },
                 set: { if !$0 { showAccentPickerFor = nil } }
             )) {
-                SpaceAccentPicker(selectedHex: Binding(
-                    get: { space.accentHex },
-                    set: { tabs.updateSpace(space.id, name: nil, icon: nil, accentHex: $0) }
+                SpaceAppearancePicker(appearance: Binding(
+                    get: { tabs.space(space.id)?.resolvedAppearance ?? space.resolvedAppearance },
+                    set: { tabs.updateSpaceAppearance(space.id, appearance: $0) }
                 ))
-                .padding(NookDesign.Spacing.lg)
+            }
+
+            Button { showIconPickerFor = space.id } label: {
+                SpaceIcon(space.icon).frame(width: 32, height: 32).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Change Icon or Emoji…")
+            .accessibilityLabel("Space icon for \(space.name)")
+            .popover(isPresented: Binding(
+                get: { showIconPickerFor == space.id },
+                set: { if !$0 { showIconPickerFor = nil } }
+            )) {
+                SpaceIconPicker(icon: Binding(
+                    get: { tabs.space(space.id)?.icon ?? space.icon },
+                    set: { tabs.updateSpace(space.id, name: nil, icon: $0, accentHex: nil) }
+                ), onSelect: { showIconPickerFor = nil })
             }
 
             VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
@@ -73,13 +91,22 @@ public struct SpacesSettingsView: View {
                     set: { tabs.updateSpace(space.id, name: $0, icon: nil, accentHex: nil) }
                 ))
                 .textFieldStyle(.plain)
+                .labelsHidden()
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Space name")
+                if sharedProfileCount(space) > 1 {
+                    Text("Profile shared by \(sharedProfileCount(space)) spaces")
+                        .font(NookDesign.Font.secondary)
+                        .foregroundStyle(.secondary)
+                }
                 Text(stats[space.id] ?? "Checking…")
                     .font(NookDesign.Font.secondary)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
             Menu {
-                Button("Clear Website Data", systemImage: "trash") {
+                Button(sharedProfileCount(space) > 1 ? "Clear Shared Profile Data" : "Clear Website Data", systemImage: "trash") {
                     Task { await clearData(space) }
                 }
                 if spaces.count > 1 {
@@ -94,6 +121,11 @@ public struct SpacesSettingsView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
         }
+    }
+
+    private func sharedProfileCount(_ space: SpaceRecord) -> Int {
+        guard let id = tabs.profileIdentifier(forSpace: space.id) else { return 0 }
+        return spaces.filter { tabs.profileIdentifier(forSpace: $0.id) == id }.count
     }
 
     // MARK: - Data
@@ -115,14 +147,7 @@ public struct SpacesSettingsView: View {
     // MARK: - Dialogs
 
     private func showCreateDialog() {
-        actions?.presentSpaceCreation { name, accentHex in
-            tabs.createSpace(
-                name: name.isEmpty ? "New Space" : name,
-                icon: "square.grid.2x2",
-                accentHex: accentHex,
-                after: tabs.orderedSpaces.last?.id
-            )
-        }
+        actions?.presentSpaceCreation()
     }
 
     private func showDeleteDialog(_ space: SpaceRecord) {

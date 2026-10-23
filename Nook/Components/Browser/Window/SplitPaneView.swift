@@ -31,7 +31,7 @@ final class SplitPaneView: NSView {
     private let maskLayer = CAShapeLayer()
     private weak var settings: NookSettingsService?
 
-    init(frame: NSRect, side: SplitViewManager.Side, itemID: UUID, browserManager: BrowserManager, windowState: BrowserWindowState) {
+    init(frame: NSRect, side: SplitViewManager.Side, itemID: UUID, browserManager: BrowserManager, windowState: BrowserWindowState, hoverManager: HoverSidebarManager) {
         self.side = side
         self.itemID = itemID
         self.settings = browserManager.nookSettings
@@ -45,17 +45,20 @@ final class SplitPaneView: NSView {
 
         // Each control is its own hosting view sized to its content, so the rest of the pane
         // passes clicks to the page.
-        func host(_ view: some View) -> NSView {
-            let host = NSHostingView(rootView: view
+        func host(_ view: some View, textCursor: Bool = false) -> NSView {
+            let host = SplitControlHostingView(rootView: view
                 .environment(browserManager.tabs)
                 .environment(windowState)
                 .environment(\.tabActions, browserManager))
+            host.usesTextCursor = textCursor
             host.translatesAutoresizingMaskIntoConstraints = false
             host.safeAreaRegions = []
             addSubview(host)
             return host
         }
-        let title = host(SplitPaneTitle(itemID: itemID))
+        let title = host(URLBarView(isSidebarHovered: false, splitItemID: itemID)
+            .environmentObject(browserManager)
+            .environmentObject(hoverManager), textCursor: true)
         let buttons = host(SplitPaneButtons(itemID: itemID))
         let inset = NookDesign.Spacing.md
         title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -101,33 +104,6 @@ final class SplitPaneView: NSView {
     }
 }
 
-/// What the pane shows, floating at its top leading corner.
-private struct SplitPaneTitle: View {
-    let itemID: UUID
-
-    @Environment(TabsController.self) private var tabs
-    @Environment(BrowserWindowState.self) private var windowState
-
-    var body: some View {
-        if let item = tabs.item(itemID) {
-            HStack(spacing: NookDesign.Spacing.sm) {
-                ItemFavicon(item: item, session: tabs.session(for: itemID))
-                    .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
-                Text(tabs.title(for: item))
-                    .font(NookDesign.Font.secondary)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, NookDesign.Spacing.rowPadding)
-            .frame(height: NookDesign.Size.navRow)
-            .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-            .onTapGesture { tabs.select(itemID, in: windowState) }
-            .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
-        }
-    }
-}
-
 /// Separate and close, floating at the pane's top trailing corner in one group.
 private struct SplitPaneButtons: View {
     let itemID: UUID
@@ -170,5 +146,35 @@ private struct SplitPaneButton: View {
         .buttonStyle(PlainButtonStyle())
         .help(help)
         .onHoverTracking { isHovering = $0 }
+    }
+}
+
+/// The title is hosted above WKWebView, which manages its own cursors. Register the
+/// text cursor on that native host so the page and SwiftUI button cannot replace it.
+private final class SplitControlHostingView<Content: View>: NSHostingView<Content> {
+    var usesTextCursor = false
+    private var textCursorTracking: NSTrackingArea?
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        if usesTextCursor { addCursorRect(bounds, cursor: .iBeam) }
+    }
+
+    override func updateTrackingAreas() {
+        if let textCursorTracking { removeTrackingArea(textCursorTracking) }
+        textCursorTracking = nil
+        super.updateTrackingAreas()
+        if usesTextCursor {
+            let area = NSTrackingArea(rect: .zero,
+                                      options: [.cursorUpdate, .activeAlways, .inVisibleRect],
+                                      owner: self, userInfo: nil)
+            addTrackingArea(area)
+            textCursorTracking = area
+        }
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        if usesTextCursor { NSCursor.iBeam.set() }
+        else { super.cursorUpdate(with: event) }
     }
 }

@@ -37,6 +37,15 @@ final class HoverSidebarManager: ObservableObject {
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var isActive: Bool = false
+    private var addressEditingWindows = Set<UUID>()
+
+    func setAddressEditing(_ editing: Bool, in windowID: UUID) {
+        if editing { addressEditingWindows.insert(windowID) }
+        else {
+            addressEditingWindows.remove(windowID)
+            if isActive { scheduleHandleMouseMovement() }
+        }
+    }
 
     // MARK: - Lifecycle
     func attach(browserManager: BrowserManager) {
@@ -96,6 +105,10 @@ final class HoverSidebarManager: ObservableObject {
             }
             return
         }
+
+        // The expanded address panel extends beyond the sidebar. Keep its host alive
+        // until the editor dismisses through Escape, navigation, or an outside click.
+        if isOverlayVisible, addressEditingWindows.contains(activeState.id) { return }
 
         // Mouse and window frames are in screen coordinates
         let mouse = NSEvent.mouseLocation

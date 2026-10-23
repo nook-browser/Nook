@@ -145,11 +145,12 @@ extension TabTree {
     // MARK: - Spaces
 
     @discardableResult
-    public mutating func createSpace(id: UUID = UUID(), name: String, icon: String, accentHex: String, after: UUID?, now: Date = Date()) -> Change {
+    public mutating func createSpace(id: UUID = UUID(), name: String, icon: String, accentHex: String, after: UUID?, now: Date = Date(), appearance: SpaceAppearance? = nil, profileID: UUID? = nil) -> Change {
         var change = Change()
         let siblings = orderedSpaces
         let order = key(after: after, among: siblings) ?? renumberSpaces(siblings, insertingAfter: after, change: &change, now: now)
-        record(&change, space: SpaceRecord(id: id, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now))
+        let theme = appearance?.normalized
+        record(&change, space: SpaceRecord(id: id, name: name, icon: icon, accentHex: theme?.nodes.first?.colorHex ?? accentHex, order: order, modifiedAt: now, appearance: theme, profileID: profileID))
         return change
     }
 
@@ -158,7 +159,32 @@ extension TabTree {
         guard var target = space(id) else { throw TreeError.missingSpace }
         if let name { target.name = name }
         if let icon { target.icon = icon }
-        if let accentHex { target.accentHex = accentHex }
+        if let accentHex {
+            target.accentHex = accentHex
+            if var appearance = target.appearance?.normalized {
+                if appearance.nodes.isEmpty {
+                    appearance.nodes = SpaceAppearance(accentHex: accentHex).nodes
+                } else {
+                    appearance.nodes[0].colorHex = accentHex
+                }
+                target.appearance = appearance.normalized
+                target.accentHex = target.appearance!.primaryAccentHex
+            }
+        }
+        guard target != spaces[id] else { return Change() }
+        target.modifiedAt = now
+        var change = Change()
+        record(&change, space: target)
+        return change
+    }
+
+    /// Changes the surface and its icon accent atomically, with the same undo/sync semantics.
+    @discardableResult
+    public mutating func updateSpaceAppearance(_ id: UUID, appearance: SpaceAppearance, now: Date = Date()) throws -> Change {
+        guard var target = space(id) else { throw TreeError.missingSpace }
+        let appearance = appearance.normalized
+        target.appearance = appearance
+        target.accentHex = appearance.primaryAccentHex
         guard target != spaces[id] else { return Change() }
         target.modifiedAt = now
         var change = Change()

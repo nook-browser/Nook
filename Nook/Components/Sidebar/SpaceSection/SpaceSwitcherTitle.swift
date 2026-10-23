@@ -19,6 +19,7 @@ struct SpaceSwitcherTitle: View {
     @Environment(\.openSettings) private var openSettings
     @ObservedObject private var dragSession = NookDragSessionManager.shared
     @State private var isHovering = false
+    @State private var showsAppearance = false
 
     let onNewSpace: () -> Void
 
@@ -46,6 +47,12 @@ struct SpaceSwitcherTitle: View {
                     .menuIndicator(.hidden)
                     // Width may shrink so a long name truncates beside the history buttons.
                     .fixedSize(horizontal: false, vertical: true)
+                    .popover(isPresented: $showsAppearance) {
+                        SpaceAppearancePicker(appearance: Binding(
+                            get: { tabs.space(space.id)?.resolvedAppearance ?? space.resolvedAppearance },
+                            set: { tabs.updateSpaceAppearance(space.id, appearance: $0) }
+                        ))
+                    }
                 }
             }
         }
@@ -94,6 +101,12 @@ struct SpaceSwitcherTitle: View {
         }
         Divider()
         Button("New Space…", systemImage: "plus", action: onNewSpace)
+        if !current.isAgent {
+            Button("Customize Appearance…", systemImage: "paintpalette") {
+                // Present after the native menu has finished dismissing.
+                DispatchQueue.main.async { showsAppearance = true }
+            }
+        }
         Button("Space Settings", systemImage: "gearshape") {
             SettingsNavigation.shared.currentSettingsTab = .spaces
             openSettings()

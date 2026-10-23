@@ -29,6 +29,8 @@ public class BrowserWindowState {
 
     /// Sidebar width for this window
     public var sidebarWidth: CGFloat = 250
+    public var isSidebarResizeHovered = false
+    public var isAddressEditing = false
 
     /// Last non-zero sidebar width so we can restore when toggling visibility
     public var savedSidebarWidth: CGFloat = 250
@@ -61,6 +63,10 @@ public class BrowserWindowState {
 
     /// Whether the extension library panel is visible in this window
     public var isExtensionLibraryVisible: Bool = false
+
+    /// Draft appearance is local to this window and is discarded on cancel or space switch.
+    public var isCreatingSpace: Bool = false
+    public var spaceCreationAppearance: SpaceAppearance?
 
     // MARK: - App-side objects
     //

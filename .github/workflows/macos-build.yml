@@ -28,6 +28,13 @@ jobs:
       - name: Ensure Metal Toolchain
         run: xcodebuild -downloadComponent MetalToolchain
 
+      - name: Test tab models and appearance compatibility
+        run: |
+          swift test --package-path Packages/NookTabsCore
+          swiftc Packages/NookTabsCore/Sources/NookTabsCore/*.swift \
+            Packages/NookTabsCore/Checks/SpaceAppearanceCheck.swift -o /tmp/nook-appearance-check
+          /tmp/nook-appearance-check
+
       - name: Build without signing secrets
         run: |
           xcodebuild -scheme Nook -configuration Release -arch arm64 \

@@ -59,6 +59,14 @@ public enum NookDesign {
         public static let titleFade: CGFloat = 20      // trailing fade on long row titles
     }
 
+    // MARK: - Browser Frame
+
+    public enum Chrome {
+        /// Window inset around web content (20px on Retina).
+        public static let pageInset: CGFloat = 10
+        public static let splitGap: CGFloat = pageInset
+    }
+
     // MARK: - Size
 
     public enum Size {
@@ -93,8 +101,8 @@ public enum NookDesign {
         public static let pipSkip: CGFloat = 48        // PiP skip buttons, as in the system PiP window
         public static let pipPlay: CGFloat = 64        // PiP play/pause, as in the system PiP window
         public static let pipScrub: CGFloat = 4        // PiP scrubber track
-        // Narrowest sidebar: the lights (88), the history pill (110), the inset (8).
-        public static let sidebarMin: CGFloat = 206
+        // Native lights (88), sidebar toggle (28), navigation (88), and breathing room.
+        public static let sidebarMin: CGFloat = 230
 
         // Settings
         public static let settingsChip: CGFloat = 22           // tinted icon chip in the settings sidebar
@@ -110,6 +118,38 @@ public enum NookDesign {
         public static let sheetMediumHeight: CGFloat = 500
         public static let sheetLargeWidth: CGFloat = 800       // data management browser
         public static let sheetLargeHeight: CGFloat = 600
+    }
+
+    /// Sidebar navigation/footer controls, sized independently of inline row actions.
+    public enum SidebarChrome {
+        /// Resize indicator colors for a space with no custom palette.
+        public static let defaultResizeLight = Color(.sRGB, red: 130 / 255, green: 149 / 255, blue: 247 / 255)
+        public static let defaultResizeDark = Color(.sRGB, red: 145 / 255, green: 153 / 255, blue: 172 / 255)
+        public static let icon: CGFloat = 15
+        public static let button: CGFloat = 30
+        public static let gap: CGFloat = 2
+        public static let trafficLightsInset: CGFloat = 76
+        public static let footerSideReserve: CGFloat = 66
+    }
+
+    /// Sidebar tab cards. Keep these separate from general chrome/control sizing.
+    public enum Tab {
+        public static let height: CGFloat = 36
+        public static let verticalInset: CGFloat = 2
+        public static let stride: CGFloat = height + verticalInset * 2
+        public static let radius: CGFloat = 12
+        public static let font = SwiftUI.Font.system(size: 14, weight: .regular)
+        public static let pressScale: CGFloat = 0.985
+        public static let selectedShadowRadius: CGFloat = 1.5
+        public static let selectedShadowOffset: CGFloat = 0.8
+        public static let dragScale: CGFloat = 1.025
+        public static let dragOpacity: Double = 0.96
+        public static let previewPadding: CGFloat = 12
+        public static let liftShadowRadius: CGFloat = 8
+        public static let liftShadowY: CGFloat = 3
+        public static let liftShadowOpacity: Double = 0.20
+        public static let dropIndicatorHeight: CGFloat = 2
+        public static let dropIndicatorDot: CGFloat = 6
     }
 
     // MARK: - Type
@@ -132,6 +172,9 @@ public enum NookDesign {
     // MARK: - Motion
 
     public enum Motion {
+        public static let tabReorder = Animation.easeOut(duration: 0.10)
+        public static let tabClose = Animation.easeOut(duration: 0.20)
+        public static let tabLandingDuration: TimeInterval = 0.10
         public static let quick = Animation.easeOut(duration: 0.12)      // hover, press
         public static let standardDuration: TimeInterval = 0.22          // `standard`, for AppKit animations
         public static let standard = Animation.smooth(duration: standardDuration)    // selection, reveal, fold
@@ -169,10 +212,15 @@ public enum NookDesign {
 
         #if os(macOS)
         public static let windowBackground = Color(nsColor: .windowBackgroundColor)
-        public static let raised = Color(nsColor: .controlBackgroundColor) // active row, active tile
+        public static let raised = Color(nsColor: .controlBackgroundColor) // floating cards and settings
+        public static let sidebarSelection = Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor.white.withAlphaComponent(0.14) : NSColor.white.withAlphaComponent(0.60)
+        })
         #else
         public static let windowBackground = Color(uiColor: .systemBackground)
         public static let raised = Color(uiColor: .secondarySystemBackground) // active row, active tile
+        public static let sidebarSelection = raised.opacity(0.7)
         #endif
 
         /// Sidebar/window chrome fill: the space accent fading to the system window background.

@@ -14,6 +14,7 @@ import NookUI
 
 /// Bottom bar of the sidebar containing menu button, spaces list, and new space button
 struct SidebarBottomBar: View {
+    @Environment(\.nookSettings) private var nookSettings
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
@@ -23,20 +24,23 @@ struct SidebarBottomBar: View {
     let onMenuHover: (Bool) -> Void
     
     var body: some View {
-        HStack(alignment: .center, spacing: NookDesign.Spacing.xxs) {
+        HStack(spacing: NookDesign.SidebarChrome.gap) {
             menuButton
-
-            // Hide spaces list in incognito windows (only one ephemeral space)
+            if nookSettings.showAIAssistant {
+                Button("Toggle AI Assistant", systemImage: "sparkle") {
+                    browserManager.toggleAISidebar(for: windowState)
+                }
+                .nookSidebarIconButtons()
+                .help("Toggle AI Assistant")
+            }
             if !windowState.isIncognito {
                 SpacesList()
-                    .frame(maxWidth: .infinity)
                     .environmentObject(browserManager)
                     .environment(windowState)
-            }
-
-            // Hide new space button in incognito windows
-            if !windowState.isIncognito {
+                    .frame(maxWidth: .infinity)
                 newSpaceButton
+            } else {
+                Spacer(minLength: 0)
             }
         }
         .frame(height: NookDesign.Size.bottomBar)
@@ -50,7 +54,7 @@ struct SidebarBottomBar: View {
             }
             // A finished download bounces the button its icon flew into.
             .symbolEffect(.bounce, value: browserManager.downloadManager.completedCount)
-            .nookIconButtons()
+            .nookSidebarIconButtons()
             .anchorPreference(key: DownloadsButtonAnchorKey.self, value: .bounds) { $0 }
             .onHoverTracking { isHovered in
                 isMenuButtonHovered = isHovered
@@ -63,18 +67,16 @@ struct SidebarBottomBar: View {
     }
     
     private var newSpaceButton: some View {
-        Menu{
-            Button("New Space", systemImage: "square.grid.2x2") {
-                onNewSpaceTap()
-            }
-            
-            Button("New Folder", systemImage: "folder.badge.plus") {
-                if let spaceID = windowState.spaceID {
-                    tabs.createFolderForRename(in: .tabs(spaceID: spaceID), after: nil)
+        Button("New Space", systemImage: "plus", action: onNewSpaceTap)
+            .nookSidebarIconButtons()
+            .disabled(windowState.isCreatingSpace)
+            .help("Create a Space")
+            .contextMenu {
+                Button("New Folder", systemImage: "folder.badge.plus") {
+                    if let spaceID = windowState.spaceID {
+                        tabs.createFolderForRename(in: .tabs(spaceID: spaceID), after: nil)
+                    }
                 }
-            }
-
-            if !windowState.isIncognito {
                 ForEach(LiveFolderMenuItem.all, id: \.title) { entry in
                     Button(entry.title, systemImage: entry.symbol) {
                         if let spaceID = windowState.spaceID {
@@ -88,18 +90,8 @@ struct SidebarBottomBar: View {
                     }
                 }
             }
-            
-            Divider()
-            
-            Button("New Profile", systemImage: "person.badge.plus") {
-                // TODO: Show profile creation dialog
-            }
-        } label:{
-            Label("Actions", systemImage: "plus")
-        }
-        .menuStyle(.button)
-        .nookIconButtons()
     }
+
 }
 
 /// The live folder sources the sidebar's create menus offer, besides feeds.

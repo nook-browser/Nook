@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Edit a split page’s address from its title using the address search panel, keeping navigation in that pane
+
+- Resize split-view pages by dragging their divider, with a horizontal resize cursor
+
+- Built-in light/dark gradients over native window transparency when the theme picker has no colors; removing the last color or resetting selects this appearance
+
+- Space themes with gradients, grain and light/dark modes
+- Inline space creation with a profile choice
+- Searchable icon and emoji tabs for spaces
+
+### Changed
+
+- Add a soft shadow around the full web frame, including the top bar, while keeping split gutters transparent
+
+- Delay the sidebar resize handle by 200 ms, then fade it in over 200 ms and out over 180 ms
+
+- Lighten favorite tile backgrounds over the sidebar theme while retaining their selected favicon rim
+
+- Use the same raised light selected-tab surface in light and dark themes, with dark labels and layered shadows
+
+- Animate remaining temporary and pinned tabs upward when a row is closed
+
+- Zen-inspired sidebar, tab cards and favorites
+- Address editing with an anchored suggestions panel
+- Shared theme across the sidebar, window frame and split gutter
+
+### Fixed
+
+- Keep the native sidebar resize handle from covering the expanded address panel
+
+- Hide the resize handle on release when the pointer is outside its final bounds
+
+- Keep sidebar edge padding at minimum width by allowing media control gaps to compress
+
+- Preserve favorite selection rim coverage on wide tiles with two or three columns
+
+- Keep space pages alive during sidebar resizing and use a native resize cursor with a tinted handle
+- Compress space switcher gaps before scrolling when the footer fills up
+
+- Settings now opens the inline space creation form; removed the obsolete macOS dialog
+
+- Favorite drop previews match the final grid layout
+- Duplicate drag and space-switch haptics
+- Window-frame double-click behavior
+
 ## 1.2.4
 
 ### Added
@@ -135,6 +184,6 @@ The latest release requires macOS 26.
 - Enhanced the built-in adblocking system
 - Added custom tweaks for YouTube and Social Media sites
 - Improved split view
-- PiP is more Arc-like (WIP, tested mainly on YouTube)
+- Refine the picture-in-picture appearance (WIP, tested mainly on YouTube)
 - Passkeys work through password managers. iCloud Keychain passkeys are still unavailable for now
 - Performed multiple passes to harden security

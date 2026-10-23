@@ -26,6 +26,18 @@ extension SpaceRecord {
 }
 
 extension TabTree {
+    /// The persistent store identifier survives deletion of the space that first owned it.
+    /// Agent spaces continue borrowing the profile of their selected ordinary space.
+    public func profileIdentifier(for spaceID: UUID) -> UUID? {
+        guard let login = loginSpace(for: spaceID), let space = space(login) else { return nil }
+        return space.profileID ?? space.id
+    }
+
+    /// Only ordinary spaces keep a shared profile alive after another space is deleted.
+    public func usesProfile(_ profileID: UUID) -> Bool {
+        orderedSpaces.contains { !$0.isAgent && ($0.profileID ?? $0.id) == profileID }
+    }
+
     public var agentSpace: SpaceRecord? { orderedSpaces.first(where: \.isAgent) }
 
     /// The space whose data store `spaceID`'s pages use: itself, or for the agent space the

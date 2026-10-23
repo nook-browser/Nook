@@ -10,6 +10,7 @@ import SwiftUI
 import AppKit
 import NookDesign
 import NookWeb
+import NookTabsCore
 import NookUI
 
 struct SidebarHoverOverlayView: View {
@@ -48,8 +49,12 @@ struct SidebarHoverOverlayView: View {
                         .environment(commandPalette)
                         .environmentObject(browserManager.gradientColorManager)
                         .frame(maxHeight: .infinity)
-                        .background(sidebarBackground)
-                        .nookFloatingSurface(in: NookDesign.Radius.shape(cornerRadius))
+                        // Clip the floating surface, not descendants: the expanded address
+                        // panel is anchored here but deliberately extends over the page.
+                        .background {
+                            sidebarBackground
+                                .nookFloatingSurface(in: NookDesign.Radius.shape(cornerRadius))
+                        }
                         .alwaysArrowCursor()
                         .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
@@ -66,9 +71,11 @@ struct SidebarHoverOverlayView: View {
 
     /// The docked sidebar's own background, so the overlay reads as the same sidebar.
     private var sidebarBackground: some View {
-        let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
-        let isAgent = windowState.spaceID != nil && windowState.spaceID == browserManager.tabs.agentSpaceID
-        return NookDesign.Surface.containerGradient(accent: accent, isActive: true)
+        let appearance = windowState.isIncognito
+            ? SpaceAppearance(accentHex: "#8E8E93")
+            : windowState.spaceCreationAppearance ?? windowState.spaceID.flatMap { browserManager.tabs.space($0)?.resolvedAppearance } ?? SpaceAppearance(accentHex: "#7C7C7C")
+        let isAgent = !windowState.isCreatingSpace && windowState.spaceID != nil && windowState.spaceID == browserManager.tabs.agentSpaceID
+        return SpaceThemeSurface(appearance: appearance, isActive: true)
             .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
             .overlay(Rectangle().fill(NookDesign.Surface.agentGradient).opacity(isAgent ? NookDesign.Surface.agentChromeOpacity : 0))
     }

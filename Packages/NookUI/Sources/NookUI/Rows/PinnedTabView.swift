@@ -13,6 +13,7 @@ public struct PinnedTabView<Icon: View>: View {
     var tabName: String
     var tabURL: String
     var tabIcon: Icon
+    var primaryColor: Color
     var isActive: Bool
     var isUnloaded: Bool = false
     /// The favorite's open page has left its pinned URL; hovering shows a reset button.
@@ -27,6 +28,7 @@ public struct PinnedTabView<Icon: View>: View {
         tabURL: String,
         tabIcon: Icon,
         isActive: Bool,
+        primaryColor: Color = .accentColor,
         isUnloaded: Bool = false,
         hasLeftPinnedURL: Bool = false,
         onResetToPinnedURL: @escaping () -> Void = {},
@@ -36,6 +38,7 @@ public struct PinnedTabView<Icon: View>: View {
         self.tabURL = tabURL
         self.tabIcon = tabIcon
         self.isActive = isActive
+        self.primaryColor = primaryColor
         self.isUnloaded = isUnloaded
         self.hasLeftPinnedURL = hasLeftPinnedURL
         self.onResetToPinnedURL = onResetToPinnedURL
@@ -45,12 +48,8 @@ public struct PinnedTabView<Icon: View>: View {
     public var body: some View {
         Button(action: action) {
             ZStack {
-                NookDesign.Radius.shape(NookDesign.Radius.lg)
-                    .fill(backgroundColor)
-                    .animation(NookDesign.Motion.quick, value: isHovered)
-
                 tabIcon
-                    .frame(height: NookDesign.Size.essentialsFavicon)
+                    .frame(width: NookDesign.Size.essentialsFavicon, height: NookDesign.Size.essentialsFavicon)
                     .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
             }
             .overlay(alignment: .topTrailing) {
@@ -70,19 +69,16 @@ public struct PinnedTabView<Icon: View>: View {
             .frame(maxWidth: .infinity)
             .frame(height: NookDesign.Size.essentialsTile)
             .frame(minWidth: NookDesign.Size.essentialsTile)
-            .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
-            .nookRowSelection(isActive, radius: NookDesign.Radius.lg)
-            .nookElevation(isActive ? .raised : .flat)
+            .nookFavoriteSurface(selected: isActive, hovered: isHovered, primaryColor: primaryColor, icon: tabIcon)
+            .animation(NookDesign.Motion.quick, value: isHovered)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NookTabButtonStyle())
+        .accessibilityLabel(tabName)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+        .help(tabName.isEmpty ? tabURL : tabName)
         .onHoverTracking { hovering in
             self.isHovered = hovering
         }
     }
 
-    //MARK: - Colors
-    /// Clear when selected: `nookRowSelection` draws the raised surface.
-    private var backgroundColor: Color {
-        isActive ? .clear : (isHovered ? NookDesign.Surface.fillPressed : NookDesign.Surface.fill)
-    }
 }

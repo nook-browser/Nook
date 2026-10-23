@@ -98,12 +98,13 @@ public class SearchManager {
         currentSpaceId = window?.spaceID
     }
     
-    @MainActor public func searchSuggestions(for query: String) {
+    @MainActor public func searchSuggestions(for query: String, includeWebSuggestions: Bool = true) {
         searchTask?.cancel()
         historyTask?.cancel()
         let generation = UUID()
         searchGeneration = generation
         isLoading = false
+        if !includeWebSuggestions { webRows = [] }
         updateSpaceContext()
         let space = currentSpaceId
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -150,6 +151,9 @@ public class SearchManager {
             self.compose(tabs: tabs)
         }
 
+        // Inline address editing may request local history only. In particular, a
+        // complete URL must not be sent to the remote suggestion provider.
+        guard includeWebSuggestions else { return }
         isLoading = true
         searchTask = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(125)) } catch { return }

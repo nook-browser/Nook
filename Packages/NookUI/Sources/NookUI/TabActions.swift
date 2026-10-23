@@ -21,8 +21,8 @@ import NookWeb
     func separateSplit(in window: BrowserWindowState)
     /// The "Edit Pinned URL" dialog. `onSave` gets the edited URL; the app closes the dialog.
     func editPinnedURL(url: URL, title: String, onSave: @escaping (URL) -> Void)
-    /// The "New Space" dialog. `onCreate` gets the name and the accent hex.
-    func presentSpaceCreation(onCreate: @escaping (String, String) -> Void)
+    /// Opens the platform’s space creation interface.
+    func presentSpaceCreation()
     /// The destructive confirmation before a space and its tabs go away.
     func confirmSpaceDeletion(spaceName: String, tabCount: Int, isLastSpace: Bool, onDelete: @escaping () -> Void)
     /// Opens Settings on the Spaces tab.
