@@ -67,13 +67,23 @@ class AIService {
 
     // MARK: - Provider Factory
 
-    private func createProvider(contextTag: String, request: String) -> AIProviderProtocol? {
+    private func createProvider(
+        contextTag: String,
+        request: String,
+        mcpToolsByFunctionName: [String: MCPTool]
+    ) -> AIProviderProtocol? {
         guard let providerConfig = configService.activeProvider else { return nil }
 
         switch providerConfig.providerType {
         case .appleIntelligence:
             return AppleIntelligenceProvider { [weak self] name, argumentsJSON in
-                await self?.runOnDeviceTool(name, argumentsJSON: argumentsJSON, tag: contextTag, request: request) ?? ""
+                await self?.runOnDeviceTool(
+                    name,
+                    argumentsJSON: argumentsJSON,
+                    tag: contextTag,
+                    request: request,
+                    mcpToolsByFunctionName: mcpToolsByFunctionName
+                ) ?? ""
             }
         case .gemini:
             return GeminiProvider(apiKey: providerConfig.apiKey, baseURL: providerConfig.baseURL)
@@ -120,7 +130,10 @@ class AIService {
             let contextTag = "page_context_" + UUID().uuidString.prefix(8).lowercased()
 
             // Collect available tools
-            let tools = isPrivate ? [] : collectAvailableTools()
+            let availableTools = isPrivate
+                ? (definitions: [AIToolDefinition](), mcpToolsByFunctionName: [String: MCPTool]())
+                : collectAvailableTools()
+            let tools = availableTools.definitions
 
             // Extract page context
             let onDevice = configService.activeProviderType == .appleIntelligence
@@ -130,7 +143,11 @@ class AIService {
             )
             let fullPrompt = pageContext + text
 
-            guard let provider = createProvider(contextTag: contextTag, request: text) else {
+            guard let provider = createProvider(
+                contextTag: contextTag,
+                request: text,
+                mcpToolsByFunctionName: availableTools.mcpToolsByFunctionName
+            ) else {
                 throw AIProviderError.invalidAPIKey
             }
 
@@ -186,8 +203,12 @@ class AIService {
                 // Execute tool calls
                 var toolResults: [AIToolResult] = []
                 for toolCall in response.toolCalls {
-                    currentToolName = toolCall.name
-                    let result = await executeToolCall(toolCall)
+                    currentToolName = availableTools.mcpToolsByFunctionName[toolCall.name]?.qualifiedName
+                        ?? toolCall.name
+                    let result = await executeToolCall(
+                        toolCall,
+                        mcpToolsByFunctionName: availableTools.mcpToolsByFunctionName
+                    )
                     // Tool output is page or server text, so it gets the same wrapper as the page context
                     toolResults.append(AIToolResult(
                         toolCallId: result.toolCallId,
@@ -256,8 +277,11 @@ class AIService {
 
     // MARK: - Tool Collection
 
-    private func collectAvailableTools() -> [AIToolDefinition] {
+    private func collectAvailableTools() -> (definitions: [AIToolDefinition], mcpToolsByFunctionName: [String: MCPTool]) {
         var tools: [AIToolDefinition] = []
+        var mcpRegistry = MCPToolFunctionRegistry()
+        var mcpToolsByFunctionName: [String: MCPTool] = [:]
+        let needsProviderSafeMCPNames = configService.activeProviderType == .openAICompatible
 
         // Browser tools
         let browserConfig = configService.browserToolsConfig
@@ -270,20 +294,34 @@ class AIService {
         // MCP tools follow the same switch: disabled means no tools at all
         if browserConfig.executionMode != .disabled, let mcpManager = mcpManager {
             for tool in mcpManager.allTools {
+                let functionName: String
+                if needsProviderSafeMCPNames {
+                    functionName = mcpRegistry.register(
+                        tool,
+                        avoiding: Set(tools.map(\.name))
+                    )
+                } else {
+                    functionName = tool.qualifiedName
+                }
+                mcpToolsByFunctionName[functionName] = tool
                 tools.append(AIToolDefinition(
-                    name: tool.qualifiedName,
+                    name: functionName,
                     description: tool.description,
                     parameters: tool.inputSchema
                 ))
             }
         }
 
-        return tools
+        return (tools, mcpToolsByFunctionName)
     }
 
     // MARK: - Tool Execution
 
-    private func executeToolCall(_ toolCall: AIToolCall, approved: Bool = false) async -> AIToolResult {
+    private func executeToolCall(
+        _ toolCall: AIToolCall,
+        mcpToolsByFunctionName: [String: MCPTool] = [:],
+        approved: Bool = false
+    ) async -> AIToolResult {
         // No tools are advertised in a private window; refuse a call the model made anyway
         if browserToolExecutor?.windowState?.isIncognito == true {
             return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Tools are not available in a private window.", isError: true)
@@ -337,37 +375,34 @@ class AIService {
         }
 
         // Check if it's an MCP tool
-        if let mcpManager = mcpManager,
-           toolCall.name.contains(".") {
-            let parts = toolCall.name.split(separator: ".", maxSplits: 1)
-            if parts.count == 2 {
-                let serverId = String(parts[0])
-                let toolName = String(parts[1])
+        if let mcpManager,
+           let mcpTool = mcpToolsByFunctionName[toolCall.name] {
+            let serverId = mcpTool.serverId
+            let toolName = mcpTool.name
 
-                // An MCP tool can do anything its server can (files, shell), so it prompts even in
-                // auto mode, which the user chose for browser tools only
-                if configService.browserToolsConfig.executionMode == .disabled {
-                    return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Tools are disabled.", isError: true)
+            // An MCP tool can do anything its server can (files, shell), so it prompts even in
+            // auto mode, which the user chose for browser tools only
+            if configService.browserToolsConfig.executionMode == .disabled {
+                return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Tools are disabled.", isError: true)
+            }
+            if !autoApprovedThisChat {
+                let approval = await requestToolApproval(toolName: toolName, args: toolCall.arguments, mcpServerId: serverId)
+                switch approval {
+                case .allow:
+                    break // proceed with this single execution
+                case .allowAll:
+                    autoApprovedThisChat = true
+                case .deny:
+                    Self.log.info("User denied tool execution: \(toolCall.name)")
+                    return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "User denied execution of \(toolCall.name).", isError: true)
                 }
-                if !autoApprovedThisChat {
-                    let approval = await requestToolApproval(toolName: toolName, args: toolCall.arguments, mcpServerId: serverId)
-                    switch approval {
-                    case .allow:
-                        break // proceed with this single execution
-                    case .allowAll:
-                        autoApprovedThisChat = true
-                    case .deny:
-                        Self.log.info("User denied tool execution: \(toolCall.name)")
-                        return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "User denied execution of \(toolCall.name).", isError: true)
-                    }
-                }
+            }
 
-                do {
-                    let result = try await mcpManager.callTool(serverId: serverId, name: toolName, arguments: toolCall.arguments)
-                    return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: result)
-                } catch {
-                    return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "MCP Error: \(error.localizedDescription)", isError: true)
-                }
+            do {
+                let result = try await mcpManager.callTool(serverId: serverId, name: toolName, arguments: toolCall.arguments)
+                return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: result)
+            } catch {
+                return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "MCP Error: \(error.localizedDescription)", isError: true)
             }
         }
 
@@ -376,7 +411,13 @@ class AIService {
 
     /// A tool call the on-device model makes mid-response. It goes through the same approval and
     /// switches as any other call; the output is cut to what the model's context can take.
-    private func runOnDeviceTool(_ name: String, argumentsJSON: String, tag: String, request: String) async -> String {
+    private func runOnDeviceTool(
+        _ name: String,
+        argumentsJSON: String,
+        tag: String,
+        request: String,
+        mcpToolsByFunctionName: [String: MCPTool]
+    ) async -> String {
         let arguments = (try? JSONSerialization.jsonObject(with: Data(argumentsJSON.utf8))) as? [String: Any] ?? [:]
         currentToolName = name
         isExecutingTools = true
@@ -395,7 +436,11 @@ class AIService {
             }
             approved = true
         }
-        let result = await executeToolCall(AIToolCall(name: name, arguments: arguments), approved: approved)
+        let result = await executeToolCall(
+            AIToolCall(name: name, arguments: arguments),
+            mcpToolsByFunctionName: mcpToolsByFunctionName,
+            approved: approved
+        )
         return wrapUntrusted(AppleIntelligenceProvider.fitted(result.content, tokens: AppleIntelligenceProvider.toolOutputTokens), tag: tag)
     }
 

@@ -7,6 +7,7 @@
 //  JSON-RPC wire format. The persisted MCPServerConfig lives in NookSettings.
 //
 
+import CryptoKit
 import Foundation
 
 // MARK: - MCP Tool
@@ -22,6 +23,29 @@ struct MCPTool: Identifiable, Equatable {
         "\(serverId).\(name)"
     }
 
+    /// Stable, provider-safe name exposed to models. OpenAI-compatible APIs reject
+    /// dots and cap function names at 64 characters, so the original MCP identity
+    /// stays in the local lookup instead of being encoded into the name.
+    func providerFunctionName(avoiding reservedNames: Set<String> = []) -> String {
+        let key = Data(serverId.utf8) + Data([0]) + Data(name.utf8)
+        let digest = SHA256.hash(data: key).map { String(format: "%02x", $0) }.joined()
+
+        // 4-character prefix + 60 hex characters is exactly the 64-character
+        // limit. If a browser tool already owns that name, shorten the digest
+        // to leave room for a deterministic suffix.
+        for collision in 0...reservedNames.count {
+            let suffix = collision == 0 ? "" : "_\(collision)"
+            let digestLength = 60 - suffix.count
+            let candidate = "mcp_\(digest.prefix(digestLength))\(suffix)"
+            if !reservedNames.contains(candidate) {
+                return candidate
+            }
+        }
+
+        // A finite reserved set cannot exhaust all suffixes above.
+        preconditionFailure("Could not create a unique MCP function name")
+    }
+
     init(serverId: String, name: String, description: String, inputSchema: [String: Any] = [:]) {
         self.id = "\(serverId).\(name)"
         self.serverId = serverId
@@ -32,6 +56,25 @@ struct MCPTool: Identifiable, Equatable {
 
     static func == (lhs: MCPTool, rhs: MCPTool) -> Bool {
         lhs.id == rhs.id && lhs.name == rhs.name && lhs.description == rhs.description
+    }
+}
+
+/// Resolves the provider-safe function names in one request back to MCP tools.
+/// The registry is request-scoped so a tool call can only target a tool that was
+/// actually advertised in that request.
+struct MCPToolFunctionRegistry {
+    private(set) var toolsByFunctionName: [String: MCPTool] = [:]
+
+    mutating func register(_ tool: MCPTool, avoiding reservedNames: Set<String> = []) -> String {
+        let name = tool.providerFunctionName(
+            avoiding: reservedNames.union(toolsByFunctionName.keys)
+        )
+        toolsByFunctionName[name] = tool
+        return name
+    }
+
+    func tool(named functionName: String) -> MCPTool? {
+        toolsByFunctionName[functionName]
     }
 }
 
