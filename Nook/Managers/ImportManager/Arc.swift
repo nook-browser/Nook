@@ -8,441 +8,135 @@
 
 import Foundation
 
-// MARK: - JSON Models
-struct SidebarData: Codable {
-    let version: Int
-    let sidebar: Sidebar
-}
-
-struct Sidebar: Codable {
-    let containers: [SidebarContainer]
-}
-
-struct SidebarContainer: Codable {
-    let global: GlobalContainer?
-    let items: [SidebarItem]?
-    let spaces: [SpaceInfo]?
-    let topAppsContainerIDs: [TopAppContainer]?
-    
-    private enum CodingKeys: String, CodingKey {
-        case global, items, spaces, topAppsContainerIDs
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        global = try container.decodeIfPresent(GlobalContainer.self, forKey: .global)
-        topAppsContainerIDs = try container.decodeIfPresent([TopAppContainer].self, forKey: .topAppsContainerIDs)
-        
-        if container.contains(.items) {
-            do {
-                var itemsContainer = try container.nestedUnkeyedContainer(forKey: .items)
-                var itemsList: [SidebarItem] = []
-                
-                while !itemsContainer.isAtEnd {
-                    if !itemsContainer.isAtEnd {
-                        _ = try itemsContainer.decode(String.self)
-                    }
-                    
-                    if !itemsContainer.isAtEnd {
-                        do {
-                            let item = try itemsContainer.decode(SidebarItem.self)
-                            itemsList.append(item)
-                        } catch {
-                            _ = try? itemsContainer.decode(AnyCodable.self)
-                        }
-                    }
-                }
-                
-                items = itemsList.isEmpty ? nil : itemsList
-            } catch {
-                items = nil
-            }
-        } else {
-            items = nil
-        }
-        
-        if container.contains(.spaces) {
-            do {
-                var spacesContainer = try container.nestedUnkeyedContainer(forKey: .spaces)
-                var spacesList: [SpaceInfo] = []
-                
-                while !spacesContainer.isAtEnd {
-                    if !spacesContainer.isAtEnd {
-                        _ = try spacesContainer.decode(String.self)
-                    }
-                    
-                    if !spacesContainer.isAtEnd {
-                        do {
-                            let space = try spacesContainer.decode(SpaceInfo.self)
-                            spacesList.append(space)
-                        } catch {
-                            _ = try? spacesContainer.decode(AnyCodable.self)
-                        }
-                    }
-                }
-                
-                spaces = spacesList.isEmpty ? nil : spacesList
-            } catch {
-                spaces = nil
-            }
-        } else {
-            spaces = nil
-        }
-    }
-}
-
-struct AnyCodable: Codable {
-    let value: Any
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        
-        if let string = try? container.decode(String.self) {
-            value = string
-        } else if let bool = try? container.decode(Bool.self) {
-            value = bool
-        } else if let int = try? container.decode(Int.self) {
-            value = int
-        } else if let double = try? container.decode(Double.self) {
-            value = double
-        } else if let dict = try? container.decode([String: AnyCodable].self) {
-            value = dict.mapValues { $0.value }
-        } else if let array = try? container.decode([AnyCodable].self) {
-            value = array.map { $0.value }
-        } else {
-            throw DecodingError.typeMismatch(AnyCodable.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Cannot decode AnyCodable"))
-        }
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        if let string = value as? String {
-            try container.encode(string)
-        } else if let bool = value as? Bool {
-            try container.encode(bool)
-        } else if let int = value as? Int {
-            try container.encode(int)
-        } else if let double = value as? Double {
-            try container.encode(double)
-        } else if let dict = value as? [String: Any] {
-            let codableDict = dict.mapValues { AnyCodable($0) }
-            try container.encode(codableDict)
-        } else if let array = value as? [Any] {
-            let codableArray = array.map { AnyCodable($0) }
-            try container.encode(codableArray)
-        } else {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Cannot encode AnyCodable"))
-        }
-    }
-    
-    init(_ value: Any) {
-        self.value = value
-    }
-}
-
-extension Dictionary where Key == String, Value == Any {
-    func mapValues<T>(_ transform: (Value) throws -> T) rethrows -> [Key: T] {
-        var result: [Key: T] = [:]
-        for (key, value) in self {
-            result[key] = try transform(value)
-        }
-        return result
-    }
-}
-
-struct GlobalContainer: Codable {}
-struct TopAppContainer: Codable {}
-
-struct SidebarItem: Codable {
-    let title: String?
-    let id: String
-    let childrenIds: [String]
-    let data: ItemData
-    let parentID: String?
-    let originatingDevice: String
-    let createdAt: Double
-    let isUnread: Bool
-}
-
-struct ItemData: Codable {
-    let tab: TabData?
-    let list: ListData?
-    let itemContainer: ItemContainer?
-}
-
-struct TabData: Codable {
-    let savedMuteStatus: String?
-    let referrerID: String?
-    let savedTitle: String?
-    let activeTabBeforeCreationID: String?
-    let timeLastActiveAt: Double?
-    let savedURL: String?
-}
-
-struct ListData: Codable {
-    let customInfo: ListCustomInfo?
-    let automaticLiveFolderData: AutomaticLiveFolderData?
-}
-
-struct ListCustomInfo: Codable {
-    let iconType: IconType?
-}
-
-struct AutomaticLiveFolderData: Codable {}
-
-struct ItemContainer: Codable {
-    let containerType: ContainerType?
-}
-
-struct ContainerType: Codable {
-    let spaceItems: SpaceItems?
-    let topApps: TopApps?
-}
-
-struct SpaceItems: Codable {
-    let _0: String
-}
-
-struct TopApps: Codable {
-    let _0: DefaultTopApp?
-}
-
-struct DefaultTopApp: Codable {
-    let `default`: EmptyObject?
-}
-
-struct EmptyObject: Codable {}
-
-struct SpaceInfo: Codable {
-    let customInfo: CustomInfo?
-    let title: String
-    let id: String
-    let containerIDs: [String]?
-}
-
-struct CustomInfo: Codable {
-    let iconType: IconType?
-}
-
-struct IconType: Codable {
-    let icon: String?
-    let emoji: Int?
-    let emoji_v2: String?
-}
-
 // MARK: - Arc Models
 struct ArcImportResult {
-    let topTabs: [ArcTab]
-    let spaces: [ArcSpace]
+    var spaces: [ArcSpace] = []
+    /// Favorites by Arc profile: "default" or the profile's directory name ("Profile 1").
+    var favorites: [String: [ArcNode]] = [:]
+    /// Profile names the person gave in Arc, by the same keys.
+    var profileNames: [String: String] = [:]
 }
 
 struct ArcSpace {
-    let id: String
     let title: String
-    let icon: String?
     let emoji: String?
-    let pinnedTabs: [ArcTab]
-    let unpinnedTabs: [ArcTab]
-    let folders: [ArcFolder]
+    let accentHex: String?
+    let profile: String
+    let pinned: [ArcNode]
+    let unpinned: [ArcNode]
 }
 
-struct ArcTab {
-    let id: String
-    let title: String
-    let url: String
-    let domain: String
-    let parentID: String?
-    let isUnread: Bool
+indirect enum ArcNode: Equatable {
+    /// `customTitle` is a name the person (or Arc's tidy titles) gave the tab.
+    case tab(url: String, title: String?, customTitle: String?)
+    case folder(title: String, children: [ArcNode])
 }
 
-struct ArcFolder {
-    let id: String
-    let title: String
-    let tabs: [ArcTab]
-    let parentID: String?
-}
+// MARK: - Parser
 
-// MARK: - Parser Function
-func parseArcSidebarData(from fileURL: URL) throws -> ArcImportResult {
-    let data = try Data(contentsOf: fileURL)
-    let sidebarData = try JSONDecoder().decode(SidebarData.self, from: data)
-    
-    var spacesDict: [String: (id: String, title: String, icon: String?, emoji: String?, containerIDs: [String]?)] = [:]
-    var allItems: [String: SidebarItem] = [:]
-    var containerToSpaceMap: [String: String] = [:]
-    
-    for container in sidebarData.sidebar.containers {
-        if let spacesList = container.spaces {
-            for spaceInfo in spacesList {
-                if spacesDict[spaceInfo.id] == nil {
-                    spacesDict[spaceInfo.id] = (
-                        id: spaceInfo.id,
-                        title: spaceInfo.title,
-                        icon: spaceInfo.customInfo?.iconType?.icon,
-                        emoji: spaceInfo.customInfo?.iconType?.emoji_v2,
-                        containerIDs: spaceInfo.containerIDs
-                    )
-                }
-                
-                if let containerIDs = spaceInfo.containerIDs {
-                    for containerID in containerIDs {
-                        containerToSpaceMap[containerID] = spaceInfo.id
-                    }
-                }
+/// Reads `StorableSidebar.json` in sidebar order. Items, spaces and favorites containers are
+/// flat `[key, value, key, value]` arrays; the tree comes from each item's `childrenIds`.
+func parseArcSidebarData(_ data: Data) throws -> ArcImportResult {
+    let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    let containers = (root?["sidebar"] as? [String: Any])?["containers"] as? [[String: Any]] ?? []
+    guard let container = containers.first(where: { $0["spaces"] != nil }) else { return ArcImportResult() }
+
+    var items: [String: [String: Any]] = [:]
+    for case let item as [String: Any] in list(container["items"]) {
+        if let id = item["id"] as? String { items[id] = item }
+    }
+
+    var visited = Set<String>()
+    func nodes(_ ids: [String]) -> [ArcNode] {
+        ids.flatMap { id -> [ArcNode] in
+            guard visited.insert(id).inserted, let item = items[id],
+                  let data = item["data"] as? [String: Any] else { return [] }
+            let name = (item["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let children = nodes(item["childrenIds"] as? [String] ?? [])
+            if let tab = data["tab"] as? [String: Any] {
+                let url = [tab["savedURL"], tab["currentURL"]].lazy.compactMap { $0 as? String }.first { !$0.isEmpty }
+                guard let url else { return children }
+                let saved = tab["savedTitle"] as? String
+                // A tab's own children follow it.
+                return [.tab(url: url, title: saved, customTitle: name == saved ? nil : name)] + children
             }
-        }
-        
-        if let itemsList = container.items {
-            for item in itemsList {
-                allItems[item.id] = item
-                
-                if let containerType = item.data.itemContainer?.containerType?.spaceItems {
-                    containerToSpaceMap[item.id] = containerType._0
-                }
-            }
+            if data["list"] != nil { return [.folder(title: name ?? "", children: children)] }
+            // Split views and any grouping Nook has no counterpart for keep their tabs in place.
+            return children
         }
     }
-    
-    var arcSpaces: [ArcSpace] = []
-    var topTabs: [ArcTab] = []
-    
-    for (_, item) in allItems {
-        if let tabData = item.data.tab {
-            let url = tabData.savedURL ?? ""
-            let domain = extractDomain(from: url)
-            let title = item.title ?? tabData.savedTitle ?? ""
-            
-            let tab = ArcTab(
-                id: item.id,
-                title: title,
-                url: url,
-                domain: domain,
-                parentID: item.parentID,
-                isUnread: item.isUnread
-            )
-            
-            if let parentID = item.parentID,
-               (parentID.contains("topApps") || allItems[parentID]?.data.itemContainer?.containerType?.topApps != nil) {
-                topTabs.append(tab)
-            }
-        }
+    func contents(_ containerID: String?) -> [ArcNode] {
+        guard let containerID, let item = items[containerID] else { return [] }
+        return nodes(item["childrenIds"] as? [String] ?? [])
     }
-    
-    for spaceInfo in spacesDict.values {
-        var pinnedTabs: [ArcTab] = []
-        var unpinnedTabs: [ArcTab] = []
-        var spaceFolders: [ArcFolder] = []
-        
-        var pinnedContainerID: String?
-        var unpinnedContainerID: String?
-        
-        if let containerIDs = spaceInfo.containerIDs {
-            var i = 0
-            while i < containerIDs.count {
-                if i + 1 < containerIDs.count {
-                    if containerIDs[i] == "pinned" {
-                        pinnedContainerID = containerIDs[i + 1]
-                    } else if containerIDs[i] == "unpinned" {
-                        unpinnedContainerID = containerIDs[i + 1]
-                    }
-                }
-                i += 2
-            }
-        }
-        
-        for (_, item) in allItems {
-            let spaceContext = findSpaceContext(
-                for: item.parentID,
-                in: containerToSpaceMap,
-                spaceID: spaceInfo.id
-            )
-            
-            guard spaceContext == spaceInfo.id else { continue }
-            
-            if let tabData = item.data.tab {
-                if let parentID = item.parentID,
-                   (parentID.contains("topApps") || allItems[parentID]?.data.itemContainer?.containerType?.topApps != nil) {
-                    continue
-                }
-                
-                let url = tabData.savedURL ?? ""
-                let domain = extractDomain(from: url)
-                let title = item.title ?? tabData.savedTitle ?? ""
-                
-                let tab = ArcTab(
-                    id: item.id,
-                    title: title,
-                    url: url,
-                    domain: domain,
-                    parentID: item.parentID,
-                    isUnread: item.isUnread
-                )
-                
-                if let pinnedContainerID = pinnedContainerID,
-                   item.parentID == pinnedContainerID {
-                    pinnedTabs.append(tab)
-                } else if let unpinnedContainerID = unpinnedContainerID,
-                          item.parentID == unpinnedContainerID {
-                    unpinnedTabs.append(tab)
-                }
-                
-            } else if (item.data.list != nil || item.data.itemContainer != nil) && !item.childrenIds.isEmpty {
-                let folderTabs = item.childrenIds.compactMap { childId -> ArcTab? in
-                    guard let childItem = allItems[childId],
-                          let childTabData = childItem.data.tab else { return nil }
-                    
-                    let url = childTabData.savedURL ?? ""
-                    let title = childItem.title ?? childTabData.savedTitle ?? ""
-                    
-                    return ArcTab(
-                        id: childItem.id,
-                        title: title,
-                        url: url,
-                        domain: extractDomain(from: url),
-                        parentID: childItem.parentID,
-                        isUnread: childItem.isUnread
-                    )
-                }
-                
-                if !folderTabs.isEmpty {
-                    let folder = ArcFolder(
-                        id: item.id,
-                        title: item.title ?? "",
-                        tabs: folderTabs,
-                        parentID: item.parentID
-                    )
-                    spaceFolders.append(folder)
-                }
-            }
-        }
-        
-        let arcSpace = ArcSpace(
-            id: spaceInfo.id,
-            title: spaceInfo.title,
-            icon: spaceInfo.icon,
-            emoji: spaceInfo.emoji,
-            pinnedTabs: pinnedTabs,
-            unpinnedTabs: unpinnedTabs,
-            folders: spaceFolders
-        )
-        
-        arcSpaces.append(arcSpace)
+
+    var result = ArcImportResult()
+    // Some files keep favorites only in the sync mirror.
+    let mirror = (((root?["sidebarSyncState"] as? [String: Any])?["container"] as? [String: Any])?["value"] as? [String: Any])
+    let favorites = pairs(container["topAppsContainerIDs"])
+    for (profile, containerID) in favorites.isEmpty ? pairs(mirror?["topAppsContainerIDs"]) : favorites {
+        result.favorites[profile, default: []] += contents(containerID)
     }
-    
-    return ArcImportResult(topTabs: topTabs, spaces: arcSpaces)
+    for case let space as [String: Any] in list(container["spaces"]) {
+        let sections = Dictionary(pairs(space["containerIDs"] ?? space["newContainerIDs"]), uniquingKeysWith: { a, _ in a })
+        let custom = space["customInfo"] as? [String: Any]
+        let midTone = ((custom?["windowTheme"] as? [String: Any])?["primaryColorPalette"] as? [String: Any])?["midTone"]
+        result.spaces.append(ArcSpace(
+            title: space["title"] as? String ?? "",
+            emoji: (custom?["iconType"] as? [String: Any])?["emoji_v2"] as? String,
+            accentHex: hex(midTone as? [String: Any]),
+            profile: space["profile"].flatMap(key) ?? "default",
+            pinned: contents(sections["pinned"]),
+            unpinned: contents(sections["unpinned"])
+        ))
+    }
+    return result
 }
 
-private func extractDomain(from url: String) -> String {
-    guard let url = URL(string: url) else { return "" }
-    return url.host ?? ""
+/// Objects from an `[id, object, id, object]` array, or from an object keyed by id.
+private func list(_ value: Any?) -> [Any] {
+    (value as? [Any]) ?? (value as? [String: Any]).map { Array($0.values) } ?? []
 }
 
-private func findSpaceContext(
-    for parentID: String?,
-    in containerToSpaceMap: [String: String],
-    spaceID: String
-) -> String? {
-    guard let parentID = parentID else { return nil }
-    return containerToSpaceMap[parentID]
+/// Chrome Web Store ids of the extensions a Chromium profile has enabled, from its
+/// `Preferences` and `Secure Preferences` files. Arc's own and Chromium's built-in ones are left out.
+func parseChromiumExtensionIDs(_ preferenceFiles: [Data]) -> [String] {
+    var ids: [String] = []
+    for data in preferenceFiles {
+        let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        let settings = (root?["extensions"] as? [String: Any])?["settings"] as? [String: Any] ?? [:]
+        for (id, value) in settings.sorted(by: { $0.key < $1.key }) {
+            guard let entry = value as? [String: Any], entry["from_webstore"] as? Bool == true,
+                  (entry["disable_reasons"] as? [Any] ?? []).isEmpty, entry["state"] as? Int != 0,
+                  !ids.contains(id) else { continue }
+            ids.append(id)
+        }
+    }
+    return ids
+}
+
+/// `[key, id, key, id]`, as in a space's `containerIDs` or `topAppsContainerIDs`.
+private func pairs(_ value: Any?) -> [(String, String)] {
+    let array = value as? [Any] ?? []
+    return stride(from: 0, to: array.count - 1, by: 2).compactMap { i in
+        guard let key = key(array[i]), let id = array[i + 1] as? String else { return nil }
+        return (key, id)
+    }
+}
+
+/// A string (`"pinned"`), a tagged object (`{"pinned": {}}`, `{"default": true}`), or a custom
+/// profile, keyed by its directory (`{"custom": {"_0": {"directoryBasename": "Profile 1"}}}`).
+private func key(_ value: Any) -> String? {
+    if let string = value as? String { return string }
+    guard let tagged = value as? [String: Any], let tag = tagged.keys.first else { return nil }
+    let profile = (tagged["custom"] as? [String: Any])?["_0"] as? [String: Any]
+    return profile?["directoryBasename"] as? String ?? tag
+}
+
+/// Arc stores extended sRGB, so components can fall outside 0...1.
+private func hex(_ color: [String: Any]?) -> String? {
+    guard let color, let r = color["red"] as? Double, let g = color["green"] as? Double,
+          let b = color["blue"] as? Double else { return nil }
+    let byte = { (v: Double) in Int((min(max(v, 0), 1) * 255).rounded()) }
+    return String(format: "#%02X%02X%02X", byte(r), byte(g), byte(b))
 }

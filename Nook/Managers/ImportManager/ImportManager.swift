@@ -13,21 +13,42 @@ import SwiftUI
 class ImportManager: ObservableObject {
     
     func importArcSidebarData() async -> ArcImportResult {
-        
-        let fileURL = getArcSidebarFileURL()
-        
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            return ArcImportResult(topTabs: [], spaces: [])
+        guard let data = try? Data(contentsOf: arcDirectory.appendingPathComponent("StorableSidebar.json")),
+              var result = try? parseArcSidebarData(data) else { return ArcImportResult() }
+        // Chromium's Local State names each profile directory.
+        let state = (try? Data(contentsOf: arcDirectory.appendingPathComponent("User Data/Local State")))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let cache = (state?["profile"] as? [String: Any])?["info_cache"] as? [String: Any] ?? [:]
+        for (directory, info) in cache {
+            guard let name = (info as? [String: Any])?["name"] as? String else { continue }
+            result.profileNames[directory == "Default" ? "default" : directory] = name
         }
-        
-        do {
-            let result = try parseArcSidebarData(from: fileURL)
-            return result
-        } catch {
-            return ArcImportResult(topTabs: [], spaces: [])
-        }
+        return result
     }
-    
+
+    /// Web Store ids of the extensions enabled in any Arc profile.
+    func arcExtensionIDs() -> [String] {
+        let userData = arcDirectory.appendingPathComponent("User Data")
+        let profiles = (try? FileManager.default.contentsOfDirectory(atPath: userData.path)) ?? []
+        let files = profiles.filter { $0 == "Default" || $0.hasPrefix("Profile ") }.sorted().flatMap { profile in
+            ["Secure Preferences", "Preferences"].compactMap {
+                try? Data(contentsOf: userData.appendingPathComponent(profile).appendingPathComponent($0))
+            }
+        }
+        return parseChromiumExtensionIDs(files)
+    }
+
+    /// Arc's member card, with the person's Arc name added, as a JSON object.
+    func arcMembershipCard() -> Data? {
+        guard let data = try? Data(contentsOf: arcDirectory.appendingPathComponent("StorableMembershipCard.json")),
+              var card = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        let auth = (try? Data(contentsOf: arcDirectory.appendingPathComponent("StorableAuthState.json")))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let user = (auth?["session"] as? [String: Any])?["user"] as? [String: Any]
+        if let name = user?["name"] as? String { card["name"] = name }
+        return try? JSONSerialization.data(withJSONObject: card, options: [.prettyPrinted, .sortedKeys])
+    }
+
     func importDiaData() async -> DiaImportResult {
         let fileURL = getDiaFileURL()
 
@@ -56,12 +77,8 @@ class ImportManager: ObservableObject {
         }
     }
 
-    private func getArcSidebarFileURL() -> URL {
-        let url = URL(fileURLWithPath: NSString(string: "~/Library/Application Support/Arc/StorableSidebar.json")
-            .expandingTildeInPath
-        )
-
-        return url
+    private var arcDirectory: URL {
+        URL(fileURLWithPath: NSString(string: "~/Library/Application Support/Arc").expandingTildeInPath)
     }
 
     private func getDiaFileURL() -> URL {

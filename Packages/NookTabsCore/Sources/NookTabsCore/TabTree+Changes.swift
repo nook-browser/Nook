@@ -145,11 +145,11 @@ extension TabTree {
     // MARK: - Spaces
 
     @discardableResult
-    public mutating func createSpace(id: UUID = UUID(), name: String, icon: String, accentHex: String, after: UUID?, now: Date = Date()) -> Change {
+    public mutating func createSpace(id: UUID = UUID(), name: String, icon: String, accentHex: String, after: UUID?, dataStoreID: UUID? = nil, profileName: String? = nil, now: Date = Date()) -> Change {
         var change = Change()
         let siblings = orderedSpaces
         let order = key(after: after, among: siblings) ?? renumberSpaces(siblings, insertingAfter: after, change: &change, now: now)
-        record(&change, space: SpaceRecord(id: id, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now))
+        record(&change, space: SpaceRecord(id: id, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now, dataStoreID: dataStoreID, profileName: profileName))
         return change
     }
 
@@ -234,7 +234,7 @@ extension TabTree {
         items[item.id] = item
     }
 
-    private mutating func record(_ change: inout Change, space: SpaceRecord) {
+    mutating func record(_ change: inout Change, space: SpaceRecord) {
         if change.spaces[space.id] == nil { change.spaces[space.id] = .some(spaces[space.id]) }
         spaces[space.id] = space
     }
