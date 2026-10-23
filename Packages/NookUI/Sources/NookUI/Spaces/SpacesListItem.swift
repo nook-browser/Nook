@@ -51,6 +51,10 @@ struct SpacesListItem: View {
             }
         } label: {
             spaceDot
+                .scaleEffect(space.icon.isEmpty && !space.isAgent ? 1 : 0.82)
+                .saturation(isActive ? 1 : 0)
+                .opacity(isActive ? 1 : 0.45)
+                .animation(NookDesign.Motion.quick, value: isActive)
                 .frame(width: buttonSize, height: buttonSize)
                 .contentShape(Rectangle())
         }
