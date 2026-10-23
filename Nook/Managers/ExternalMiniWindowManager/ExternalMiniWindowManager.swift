@@ -60,11 +60,26 @@ final class ExternalMiniWindowManager {
 
     /// Into the active window's space, or into `spaceID`, which the window switches to first.
     /// Another space has its own data store, so the page opens there fresh.
+    /// With no browser window open, opens one first.
     private func adopt(_ page: PageSession, in spaceID: UUID? = nil) {
-        guard let browserManager, let window = browserManager.windowRegistry?.activeWindow else { return }
+        guard let browserManager else { return }
+        guard let window = browserManager.windowRegistry?.activeWindow else {
+            browserManager.createNewWindow { [weak self] window in
+                guard self?.controllers[page.itemID] != nil else { return }
+                self?.adopt(page, in: spaceID, window: window)
+            }
+            return
+        }
+        adopt(page, in: spaceID, window: window)
+    }
+
+    private func adopt(_ page: PageSession, in spaceID: UUID?, window: BrowserWindowState) {
+        guard let browserManager else { return }
         if let spaceID { browserManager.tabs.setSpace(spaceID, in: window) }
         browserManager.tabs.adopt(page, in: window)
         controllers[page.itemID]?.close()
+        NSApp.activate(ignoringOtherApps: true)
+        window.window?.makeKeyAndOrderFront(nil)
     }
 }
 

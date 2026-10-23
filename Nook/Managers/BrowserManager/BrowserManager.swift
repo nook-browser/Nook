@@ -535,6 +535,8 @@ class BrowserManager: ObservableObject {
 
     private var startupWaitedForContentBlocker = false
     private var startupWarmTasks: [UUID: Task<Void, Never>] = [:]
+    /// Runs once the next regular window `createNewWindow(then:)` opened is set up.
+    private var nextWindowSetup: ((BrowserWindowState) -> Void)?
 
     /// Loads a newly registered window's selected page. With "Last Tab, Favorites & Space" the
     /// space's other tabs-section pages then warm one at a time; pinned tabs and favorites load
@@ -959,9 +961,12 @@ class BrowserManager: ObservableObject {
 
         tabs.attach(window: windowState)
         guard !windowState.isIncognito else { return }
+        let setup = nextWindowSetup
+        nextWindowSetup = nil
         windowSpaceChanged(windowState)
         applyStartupLoadMode(for: windowState)
         restoreSavedWindows()
+        setup?(windowState)
     }
 
     /// Set the active window state (called when a window gains focus)
@@ -999,8 +1004,9 @@ class BrowserManager: ObservableObject {
         webViewCoordinator?.setMuteState(muted, for: tabId, excludingWindow: originatingWindowId)
     }
 
-    /// Opens a regular window. `frame` places a window restored from DeviceState.windows.
-    func createNewWindow(frame: NSRect? = nil) {
+    /// Opens a regular window. `frame` places a window restored from DeviceState.windows;
+    /// `setup` runs once the window is registered and set up.
+    func createNewWindow(frame: NSRect? = nil, then setup: ((BrowserWindowState) -> Void)? = nil) {
         guard let windowRegistry = windowRegistry,
               let webViewCoordinator = webViewCoordinator else {
             #if DEBUG
@@ -1009,6 +1015,7 @@ class BrowserManager: ObservableObject {
             return
         }
 
+        if let setup { nextWindowSetup = setup }
         let newWindow = makeBrowserNSWindow(title: "Nook")
         let contentView = windowContent(ContentView(), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
         newWindow.contentView = NSHostingView(rootView: contentView)
