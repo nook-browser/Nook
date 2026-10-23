@@ -147,14 +147,7 @@ public struct SpacesSettingsView: View {
     // MARK: - Dialogs
 
     private func showCreateDialog() {
-        actions?.presentSpaceCreation { name, accentHex in
-            tabs.createSpace(
-                name: name.isEmpty ? "New Space" : name,
-                icon: "square.grid.2x2",
-                accentHex: accentHex,
-                after: tabs.orderedSpaces.last?.id
-            )
-        }
+        actions?.presentSpaceCreation()
     }
 
     private func showDeleteDialog(_ space: SpaceRecord) {

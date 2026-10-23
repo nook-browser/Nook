@@ -13,6 +13,7 @@ import AppKit
 import SwiftUI
 import NookTabsCore
 import NookUI
+import NookDesign
 import NookWeb
 
 extension BrowserManager: TabActions {
@@ -51,16 +52,34 @@ extension BrowserManager: TabActions {
         )
     }
 
-    func presentSpaceCreation(onCreate:@escaping (String, String) -> Void) {
-        dialogManager.showDialog(
-            SpaceCreationDialog(
-                onCreate: { [weak self] name, accentHex in
-                    onCreate(name, accentHex)
-                    self?.dialogManager.closeDialog()
-                },
-                onCancel: { [weak self] in self?.dialogManager.closeDialog() }
-            )
-        )
+    func presentSpaceCreation() {
+        guard let registry = windowRegistry else { return }
+        let target = registry.activeWindow.flatMap { $0.isIncognito ? nil : $0 }
+            ?? registry.allWindows.first(where: { !$0.isIncognito })
+        if let target {
+            beginSpaceCreation(in: target)
+            target.window?.deminiaturize(nil)
+            target.window?.makeKeyAndOrderFront(nil)
+        } else {
+            let state = BrowserWindowState()
+            state.isCreatingSpace = true
+            createNewWindow(windowState: state)
+        }
+    }
+
+    /// All macOS entry points use the same sidebar form and preserve an existing draft.
+    func beginSpaceCreation(in window: BrowserWindowState) {
+        guard !window.isIncognito else { return }
+        withAnimation(NookDesign.Motion.standard) {
+            window.isSidebarVisible = true
+            window.isSidebarMenuVisible = false
+            if !window.isCreatingSpace {
+                window.spaceCreationAppearance = window.spaceID
+                    .flatMap { tabs.space($0)?.resolvedAppearance }
+                    ?? SpaceAppearance(accentHex: SpaceAccent.defaultHex)
+                window.isCreatingSpace = true
+            }
+        }
     }
 
     func confirmSpaceDeletion(spaceName: String, tabCount: Int, isLastSpace: Bool, onDelete: @escaping () -> Void) {

@@ -26,8 +26,13 @@ extension BrowserModel: TabActions {
         present(.editPinnedURL(url: url, title: title, onSave: onSave))
     }
 
-    func presentSpaceCreation(onCreate: @escaping (String, String) -> Void) {
-        present(.createSpace(onCreate: onCreate))
+    func presentSpaceCreation() {
+        present(.createSpace(onCreate: { [weak self] name, accentHex in
+            guard let self else { return }
+            tabs.createSpace(name: name.isEmpty ? "New Space" : name,
+                             icon: "square.grid.2x2", accentHex: accentHex,
+                             after: tabs.orderedSpaces.last?.id)
+        }))
     }
 
     func confirmSpaceDeletion(

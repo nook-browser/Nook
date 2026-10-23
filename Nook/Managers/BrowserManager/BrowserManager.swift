@@ -950,7 +950,7 @@ class BrowserManager: ObservableObject {
     func setupWindowState(_ windowState: BrowserWindowState) {
         windowState.sidebarWidth = sidebarWidth
         windowState.sidebarContentWidth = max(sidebarWidth - 16, 0)
-        windowState.isSidebarVisible = isSidebarVisible
+        windowState.isSidebarVisible = windowState.isCreatingSpace || isSidebarVisible
         windowState.savedSidebarWidth = savedSidebarWidth
         windowState.isCommandPaletteVisible = false
         windowState.sidebarPiPController = SidebarPiPController(windowState: windowState)
@@ -1000,7 +1000,7 @@ class BrowserManager: ObservableObject {
     }
 
     /// Opens a regular window. `frame` places a window restored from DeviceState.windows.
-    func createNewWindow(frame: NSRect? = nil) {
+    func createNewWindow(frame: NSRect? = nil, windowState: BrowserWindowState? = nil) {
         guard let windowRegistry = windowRegistry,
               let webViewCoordinator = webViewCoordinator else {
             #if DEBUG
@@ -1010,7 +1010,7 @@ class BrowserManager: ObservableObject {
         }
 
         let newWindow = makeBrowserNSWindow(title: "Nook")
-        let contentView = windowContent(ContentView(), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
+        let contentView = windowContent(ContentView(windowState: windowState), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
         newWindow.contentView = NSHostingView(rootView: contentView)
         if let frame {
             newWindow.setFrame(frame, display: false)

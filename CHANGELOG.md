@@ -16,6 +16,8 @@
 
 ### Fixed
 
+- Settings now opens the inline space creation form; removed the obsolete macOS dialog
+
 - Favorite drop previews match the final grid layout
 - Duplicate drag and space-switch haptics
 - Window-frame double-click behavior

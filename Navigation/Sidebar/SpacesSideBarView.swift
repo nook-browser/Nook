@@ -421,13 +421,7 @@ struct SpacesSideBarView: View {
     // MARK: - Dialogs
 
     private func showSpaceCreationDialog() {
-        guard !windowState.isIncognito, !windowState.isCreatingSpace else { return }
-        withAnimation(NookDesign.Motion.standard) {
-            windowState.spaceCreationAppearance = windowState.spaceID
-                .flatMap { tabs.space($0)?.resolvedAppearance } ?? SpaceAppearance(accentHex: SpaceAccent.defaultHex)
-            windowState.isSidebarMenuVisible = false
-            windowState.isCreatingSpace = true
-        }
+        browserManager.beginSpaceCreation(in: windowState)
     }
 
 
