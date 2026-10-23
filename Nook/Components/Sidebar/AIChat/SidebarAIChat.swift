@@ -139,13 +139,6 @@ struct SidebarAIChat: View {
 
     private var headerView: some View {
         HStack(spacing: 8) {
-            Button("Close", systemImage: "xmark") {
-                withAnimation(NookDesign.Motion.standard) {
-                    windowState.isSidebarAIChatVisible = false
-                }
-            }
-            .nookIconButtons()
-
             if !aiService.messages.isEmpty {
                 Text("Ask Nook")
                     .font(NookDesign.Font.title)
@@ -163,6 +156,14 @@ struct SidebarAIChat: View {
                     showClearMessagesDialog()
                 }
                 .disabled(aiService.messages.isEmpty)
+                // With Developer Mode on, the panel's tab bar has the close button.
+                if !nookSettings.developerModeEnabled {
+                    Button("Close", systemImage: "xmark") {
+                        withAnimation(NookDesign.Motion.standard) {
+                            windowState.isSidebarAIChatVisible = false
+                        }
+                    }
+                }
             }
             .nookIconButtons()
         }

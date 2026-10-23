@@ -69,14 +69,12 @@ struct DevPanelColumn: View {
                 .buttonStyle(.plain)
             }
             Spacer()
-            if selectedTab != .agent {
-                Button("Close", systemImage: "xmark") {
-                    withAnimation(NookDesign.Motion.standard) {
-                        windowState.isSidebarAIChatVisible = false
-                    }
+            Button("Close", systemImage: "xmark") {
+                withAnimation(NookDesign.Motion.standard) {
+                    windowState.isSidebarAIChatVisible = false
                 }
-                .nookIconButtons()
             }
+            .nookIconButtons()
         }
         .padding(.horizontal, NookDesign.Spacing.md)
         .padding(.top, NookDesign.Spacing.md)
