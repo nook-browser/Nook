@@ -53,7 +53,7 @@ Betas are prereleases: they arrive first and one of them is promoted to the offi
 ### or, Build from Source
 
 #### Prerequisites  
-- macOS 15.5 (Sequoia) or later, Apple Silicon
+- macOS 15.6 (Sequoia) or later, Apple Silicon. Xcode 26 needs 15.6; the built app runs on 15.5 and later
 - On-device AI chat and Tab Organizer require macOS 26 or later with Apple Intelligence enabled
 - [Xcode](https://developer.apple.com/xcode/) 26 or later
 ```bash
