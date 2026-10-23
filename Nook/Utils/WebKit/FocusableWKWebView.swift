@@ -115,6 +115,7 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
     /// toolbar changes; in a browser window the inset stays zero.
     override func layout() {
         super.layout()
+        guard #available(macOS 26, *) else { return }
         guard let window = window as? MiniBrowserWindow, bounds.height > 0 else {
             if obscuredContentInsets.top != 0 { obscuredContentInsets = NSEdgeInsetsZero }
             return

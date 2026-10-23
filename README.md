@@ -8,7 +8,7 @@
 </div>
 
 <p align="center">
-  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-26.0+-blue" alt="macOS 26.0+"></a>
+  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-15.5+-blue" alt="macOS 15.5+"></a>
   <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-5-orange" alt="Swift"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-green" alt="GPL-3.0"></a>
   <a href="https://github.com/nook-browser/Nook/pulls"><img src="https://img.shields.io/github/issues-pr/nook-browser/Nook" alt="Open pull requests"></a>
@@ -53,7 +53,8 @@ Betas are prereleases: they arrive first and one of them is promoted to the offi
 ### or, Build from Source
 
 #### Prerequisites  
-- macOS 26.0 (Tahoe) or later, Apple Silicon
+- macOS 15.5 (Sequoia) or later, Apple Silicon
+- On-device AI chat and Tab Organizer require macOS 26 or later with Apple Intelligence enabled
 - [Xcode](https://developer.apple.com/xcode/) 26 or later
 ```bash
 

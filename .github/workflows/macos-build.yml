@@ -1,0 +1,70 @@
+name: macOS Compatibility Build
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build on macOS 26
+    # Same runner and default Xcode as the release workflow.
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Ensure Metal Toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
+      - name: Build without signing secrets
+        run: |
+          xcodebuild -scheme Nook -configuration Release -arch arm64 \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ENABLE_CODE_COVERAGE=NO \
+            CLANG_COVERAGE_MAPPING=NO
+
+      - name: Ad-hoc sign and pack
+        run: |
+          codesign --force --deep --sign - build/Build/Products/Release/Nook.app
+          ditto -c -k --keepParent build/Build/Products/Release/Nook.app Nook.zip
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Nook
+          path: Nook.zip
+          retention-days: 1
+
+  launch-sequoia:
+    name: Launch on macOS 15
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: Nook
+
+      # Through LaunchServices, so LSMinimumSystemVersion is checked too. A macOS 26 framework
+      # linked strongly fails here in dyld, before any availability check runs.
+      - name: Launch and stay up for 20 seconds
+        run: |
+          ditto -x -k Nook.zip .
+          open -g --stdout "$PWD/nook.log" --stderr "$PWD/nook.log" Nook.app
+          sleep 20
+          if ! pgrep -x Nook; then cat nook.log; exit 1; fi
+          pkill -x Nook

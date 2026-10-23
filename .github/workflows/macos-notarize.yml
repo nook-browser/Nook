@@ -79,9 +79,9 @@ jobs:
           set -e
           mkdir -p build
           # CI entitlements omit push/autofill which require provisioning profiles.
-          # The re-sign step applies the full entitlements before notarization.
+          # The re-sign step applies the same reduced entitlements before notarization.
           ENTITLEMENTS="$(pwd)/Nook/Nook-CI.entitlements"
-          # Apple Silicon only: deployment target is macOS 26 and MLX has no x86_64 slice.
+          # Apple Silicon only; the app supports macOS 15.5 and later.
           xcodebuild -scheme Nook -configuration Release \
             -arch arm64 \
             -derivedDataPath build \
@@ -96,6 +96,12 @@ jobs:
             ENABLE_CODE_COVERAGE=NO \
             CLANG_COVERAGE_MAPPING=NO
           cp -R "build/Build/Products/Release/Nook.app" ./Nook.app
+
+      - name: Read minimum macOS version
+        run: |
+          MINIMUM_MACOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Nook.app/Contents/Info.plist)
+          test -n "$MINIMUM_MACOS"
+          echo "MINIMUM_MACOS=$MINIMUM_MACOS" >> "$GITHUB_ENV"
 
       - name: Re-sign for notarization
         run: |
@@ -247,6 +253,7 @@ jobs:
                 <sparkle:belowVersion>110</sparkle:belowVersion>
               </sparkle:informationalUpdate>
               <pubDate>${DATE}</pubDate>
+              <sparkle:minimumSystemVersion>${MINIMUM_MACOS}</sparkle:minimumSystemVersion>
               <enclosure
                 url="${DMG_URL}"
                 sparkle:version="${BUILD_NUMBER}"

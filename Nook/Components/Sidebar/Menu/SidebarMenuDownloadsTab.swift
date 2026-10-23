@@ -54,11 +54,10 @@ struct SidebarMenuDownloadsTab: View {
             .padding(.bottom, NookDesign.Spacing.md)
         }
         // Rows scroll under the floating search field, as in the history tab.
-        .safeAreaBar(edge: .top, spacing: 0) {
+        .nookScrollHeader {
             SidebarMenuSearchField(prompt: "Search downloads...", text: $text)
                 .padding(NookDesign.Spacing.md)
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 }
 

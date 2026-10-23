@@ -61,11 +61,10 @@ struct SidebarMenuHistoryTab: View {
         }
         // The rows scroll under the search field and filters, which float as filled controls with the
         // system's soft blur at the edge behind them, the way a macOS 26 toolbar does.
-        .safeAreaBar(edge: .top, spacing: 0) {
+        .nookScrollHeader {
             header
                 .padding(NookDesign.Spacing.md)
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
         .onAppear {
             loadHistory()
         }

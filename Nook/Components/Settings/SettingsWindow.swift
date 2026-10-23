@@ -103,18 +103,26 @@ private struct HistoryToolbar: ViewModifier {
     let goBack: () -> Void
     let goForward: () -> Void
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content.toolbar {
-            ToolbarItem(placement: .navigation) {
-                HStack(spacing: NookDesign.Spacing.xxs) {
-                    Button("Back", systemImage: "chevron.backward", action: goBack)
-                        .disabled(!canGoBack)
-                    Button("Forward", systemImage: "chevron.forward", action: goForward)
-                        .disabled(!canGoForward)
-                }
-                .nookIconButtons()
+        // Branch at the View level: ToolbarContentBuilder's availability erasure fails
+        // to link in optimized builds with the Xcode 26.3 SDK.
+        if #available(macOS 26, *) {
+            content.toolbar { buttons.sharedBackgroundVisibility(.hidden) }
+        } else {
+            content.toolbar { buttons }
+        }
+    }
+
+    private var buttons: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            HStack(spacing: NookDesign.Spacing.xxs) {
+                Button("Back", systemImage: "chevron.backward", action: goBack)
+                    .disabled(!canGoBack)
+                Button("Forward", systemImage: "chevron.forward", action: goForward)
+                    .disabled(!canGoForward)
             }
-            .sharedBackgroundVisibility(.hidden)
+            .nookIconButtons()
         }
     }
 }

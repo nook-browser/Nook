@@ -8,16 +8,28 @@ struct MiniBrowserWindowView: View {
     @EnvironmentObject private var gradientColorManager: GradientColorManager
 
     var body: some View {
-        // The page runs up under the glass toolbar; the load bar sits just below it.
+        // On macOS 26 the page runs up under the toolbar; the load bar sits just below it.
         ZStack(alignment: .top) {
             DetachedPageHost(page: page)
-                .ignoresSafeArea(.container, edges: .top)
+                .underToolbar()
             BlockedPageView(session: page)
+            TranslationTaskHost(session: page)
             if let webView = page.webView {
                 PageLoadBar(webView: webView, tint: gradientColorManager.accentColor)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.windowBackgroundColor))
+    }
+}
+
+private extension View {
+    /// Sequoia's WKWebView has no `obscuredContentInsets`, so there the page starts below the toolbar.
+    @ViewBuilder func underToolbar() -> some View {
+        if #available(macOS 26, *) {
+            ignoresSafeArea(.container, edges: .top)
+        } else {
+            self
+        }
     }
 }

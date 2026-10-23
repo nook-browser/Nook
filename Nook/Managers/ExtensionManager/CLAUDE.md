@@ -4,7 +4,7 @@ Deep documentation for Nook's web extension subsystem. For project-level context
 
 ## Availability
 
-Deployment target is macOS 26.0, so WKWebExtension (15.4+) and content scripts (15.5+) are always available. No `@available` / `#available` guards are needed or wanted in extension code.
+Deployment target is macOS 15.5, so WKWebExtension (15.4+) and content scripts (15.5+) are always available. No `@available` / `#available` guards are needed or wanted in extension code.
 
 ## Key Files
 

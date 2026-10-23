@@ -61,7 +61,13 @@ extension BrowserManager {
     private func snapshot(of element: DevPickedElement, in session: PageSession) async -> String? {
         guard let webView = session.webView else { return nil }
         let scale = webView.pageZoom * webView.magnification
-        let rect = CGRect(x: element.rect.minX * scale, y: element.rect.minY * scale + webView.obscuredContentInsets.top,
+        let topInset: CGFloat
+        if #available(macOS 26, *) {
+            topInset = webView.obscuredContentInsets.top
+        } else {
+            topInset = 0
+        }
+        let rect = CGRect(x: element.rect.minX * scale, y: element.rect.minY * scale + topInset,
                           width: element.rect.width * scale, height: element.rect.height * scale)
             .intersection(webView.bounds)
         guard !rect.isNull, rect.width >= 1, rect.height >= 1 else { return nil }

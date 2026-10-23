@@ -38,10 +38,16 @@ enum TabOrganizationModel {
     }
 
     /// Observable: views reading this update when Apple Intelligence is turned on or off.
-    static var isAvailable: Bool { model.isAvailable }
+    static var isAvailable: Bool {
+        guard #available(macOS 26, *) else { return false }
+        return model.isAvailable
+    }
 
     /// Why the feature is hidden, for Settings; nil when the model is usable.
     static var unavailableNote: String? {
+        guard #available(macOS 26, *) else {
+            return "Tab Organizer requires macOS 26 or later and Apple Intelligence."
+        }
         switch model.availability {
         case .available:
             return nil
@@ -54,8 +60,10 @@ enum TabOrganizationModel {
         }
     }
 
+    @available(macOS 26, *)
     private static let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
     /// Greedy decoding (temperature 0 alone still varied run to run), with a response cap sized to the entry count as a backstop against a runaway.
+    @available(macOS 26, *)
     private static func options(for entries: Int) -> GenerationOptions {
         // `sampling:` is deprecated in the 27 SDK, but its replacement `samplingMode:` exists only there.
         GenerationOptions(sampling: .greedy, maximumResponseTokens: 300 + entries * 40)
@@ -66,6 +74,7 @@ enum TabOrganizationModel {
     /// Groups the loose tabs on their own, then folds whole groups into existing folders. Existing
     /// folders stay out of the grouping turns: offered there, they used up the folder budget and
     /// pulled unrelated tabs in.
+    @available(macOS 26, *)
     static func groups(for inputs: [TabInput], existingFolders: [ExistingFolder]) async throws -> [TabOrganizationPlan.Group] {
         guard !inputs.isEmpty else { return [] }
         let session = LanguageModelSession(model: model, instructions: """
@@ -126,6 +135,7 @@ enum TabOrganizationModel {
     /// First turn: each tab's topic, then folder names with a sentence on what each holds. The topics
     /// come first so the model has read every tab before it names a folder. Both arrays are
     /// bounded: an unbounded one let the model run on until it overflowed the context.
+    @available(macOS 26, *)
     private static func proposeFolders(for inputs: [TabInput], session: LanguageModelSession) async throws -> [(name: String, about: String)] {
         let limit = max(3, inputs.count / 3)
         let folder = DynamicGenerationSchema(name: "ProposedFolder", properties: [
@@ -149,6 +159,7 @@ enum TabOrganizationModel {
 
     /// One constrained entry per tab: its topic, then one of `names` or "Unrelated". The topic comes
     /// first so the model says what the page is before it chooses. Returns tab numbers by folder name.
+    @available(macOS 26, *)
     private static func file(_ inputs: [TabInput], into names: [String], session: LanguageModelSession, prompt: String) async throws -> [String: [Int]] {
         let entry = DynamicGenerationSchema(name: "Entry", properties: [
             .init(name: "tab", schema: DynamicGenerationSchema(type: Int.self)),
@@ -176,6 +187,7 @@ enum TabOrganizationModel {
     /// compared in code first: most existing folders were named by an earlier run, so the same topic
     /// comes back under the same or a near-identical name. Only the rest go to the model, and
     /// strictly: asked loosely, it handed every new group to some existing folder.
+    @available(macOS 26, *)
     private static func existingFolderNames(covering groups: [(name: String, about: String)], in existing: [ExistingFolder]) async throws -> [String?] {
         var result = groups.map { group in existing.first { sameTopic($0.name, group.name) }?.name }
         let open = groups.indices.filter { result[$0] == nil }
@@ -218,6 +230,7 @@ enum TabOrganizationModel {
     // MARK: - Renaming
 
     /// Short sidebar titles for the given tabs. Pass only tabs whose titles need it.
+    @available(macOS 26, *)
     static func renames(for all: [TabInput]) async throws -> [TabOrganizationPlan.Rename] {
         // A site's front page is named after the site; the model strips site names, so it never sees these.
         let sites = all.compactMap { input in siteTitle(for: input).map { TabOrganizationPlan.Rename(tab: input.index, name: fitted($0)) } }
@@ -292,6 +305,7 @@ enum TabOrganizationModel {
     // MARK: - Private
 
     /// `{"entries": [entry × count]}`, one per tab, so the model can neither skip nor repeat a tab.
+    @available(macOS 26, *)
     private static func entries(of entry: DynamicGenerationSchema, count: Int) throws -> GenerationSchema {
         let root = DynamicGenerationSchema(name: "Entries", properties: [
             .init(
