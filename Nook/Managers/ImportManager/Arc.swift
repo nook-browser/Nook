@@ -13,6 +13,8 @@ struct ArcImportResult {
     var spaces: [ArcSpace] = []
     /// Favorites by Arc profile: "default" or the profile's directory name ("Profile 1").
     var favorites: [String: [ArcNode]] = [:]
+    /// Profile names the person gave in Arc, by the same keys.
+    var profileNames: [String: String] = [:]
 }
 
 struct ArcSpace {

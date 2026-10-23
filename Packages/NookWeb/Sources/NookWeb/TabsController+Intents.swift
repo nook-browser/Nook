@@ -600,14 +600,15 @@ extension TabsController {
 
     // MARK: - Spaces
 
-    /// A new space with its own (empty) website data store, so it starts logged out.
-    /// `sharingLoginsWith` gives it that space's data store instead.
+    /// A new space in a new profile with an empty website data store, so it starts logged out.
+    /// `sharingLoginsWith` puts it in that space's profile instead.
     @discardableResult
-    public func createSpace(name: String, icon: String, accentHex: String, after: UUID?, sharingLoginsWith: UUID? = nil) -> UUID? {
+    public func createSpace(name: String, icon: String, accentHex: String, after: UUID?, sharingLoginsWith: UUID? = nil, profileName: String? = nil) -> UUID? {
         let id = UUID()
         let store = sharingLoginsWith.flatMap { tree.dataStoreID(for: $0) }
         guard perform(.main, "createSpace", {
-            $0.createSpace(id: id, name: name, icon: icon, accentHex: accentHex, after: after, dataStoreID: store)
+            $0.createSpace(id: id, name: name, icon: icon, accentHex: accentHex, after: after, dataStoreID: store,
+                           profileName: store == nil ? profileName : nil)
         }) != nil else { return nil }
         return id
     }
@@ -621,6 +622,29 @@ extension TabsController {
     func moveSpace(_ spaceID: UUID, after: UUID?) {
         guard let owner = owner(ofSpace: spaceID) else { return }
         perform(owner, "moveSpace") { try $0.moveSpace(spaceID, after: after) }
+    }
+
+    // MARK: - Profiles
+
+    public var profiles: [ProfileSummary] { tree.profiles }
+
+    /// Moves a space into the profile with store `storeID`, or a new one when nil. Its pages
+    /// reload on the new store, and the store it left is cleared when no space uses it any more.
+    public func setProfile(_ spaceID: UUID, to storeID: UUID?, name: String? = nil) {
+        guard case .main? = owner(ofSpace: spaceID), let old = profile(forSpace: spaceID),
+              perform(.main, "setProfile", { try $0.setProfile(spaceID, to: storeID, name: name) }) != nil
+        else { return }
+        unloadPagesOnWrongDataStore(items(inSpace: spaceID).map(\.id))
+        if let agent = agentSpaceID { unloadPagesOnWrongDataStore(items(inSpace: agent).map(\.id)) }
+        for window in regularWindows where window.spaceID == spaceID { sessionDelegate?.windowSpaceChanged(window) }
+        if !tree.orderedSpaces.contains(where: { tree.dataStoreID(for: $0.id) == old.id }) {
+            forgetProfile(old.id)
+            Task { await old.clearAllData() }
+        }
+    }
+
+    public func renameProfile(_ storeID: UUID, to name: String) {
+        perform(.main, "renameProfile") { try $0.renameProfile(storeID, to: name) }
     }
 
     /// Pages whose item now belongs to another space reload on that space's data store.

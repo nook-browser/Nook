@@ -14,10 +14,13 @@ public struct SpaceRecord: Identifiable, Codable, Hashable, Sendable {
     /// The website data store this space uses when it shares another space's logins; nil means
     /// its own, keyed by `id`. May name a deleted space, whose store lives on for the others.
     public var dataStoreID: UUID?
+    /// The name of the profile (data store) this space is in; see `TabTree.profiles`.
+    public var profileName: String?
 
-    public init(id: UUID = UUID(), name: String, icon: String, accentHex: String, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil, dataStoreID: UUID? = nil) {
+    public init(id: UUID = UUID(), name: String, icon: String, accentHex: String, order: OrderKey, modifiedAt: Date = Date(), deletedAt: Date? = nil, dataStoreID: UUID? = nil, profileName: String? = nil) {
         self.id = id
         self.dataStoreID = dataStoreID
+        self.profileName = profileName
         self.name = name
         self.icon = icon
         self.accentHex = accentHex

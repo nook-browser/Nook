@@ -14,7 +14,15 @@ class ImportManager: ObservableObject {
     
     func importArcSidebarData() async -> ArcImportResult {
         guard let data = try? Data(contentsOf: arcDirectory.appendingPathComponent("StorableSidebar.json")),
-              let result = try? parseArcSidebarData(data) else { return ArcImportResult() }
+              var result = try? parseArcSidebarData(data) else { return ArcImportResult() }
+        // Chromium's Local State names each profile directory.
+        let state = (try? Data(contentsOf: arcDirectory.appendingPathComponent("User Data/Local State")))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let cache = (state?["profile"] as? [String: Any])?["info_cache"] as? [String: Any] ?? [:]
+        for (directory, info) in cache {
+            guard let name = (info as? [String: Any])?["name"] as? String else { continue }
+            result.profileNames[directory == "Default" ? "default" : directory] = name
+        }
         return result
     }
 

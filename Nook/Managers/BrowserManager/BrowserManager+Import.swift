@@ -11,8 +11,8 @@ import SwiftUI
 
 extension BrowserManager {
     /// Arc's spaces in order, each with its pinned and Today sections, its profile's favorites,
-    /// nested folders, custom tab names and theme color. Spaces on one Arc profile share logins,
-    /// as they did in Arc. Arc's member card is kept beside the tabs.
+    /// nested folders, custom tab names and theme color. Each Arc profile becomes a Nook profile
+    /// with Arc's name. Arc's member card is kept beside the tabs.
     func importArcData() async {
         let result = await importManager.importArcSidebarData()
         if let card = importManager.arcMembershipCard() {
@@ -27,7 +27,8 @@ extension BrowserManager {
             guard let spaceID = tabs.createSpace(
                 name: space.title, icon: space.emoji ?? "person.fill",
                 accentHex: space.accentHex ?? "#7C7C7C", after: lastSpace,
-                sharingLoginsWith: profileSpaces[space.profile]
+                sharingLoginsWith: profileSpaces[space.profile],
+                profileName: result.profileNames[space.profile]
             ) else { continue }
             lastSpace = spaceID
             if profileSpaces[space.profile] == nil { profileSpaces[space.profile] = spaceID }
