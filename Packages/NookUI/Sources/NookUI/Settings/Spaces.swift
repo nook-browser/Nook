@@ -91,6 +91,10 @@ public struct SpacesSettingsView: View {
                     set: { tabs.updateSpace(space.id, name: $0, icon: nil, accentHex: nil) }
                 ))
                 .textFieldStyle(.plain)
+                .labelsHidden()
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Space name")
                 if sharedProfileCount(space) > 1 {
                     Text("Profile shared by \(sharedProfileCount(space)) spaces")
                         .font(NookDesign.Font.secondary)
@@ -100,7 +104,7 @@ public struct SpacesSettingsView: View {
                     .font(NookDesign.Font.secondary)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
             Menu {
                 Button(sharedProfileCount(space) > 1 ? "Clear Shared Profile Data" : "Clear Website Data", systemImage: "trash") {
                     Task { await clearData(space) }

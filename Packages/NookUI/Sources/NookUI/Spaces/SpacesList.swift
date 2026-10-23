@@ -24,30 +24,31 @@ public struct SpacesList: View {
     public var body: some View {
         GeometryReader { geometry in
             ScrollView(.horizontal) {
-                    HStack(spacing: 3) {
-                        ForEach(visibleSpaces, id: \.id) { space in
-                            SpacesListItem(
-                                space: space,
-                                isActive: windowState.spaceID == space.id,
-                                isFaded: false
-                            )
-                            .environment(windowState)
-                            .id(space.id)
-                            .transition(.asymmetric(
-                                insertion: .scale.combined(with: .opacity),
-                                removal: .scale.combined(with: .opacity)
-                            ))
-                        }
+                HStack(alignment: .center, spacing: 3) {
+                    ForEach(visibleSpaces, id: \.id) { space in
+                        SpacesListItem(
+                            space: space,
+                            isActive: windowState.spaceID == space.id,
+                            isFaded: false
+                        )
+                        .environment(windowState)
+                        .id(space.id)
+                        .transition(.asymmetric(
+                            insertion: .scale.combined(with: .opacity),
+                            removal: .scale.combined(with: .opacity)
+                        ))
                     }
-                    .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
-
+                }
+                .fixedSize(horizontal: true, vertical: true)
+                .frame(minWidth: geometry.size.width, alignment: .center)
             }
             .scrollIndicators(.hidden)
             .defaultScrollAnchor(.center)
-
+            // Keep the scrolling content at button height, then center that viewport
+            // in the footer. Extra footer height must not become scrollable content.
+            .frame(height: 32)
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .center)
         }
         .animation(NookDesign.Motion.standard, value: visibleSpaces.count)
     }
-
-
 }
