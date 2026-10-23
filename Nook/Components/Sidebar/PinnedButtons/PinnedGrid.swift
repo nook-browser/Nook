@@ -141,7 +141,9 @@ private struct PinnedTile: View {
     private var tabs: TabsController { browserManager.tabs }
     @Environment(\.colorScheme) private var colorScheme
     private var appearance: SpaceAppearance {
-        windowState.spaceID.flatMap { tabs.space($0)?.resolvedAppearance } ?? SpaceAppearance(accentHex: "#7C7C7C")
+        let fallback = SpaceAppearance(accentHex: "#7C7C7C")
+        guard case .favorites(let spaceID) = zone else { return fallback }
+        return tabs.space(spaceID)?.resolvedAppearance ?? fallback
     }
     private var favoriteScheme: ColorScheme {
         appearance.mode == .system ? colorScheme : (appearance.mode == .dark ? .dark : .light)
