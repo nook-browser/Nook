@@ -47,7 +47,7 @@ struct URLBarView: View {
             }
         }
         .onChange(of: addressFocused) { _, focused in
-            if !focused {
+            if splitItemID == nil, !focused {
                 // Let a suggestion button's click finish before removing its overlay.
                 DispatchQueue.main.async {
                     if !addressFocused { cancelEditing() }
@@ -279,31 +279,41 @@ struct URLBarView: View {
         selectedSuggestion = index < 0 || (!showsInitialSuggestions && index == 0) ? nil : suggestions[index]
     }
 
+    @ViewBuilder
     private var inlineAddressField: some View {
-        TextField("Search or Enter URL...", text: $addressText)
-            .textFieldStyle(.plain)
-            .font(.system(size: 14, weight: .regular))
-            .focused($addressFocused)
-            .onSubmit { submitAddress() }
-            .onExitCommand { cancelEditing() }
-            .onKeyPress(.downArrow) {
-                guard !isComposingAddress else { return .ignored }
-                moveSuggestionSelection(by: 1)
-                return .handled
-            }
-            .onKeyPress(.upArrow) {
-                guard !isComposingAddress else { return .ignored }
-                moveSuggestionSelection(by: -1)
-                return .handled
-            }
-            .onAppear {
-                addressFocused = true
-                DispatchQueue.main.async {
-                    guard isEditing, addressFocused,
-                          let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
-                    editor.selectAll(nil)
+        if splitItemID != nil {
+            SplitAddressSearchField(text: $addressText,
+                                    onSubmit: { submitAddress() },
+                                    onCancel: cancelEditing,
+                                    onMove: moveSuggestionSelection,
+                                    onEndEditing: cancelEditing)
+                .frame(height: 22)
+        } else {
+            TextField("Search or Enter URL...", text: $addressText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14, weight: .regular))
+                .focused($addressFocused)
+                .onSubmit { submitAddress() }
+                .onExitCommand { cancelEditing() }
+                .onKeyPress(.downArrow) {
+                    guard !isComposingAddress else { return .ignored }
+                    moveSuggestionSelection(by: 1)
+                    return .handled
                 }
-            }
+                .onKeyPress(.upArrow) {
+                    guard !isComposingAddress else { return .ignored }
+                    moveSuggestionSelection(by: -1)
+                    return .handled
+                }
+                .onAppear {
+                    addressFocused = true
+                    DispatchQueue.main.async {
+                        guard isEditing, addressFocused,
+                              let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
+                        editor.selectAll(nil)
+                    }
+                }
+        }
     }
 
     private var showsInitialSuggestions: Bool {
@@ -706,5 +716,79 @@ private struct AddressAnchoredPanel<Content: View>: NSViewRepresentable {
 
     static func dismantleNSView(_ nsView: Anchor, coordinator: ()) {
         nsView.removePanel()
+    }
+}
+
+/// The expanded split editor lives in a separate hosting view, so give its native
+/// field focus after attachment rather than sharing FocusState across hosting roots.
+private struct SplitAddressSearchField: NSViewRepresentable {
+    @Binding var text: String
+    let onSubmit: () -> Void
+    let onCancel: () -> Void
+    let onMove: (Int) -> Void
+    let onEndEditing: () -> Void
+
+    final class Field: NSTextField {
+        private var didRequestFocus = false
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard window != nil, !didRequestFocus else { return }
+            didRequestFocus = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let window = self.window else { return }
+                if window.makeFirstResponder(self) {
+                    self.currentEditor()?.selectAll(nil)
+                }
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: SplitAddressSearchField
+        init(_ parent: SplitAddressSearchField) { self.parent = parent }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        func controlTextDidEndEditing(_ notification: Notification) {
+            DispatchQueue.main.async { [weak self] in self?.parent.onEndEditing() }
+        }
+
+        func control(_ control: NSControl, textView: NSTextView,
+                     doCommandBy commandSelector: Selector) -> Bool {
+            guard !textView.hasMarkedText() else { return false }
+            switch commandSelector {
+            case #selector(NSResponder.insertNewline(_:)): parent.onSubmit()
+            case #selector(NSResponder.cancelOperation(_:)): parent.onCancel()
+            case #selector(NSResponder.moveDown(_:)): parent.onMove(1)
+            case #selector(NSResponder.moveUp(_:)): parent.onMove(-1)
+            default: return false
+            }
+            return true
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> Field {
+        let field = Field()
+        field.placeholderString = "Search or Enter URL..."
+        field.font = .systemFont(ofSize: 14)
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.usesSingleLineMode = true
+        field.stringValue = text
+        field.delegate = context.coordinator
+        field.setAccessibilityLabel("Search or Enter URL...")
+        return field
+    }
+
+    func updateNSView(_ nsView: Field, context: Context) {
+        context.coordinator.parent = self
+        if nsView.stringValue != text { nsView.stringValue = text }
     }
 }
