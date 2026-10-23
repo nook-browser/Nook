@@ -280,8 +280,6 @@ class AIService {
     private func collectAvailableTools() -> (definitions: [AIToolDefinition], mcpToolsByFunctionName: [String: MCPTool]) {
         var tools: [AIToolDefinition] = []
         var mcpRegistry = MCPToolFunctionRegistry()
-        var mcpToolsByFunctionName: [String: MCPTool] = [:]
-        let needsProviderSafeMCPNames = configService.activeProviderType == .openAICompatible
 
         // Browser tools
         let browserConfig = configService.browserToolsConfig
@@ -294,16 +292,7 @@ class AIService {
         // MCP tools follow the same switch: disabled means no tools at all
         if browserConfig.executionMode != .disabled, let mcpManager = mcpManager {
             for tool in mcpManager.allTools {
-                let functionName: String
-                if needsProviderSafeMCPNames {
-                    functionName = mcpRegistry.register(
-                        tool,
-                        avoiding: Set(tools.map(\.name))
-                    )
-                } else {
-                    functionName = tool.qualifiedName
-                }
-                mcpToolsByFunctionName[functionName] = tool
+                let functionName = mcpRegistry.register(tool, avoiding: Set(tools.map(\.name)))
                 tools.append(AIToolDefinition(
                     name: functionName,
                     description: tool.description,
@@ -312,14 +301,14 @@ class AIService {
             }
         }
 
-        return (tools, mcpToolsByFunctionName)
+        return (tools, mcpRegistry.toolsByFunctionName)
     }
 
     // MARK: - Tool Execution
 
     private func executeToolCall(
         _ toolCall: AIToolCall,
-        mcpToolsByFunctionName: [String: MCPTool] = [:],
+        mcpToolsByFunctionName: [String: MCPTool],
         approved: Bool = false
     ) async -> AIToolResult {
         // No tools are advertised in a private window; refuse a call the model made anyway

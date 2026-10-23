@@ -23,27 +23,23 @@ struct MCPTool: Identifiable, Equatable {
         "\(serverId).\(name)"
     }
 
-    /// Stable, provider-safe name exposed to models. OpenAI-compatible APIs reject
-    /// dots and cap function names at 64 characters, so the original MCP identity
-    /// stays in the local lookup instead of being encoded into the name.
+    /// Name sent to providers: OpenAI-style APIs allow only `[a-zA-Z0-9_-]`, 64 characters at most,
+    /// and Gemini wants a leading letter. The hash keeps tools with the same name on two servers apart.
     func providerFunctionName(avoiding reservedNames: Set<String> = []) -> String {
         let key = Data(serverId.utf8) + Data([0]) + Data(name.utf8)
-        let digest = SHA256.hash(data: key).map { String(format: "%02x", $0) }.joined()
-
-        // 4-character prefix + 60 hex characters is exactly the 64-character
-        // limit. If a browser tool already owns that name, shorten the digest
-        // to leave room for a deterministic suffix.
-        for collision in 0...reservedNames.count {
-            let suffix = collision == 0 ? "" : "_\(collision)"
-            let digestLength = 60 - suffix.count
-            let candidate = "mcp_\(digest.prefix(digestLength))\(suffix)"
-            if !reservedNames.contains(candidate) {
-                return candidate
-            }
+        let hash = SHA256.hash(data: key).prefix(4).map { String(format: "%02x", $0) }.joined()
+        let readable = String(name.unicodeScalars.prefix(46).map {
+            $0.isASCII && (CharacterSet.alphanumerics.contains($0) || $0 == "-") ? Character($0) : "_"
+        })
+        // At most 59 characters, leaving room for a "_N" suffix
+        let base = "mcp_\(readable)_\(hash)"
+        var candidate = base
+        var collision = 1
+        while reservedNames.contains(candidate) {
+            candidate = "\(base)_\(collision)"
+            collision += 1
         }
-
-        // A finite reserved set cannot exhaust all suffixes above.
-        preconditionFailure("Could not create a unique MCP function name")
+        return candidate
     }
 
     init(serverId: String, name: String, description: String, inputSchema: [String: Any] = [:]) {
@@ -71,10 +67,6 @@ struct MCPToolFunctionRegistry {
         )
         toolsByFunctionName[name] = tool
         return name
-    }
-
-    func tool(named functionName: String) -> MCPTool? {
-        toolsByFunctionName[functionName]
     }
 }
 
