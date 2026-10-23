@@ -35,7 +35,34 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
         if window?.firstResponder != self {
             window?.makeFirstResponder(self)
         }
+        if dragsWindowFromTitleBand(event) { return }
         super.mouseDown(with: event)
+    }
+
+    /// Like Arc: a press in the title band where WebKit shows the arrow cursor (no link, text or
+    /// field under it) moves the window once the pointer moves; a press that never moves is
+    /// replayed to the page as a click.
+    private func dragsWindowFromTitleBand(_ down: NSEvent) -> Bool {
+        guard let window, TitlebarDragRegion.isBrowserWindow(window),
+              !window.styleMask.contains(.fullScreen),
+              down.clickCount == 1,
+              down.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+              down.locationInWindow.y >= window.contentLayoutRect.maxY,
+              NSCursor.current == NSCursor.arrow else { return false }
+        let start = NSEvent.mouseLocation
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            if next.type == .leftMouseUp {
+                super.mouseDown(with: down)
+                super.mouseUp(with: next)
+                return true
+            }
+            let now = NSEvent.mouseLocation
+            if hypot(now.x - start.x, now.y - start.y) >= 3 {
+                window.performDrag(with: down)
+                return true
+            }
+        }
+        return false
     }
 
     /// A three-finger or Magic Mouse swipe back. WebKit only acts on it with history, so on a

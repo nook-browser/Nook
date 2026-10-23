@@ -21,6 +21,8 @@ enum TitlebarDragRegion {
     /// and would block the whole band.
     nonisolated(unsafe) private static let browserWindows = NSHashTable<NSWindow>.weakObjects()
 
+    @MainActor static func isBrowserWindow(_ window: NSWindow) -> Bool { browserWindows.contains(window) }
+
     /// A hosting view that does not override NSView's answer, or whose method has another
     /// signature, is left alone, and the band drags the window as it did before.
     @MainActor static func letAppKitViewsBlockDrags(in window: NSWindow) {
