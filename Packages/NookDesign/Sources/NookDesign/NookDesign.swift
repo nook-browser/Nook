@@ -165,6 +165,17 @@ public enum NookDesign {
             colors: [Color(hex: "#FFB000"), Color(hex: "#FF5A1F"), Color(hex: "#E5177E")],
             startPoint: .topLeading, endPoint: .bottomTrailing)
         public static let agentChromeOpacity: Double = 0.45   // over the sidebar's own background
+        /// Onboarding's fixed backdrop: the app icon's forest green as a soft mesh, lightest at the
+        /// top left. The stages draw white text on it, so it stays dark in either appearance.
+        public static let onboardingBackdrop = MeshGradient(
+            width: 3, height: 3,
+            points: [[0, 0], [0.5, 0], [1, 0], [0, 0.5], [0.6, 0.45], [1, 0.5], [0, 1], [0.5, 1], [1, 1]],
+            colors: [
+                Color(hex: "#6B8F72"), Color(hex: "#2C5242"), Color(hex: "#1D3A2F"),
+                Color(hex: "#2F5A47"), Color(hex: "#23463A"), Color(hex: "#16302A"),
+                Color(hex: "#13261E"), Color(hex: "#0F1F19"), Color(hex: "#0A1612"),
+            ])
+        public static let grainOpacity: Double = 0.08         // film grain over a fixed backdrop
         public static let agentFrameWidth: CGFloat = 3        // frame around the Agent space's page
 
         #if os(macOS)

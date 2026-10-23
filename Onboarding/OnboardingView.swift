@@ -6,6 +6,7 @@
 //  Created by Maciek Bagiński on 19/02/2026.
 //
 
+import NookDesign
 import SwiftUI
 
 struct OnboardingView: View {
@@ -19,9 +20,16 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            BlurEffectView(material: .hudWindow, state: .active)
+            // A fixed dark backdrop: the stages draw white text. The old blur showed glass while
+            // the window was key and plain white once it was not.
+            NookDesign.Surface.onboardingBackdrop
+                .overlay {
+                    Image("noise_texture")
+                        .resizable(resizingMode: .tile)
+                        .opacity(NookDesign.Surface.grainOpacity)
+                        .blendMode(.overlay)
+                }
                 .ignoresSafeArea()
-            Color.white.opacity(0.2)
 
             VStack {
                 StageIndicator(stages: 3, activeStage: currentStage)
@@ -43,6 +51,7 @@ struct OnboardingView: View {
             .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .environment(\.colorScheme, .dark)
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(.return) {
