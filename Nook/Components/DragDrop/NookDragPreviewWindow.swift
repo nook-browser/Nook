@@ -128,6 +128,7 @@ private struct NookDragPreviewContent: View {
                     }
                 }
                 .padding(.horizontal, NookDesign.Spacing.rowPadding)
+                .environment(\.colorScheme, isTile ? manager.draggedColorScheme : .light)
             }
             .frame(width: size.width, height: size.height)
             .clipShape(NookDesign.Radius.shape(isTile ? NookDesign.Radius.lg : NookDesign.Tab.radius))

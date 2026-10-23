@@ -72,7 +72,7 @@ struct SpaceView: View {
                     sectionList(.tabs(spaceID: spaceID), rows: regular, split: split, showsTail: true)
                 }
             }
-            .animation(NookDesign.Motion.standard, value: pinned.isEmpty)
+            .animation(reduceMotion || dragSession.isDragging ? nil : NookDesign.Motion.tabClose, value: pinned.isEmpty)
             .frame(minWidth: 0, maxWidth: innerWidth, alignment: .leading)
             // Inset the rows, not the scroll viewport: the indicator belongs at the sidebar edge.
             .padding(.horizontal, NookDesign.Spacing.sidebarInset)
@@ -129,6 +129,10 @@ struct SpaceView: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                         rowView(row, zone: zone, split: split, isDropTarget: position == DropPosition(zone: zone, index: index, placement: .into))
                             .padding(.leading, CGFloat(row.depth) * NookDesign.Spacing.folderIndent)
+                            .transition(.asymmetric(
+                                insertion: .identity,
+                                removal: .opacity
+                            ))
                             // Zen keeps a dimmed source in place while its floating card
                             // follows the pointer freely; only the insertion marker moves.
                             .opacity(preview.containsDraggedRow(id: row.id) ? (dragSession.isFinishingDrag ? 0 : 0.3) : 1)
@@ -142,6 +146,9 @@ struct SpaceView: View {
                     VStack(spacing: 0) { content }
                 } else {
                     LazyVStack(spacing: 0) { content }
+                        // Keep row identities stable so remaining tabs slide into the gap.
+                        // Apply the same layout animation to temporary and pinned rows.
+                        .animation(reduceMotion ? nil : NookDesign.Motion.tabClose, value: rows.map(\.id))
                 }
                 if dragSession.isFinishingDrag, !isSource, isDestination, preview.gapIndex != nil, !rows.isEmpty {
                     Color.clear.frame(height: NookDesign.Tab.stride)

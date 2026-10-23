@@ -170,6 +170,7 @@ public enum NookDesign {
 
     public enum Motion {
         public static let tabReorder = Animation.easeOut(duration: 0.10)
+        public static let tabClose = Animation.easeOut(duration: 0.20)
         public static let tabLandingDuration: TimeInterval = 0.10
         public static let quick = Animation.easeOut(duration: 0.12)      // hover, press
         public static let standardDuration: TimeInterval = 0.22          // `standard`, for AppKit animations

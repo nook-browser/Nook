@@ -10,11 +10,19 @@
 
 ### Changed
 
+- Lighten favorite tile backgrounds over the sidebar theme while retaining their selected favicon rim
+
+- Use the same raised light selected-tab surface in light and dark themes, with dark labels and layered shadows
+
+- Animate remaining temporary and pinned tabs upward when a row is closed
+
 - Zen-inspired sidebar, tab cards and favorites
 - Address editing with an anchored suggestions panel
 - Shared theme across the sidebar, window frame and split gutter
 
 ### Fixed
+
+- Preserve favorite selection rim coverage on wide tiles with two or three columns
 
 - Keep space pages alive during sidebar resizing and use a native resize cursor with a tinted handle
 - Compress space switcher gaps before scrolling when the footer fills up
