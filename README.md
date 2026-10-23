@@ -14,19 +14,16 @@
   <a href="https://github.com/nook-browser/Nook/pulls"><img src="https://img.shields.io/github/issues-pr/nook-browser/Nook" alt="Open pull requests"></a>
   <a href="https://github.com/nook-browser/Nook/issues"><img src="https://img.shields.io/github/issues/nook-browser/Nook" alt="Open issues"></a>
   <a href="https://github.com/nook-browser/Nook/graphs/contributors"><img src="https://img.shields.io/github/contributors/nook-browser/Nook" alt="Contributors"></a>
-  <a href="https://deepwiki.com/nook-browser/Nook"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a>
   <a href=""><img src="https://img.shields.io/coderabbit/prs/github/nook-browser/Nook?utm_source=oss&utm_medium=github&utm_campaign=nook-browser%2FNook&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews" alt="CodeRabbit Pull Request Reviews"></a>
 </p>
 
 
 <p align="center">
-  <a href="https://github.com/nook-browser/Nook/releases/latest"><img src="https://img.shields.io/github/v/release/nook-browser/Nook?label=stable" alt="Latest stable release"></a>
-  <a href="https://github.com/nook-browser/Nook/releases"><img src="https://img.shields.io/github/v/release/nook-browser/Nook?include_prereleases&label=beta&color=orange" alt="Latest beta release"></a>
+  <a href="https://github.com/nook-browser/Nook/releases/latest"><img src="https://img.shields.io/github/v/release/nook-browser/Nook?label=release" alt="Latest release"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/nook-browser/Nook/releases/latest"><img src="https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
-  <a href="https://github.com/nook-browser/Nook/releases"><img src="https://img.shields.io/badge/Download-Beta-FF8C00?style=for-the-badge&logo=apple&logoColor=white" alt="Download the beta"></a>
 </p>
 
 > **Status:** Development started back up in September 2026 under a new maintainer. See [Releases](https://github.com/nook-browser/Nook/releases) for the current download.
@@ -46,9 +43,6 @@
 
 ### Download
 [![Download for macOS](https://img.shields.io/badge/Download%20for-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/Nook/releases/latest)
-[![Download the beta](https://img.shields.io/badge/Download-Beta-FF8C00?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/nook-browser/Nook/releases)
-
-Betas are prereleases: they arrive first and one of them is promoted to the official release. The beta badge above always shows the newest one.
 
 ### or, Build from Source
 
