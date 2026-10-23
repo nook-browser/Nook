@@ -47,6 +47,17 @@ extension ExtensionManager {
         return browserManagerRef?.tabs.selectedSession(in: window).flatMap { adapter(for: $0.itemID) }
     }
 
+    /// Clicks an extension's action. WebKit ignores every click while it believes a popup is
+    /// open, so a popover it still holds but no longer shows is closed first. Reading
+    /// `popupPopover` would build and load a new popup, hence the weak reference.
+    func performAction(_ context: WKWebExtensionContext, for tab: ExtensionTabAdapter?) {
+        if let popover = shownPopover, !popover.isShown {
+            context.action(for: tab)?.closePopup()
+            shownPopover = nil
+        }
+        context.performAction(for: tab)
+    }
+
     /// Opened Peek and mini window pages hosted by `window`.
     func detachedAdapters(in window: BrowserWindowState) -> [ExtensionTabAdapter] {
         openedTabIDs.compactMap { id in

@@ -169,42 +169,9 @@ extension ExtensionManager {
 
     /// Register a UI anchor view for an extension action button to position popovers.
     func setActionAnchor(for extensionId: String, anchorView: NSView) {
-        Self.logger.debug("setActionAnchor called for extension ID: \(extensionId, privacy: .public)")
-        let anchor = WeakAnchor(view: anchorView, window: anchorView.window)
-        if actionAnchors[extensionId] == nil { actionAnchors[extensionId] = [] }
-        // Remove stale anchors
-        actionAnchors[extensionId]?.removeAll { $0.view == nil }
-        if let idx = actionAnchors[extensionId]?.firstIndex(where: {
-            $0.view === anchorView
-        }) {
-            actionAnchors[extensionId]?[idx] = anchor
-        } else {
-            actionAnchors[extensionId]?.append(anchor)
-        }
-        Self.logger.debug("Total anchors for extension \(extensionId, privacy: .public): \(self.actionAnchors[extensionId]?.count ?? 0)")
-
-        // MEMORY LEAK FIX: Remove any previous observer for this anchor to prevent accumulation
-        if anchorObserverTokens[extensionId] == nil { anchorObserverTokens[extensionId] = [] }
-
-        // Update anchor if view moves to a different window
-        let token = NotificationCenter.default.addObserver(
-            forName: NSView.frameDidChangeNotification,
-            object: anchorView,
-            queue: .main
-        ) { [weak self, weak anchorView] _ in
-            MainActor.assumeIsolated {
-                guard let anchorView else { return }
-                if let idx = self?.actionAnchors[extensionId]?.firstIndex(
-                    where: { $0.view === anchorView }
-                ) {
-                    let updated = WeakAnchor(
-                        view: anchorView,
-                        window: anchorView.window
-                    )
-                    self?.actionAnchors[extensionId]?[idx] = updated
-                }
-            }
-        }
-        anchorObserverTokens[extensionId]?.append(token)
+        var anchors = actionAnchors[extensionId] ?? []
+        anchors.removeAll { $0.view == nil }
+        if !anchors.contains(where: { $0.view === anchorView }) { anchors.append(WeakAnchor(view: anchorView)) }
+        actionAnchors[extensionId] = anchors
     }
 }
