@@ -16,14 +16,3 @@ extension View {
         }
     }
 }
-
-extension ToolbarContent {
-    @ToolbarContentBuilder
-    public func nookHiddenToolbarBackground() -> some ToolbarContent {
-        if #available(macOS 26, iOS 26, *) {
-            self.sharedBackgroundVisibility(.hidden)
-        } else {
-            self
-        }
-    }
-}
