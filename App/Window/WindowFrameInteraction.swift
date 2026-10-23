@@ -7,6 +7,7 @@ import AppKit
 final class WindowFrameInteractionView: NSView {
     var beginDrag: (() -> String?)?
     var endDrag: ((String) -> Void)?
+    var clickAction: (() -> Void)?
     private var press: NSEvent?
     private var didDrag = false
     var doubleClickActionProvider: () -> String = { WindowFrameInteractionView.doubleClickAction() }
@@ -33,14 +34,18 @@ final class WindowFrameInteractionView: NSView {
             owner = acquired
         } else { owner = nil }
         defer { if let owner { endDrag?(owner) } }
-        window.performDrag(with: event)
+        window.performDrag(with: press)
     }
 
     override func mouseUp(with event: NSEvent) {
         defer { press = nil; didDrag = false }
-        guard press != nil, !didDrag, event.clickCount == 2,
+        guard press != nil, !didDrag,
               let window, event.window === window else { return }
-        performDoubleClick(in: window, action: doubleClickActionProvider())
+        if event.clickCount == 2 {
+            performDoubleClick(in: window, action: doubleClickActionProvider())
+        } else {
+            clickAction?()
+        }
     }
 
     static func doubleClickAction(defaults: UserDefaults = .standard) -> String {

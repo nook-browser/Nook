@@ -3,7 +3,6 @@
 import NookDesign
 import NookTabsCore
 import SwiftUI
-import AppKit
 
 /// A native, live editor for a space's colors, material and appearance.
 public struct SpaceAppearancePicker: View {
@@ -230,7 +229,7 @@ public struct SpaceAppearancePicker: View {
         let previousStep = ((appearance.opacity - 0.3) / 0.025).rounded()
         appearance.opacity = next
         if previousStep != step.rounded() {
-            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            Haptics.alignment()
         }
     }
 
@@ -239,7 +238,7 @@ public struct SpaceAppearancePicker: View {
         let previousStep = (appearance.grain * 15).rounded()
         appearance.grain = step / 15
         if previousStep != step {
-            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            Haptics.alignment()
         }
     }
 

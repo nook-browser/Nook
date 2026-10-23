@@ -41,7 +41,10 @@ final class HoverSidebarManager: ObservableObject {
 
     func setAddressEditing(_ editing: Bool, in windowID: UUID) {
         if editing { addressEditingWindows.insert(windowID) }
-        else { addressEditingWindows.remove(windowID) }
+        else {
+            addressEditingWindows.remove(windowID)
+            if isActive { scheduleHandleMouseMovement() }
+        }
     }
 
     // MARK: - Lifecycle

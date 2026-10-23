@@ -7,9 +7,13 @@ private final class RecordingWindow: NSWindow {
     var zoomCalls = 0
     var minimizeCalls = 0
     var dragCalls = 0
+    var lastDragEvent: NSEvent?
     override func performZoom(_ sender: Any?) { zoomCalls += 1 }
     override func performMiniaturize(_ sender: Any?) { minimizeCalls += 1 }
-    override func performDrag(with event: NSEvent) { dragCalls += 1 }
+    override func performDrag(with event: NSEvent) {
+        dragCalls += 1
+        lastDragEvent = event
+    }
     override func setFrame(_ frameRect: NSRect, display flag: Bool, animate animateFlag: Bool) {
         super.setFrame(frameRect, display: flag, animate: false)
     }
@@ -26,12 +30,16 @@ struct WindowFrameInteractionCheck {
             NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)!
         }
         region.doubleClickActionProvider = { "Zoom" }
+        var clickCalls = 0
+        region.clickAction = { clickCalls += 1 }
         region.mouseDown(with: event(.leftMouseDown, .zero))
         region.mouseUp(with: event(.leftMouseUp, .zero))
         precondition(window.zoomCalls == 0)
+        precondition(clickCalls == 1)
         region.mouseDown(with: event(.leftMouseDown, .zero, clicks: 2))
         region.mouseUp(with: event(.leftMouseUp, .zero, clicks: 2))
         precondition(window.zoomCalls == 1)
+        precondition(clickCalls == 1)
         window.zoomCalls = 0
         let otherWindow = RecordingWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
         let wrongWindowUp = NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: otherWindow.windowNumber, context: nil, eventNumber: 0, clickCount: 2, pressure: 1)!
@@ -50,15 +58,19 @@ struct WindowFrameInteractionCheck {
         var released = 0
         region.beginDrag = { acquired += 1; return "frame" }
         region.endDrag = { precondition($0 == "frame"); released += 1 }
-        region.mouseDown(with: event(.leftMouseDown, .zero))
+        let initiatingPress = event(.leftMouseDown, .zero)
+        region.mouseDown(with: initiatingPress)
         region.mouseDragged(with: event(.leftMouseDragged, NSPoint(x: 1, y: 1)))
         precondition(window.dragCalls == 0 && acquired == 0)
         region.mouseDragged(with: event(.leftMouseDragged, NSPoint(x: 4, y: 0)))
         precondition(window.dragCalls == 1 && acquired == 1 && released == 1)
+        precondition(window.lastDragEvent === initiatingPress)
+        precondition(window.lastDragEvent?.type == .leftMouseDown)
         region.mouseDragged(with: event(.leftMouseDragged, NSPoint(x: 8, y: 0)))
         precondition(window.dragCalls == 1)
         region.mouseUp(with: event(.leftMouseUp, NSPoint(x: 8, y: 0), clicks: 2))
         precondition(window.zoomCalls == 0)
+        precondition(clickCalls == 1)
 
         region.beginDrag = { nil }
         region.mouseDown(with: event(.leftMouseDown, .zero))

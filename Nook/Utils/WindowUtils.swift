@@ -10,8 +10,8 @@ import Foundation
 import SwiftUI
 
 extension View {
-    public func backgroundDraggable() -> some View {
-        overlay(WindowFrameInteractionSurface())
+    public func backgroundDraggable(onClick: (() -> Void)? = nil) -> some View {
+        overlay(WindowFrameInteractionSurface(onClick: onClick))
     }
 
     public func backgroundDraggable<G: Gesture>(gesture: G) -> some View {
@@ -41,6 +41,8 @@ private struct ConditionalWindowDragModifier: ViewModifier {
 }
 
 private struct WindowFrameInteractionSurface: NSViewRepresentable {
+    var onClick: (() -> Void)? = nil
+
     func makeNSView(context: Context) -> WindowFrameInteractionView {
         let view = WindowFrameInteractionView()
         view.beginDrag = {
@@ -48,24 +50,11 @@ private struct WindowFrameInteractionSurface: NSViewRepresentable {
             return DragLockManager.shared.startDrag(ownerID: owner) ? owner : nil
         }
         view.endDrag = { DragLockManager.shared.endDrag(ownerID: $0) }
+        view.clickAction = onClick
         return view
     }
 
-    func updateNSView(_ nsView: WindowFrameInteractionView, context: Context) {}
-}
-
-/// Retained for callers supplying their own SwiftUI gesture. The built-in decorative chrome
-/// uses WindowFrameInteractionView so clicks can retain native double-click behavior.
-struct WindowDragGesture: Gesture {
-    var body: some Gesture {
-        DragGesture(minimumDistance: 3, coordinateSpace: .global)
-            .onChanged { _ in
-                guard let event = NSApp.currentEvent, event.type == .leftMouseDragged,
-                      let window = event.window else { return }
-                let owner = UUID().uuidString
-                guard DragLockManager.shared.startDrag(ownerID: owner) else { return }
-                defer { DragLockManager.shared.endDrag(ownerID: owner) }
-                window.performDrag(with: event)
-            }
+    func updateNSView(_ nsView: WindowFrameInteractionView, context: Context) {
+        nsView.clickAction = onClick
     }
 }
