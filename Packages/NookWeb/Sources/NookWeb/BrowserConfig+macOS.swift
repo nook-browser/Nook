@@ -17,10 +17,8 @@ extension BrowserConfiguration {
         // them either. Gesture-driven copy and paste go through WebKit's own path.
         setPrivatePreference("allowsPictureInPictureMediaPlayback", in: config.preferences)
         setPrivatePreference("allowsInlineMediaPlayback", in: config.preferences)
-        // The inspector itself is enabled per web view through isInspectable.
-        #if DEBUG
+        // Puts Inspect Element in the page's context menu; isInspectable covers Safari's remote inspector.
         setPrivatePreference("developerExtrasEnabled", in: config.preferences)
-        #endif
         hidePDFHUD(in: config.preferences)
     }
 

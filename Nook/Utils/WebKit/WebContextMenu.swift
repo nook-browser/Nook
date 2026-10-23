@@ -17,8 +17,13 @@ enum WebContextMenuItem {
     case pageReload
     case pageCopyAddress
     case pageTranslate
+    case pagePrint
+    case pageViewSource
 
     case linkOpenInNewTab
+    case linkOpenInNewWindow
+    case linkOpenInSplitView
+    case linkSaveAs
     case linkCopy
 
     case imageOpenInNewTab
@@ -49,28 +54,26 @@ enum WebContextMenuItem {
     private static func content(for payload: WebContextMenuPayload) -> [WebContextMenuItem] {
         switch payload {
         case .page:
-            return [.pageBack, .pageForward, .pageReload, .separator, .pageCopyAddress, .pageTranslate, .separator, .systemInspect]
-        case .textSelection:
-            return [.systemLookUp, .systemTranslate, .textCopy, .separator, .systemShare, .separator, .systemInspect]
-        case .link:
-            return [.linkOpenInNewTab, .separator, .linkCopy, .separator, .systemShare, .separator, .systemInspect]
-        case .image:
-            return [
-                .imageOpenInNewTab,
-                .separator,
-                .imageSaveToDownloads,
-                .imageSaveAs,
-                .separator,
-                .imageCopyAddress,
-                .systemImageCopy,
-                .separator,
-                .systemShare,
-                .separator,
-                .systemInspect
-            ]
-        case .multiple(let payloads):
-            return payloads.flatMap { content(for: $0) }
+            return [.pageBack, .pageForward, .pageReload, .separator, .pageCopyAddress, .pagePrint, .pageTranslate, .separator, .pageViewSource, .systemInspect]
         case .ignored:
+            return []
+        default:
+            // Link first, then image, then the selection; Share and Inspect once at the end,
+            // since a system item added to the menu twice throws.
+            let parts = payload.parts.sorted { $0.menuRank < $1.menuRank }
+            return parts.flatMap { section(for: $0) + [.separator] } + [.systemShare, .separator, .systemInspect]
+        }
+    }
+
+    private static func section(for payload: WebContextMenuPayload) -> [WebContextMenuItem] {
+        switch payload {
+        case .link:
+            return [.linkOpenInNewTab, .linkOpenInNewWindow, .linkOpenInSplitView, .separator, .linkSaveAs, .linkCopy]
+        case .image:
+            return [.imageOpenInNewTab, .separator, .imageSaveToDownloads, .imageSaveAs, .separator, .imageCopyAddress, .systemImageCopy]
+        case .textSelection:
+            return [.systemLookUp, .systemTranslate, .textCopy]
+        default:
             return []
         }
     }
@@ -129,11 +132,17 @@ enum WebContextMenuItem {
         case .pageReload: return "Reload Page"
         case .pageCopyAddress: return "Copy Page Address"
         case .pageTranslate: return webView.owningSession?.isTranslated == true ? "Show Original" : "Translate Page"
+        case .pagePrint: return "Print…"
+        case .pageViewSource: return "View Page Source"
         case .linkOpenInNewTab: return "Open Link in New Tab"
+        // A new window is a regular one, so a private page leaves it out.
+        case .linkOpenInNewWindow: return webView.owningSession?.isPrivate == true ? nil : "Open Link in New Window"
+        case .linkOpenInSplitView: return "Open Link in Split View"
+        case .linkSaveAs: return "Save Link As…"
         case .linkCopy: return "Copy Link"
         case .imageOpenInNewTab: return "Open Image in New Tab"
         case .imageSaveToDownloads: return "Save Image to Downloads"
-        case .imageSaveAs: return "Save Image As..."
+        case .imageSaveAs: return "Save Image As…"
         case .imageCopyAddress: return "Copy Image Address"
         case .textCopy: return "Copy"
         case .separator, .systemLookUp, .systemTranslate, .systemShare, .systemInspect, .systemImageCopy:
@@ -182,6 +191,22 @@ enum WebContextMenuItem {
             if let url = payload.linkURL {
                 webView.openLinkInNewTab(url)
             }
+        case .pagePrint:
+            webView.nookPrint()
+        case .pageViewSource:
+            webView.showPageSource()
+        case .linkOpenInNewWindow:
+            if let url = payload.linkURL {
+                webView.openLinkInNewWindow(url)
+            }
+        case .linkOpenInSplitView:
+            if let url = payload.linkURL {
+                webView.openLinkInSplitView(url)
+            }
+        case .linkSaveAs:
+            if let url = payload.linkURL {
+                webView.saveLink(url)
+            }
         case .linkCopy:
             if let url = payload.linkURL {
                 NSPasteboard.general.clearContents()
@@ -211,6 +236,22 @@ enum WebContextMenuItem {
     }
 }
 
+private extension WebContextMenuPayload {
+    var parts: [WebContextMenuPayload] {
+        if case .multiple(let payloads) = self { return payloads.flatMap(\.parts) }
+        return [self]
+    }
+
+    var menuRank: Int {
+        switch self {
+        case .link: return 0
+        case .image: return 1
+        case .textSelection: return 2
+        default: return 3
+        }
+    }
+}
+
 @MainActor
 final class HandlerMenuItem: NSMenuItem {
     private let handler: (NSMenuItem) -> Void
@@ -235,6 +276,51 @@ extension FocusableWKWebView {
     /// on a link takes the same path, so the placement and scheme rules live on the session.
     func openLinkInNewTab(_ url: URL) {
         owningSession?.openInNewTab(url)
+    }
+
+    private var browserManager: BrowserManager? {
+        owningSession?.controller?.sessionDelegate as? BrowserManager
+    }
+
+    /// Opens `url` in a new regular window on the page's space.
+    func openLinkInNewWindow(_ url: URL) {
+        guard let browserManager, let spaceID = owningSession.flatMap({ browserManager.tabs.window(for: $0) })?.spaceID else { return }
+        browserManager.createNewWindow { window in
+            browserManager.tabs.setSpace(spaceID, in: window)
+            _ = browserManager.tabs.open(url: url, in: window, placement: .newTab)
+        }
+    }
+
+    /// Opens `url` as a trail child and pairs it with the window's selection.
+    func openLinkInSplitView(_ url: URL) {
+        guard let browserManager, let session = owningSession,
+              let window = browserManager.tabs.window(for: session),
+              let itemID = browserManager.tabs.open(url: url, in: window, placement: .background, from: session.itemID)
+        else { return }
+        browserManager.splitManager.enterSplit(with: itemID, in: window)
+    }
+
+    /// Downloads `url` with the page's cookies, asking where to save it.
+    func saveLink(_ url: URL) {
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
+        startDownload(using: URLRequest(url: url)) { download in
+            _ = DownloadManager.shared.addDownload(
+                download,
+                originalURL: url,
+                suggestedFilename: url.lastPathComponent,
+                destinationPreference: .askUser
+            )
+        }
+    }
+
+    /// The Web Inspector's Sources tab, the way Safari shows source. `_inspector` is SPI.
+    func showPageSource() {
+        let selector = NSSelectorFromString("_inspector")
+        guard responds(to: selector),
+              let inspector = perform(selector)?.takeUnretainedValue() as? NSObject else { return }
+        for name in ["show", "attach", "showResources"] where inspector.responds(to: NSSelectorFromString(name)) {
+            inspector.perform(NSSelectorFromString(name))
+        }
     }
 
     func downloadImage(from url: URL?, promptForLocation: Bool = false) {
