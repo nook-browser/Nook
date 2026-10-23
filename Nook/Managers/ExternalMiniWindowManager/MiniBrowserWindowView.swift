@@ -10,8 +10,13 @@ struct MiniBrowserWindowView: View {
     var body: some View {
         // The page runs up under the glass toolbar; the load bar sits just below it.
         ZStack(alignment: .top) {
-            DetachedPageHost(page: page)
-                .ignoresSafeArea(.container, edges: .top)
+            if #available(macOS 26, *) {
+                DetachedPageHost(page: page)
+                    .ignoresSafeArea(.container, edges: .top)
+            } else {
+                // Sequoia cannot inset WebKit's fixed content beneath the toolbar.
+                DetachedPageHost(page: page)
+            }
             BlockedPageView(session: page)
             if let webView = page.webView {
                 PageLoadBar(webView: webView, tint: gradientColorManager.accentColor)

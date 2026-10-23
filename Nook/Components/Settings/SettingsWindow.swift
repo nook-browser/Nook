@@ -114,7 +114,7 @@ private struct HistoryToolbar: ViewModifier {
                 }
                 .nookIconButtons()
             }
-            .sharedBackgroundVisibility(.hidden)
+            .nookHiddenToolbarBackground()
         }
     }
 }

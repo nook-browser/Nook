@@ -137,7 +137,7 @@ public final class PageSession: NSObject, Identifiable {
     public internal(set) var isTranslated = false
     /// The detected language while the window offers to translate the page.
     public internal(set) var translationOffer: Locale.Language?
-    /// Set when the language pair still needs downloading; the window's `.translationTask` runs it.
+    /// Requests a view-hosted session for language downloads, or any translation on Sequoia.
     public internal(set) var translationRequest: TranslationSession.Configuration?
     @ObservationIgnored var translationSource: Locale.Language?
     @ObservationIgnored var translationGeneration = 0

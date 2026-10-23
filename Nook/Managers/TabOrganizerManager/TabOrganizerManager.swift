@@ -51,7 +51,7 @@ final class TabOrganizerManager {
     /// 3. Asks the model for folders and short titles.
     /// 4. Applies the plan.
     func organizeTabs(in spaceID: UUID, using tabs: TabsController) async {
-        guard isAvailable else { return }
+        guard #available(macOS 26, *), isAvailable else { return }
         guard !isOrganizing else {
             Self.log.warning("Organization already in progress, ignoring request")
             return
@@ -146,7 +146,7 @@ final class TabOrganizerManager {
     /// Shortens the titles of tabs that were just pinned. Skips titles the user typed and short
     /// ones, and drops a result when the tab was renamed, moved out or navigated meanwhile.
     func autoRename(_ itemIDs: [UUID], using tabs: TabsController) {
-        guard isAvailable else { return }
+        guard #available(macOS 26, *), isAvailable else { return }
         var inputs: [TabInput] = []
         for itemID in itemIDs.prefix(Self.maxTabs) {
             guard let item = tabs.item(itemID), let url = tabs.session(for: itemID)?.url ?? item.url else { continue }

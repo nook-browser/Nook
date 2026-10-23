@@ -1,0 +1,49 @@
+name: macOS Compatibility Build
+
+on:
+  pull_request:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Ensure Metal Toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
+      - name: Build without signing secrets
+        run: |
+          xcodebuild -scheme Nook -configuration Release -arch arm64 \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ENABLE_CODE_COVERAGE=NO \
+            CLANG_COVERAGE_MAPPING=NO
+
+      - name: Verify Sequoia deployment target
+        run: |
+          MINIMUM_MACOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' build/Build/Products/Release/Nook.app/Contents/Info.plist)
+          test "$MINIMUM_MACOS" = "15.5"

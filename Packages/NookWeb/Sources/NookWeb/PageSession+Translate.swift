@@ -99,8 +99,13 @@ extension PageSession {
         switch status {
         case .installed:
             isTranslated = true
-            let session = TranslationSession(installedSource: source, target: target)
-            installedTranslation = Task { await runTranslation(with: session) }
+            if #available(macOS 26, iOS 26, *) {
+                let session = TranslationSession(installedSource: source, target: target)
+                installedTranslation = Task { await runTranslation(with: session) }
+            } else {
+                // Sequoia creates sessions through the view's translationTask, even for installed languages.
+                translationRequest = TranslationSession.Configuration(source: source, target: target)
+            }
         case .supported:
             // The window's .translationTask hands back a session that can show the download sheet.
             isTranslated = true

@@ -26,7 +26,10 @@ struct AppleIntelligenceProvider: AIProviderProtocol {
         """
 
     /// Observable: views reading this update when Apple Intelligence is turned on or off.
-    static var isAvailable: Bool { model.isAvailable }
+    static var isAvailable: Bool {
+        guard #available(macOS 26, *) else { return false }
+        return model.isAvailable
+    }
 
     // Budgets in estimated tokens for a 4096-token context on macOS 26 and 8192 on 27, keyed on the
     // OS because `contextSize` needs the 26.4 SDK.
@@ -42,6 +45,7 @@ struct AppleIntelligenceProvider: AIProviderProtocol {
         "getSelectedText", "getTabList", "switchTab", "createTab",
     ]
 
+    @available(macOS 26, *)
     private static let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
 
     /// Whether the person's own message names what an opening or clicking tool is aimed at. The model
@@ -77,6 +81,19 @@ struct AppleIntelligenceProvider: AIProviderProtocol {
     func sendMessage(
         messages: [AIMessage],
         model: String,
+        config: AIGenerationConfig,
+        tools: [AIToolDefinition],
+        onStream: @escaping @Sendable (String) -> Void
+    ) async throws -> AIResponse {
+        guard #available(macOS 26, *) else {
+            throw AIProviderError.unsupportedFeature("On-device chat requires macOS 26 or later and Apple Intelligence")
+        }
+        return try await sendOnDeviceMessage(messages: messages, config: config, tools: tools, onStream: onStream)
+    }
+
+    @available(macOS 26, *)
+    private func sendOnDeviceMessage(
+        messages: [AIMessage],
         config: AIGenerationConfig,
         tools: [AIToolDefinition],
         onStream: @escaping @Sendable (String) -> Void
@@ -195,6 +212,7 @@ private enum OnDeviceError: LocalizedError {
 
 /// One browser tool as the framework sees it. Calls go back through `AIService`, so they get the
 /// same approval prompts, per-tool switches and private-window refusal as every other provider's.
+@available(macOS 26, *)
 private struct BrowserTool: Tool {
     let name: String
     let description: String
