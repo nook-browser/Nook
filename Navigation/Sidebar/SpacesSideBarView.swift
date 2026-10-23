@@ -416,7 +416,8 @@ struct SpacesSideBarView: View {
                         name: name.isEmpty ? "New Space" : name,
                         icon: "square.grid.2x2",
                         accentHex: accentHex,
-                        after: tabs.orderedSpaces.last?.id
+                        after: tabs.orderedSpaces.last?.id,
+                        sharingLoginsWith: windowState.spaceID
                     ) {
                         tabs.setSpace(spaceID, in: windowState)
                     }
