@@ -274,6 +274,13 @@ struct WebsiteView: View {
                 BlockedPageView(session: session)
             }
 
+            // The unselected split pane can be translated from its context menu too.
+            if shouldShowSplit, let other = [splitManager.leftTabId(for: windowState.id), splitManager.rightTabId(for: windowState.id)]
+                .compactMap({ $0 }).first(where: { $0 != windowState.selectedItemID }),
+               let session = browserManager.tabs.session(for: other) {
+                TranslationTaskHost(session: session)
+            }
+
             if let session = browserManager.tabs.controllableSession(in: windowState) {
                 TranslationTaskHost(session: session)
                 if let language = session.translationOffer, !session.isTranslated {

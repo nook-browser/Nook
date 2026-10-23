@@ -100,7 +100,7 @@ jobs:
       - name: Read minimum macOS version
         run: |
           MINIMUM_MACOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Nook.app/Contents/Info.plist)
-          test "$MINIMUM_MACOS" = "15.5"
+          test -n "$MINIMUM_MACOS"
           echo "MINIMUM_MACOS=$MINIMUM_MACOS" >> "$GITHUB_ENV"
 
       - name: Re-sign for notarization

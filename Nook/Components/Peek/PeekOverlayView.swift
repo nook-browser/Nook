@@ -65,6 +65,7 @@ struct PeekOverlayView: View {
                     .id(page.itemID)
 
                 BlockedPageView(session: page)
+                TranslationTaskHost(session: page)
 
                 if let webView = page.webView {
                     PageLoadBar(webView: webView, tint: currentSpaceColor)
