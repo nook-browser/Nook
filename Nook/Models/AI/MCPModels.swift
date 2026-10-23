@@ -7,6 +7,7 @@
 //  JSON-RPC wire format. The persisted MCPServerConfig lives in NookSettings.
 //
 
+import CryptoKit
 import Foundation
 
 // MARK: - MCP Tool
@@ -22,6 +23,25 @@ struct MCPTool: Identifiable, Equatable {
         "\(serverId).\(name)"
     }
 
+    /// Name sent to providers: OpenAI-style APIs allow only `[a-zA-Z0-9_-]`, 64 characters at most,
+    /// and Gemini wants a leading letter. The hash keeps tools with the same name on two servers apart.
+    func providerFunctionName(avoiding reservedNames: Set<String> = []) -> String {
+        let key = Data(serverId.utf8) + Data([0]) + Data(name.utf8)
+        let hash = SHA256.hash(data: key).prefix(4).map { String(format: "%02x", $0) }.joined()
+        let readable = String(name.unicodeScalars.prefix(46).map {
+            $0.isASCII && (CharacterSet.alphanumerics.contains($0) || $0 == "-") ? Character($0) : "_"
+        })
+        // At most 59 characters, leaving room for a "_N" suffix
+        let base = "mcp_\(readable)_\(hash)"
+        var candidate = base
+        var collision = 1
+        while reservedNames.contains(candidate) {
+            candidate = "\(base)_\(collision)"
+            collision += 1
+        }
+        return candidate
+    }
+
     init(serverId: String, name: String, description: String, inputSchema: [String: Any] = [:]) {
         self.id = "\(serverId).\(name)"
         self.serverId = serverId
@@ -32,6 +52,21 @@ struct MCPTool: Identifiable, Equatable {
 
     static func == (lhs: MCPTool, rhs: MCPTool) -> Bool {
         lhs.id == rhs.id && lhs.name == rhs.name && lhs.description == rhs.description
+    }
+}
+
+/// Resolves the provider-safe function names in one request back to MCP tools.
+/// The registry is request-scoped so a tool call can only target a tool that was
+/// actually advertised in that request.
+struct MCPToolFunctionRegistry {
+    private(set) var toolsByFunctionName: [String: MCPTool] = [:]
+
+    mutating func register(_ tool: MCPTool, avoiding reservedNames: Set<String> = []) -> String {
+        let name = tool.providerFunctionName(
+            avoiding: reservedNames.union(toolsByFunctionName.keys)
+        )
+        toolsByFunctionName[name] = tool
+        return name
     }
 }
 
