@@ -174,7 +174,7 @@ struct SidebarSpaceCreationView: View {
         guard !trimmedName.isEmpty else { return }
         let appearance = theme.wrappedValue.normalized
         guard let id = tabs.createSpace(
-            name: trimmedName, icon: icon, accentHex: appearance.nodes[0].colorHex,
+            name: trimmedName, icon: icon, accentHex: appearance.primaryAccentHex,
             after: tabs.orderedSpaces.last?.id, appearance: appearance, profileID: profileID
         ) else { return }
         tabs.setSpace(id, in: windowState)

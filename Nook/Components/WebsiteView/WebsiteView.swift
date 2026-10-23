@@ -220,15 +220,14 @@ struct WebsiteView: View {
                             squareTopCorners: nookSettings.topBarAddressView
                         )
                         .coordinateSpace(name: dragCoordinateSpace)
-                        // The shadow comes from this opaque shape behind the webview, and the
-                        // corners from the container layer's cornerRadius. A clipShape mask,
+                        // The page-frame shadow is drawn separately by WindowView, and the
+                        // corners come from the container layer's cornerRadius. A clipShape mask,
                         // shadow or compositingGroup on this branch recomposites the
                         // WKWebView's live video layer and flashes it black one frame at a
                         // time during playback.
                         .background(
                             webViewClipShape
                                 .fill(shouldShowSplit ? Color.clear : Color(nsColor: .windowBackgroundColor))
-                                .nookElevation(nookSettings.hideWebContentBorder ? .flat : .raised)
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         // Critical: Use allowsHitTesting to prevent SwiftUI from intercepting mouse events

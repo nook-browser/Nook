@@ -162,9 +162,13 @@ extension TabTree {
         if let accentHex {
             target.accentHex = accentHex
             if var appearance = target.appearance?.normalized {
-                appearance.nodes[0].colorHex = accentHex
+                if appearance.nodes.isEmpty {
+                    appearance.nodes = SpaceAppearance(accentHex: accentHex).nodes
+                } else {
+                    appearance.nodes[0].colorHex = accentHex
+                }
                 target.appearance = appearance.normalized
-                target.accentHex = target.appearance!.nodes[0].colorHex
+                target.accentHex = target.appearance!.primaryAccentHex
             }
         }
         guard target != spaces[id] else { return Change() }
@@ -180,7 +184,7 @@ extension TabTree {
         guard var target = space(id) else { throw TreeError.missingSpace }
         let appearance = appearance.normalized
         target.appearance = appearance
-        target.accentHex = appearance.nodes[0].colorHex
+        target.accentHex = appearance.primaryAccentHex
         guard target != spaces[id] else { return Change() }
         target.modifiedAt = now
         var change = Change()

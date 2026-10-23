@@ -10,12 +10,23 @@ struct SidebarResizeView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.nookSettings) private var settings
+    @Environment(\.nookUsesDefaultSpaceTheme) private var usesDefaultTheme
+    @Environment(\.colorScheme) private var colorScheme
     @State private var startingWidth: CGFloat = 0
     @State private var sessionID = UUID().uuidString
 
+    private var indicatorColor: NSColor {
+        if usesDefaultTheme {
+            return NSColor(colorScheme == .dark
+                ? NookDesign.SidebarChrome.defaultResizeDark
+                : NookDesign.SidebarChrome.defaultResizeLight)
+        }
+        return NSColor(browserManager.accentColor).withAlphaComponent(0.8)
+    }
+
     var body: some View {
         SidebarResizeHandle(
-            color: NSColor(browserManager.accentColor).withAlphaComponent(0.8),
+            color: indicatorColor,
             onHover: { windowState.isSidebarResizeHovered = $0 },
             onStart: {
                 guard windowState.isSidebarVisible,

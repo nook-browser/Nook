@@ -9,7 +9,38 @@
 
 import SwiftUI
 
+private struct DefaultSpaceThemeKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+public extension EnvironmentValues {
+    var nookUsesDefaultSpaceTheme: Bool {
+        get { self[DefaultSpaceThemeKey.self] }
+        set { self[DefaultSpaceThemeKey.self] = newValue }
+    }
+}
+
 public extension View {
+    /// A soft page-frame shadow, drawn separately from live WebKit content.
+    /// Removing the silhouette's fill keeps split gutters transparent to the window theme.
+    func nookWebPageShadow<S: Shape>(in shape: S, enabled: Bool = true) -> some View {
+        background {
+            if enabled {
+                shape.fill(Color.black)
+                    .shadow(color: .black.opacity(0.20), radius: 6, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.08), radius: 1, x: 0, y: 0)
+                    .overlay {
+                        shape.fill(Color.black).blendMode(.destinationOut)
+                    }
+                    // Only the shadow is composited; the page and its video layers
+                    // remain outside this group.
+                    .compositingGroup()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
     /// A layer that floats over content: solid raised card, hairline edge, floating shadow.
     func nookFloatingSurface<S: InsettableShape>(in shape: S) -> some View {
         self.clipShape(shape)
@@ -53,6 +84,7 @@ public struct NookTabButtonStyle: ButtonStyle {
 
 private struct NookTabSurface: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.nookUsesDefaultSpaceTheme) private var defaultTheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     let selected: Bool
@@ -65,18 +97,28 @@ private struct NookTabSurface: ViewModifier {
         // A mostly opaque neutral surface stabilizes contrast across multicolor themes.
         // The remaining transparency picks up the actual background beneath this row,
         // including its position in a gradient, rather than using one global accent.
-        let base = Color(white: 0.99)
-        let opacity = reduceTransparency || strongContrast ? 1.0 : 0.92
+        let defaultDark = defaultTheme && dark
+        let opaque = reduceTransparency || strongContrast
+        let darkBase = opaque ? Color(white: 0.25) : Color(red: 0.98, green: 0.984, blue: 1)
+        let base = defaultTheme
+            ? (dark ? darkBase : .white)
+            : Color(white: 0.99)
+        let opacity = opaque ? 1.0
+            : defaultTheme ? (dark ? 0.20 : 0.85) : 0.92
+        let hoverFill = defaultTheme
+            ? (dark ? Color(red: 0.98, green: 0.984, blue: 1).opacity(0.15)
+                    : Color(red: 0.055, green: 0.059, blue: 0.063).opacity(0.10))
+            : (dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
         let fill = selected
             ? base.opacity(opacity)
-            : hovered ? (dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)) : .clear
+            : hovered ? hoverFill : .clear
         content
-            .environment(\.colorScheme, selected ? .light : colorScheme)
+            .environment(\.colorScheme, selected && !defaultDark ? .light : colorScheme)
             .clipShape(shape)
             .background {
                 shape.fill(fill)
                     .overlay {
-                        if selected {
+                        if selected && !defaultDark {
                             // A subtle top light gives the card a rounded, raised surface.
                             shape.fill(LinearGradient(
                                 colors: [.white.opacity(0.12), .clear],
@@ -93,9 +135,9 @@ private struct NookTabSurface: ViewModifier {
                         }
                     }
                     // Contact shadow, then a soft lift: avoid a dark halo around the card.
-                    .shadow(color: .black.opacity(selected ? 0.16 : 0),
+                    .shadow(color: .black.opacity(selected && !defaultDark ? 0.16 : 0),
                             radius: 0.65, y: 0.8)
-                    .shadow(color: .black.opacity(selected ? 0.10 : 0),
+                    .shadow(color: .black.opacity(selected && !defaultDark ? 0.10 : 0),
                             radius: 2, y: 1.5)
                     .allowsHitTesting(false)
             }
@@ -112,6 +154,7 @@ public extension View {
 
 private struct NookFavoriteSurface: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.nookUsesDefaultSpaceTheme) private var defaultTheme
     let selected: Bool
     let hovered: Bool
     var primaryColor: Color = .accentColor
@@ -125,8 +168,10 @@ private struct NookFavoriteSurface: ViewModifier {
     func body(content: Content) -> some View {
         let shape = NookDesign.Radius.shape(NookDesign.Tab.radius)
         let dark = colorScheme == .dark
-        let restingFill: Color = .white.opacity(dark ? (hovered ? 0.18 : 0.10)
-                                                        : (hovered ? 0.26 : 0.16))
+        let restingFill: Color = defaultTheme
+            ? (dark ? Color(red: 0.98, green: 0.984, blue: 1).opacity(hovered ? 0.15 : 0.10)
+                    : Color(red: 0.055, green: 0.059, blue: 0.063).opacity(hovered ? 0.10 : 0.05))
+            : .white.opacity(dark ? (hovered ? 0.18 : 0.10) : (hovered ? 0.26 : 0.16))
         content
             .clipShape(shape)
             .background {

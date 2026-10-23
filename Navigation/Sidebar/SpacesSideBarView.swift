@@ -394,6 +394,8 @@ struct SpacesSideBarView: View {
             .id(space.id)
             Spacer()
         }
+        .modifier(SpaceThemeScope(spaceID: space.id))
+        .environment(tabs)
     }
 
     /// Back, forward and reload at the trailing edge, unless the URL bar mode has them.
@@ -468,5 +470,16 @@ private struct ResizableSpaceFavorites: View {
 
     var body: some View {
         PinnedGrid(width: windowState.sidebarContentWidth, spaceID: spaceID)
+    }
+}
+
+/// The paging host caches its content; observe theme edits inside each cached page.
+private struct SpaceThemeScope: ViewModifier {
+    @Environment(TabsController.self) private var tabs
+    let spaceID: UUID
+
+    func body(content: Content) -> some View {
+        content.environment(\.nookUsesDefaultSpaceTheme,
+                            tabs.space(spaceID)?.resolvedAppearance.usesDefaultTheme ?? false)
     }
 }

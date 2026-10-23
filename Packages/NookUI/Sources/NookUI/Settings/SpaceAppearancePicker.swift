@@ -46,7 +46,7 @@ public struct SpaceAppearancePicker: View {
                     .font(.caption)
                 Spacer()
                 Button("Reset") {
-                    appearance = SpaceAppearance(accentHex: appearance.nodes.first?.colorHex ?? "#CCD4FF")
+                    appearance = SpaceAppearance(nodes: [], mode: appearance.mode)
                     selection = nil
                 }
                 .font(.caption)
@@ -108,7 +108,7 @@ public struct SpaceAppearancePicker: View {
                             .disabled(appearance.nodes.count >= 3)
                             .help("Add color").accessibilityLabel("Add color")
                         Button(action: removeColor) { Image(systemName: "minus") }
-                            .disabled(appearance.nodes.count <= 1)
+                            .disabled(appearance.nodes.isEmpty)
                             .help("Remove selected color").accessibilityLabel("Remove selected color")
                         Button(action: harmonize) { Image(systemName: "circle.grid.2x2") }
                             .disabled(appearance.nodes.count <= 1)
@@ -248,8 +248,13 @@ public struct SpaceAppearancePicker: View {
     }
 
     private func setSelectedHex(_ hex: String) {
-        guard let index = appearance.nodes.firstIndex(where: { $0.id == selectedID }) else { return }
-        appearance.nodes[index].colorHex = hex
+        if let index = appearance.nodes.firstIndex(where: { $0.id == selectedID }) {
+            appearance.nodes[index].colorHex = hex
+        } else {
+            let node = SpaceAppearance.Node(colorHex: hex)
+            appearance.nodes.append(node)
+            selection = node.id
+        }
     }
 
     private func addColor() {
@@ -261,7 +266,7 @@ public struct SpaceAppearancePicker: View {
     }
 
     private func removeColor() {
-        guard appearance.nodes.count > 1, let id = selectedID else { return }
+        guard let id = selectedID else { return }
         appearance.nodes.removeAll { $0.id == id }
         selection = appearance.nodes.first?.id
     }

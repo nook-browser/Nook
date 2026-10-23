@@ -104,7 +104,7 @@ private struct NookDragPreviewContent: View {
                 if isTile {
                     let nodes = manager.draggedAppearance.normalized.nodes
                     Color.clear.nookFavoriteSurface(selected: true,
-                        primaryColor: Color(hex: nodes[nodes.count / 2].colorHex),
+                        primaryColor: Color(hex: nodes.isEmpty ? "#8E8E93" : nodes[nodes.count / 2].colorHex),
                         icon: (manager.draggedIcon ?? Image(systemName: "globe")).resizable().scaledToFit())
                 } else {
                     Color.clear.nookTabSurface(selected: true)
@@ -128,7 +128,7 @@ private struct NookDragPreviewContent: View {
                     }
                 }
                 .padding(.horizontal, NookDesign.Spacing.rowPadding)
-                .environment(\.colorScheme, isTile ? manager.draggedColorScheme : .light)
+                .environment(\.colorScheme, isTile || manager.draggedAppearance.usesDefaultTheme ? manager.draggedColorScheme : .light)
             }
             .frame(width: size.width, height: size.height)
             .clipShape(NookDesign.Radius.shape(isTile ? NookDesign.Radius.lg : NookDesign.Tab.radius))
@@ -136,6 +136,7 @@ private struct NookDragPreviewContent: View {
             .padding(inset)
         }
         .environment(\.colorScheme, manager.draggedColorScheme)
+        .environment(\.nookUsesDefaultSpaceTheme, manager.draggedAppearance.usesDefaultTheme)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

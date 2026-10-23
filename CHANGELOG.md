@@ -4,11 +4,15 @@
 
 ### Added
 
+- Built-in light/dark gradients over native window transparency when the theme picker has no colors; removing the last color or resetting selects this appearance
+
 - Space themes with gradients, grain and light/dark modes
 - Inline space creation with a profile choice
 - Searchable icon and emoji tabs for spaces
 
 ### Changed
+
+- Add a soft shadow around the full web frame, including the top bar, while keeping split gutters transparent
 
 - Delay the sidebar resize handle by 200 ms, then fade it in over 200 ms and out over 180 ms
 
@@ -176,6 +180,6 @@ The latest release requires macOS 26.
 - Enhanced the built-in adblocking system
 - Added custom tweaks for YouTube and Social Media sites
 - Improved split view
-- PiP is more Arc-like (WIP, tested mainly on YouTube)
+- Refine the picture-in-picture appearance (WIP, tested mainly on YouTube)
 - Passkeys work through password managers. iCloud Keychain passkeys are still unavailable for now
 - Performed multiple passes to harden security

@@ -38,6 +38,10 @@ public struct SpaceAppearance: Codable, Hashable, Sendable {
         self.init(nodes: [Node(id: Self.fallbackNodeID, colorHex: accentHex)])
     }
 
+    /// Empty colors explicitly select the built-in light/dark chrome.
+    public var usesDefaultTheme: Bool { nodes.isEmpty }
+    public var primaryAccentHex: String { nodes.first?.colorHex ?? "#8E8E93" }
+
     private static let fallbackNodeID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     private static let fallbackHex = "#3A8FA3"
 
@@ -63,9 +67,6 @@ public struct SpaceAppearance: Codable, Hashable, Sendable {
             node.x = bounded(node.x, 0...1, fallback: 0.25)
             node.y = bounded(node.y, 0...1, fallback: 0.25)
             return node
-        }
-        if result.nodes.isEmpty {
-            result.nodes = [Node(id: Self.fallbackNodeID, colorHex: Self.fallbackHex)]
         }
         result.grain = bounded(grain, 0...1, fallback: 0)
         result.opacity = bounded(opacity, 0.3...0.8, fallback: 0.65)

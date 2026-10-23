@@ -148,7 +148,7 @@ private struct PinnedTile: View {
     }
     private var favoritePrimaryColor: Color {
         let nodes = appearance.normalized.nodes
-        return Color(hex: nodes[nodes.count / 2].colorHex)
+        return Color(hex: nodes.isEmpty ? "#8E8E93" : nodes[nodes.count / 2].colorHex)
     }
 
     var body: some View {

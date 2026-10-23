@@ -4,6 +4,28 @@ import Testing
 @testable import NookTabsCore
 
 struct SpaceCreationTests {
+    @Test(arguments: SpaceAppearance.Mode.allCases)
+    func defaultThemeSurvivesPersistenceAndCanReturnToColor(mode: SpaceAppearance.Mode) throws {
+        var f = Fixture()
+        let before = try #require(f.tree.space(f.spaceA))
+        let theme = SpaceAppearance(nodes: [], mode: mode, grain: 0.2)
+        let change = try f.tree.updateSpaceAppearance(f.spaceA, appearance: theme, now: fixedNow)
+        let updated = try #require(f.tree.space(f.spaceA))
+        #expect(updated.resolvedAppearance.usesDefaultTheme)
+        #expect(updated.resolvedAppearance.mode == mode)
+        let decoded = try JSONDecoder().decode(SpaceRecord.self, from: JSONEncoder().encode(updated))
+        #expect(decoded.resolvedAppearance == theme.normalized)
+        f.tree.apply(change)
+        #expect(f.tree.space(f.spaceA) == before)
+        try f.tree.updateSpaceAppearance(f.spaceA, appearance: theme)
+        try f.tree.updateSpace(f.spaceA, accentHex: "#ABCDEF")
+        let colored = try #require(f.tree.space(f.spaceA)?.resolvedAppearance)
+        #expect(!colored.usesDefaultTheme)
+        #expect(colored.nodes.count == 1)
+        #expect(colored.primaryAccentHex == "#ABCDEF")
+        #expect(colored.mode == mode)
+    }
+
     @Test func themeAndProfileSurviveSaveAndLoad() throws {
         var f = Fixture()
         let theme = SpaceAppearance(nodes: [.init(colorHex: "#AABBCC"), .init(colorHex: "#DDEEFF")], mode: .dark, grain: 0.4)

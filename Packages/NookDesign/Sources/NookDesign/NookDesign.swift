@@ -62,7 +62,7 @@ public enum NookDesign {
     // MARK: - Browser Frame
 
     public enum Chrome {
-        /// Matches the 10pt content inset in Arc's macOS window (20px on Retina).
+        /// Window inset around web content (20px on Retina).
         public static let pageInset: CGFloat = 10
         public static let splitGap: CGFloat = pageInset
     }
@@ -122,6 +122,9 @@ public enum NookDesign {
 
     /// Sidebar navigation/footer controls, sized independently of inline row actions.
     public enum SidebarChrome {
+        /// Resize indicator colors for a space with no custom palette.
+        public static let defaultResizeLight = Color(.sRGB, red: 130 / 255, green: 149 / 255, blue: 247 / 255)
+        public static let defaultResizeDark = Color(.sRGB, red: 145 / 255, green: 153 / 255, blue: 172 / 255)
         public static let icon: CGFloat = 15
         public static let button: CGFloat = 30
         public static let gap: CGFloat = 2

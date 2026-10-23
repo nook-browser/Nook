@@ -141,3 +141,6 @@ tasks/
 .superpowers/
 .playwright-mcp/
 build-ios/
+
+# Local agent skills, at any depth
+skills/

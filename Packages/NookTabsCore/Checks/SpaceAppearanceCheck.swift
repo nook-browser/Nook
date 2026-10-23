@@ -48,7 +48,7 @@ struct SpaceAppearanceCheck {
         precondition(malformed.nodes[1].colorHex == "#ABCDEF")
         precondition(malformed.grain == 0 && malformed.opacity == 0.65)
         precondition(malformed == malformed.normalized)
-        precondition(SpaceAppearance(nodes: [], grain: -1, opacity: 9).normalized.nodes.count == 1)
+        precondition(SpaceAppearance(nodes: [], grain: -1, opacity: 9).normalized.nodes.isEmpty)
         precondition(SpaceAppearance(nodes: [], grain: 9, opacity: -1).normalized.opacity == 0.3)
         _ = try JSONEncoder().encode(malformed)
         print("SpaceAppearance checks passed")
