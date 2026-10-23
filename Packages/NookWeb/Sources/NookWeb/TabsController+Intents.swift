@@ -601,11 +601,13 @@ extension TabsController {
     // MARK: - Spaces
 
     /// A new space with its own (empty) website data store, so it starts logged out.
+    /// `sharingLoginsWith` gives it that space's data store instead.
     @discardableResult
-    public func createSpace(name: String, icon: String, accentHex: String, after: UUID?) -> UUID? {
+    public func createSpace(name: String, icon: String, accentHex: String, after: UUID?, sharingLoginsWith: UUID? = nil) -> UUID? {
         let id = UUID()
+        let store = sharingLoginsWith.flatMap { tree.dataStoreID(for: $0) }
         guard perform(.main, "createSpace", {
-            $0.createSpace(id: id, name: name, icon: icon, accentHex: accentHex, after: after)
+            $0.createSpace(id: id, name: name, icon: icon, accentHex: accentHex, after: after, dataStoreID: store)
         }) != nil else { return nil }
         return id
     }
@@ -630,7 +632,8 @@ extension TabsController {
         }
     }
 
-    /// Deletes a space; its items go to the reopen history and its website data is cleared.
+    /// Deletes a space; its items go to the reopen history and its website data is cleared
+    /// unless another space shares it.
     /// Windows showing it move to another space.
     public func deleteSpace(_ spaceID: UUID) {
         guard let owner = owner(ofSpace: spaceID) else { return }
@@ -662,9 +665,10 @@ extension TabsController {
                 setSpace(next.id, in: window)
             }
         }
-        if case .main = owner, let profile = deleted {
-            // Its cookies and logins go with it. Nothing else shares this data store.
-            forgetProfile(spaceID)
+        if case .main = owner, let profile = deleted,
+           !tree.orderedSpaces.contains(where: { tree.dataStoreID(for: $0.id) == profile.id }) {
+            // Its cookies and logins go with it, since no other space uses this data store.
+            forgetProfile(profile.id)
             Task { await profile.clearAllData() }
             // The Agent space may have borrowed its logins from this one.
             if let agent = agentSpaceID { unloadPagesOnWrongDataStore(items(inSpace: agent).map(\.id)) }

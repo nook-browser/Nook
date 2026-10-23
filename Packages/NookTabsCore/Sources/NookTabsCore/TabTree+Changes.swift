@@ -145,11 +145,11 @@ extension TabTree {
     // MARK: - Spaces
 
     @discardableResult
-    public mutating func createSpace(id: UUID = UUID(), name: String, icon: String, accentHex: String, after: UUID?, now: Date = Date()) -> Change {
+    public mutating func createSpace(id: UUID = UUID(), name: String, icon: String, accentHex: String, after: UUID?, dataStoreID: UUID? = nil, now: Date = Date()) -> Change {
         var change = Change()
         let siblings = orderedSpaces
         let order = key(after: after, among: siblings) ?? renumberSpaces(siblings, insertingAfter: after, change: &change, now: now)
-        record(&change, space: SpaceRecord(id: id, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now))
+        record(&change, space: SpaceRecord(id: id, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now, dataStoreID: dataStoreID))
         return change
     }
 

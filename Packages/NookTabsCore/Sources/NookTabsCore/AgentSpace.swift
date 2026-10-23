@@ -37,6 +37,13 @@ extension TabTree {
         return orderedSpaces.first { !$0.isAgent }?.id
     }
 
+    /// The id of the website data store `spaceID`'s pages use: its login space's shared store,
+    /// else that space's own.
+    public func dataStoreID(for spaceID: UUID) -> UUID? {
+        guard let login = loginSpace(for: spaceID).flatMap(space) else { return nil }
+        return login.dataStoreID ?? login.id
+    }
+
     /// The agent space, created last in order with logins from `loginsFrom` when there is none.
     public mutating func ensureAgentSpace(loginsFrom: UUID?, now: Date = Date()) -> (id: UUID, change: Change)? {
         if let existing = agentSpace { return (existing.id, Change()) }

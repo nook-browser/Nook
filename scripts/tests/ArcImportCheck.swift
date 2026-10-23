@@ -36,7 +36,10 @@ struct ArcImportCheck {
 
         let home = result.spaces[1]
         precondition(home.profile == "Profile 1", "custom profile keyed by directory")
-        precondition(home.pinned == [.tab(url: "https://home.example", title: nil, customTitle: nil)], "newContainerIDs fallback")
+        precondition(home.pinned == [
+            .tab(url: "https://home.example", title: nil, customTitle: nil),
+            .tab(url: "https://child.example", title: nil, customTitle: nil),
+        ], "newContainerIDs fallback, a tab's children follow it, currentURL fallback")
         precondition(home.accentHex == nil)
 
         precondition(result.favorites["default"] == [.tab(url: "https://fav.example", title: "Fav", customTitle: nil)])
@@ -93,7 +96,8 @@ struct ArcImportCheck {
         "R", {"id": "R", "childrenIds": [], "parentID": "SPLIT", "data": {"tab": {"savedURL": "https://right.example"}}},
         "EMPTY", {"id": "EMPTY", "childrenIds": [], "parentID": "U1", "data": {"tab": {}}},
         "P2", {"id": "P2", "childrenIds": ["H1"], "parentID": null, "data": {"itemContainer": {}}},
-        "H1", {"id": "H1", "childrenIds": [], "parentID": "P2", "data": {"tab": {"savedURL": "https://home.example"}}},
+        "H1", {"id": "H1", "childrenIds": ["H2"], "parentID": "P2", "data": {"tab": {"savedURL": "https://home.example"}}},
+        "H2", {"id": "H2", "childrenIds": [], "parentID": "H1", "data": {"tab": {"savedURL": "", "currentURL": "https://child.example"}}},
         "U2", {"id": "U2", "childrenIds": [], "parentID": null, "data": {"itemContainer": {}}}
       ]
     }]}}

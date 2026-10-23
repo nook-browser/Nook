@@ -454,29 +454,31 @@ public final class TabsController {
         }
     }
 
-    /// The website data store of a space, made on first use. Its name and icon follow the space.
+    /// The website data store of a space, made on first use and shared by every space that uses
+    /// the same store (the Agent space borrows one). Its name and icon follow the space asked for.
     public func profile(forSpace spaceID: UUID) -> Profile? {
-        // The Agent space has no store of its own: it uses the one it borrows logins from.
-        if let login = tree.loginSpace(for: spaceID), login != spaceID { return profile(forSpace: login) }
-        guard let space = tree.space(spaceID) else { return nil }
-        if let existing = spaceProfiles[spaceID] {
-            existing.name = space.name
-            existing.icon = space.icon
+        guard let space = tree.space(spaceID), let storeID = tree.dataStoreID(for: spaceID) else { return nil }
+        if let existing = spaceProfiles[storeID] {
+            if !space.isAgent {
+                existing.name = space.name
+                existing.icon = space.icon
+            }
             return existing
         }
-        let profile = Profile(id: spaceID, name: space.name, icon: space.icon)
-        spaceProfiles[spaceID] = profile
+        let profile = Profile(id: storeID, name: space.name, icon: space.icon)
+        spaceProfiles[storeID] = profile
         return profile
     }
 
     /// Every space's data store, made if it does not exist yet. For whole-app cleanup only.
     var allSpaceProfiles: [Profile] {
-        tree.orderedSpaces.compactMap { profile(forSpace: $0.id) }
+        var seen = Set<UUID>()
+        return tree.orderedSpaces.compactMap { profile(forSpace: $0.id) }.filter { seen.insert($0.id).inserted }
     }
 
-    /// Drops the cached data store of a deleted space.
-    func forgetProfile(_ spaceID: UUID) {
-        spaceProfiles[spaceID] = nil
+    /// Drops a cached data store no space uses any more.
+    func forgetProfile(_ storeID: UUID) {
+        spaceProfiles[storeID] = nil
     }
 
     /// The data store a session's page uses: the private window's ephemeral one, else the store

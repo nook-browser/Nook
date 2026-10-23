@@ -40,7 +40,7 @@ func parseArcSidebarData(_ data: Data) throws -> ArcImportResult {
     guard let container = containers.first(where: { $0["spaces"] != nil }) else { return ArcImportResult() }
 
     var items: [String: [String: Any]] = [:]
-    for case let item as [String: Any] in container["items"] as? [Any] ?? [] {
+    for case let item as [String: Any] in list(container["items"]) {
         if let id = item["id"] as? String { items[id] = item }
     }
 
@@ -50,12 +50,14 @@ func parseArcSidebarData(_ data: Data) throws -> ArcImportResult {
             guard visited.insert(id).inserted, let item = items[id],
                   let data = item["data"] as? [String: Any] else { return [] }
             let name = (item["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            if let tab = data["tab"] as? [String: Any] {
-                guard let url = tab["savedURL"] as? String, !url.isEmpty else { return [] }
-                let saved = tab["savedTitle"] as? String
-                return [.tab(url: url, title: saved, customTitle: name == saved ? nil : name)]
-            }
             let children = nodes(item["childrenIds"] as? [String] ?? [])
+            if let tab = data["tab"] as? [String: Any] {
+                let url = [tab["savedURL"], tab["currentURL"]].lazy.compactMap { $0 as? String }.first { !$0.isEmpty }
+                guard let url else { return children }
+                let saved = tab["savedTitle"] as? String
+                // A tab's own children follow it.
+                return [.tab(url: url, title: saved, customTitle: name == saved ? nil : name)] + children
+            }
             if data["list"] != nil { return [.folder(title: name ?? "", children: children)] }
             // Split views and any grouping Nook has no counterpart for keep their tabs in place.
             return children
@@ -67,10 +69,13 @@ func parseArcSidebarData(_ data: Data) throws -> ArcImportResult {
     }
 
     var result = ArcImportResult()
-    for (profile, containerID) in pairs(container["topAppsContainerIDs"]) {
+    // Some files keep favorites only in the sync mirror.
+    let mirror = (((root?["sidebarSyncState"] as? [String: Any])?["container"] as? [String: Any])?["value"] as? [String: Any])
+    let favorites = pairs(container["topAppsContainerIDs"])
+    for (profile, containerID) in favorites.isEmpty ? pairs(mirror?["topAppsContainerIDs"]) : favorites {
         result.favorites[profile, default: []] += contents(containerID)
     }
-    for case let space as [String: Any] in container["spaces"] as? [Any] ?? [] {
+    for case let space as [String: Any] in list(container["spaces"]) {
         let sections = Dictionary(pairs(space["containerIDs"] ?? space["newContainerIDs"]), uniquingKeysWith: { a, _ in a })
         let custom = space["customInfo"] as? [String: Any]
         let midTone = ((custom?["windowTheme"] as? [String: Any])?["primaryColorPalette"] as? [String: Any])?["midTone"]
@@ -84,6 +89,11 @@ func parseArcSidebarData(_ data: Data) throws -> ArcImportResult {
         ))
     }
     return result
+}
+
+/// Objects from an `[id, object, id, object]` array, or from an object keyed by id.
+private func list(_ value: Any?) -> [Any] {
+    (value as? [Any]) ?? (value as? [String: Any]).map { Array($0.values) } ?? []
 }
 
 /// `[key, id, key, id]`, as in a space's `containerIDs` or `topAppsContainerIDs`.
