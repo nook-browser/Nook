@@ -32,8 +32,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     internal var extensionController: WKWebExtensionController?
     internal var extensionContexts: [String: WKWebExtensionContext] = [:]
     var actionAnchors: [String: [WeakAnchor]] = [:]
-    /// Observer tokens per extension so anchor observers can be removed when anchors change
-    var anchorObserverTokens: [String: [Any]] = [:]
+    /// The action popover last shown, while WebKit still holds it.
+    weak var shownPopover: NSPopover?
     // Keep options windows alive per extension id
     var optionsWindows: [String: NSWindow] = [:]
     /// Stable tab adapters by item id; they resolve the page session on each call.
@@ -226,10 +226,6 @@ final class ExtensionManager: NSObject, ObservableObject,
 // MARK: - Weak View Reference Helper
 final class WeakAnchor {
     weak var view: NSView?
-    weak var window: NSWindow?
-    init(view: NSView?, window: NSWindow?) {
-        self.view = view
-        self.window = window
-    }
+    init(view: NSView?) { self.view = view }
 }
 

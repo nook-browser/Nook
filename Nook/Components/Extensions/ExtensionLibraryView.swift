@@ -443,7 +443,7 @@ private struct ExtensionGridItem: View {
         }
 
         let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
-        ctx.performAction(for: adapter)
+        ExtensionManager.shared.performAction(ctx, for: adapter)
     }
 
     private func refreshBadge() {

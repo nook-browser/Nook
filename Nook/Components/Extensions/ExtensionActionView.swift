@@ -144,7 +144,7 @@ struct ExtensionActionButton: View {
 
         let perform = {
             Self.logger.notice("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
-            extensionContext.performAction(for: adapter)
+            ExtensionManager.shared.performAction(extensionContext, for: adapter)
         }
         guard extensionContext.webExtension.hasBackgroundContent else { return perform() }
 

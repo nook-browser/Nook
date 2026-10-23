@@ -77,97 +77,41 @@ extension ExtensionManager {
 
             popover.behavior = .transient
             popover.delegate = self
-            self.isPopupActive = true
 
-            // After showing the popover, make the popup webview first responder
-            // so Cmd+C and other keyboard shortcuts are routed to it.
-            let focusPopupWebView = {
-                if let webView = popupWebView,
-                   let popoverWindow = webView.window {
-                    popoverWindow.makeFirstResponder(webView)
+            // Anchors for this extension that sit visible in a window, key window first.
+            var anchors: [NSView] = []
+            if let extId = self.extensionContexts.first(where: { $0.value === extensionContext })?.key {
+                self.actionAnchors[extId]?.removeAll { $0.view == nil || $0.view?.window == nil }
+                anchors = (self.actionAnchors[extId] ?? []).compactMap(\.view).filter {
+                    !$0.isHiddenOrHasHiddenAncestor && !$0.bounds.isEmpty && $0.window?.isVisible == true
                 }
+                anchors = anchors.filter { $0.window === targetWindow } + anchors.filter { $0.window !== targetWindow }
             }
 
-            // Keep popover size fixed; no autosizing bookkeeping
-
-            // Try to use registered anchor for this extension
-            if let extId = self.extensionContexts.first(where: {
-                $0.value === extensionContext
-            })?.key,
-                var anchors = self.actionAnchors[extId]
-            {
-                Self.logger.debug("   📌 Registered anchors for this extension: \(anchors.count)")
-
-                // Clean up stale anchors (no view OR no window)
-                anchors.removeAll { $0.view == nil || $0.view?.window == nil }
-                self.actionAnchors[extId] = anchors
-                // A button in a collapsed sidebar or hidden top bar stays in the window; a popover
-                // shown from it never appears.
-                anchors.removeAll { $0.view?.isHiddenOrHasHiddenAncestor != false || $0.view?.bounds.isEmpty != false }
-                Self.logger.debug("   📌 After cleanup: \(anchors.count) anchors")
-
-                // Find anchor in current window
-                if let win = targetWindow,
-                    let match = anchors.first(where: { $0.window === win }),
-                    let view = match.view,
-                    view.window != nil  // Double-check view is still in window
-                {
-                    popover.show(
-                        relativeTo: view.bounds,
-                        of: view,
-                        preferredEdge: .maxY
-                    )
-                    Self.logger.notice("Popup shown at key window anchor, shown=\(popover.isShown)")
-                    focusPopupWebView()
-                    completionHandler(nil)
-                    return
-                }
-
-                // Use first available anchor that's still in a window
-                if let validAnchor = anchors.first(where: { $0.view?.window != nil }),
-                   let view = validAnchor.view
-                {
-                    popover.show(
-                        relativeTo: view.bounds,
-                        of: view,
-                        preferredEdge: .maxY
-                    )
-                    Self.logger.notice("Popup shown at another window's anchor, shown=\(popover.isShown), visible=\(view.window?.isVisible == true)")
-                    focusPopupWebView()
-                    completionHandler(nil)
-                    return
-                }
-
-                Self.logger.debug("   ⚠️  No valid anchors found (all were removed from windows)")
+            // WebKit treats a success reply as an open popup and ignores every later click
+            // until that popover closes, so only report success once it is on screen.
+            var shown = false
+            for view in anchors where !shown {
+                popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
+                shown = popover.isShown
+            }
+            if !shown, let contentView = targetWindow?.contentView {
+                let rect = CGRect(x: contentView.bounds.midX - 10, y: contentView.bounds.maxY - 50, width: 20, height: 20)
+                popover.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
+                shown = popover.isShown
             }
 
-            // Fallback to center of window
-            if let window = targetWindow, let contentView = window.contentView {
-                let rect = CGRect(
-                    x: contentView.bounds.midX - 10,
-                    y: contentView.bounds.maxY - 50,
-                    width: 20,
-                    height: 20
-                )
-                popover.show(
-                    relativeTo: rect,
-                    of: contentView,
-                    preferredEdge: .minY
-                )
-                Self.logger.notice("Popup shown at window center, shown=\(popover.isShown)")
-                focusPopupWebView()
-                completionHandler(nil)
+            guard shown else {
+                Self.logger.error("Popup for '\(extName, privacy: .public)' could not be shown (\(anchors.count) anchors)")
+                completionHandler(NSError(domain: "ExtensionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No window available"]))
                 return
             }
-
-            Self.logger.error("DELEGATE: No anchor or contentView available")
-            completionHandler(
-                NSError(
-                    domain: "ExtensionManager",
-                    code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "No window available"]
-                )
-            )
+            Self.logger.notice("Popup shown for '\(extName, privacy: .public)'")
+            self.isPopupActive = true
+            self.shownPopover = popover
+            // First responder so Cmd+C and other shortcuts reach the popup.
+            if let webView = popupWebView { webView.window?.makeFirstResponder(webView) }
+            completionHandler(nil)
         }
     }
 
@@ -501,7 +445,7 @@ extension ExtensionManager {
                 // Bitwarden sends this to open its action popup.
                 Self.logger.info("[NativeMessaging] Intercepting showPopover for '\(extensionContext.webExtension.displayName ?? "?", privacy: .public)'")
                 let window = browserManagerRef?.windowRegistry?.activeWindow
-                extensionContext.performAction(for: window.flatMap { actionAdapter(in: $0) })
+                performAction(extensionContext, for: window.flatMap { actionAdapter(in: $0) })
                 replyHandler(["success": true], nil)
                 return
 
@@ -688,7 +632,7 @@ extension ExtensionManager {
 
                 case "showPopover":
                     let window = self?.browserManagerRef?.windowRegistry?.activeWindow
-                    extensionContext.performAction(for: window.flatMap { self?.actionAdapter(in: $0) })
+                    self?.performAction(extensionContext, for: window.flatMap { self?.actionAdapter(in: $0) })
                     port.sendMessage(["command": command, "success": true] as [String: Any]) { _ in }
 
                 default:
