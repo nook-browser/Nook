@@ -358,10 +358,13 @@ struct URLBarView: View {
         selectedSuggestion = nil
         searchManager.clearSuggestions()
         isEditing = true
+        windowState.isAddressEditing = true
+        windowState.isSidebarResizeHovered = false
         hoverManager.setAddressEditing(true, in: windowState.id)
     }
 
     private func cancelEditing() {
+        windowState.isAddressEditing = false
         hoverManager.setAddressEditing(false, in: windowState.id)
         isEditing = false
         addressFocused = false

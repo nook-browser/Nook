@@ -269,12 +269,14 @@ struct WindowView: View {
                 .scrollIndicators(windowState.isSidebarResizeHovered ? .hidden : .automatic)
                 .frame(width: windowState.sidebarWidth)
                 .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
-                    SidebarResizeView()
-                        .frame(maxHeight: .infinity)
-                        .environmentObject(browserManager)
-                        .environment(windowState)
-                        .zIndex(2000)
-                        .environment(windowState)
+                    // The expanded address panel extends across this edge. Suspend the
+                    // native resize target so it cannot paint or steal clicks over the panel.
+                    if !windowState.isAddressEditing {
+                        SidebarResizeView()
+                            .frame(maxHeight: .infinity)
+                            .environmentObject(browserManager)
+                            .environment(windowState)
+                    }
                 }
                 .environmentObject(browserManager)
                 .environment(windowState)

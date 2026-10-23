@@ -65,7 +65,7 @@ private struct SidebarResizeHandle: NSViewRepresentable {
     func makeNSView(context: Context) -> Handle { Handle() }
     func updateNSView(_ view: Handle, context: Context) {
         view.callbacks = self
-        view.needsDisplay = true
+        view.updateIndicator()
     }
 
     final class Handle: NSView {
@@ -74,33 +74,130 @@ private struct SidebarResizeHandle: NSViewRepresentable {
         private var hovered = false
         private var dragging = false
         private var startX: CGFloat = 0
+        private var mouseMonitor: Any?
+        private var waitsForPointerMovement = false
+        private var pendingAppearance: DispatchWorkItem?
+        private let indicator = CALayer()
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            wantsLayer = true
+            indicator.cornerRadius = 2
+            indicator.opacity = 0
+            layer?.addSublayer(indicator)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func layout() {
+            super.layout()
+            updateIndicator()
+        }
+
+        func updateIndicator() {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            indicator.frame = bounds.insetBy(dx: 2, dy: 0)
+            indicator.backgroundColor = callbacks?.color.cgColor
+            CATransaction.commit()
+        }
+
         override var mouseDownCanMoveWindow: Bool { false }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
+            mouseMonitor = nil
+            guard let window else { return }
+            // Receive movement outside the handle too. Tracking-area exit events can
+            // be lost when SwiftUI moves the handle during a drag.
+            window.acceptsMouseMovedEvents = true
+            mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+                guard let self else { return event }
+                if !self.dragging {
+                    self.waitsForPointerMovement = false
+                    self.setHovered(self.containsPointer(event))
+                }
+                return event
+            }
+        }
+
+        private func containsPointer(_ event: NSEvent) -> Bool {
+            guard let window, event.window === window, window.isKeyWindow else { return false }
+            return bounds.intersection(visibleRect).contains(convert(event.locationInWindow, from: nil))
+        }
+
+        private func setHovered(_ inside: Bool) {
+            guard inside != hovered else { return }
+            hovered = inside
+            callbacks?.onHover(inside || dragging)
+            (inside || dragging ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
+            pendingAppearance?.cancel()
+            pendingAppearance = nil
+            if dragging {
+                setIndicatorVisible(true, duration: 0)
+            } else if inside {
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self, self.hovered, !self.dragging else { return }
+                    self.setIndicatorVisible(true, duration: 0.20)
+                }
+                pendingAppearance = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.20, execute: work)
+            } else {
+                setIndicatorVisible(false, duration: 0.18)
+            }
+        }
+
+        private func setIndicatorVisible(_ visible: Bool, duration: CFTimeInterval) {
+            let target: Float = visible ? 1 : 0
+            let current = indicator.presentation()?.opacity ?? indicator.opacity
+            indicator.removeAnimation(forKey: "hoverFade")
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            indicator.opacity = target
+            CATransaction.commit()
+            if duration > 0, current != target {
+                let fade = CABasicAnimation(keyPath: "opacity")
+                fade.fromValue = current
+                fade.toValue = target
+                fade.duration = duration
+                fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                indicator.add(fade, forKey: "hoverFade")
+            }
+        }
+
+        deinit {
+            pendingAppearance?.cancel()
+            if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
+        }
+
         override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeLeftRight) }
         override func updateTrackingAreas() {
             super.updateTrackingAreas()
             if let tracking { removeTrackingArea(tracking) }
-            let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .cursorUpdate, .activeInKeyWindow, .inVisibleRect], owner: self, userInfo: nil)
+            let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .cursorUpdate, .activeInKeyWindow, .inVisibleRect, .enabledDuringMouseDrag], owner: self, userInfo: nil)
             addTrackingArea(area)
             tracking = area
         }
-        override func cursorUpdate(with event: NSEvent) { NSCursor.resizeLeftRight.set() }
+        override func cursorUpdate(with event: NSEvent) {
+            if dragging || containsPointer(event) { NSCursor.resizeLeftRight.set() }
+        }
         override func mouseEntered(with event: NSEvent) {
-            hovered = true
-            callbacks?.onHover(true)
-            NSCursor.resizeLeftRight.set()
-            needsDisplay = true
+            guard !dragging, !waitsForPointerMovement else { return }
+            setHovered(containsPointer(event))
         }
-        override func mouseExited(with event: NSEvent) {
-            hovered = false
-            callbacks?.onHover(dragging)
-            if !dragging { NSCursor.arrow.set() }
-            needsDisplay = true
-        }
+        override func mouseExited(with event: NSEvent) { setHovered(false) }
         override func mouseDown(with event: NSEvent) {
             if event.clickCount == 2 { callbacks?.onReset(); return }
             dragging = callbacks?.onStart() ?? false
             startX = NSEvent.mouseLocation.x
-            needsDisplay = true
+            if dragging {
+                pendingAppearance?.cancel()
+                pendingAppearance = nil
+                callbacks?.onHover(true)
+                setIndicatorVisible(true, duration: 0)
+            }
+            updateIndicator()
         }
         override func mouseDragged(with event: NSEvent) {
             guard dragging else { return }
@@ -110,15 +207,18 @@ private struct SidebarResizeHandle: NSViewRepresentable {
         override func mouseUp(with event: NSEvent) {
             guard dragging else { return }
             dragging = false
+            waitsForPointerMovement = true
+            hovered = false
+            pendingAppearance?.cancel()
+            pendingAppearance = nil
+            callbacks?.onHover(false)
+            NSCursor.arrow.set()
+            setIndicatorVisible(false, duration: 0.18)
+            updateIndicator()
             callbacks?.onEnd()
-            callbacks?.onHover(hovered)
-            if !hovered { NSCursor.arrow.set() }
-            needsDisplay = true
+            // Layout and tracking-area updates cannot re-show the handle after release.
+            // Only a subsequent physical mouse movement may activate hover again.
         }
-        override func draw(_ dirtyRect: NSRect) {
-            guard hovered || dragging else { return }
-            callbacks?.color.setFill()
-            NSBezierPath(roundedRect: bounds.insetBy(dx: 2, dy: 0), xRadius: 2, yRadius: 2).fill()
-        }
+
     }
 }

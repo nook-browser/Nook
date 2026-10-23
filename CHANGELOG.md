@@ -10,6 +10,8 @@
 
 ### Changed
 
+- Delay the sidebar resize handle by 200 ms, then fade it in over 200 ms and out over 180 ms
+
 - Lighten favorite tile backgrounds over the sidebar theme while retaining their selected favicon rim
 
 - Use the same raised light selected-tab surface in light and dark themes, with dark labels and layered shadows
@@ -21,6 +23,12 @@
 - Shared theme across the sidebar, window frame and split gutter
 
 ### Fixed
+
+- Keep the native sidebar resize handle from covering the expanded address panel
+
+- Hide the resize handle on release when the pointer is outside its final bounds
+
+- Keep sidebar edge padding at minimum width by allowing media control gaps to compress
 
 - Preserve favorite selection rim coverage on wide tiles with two or three columns
 

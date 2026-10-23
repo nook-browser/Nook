@@ -95,7 +95,7 @@ struct MediaControlsView: View {
                         }
 
                         if shouldShowFavicon {
-                            Spacer()
+                            Spacer(minLength: 0)
                         }
 
                         // Previous button (collapses second)
@@ -117,7 +117,7 @@ struct MediaControlsView: View {
                         }
 
                         if shouldShowPreviousButton || shouldShowFavicon {
-                            Spacer()
+                            Spacer(minLength: 0)
                         }
 
                         // Play/Pause button
@@ -138,7 +138,7 @@ struct MediaControlsView: View {
                         .foregroundStyle(Color.white)
                         .help(isPlaying ? "Pause" : "Play")
 
-                        Spacer()
+                        Spacer(minLength: 0)
 
                         // Next button
                         Button("Next", systemImage: "forward.end.fill") {
@@ -155,7 +155,7 @@ struct MediaControlsView: View {
                         .foregroundStyle(Color.white)
                         .help("Next")
 
-                        Spacer()
+                        Spacer(minLength: 0)
 
                         Button("Return to Tab", systemImage: "arrow.up.forward.app") {
                             browserManager.tabs.select(tab.itemID, in: windowState)
@@ -165,7 +165,7 @@ struct MediaControlsView: View {
                         .foregroundStyle(Color.white)
                         .help("Return to Tab")
 
-                        Spacer()
+                        Spacer(minLength: 0)
 
                         // Mute toggle
                         Button(isMuted ? "Unmute" : "Mute", systemImage: isMuted ? "speaker.slash.fill": "speaker.wave.2.fill") {
@@ -187,7 +187,7 @@ struct MediaControlsView: View {
 
                         // Bring the video itself back into the sidebar above this bar.
                         if tab.hasVideoContent || tab.hasPlayingVideo {
-                            Spacer()
+                            Spacer(minLength: 0)
 
                             Button("Maximize", systemImage: "arrow.up.left.and.arrow.down.right") {
                                 maximize(tab)
@@ -199,6 +199,7 @@ struct MediaControlsView: View {
                         }
                     }
                 }
+                // Flexible gaps must shrink before the bar consumes the sidebar's outer inset.
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(
