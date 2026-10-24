@@ -23,8 +23,12 @@ extension BrowserManager {
         pendingExtensionImports += importManager.arcExtensionIDs()
         installPendingExtensionImports()
         guard let window = importWindow else { return }
+        // Onboarding starts with one empty space; beside Arc's spaces it is only an extra.
+        let starters = nookSettings?.didFinishOnboarding == false
+            ? tabs.orderedSpaces.filter { !$0.isAgent && tabs.items(inSpace: $0.id).isEmpty }.map(\.id) : []
 
         var lastSpace = tabs.orderedSpaces.last?.id
+        var firstImported: UUID?
         var profileSpaces: [String: UUID] = [:]
         for space in result.spaces {
             guard let spaceID = tabs.createSpace(
@@ -34,6 +38,7 @@ extension BrowserManager {
                 profileName: result.profileNames[space.profile]
             ) else { continue }
             lastSpace = spaceID
+            firstImported = firstImported ?? spaceID
             if profileSpaces[space.profile] == nil { profileSpaces[space.profile] = spaceID }
 
             // Arc shows a profile's favorites in each of its spaces; a Nook space has its own.
@@ -42,6 +47,10 @@ extension BrowserManager {
             importArc(space.unpinned, into: .tabs(spaceID: spaceID), window: window)
             tabs.setAllFolders(open: false, space: spaceID)
         }
+
+        guard let firstImported else { return }
+        if window.spaceID.map(starters.contains) ?? true { tabs.setSpace(firstImported, in: window) }
+        starters.forEach { tabs.deleteSpace($0) }
     }
 
     func importDiaData() async {
