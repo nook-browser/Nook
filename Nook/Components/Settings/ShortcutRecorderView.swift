@@ -11,181 +11,86 @@ import NookDesign
 import AppKit
 import NookUI
 
+/// The shortcut's keys as a button: click to record, Esc cancels, Delete clears.
 struct ShortcutRecorderView: View {
-    @Binding var keyCombination: KeyCombination
-    @State private var isRecording = false
-    @State private var recordingKey: String = ""
-    @State private var recordingModifiers: Modifiers = []
-    @State private var hasConflict = false
-    @State private var conflictAction: ShortcutAction? = nil
-    @State private var eventMonitor: Any?
-
+    let keyCombination: KeyCombination?
     let action: ShortcutAction
     let shortcutManager: KeyboardShortcutManager
-    let onRecordingComplete: () -> Void
+    let onRecord: (KeyCombination?) -> Void
+
+    @State private var isRecording = false
+    @State private var conflictAction: ShortcutAction?
+    @State private var eventMonitor: Any?
 
     var body: some View {
-        HStack(spacing: NookDesign.Spacing.md) {
-            Button(action: toggleRecording) {
-                HStack(spacing: NookDesign.Spacing.xs) {
-                    Image(systemName: isRecording ? "stop.fill" : "pencil")
-                    Text(isRecording ? "Recording..." : keyCombination.displayString)
-                        .font(NookDesign.Font.body.monospaced())
-                }
-                .padding(.horizontal, NookDesign.Spacing.lg)
-                .padding(.vertical, NookDesign.Spacing.sm)
-                .background(
-                    NookDesign.Radius.shape(NookDesign.Radius.sm)
-                        .fill(isRecording ? Color.red.opacity(0.2) : NookDesign.Surface.raised)
-                )
-                .overlay(
-                    NookDesign.Radius.shape(NookDesign.Radius.sm)
-                        .stroke(hasConflict ? Color.red : Color.clear, lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-            .onHoverTracking { isHovered in
-                if isHovered {
-                    NSCursor.pointingHand.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-
-            if hasConflict, let conflictAction = conflictAction {
+        HStack(spacing: NookDesign.Spacing.sm) {
+            if let conflictAction {
                 Image(systemName: "exclamationmark.triangle")
-                    .foregroundColor(.red)
+                    .foregroundStyle(.secondary)
                     .help("Conflicts with \(conflictAction.displayName)")
             }
 
-            Button("Clear") {
-                clearShortcut()
+            Button(action: toggleRecording) {
+                Text(label)
+                    .font(NookDesign.Font.body)
+                    .foregroundStyle(isRecording || keyCombination == nil ? .secondary : .primary)
             }
-            .buttonStyle(.borderless)
-            .foregroundColor(.secondary)
-            .disabled(keyCombination.key.isEmpty && keyCombination.modifiers.isEmpty)
+            .buttonStyle(RectNavButtonStyle())
+            .controlSize(.small)
+            .nookControlSurface(isRecording, in: NookDesign.Radius.shape(NookDesign.Radius.md))
         }
-        .onChange(of: recordingKey) {
-            checkForConflicts()
-        }
-        .onChange(of: recordingModifiers) {
-            checkForConflicts()
-        }
-        .onDisappear {
-            removeKeyMonitor()
-        }
+        .onDisappear { stopRecording() }
+    }
+
+    private var label: String {
+        if isRecording { return "Type Shortcut" }
+        return keyCombination?.displayString ?? "(none)"
     }
 
     private func toggleRecording() {
-        if isRecording {
-            finishRecording()
-        } else {
-            startRecording()
-        }
+        isRecording ? stopRecording() : startRecording()
     }
 
     private func startRecording() {
         isRecording = true
-        recordingKey = ""
-        recordingModifiers = []
-        setupKeyMonitor()
+        conflictAction = nil
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            handleKeyDown(event)
+            return nil
+        }
     }
 
-    private func finishRecording() {
+    private func stopRecording() {
         isRecording = false
-        removeKeyMonitor()
-        if !recordingKey.isEmpty || !recordingModifiers.isEmpty {
-            let newCombination = KeyCombination(key: recordingKey, modifiers: recordingModifiers)
-            if shortcutManager.isValidKeyCombination(newCombination) {
-                keyCombination = newCombination
-                onRecordingComplete()
-            }
-        }
-    }
-
-    private func clearShortcut() {
-        keyCombination = KeyCombination(key: "", modifiers: [])
-        removeKeyMonitor()
-        onRecordingComplete()
-    }
-
-    private func checkForConflicts() {
-        guard !recordingKey.isEmpty || !recordingModifiers.isEmpty else {
-            hasConflict = false
-            conflictAction = nil
-            return
-        }
-
-        let testCombination = KeyCombination(key: recordingKey, modifiers: recordingModifiers)
-        if let conflictingAction = shortcutManager.hasConflict(keyCombination: testCombination, excludingAction: action) {
-            hasConflict = true
-            conflictAction = conflictingAction
-        } else {
-            hasConflict = false
-            conflictAction = nil
-        }
-    }
-
-    private func setupKeyMonitor() {
-        // Remove any existing monitor first
-        removeKeyMonitor()
-        
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
-            guard isRecording else { return event }
-
-            switch event.type {
-            case .keyDown:
-                handleKeyDown(event)
-                return nil
-            case .flagsChanged:
-                handleFlagsChanged(event)
-                return nil
-            default:
-                return event
-            }
-        }
-    }
-    
-    private func removeKeyMonitor() {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
+        conflictAction = nil
+        if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
+        eventMonitor = nil
     }
 
     private func handleKeyDown(_ event: NSEvent) {
-        // Don't record modifier keys alone
-        guard !event.modifierFlags.contains(.command) ||
-              !event.modifierFlags.contains(.option) ||
-              !event.modifierFlags.contains(.control) ||
-              !event.modifierFlags.contains(.shift) else {
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        if modifiers.isEmpty {
+            switch event.keyCode {
+            case 53: // Escape
+                stopRecording()
+                return
+            case 51, 117: // Delete, Forward Delete
+                stopRecording()
+                onRecord(nil)
+                return
+            default:
+                break
+            }
+        }
+
+        guard let combination = KeyCombination(from: event),
+              shortcutManager.isValidKeyCombination(combination) else { return }
+        // A key another action holds is refused; recording continues so another can be tried.
+        if let holder = shortcutManager.hasConflict(keyCombination: combination, excludingAction: action) {
+            conflictAction = holder
             return
         }
-
-        // Use charactersIgnoringModifiers for consistent handling of bracket keys
-        // This ensures Cmd+[ works correctly on US keyboards where [ requires Shift
-        if let key = event.charactersIgnoringModifiers?.lowercased() {
-            recordingKey = key
-            finishRecording()
-        }
-    }
-
-    private func handleFlagsChanged(_ event: NSEvent) {
-        var newModifiers: Modifiers = []
-
-        if event.modifierFlags.contains(.command) {
-            newModifiers.insert(.command)
-        }
-        if event.modifierFlags.contains(.option) {
-            newModifiers.insert(.option)
-        }
-        if event.modifierFlags.contains(.control) {
-            newModifiers.insert(.control)
-        }
-        if event.modifierFlags.contains(.shift) {
-            newModifiers.insert(.shift)
-        }
-
-        recordingModifiers = newModifiers
+        stopRecording()
+        onRecord(combination)
     }
 }

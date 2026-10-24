@@ -25,9 +25,9 @@ struct KeyboardShortcut: Identifiable, Hashable, Codable {
         self.isCustomizable = isCustomizable
     }
 
-    /// Unique hash for O(1) lookup: "cmd+shift+t"
+    /// Unique hash for O(1) lookup: "cmd+shift+t". A cleared shortcut gets its own key per action.
     var lookupKey: String {
-        keyCombination.lookupKey
+        keyCombination.key.isEmpty ? "none:\(action.rawValue)" : keyCombination.lookupKey
     }
 }
 
@@ -259,16 +259,12 @@ struct KeyCombination: Hashable, Codable {
         }
     }
 
+    /// Menu style: "⌃⌥⇧⌘T".
     var displayString: String {
-        var parts = modifiers.displayStrings
-        switch Self.keyName(key) {
-        case "up": parts.append("↑")
-        case "down": parts.append("↓")
-        case "left": parts.append("←")
-        case "right": parts.append("→")
-        default: parts.append(key.uppercased())
-        }
-        return parts.joined(separator: " + ")
+        let name = Self.keyName(key)
+        let symbols = ["up": "↑", "down": "↓", "left": "←", "right": "→", "tab": "⇥", "return": "↩",
+                       "delete": "⌫", "escape": "⎋", "space": "Space", "\t": "⇥", "\r": "↩", " ": "Space"]
+        return modifiers.displayStrings.joined() + (symbols[name] ?? name.uppercased())
     }
 
     // For matching with NSEvent
@@ -332,10 +328,10 @@ struct Modifiers: OptionSet, Hashable, Codable {
 
     var displayStrings: [String] {
         var strings: [String] = []
-        if contains(.command) { strings.append("⌘") }
-        if contains(.option) { strings.append("⌥") }
         if contains(.control) { strings.append("⌃") }
+        if contains(.option) { strings.append("⌥") }
         if contains(.shift) { strings.append("⇧") }
+        if contains(.command) { strings.append("⌘") }
         return strings
     }
 }

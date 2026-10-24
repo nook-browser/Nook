@@ -144,28 +144,21 @@ class KeyboardShortcutManager {
         shortcutMap.values.first { $0.action == action && $0.isEnabled }
     }
 
-    func updateShortcut(action: ShortcutAction, keyCombination: KeyCombination) {
-        // Find the existing shortcut first
-        guard var shortcut = shortcutMap.values.first(where: { $0.action == action }) else {
-            return
-        }
-
-        // Remove old entry
+    /// Sets an action's keys, or clears them with nil. Any other action on those keys is cleared.
+    func updateShortcut(action: ShortcutAction, keyCombination: KeyCombination?) {
+        guard var shortcut = shortcutMap.values.first(where: { $0.action == action }) else { return }
         shortcutMap.removeValue(forKey: shortcut.lookupKey)
 
-        // Update and add back
-        shortcut.keyCombination = keyCombination
-        shortcutMap[keyCombination.lookupKey] = shortcut
-        saveShortcuts()
-    }
-
-    func toggleShortcut(action: ShortcutAction, isEnabled: Bool) {
-        if let key = shortcutMap.first(where: { $0.value.action == action })?.key,
-           var shortcut = shortcutMap[key] {
-            shortcut.isEnabled = isEnabled
-            shortcutMap[key] = shortcut
-            saveShortcuts()
+        if let keyCombination, var holder = shortcutMap.removeValue(forKey: keyCombination.lookupKey) {
+            holder.keyCombination = KeyCombination(key: "")
+            holder.isEnabled = false
+            shortcutMap[holder.lookupKey] = holder
         }
+
+        shortcut.keyCombination = keyCombination ?? KeyCombination(key: "")
+        shortcut.isEnabled = keyCombination != nil
+        shortcutMap[shortcut.lookupKey] = shortcut
+        saveShortcuts()
     }
 
     func resetToDefaults() {
