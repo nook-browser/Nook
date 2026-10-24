@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+
+- Profiles: spaces can share logins
+- Ctrl+1 to 9 switch spaces, new Spaces menu
+- Fuller page context menu
+- Arc import keeps folders, order, favorites, colors and extensions
+
+### Changed
+
+- Next and Previous Space on Cmd+Opt+arrows
+- Cleaner Shortcuts settings
+- Runs on macOS 15.5 again
+
+### Fixed
+
+- MCP tools with OpenAI-compatible providers
+- Bugs
+
+### Thanks
+
+- @zannagh, @QusaiiSaleem, @Fenrur, @sean0407
+
 ## 1.2.4
 
 ### Added
