@@ -216,6 +216,7 @@ struct WebsiteView: View {
                             windowState: windowState,
                             compositorVersion: windowState.compositorVersion,
                             selectedItemID: windowState.selectedItemID,
+                            spaceID: windowState.spaceID,
                             cornerRadius: cornerRadius,
                             squareTopCorners: nookSettings.topBarAddressView
                         )
@@ -504,6 +505,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
     let windowState: BrowserWindowState
     var compositorVersion: Int
     var selectedItemID: UUID?
+    var spaceID: UUID?
     var cornerRadius: CGFloat
     var squareTopCorners: Bool
 
@@ -531,6 +533,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         var lastLeftId: UUID? = nil
         var lastRightId: UUID? = nil
         var lastCurrentId: UUID? = nil
+        var lastSpaceID: UUID? = nil
         var lastFraction: CGFloat = -1
         var lastSize: CGSize = .zero
         var lastVersion: Int = -1
@@ -602,6 +605,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         let currentId = windowState.selectedItemID
         let compositorVersion = windowState.compositorVersion
         let needsRebuild =
+            context.coordinator.lastSpaceID != spaceID ||
             context.coordinator.lastIsSplit != isSplit ||
             context.coordinator.lastLeftId != leftId ||
             context.coordinator.lastRightId != rightId ||
@@ -612,7 +616,16 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
         if needsRebuild {
             let previousCurrentId = context.coordinator.lastCurrentId
-            updateCompositor(nsView)
+            let changesSpace = context.coordinator.lastSpaceID != nil
+                && context.coordinator.lastSpaceID != spaceID
+
+            // A tab selection during a fade should take effect immediately.
+            if !changesSpace, previousCurrentId != currentId {
+                nsView.layer?.removeAnimation(forKey: "spaceSwitch")
+            }
+
+            updateCompositor(nsView, crossfade: changesSpace)
+            context.coordinator.lastSpaceID = spaceID
             context.coordinator.lastIsSplit = isSplit
             context.coordinator.lastLeftId = leftId
             context.coordinator.lastRightId = rightId
@@ -653,7 +666,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
         coordinator.browserManager?.webViewCoordinator?.removeCompositorContainerView(for: coordinator.windowState.id)
     }
 
-    private func updateCompositor(_ containerView: NSView) {
+    private func updateCompositor(_ containerView: NSView, crossfade: Bool = false) {
         // Non-destructive compositor: avoid removing/re-adding WKWebViews that are
         // already correctly positioned. Removing a WKWebView from its superview
         // disconnects its GPU video surface, causing black flashes during playback.
@@ -667,6 +680,15 @@ struct TabCompositorWrapper: NSViewRepresentable {
         let pages = [selected] + [split.leftTabId(for: windowState.id), split.rightTabId(for: windowState.id)]
             .map { $0.flatMap(tabs.session(for:)) }
         if pages.contains(where: { ($0?.webView?.fullscreenState ?? .notInFullscreen) != .notInFullscreen }) { return }
+
+        // Crossfade the content host so single pages and split panes transition together.
+        if crossfade, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = 0.15
+            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            containerView.layer?.add(fade, forKey: "spaceSwitch")
+        }
 
         // Identify overlay (always preserved)
         let overlay = containerView.subviews.compactMap { $0 as? SplitDropCaptureView }.first

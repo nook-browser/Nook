@@ -357,8 +357,19 @@ class BrowserManager: ObservableObject {
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
     @Published var urlBarFrame: CGRect = .zero
     @Published var shouldShowZoomPopup: Bool = false
-    /// The website data store of the active window's space.
-    @Published var currentProfile: Profile?
+    /// Data-store consumers subscribe here; changing profiles is not a visual
+    /// change to every view observing BrowserManager.
+    private let currentProfileSubject: CurrentValueSubject<Profile?, Never>
+
+    var currentProfile: Profile? {
+        get { currentProfileSubject.value }
+        set { currentProfileSubject.send(newValue) }
+    }
+
+    var currentProfilePublisher: AnyPublisher<Profile?, Never> {
+        currentProfileSubject.eraseToAnyPublisher()
+    }
+
     /// True for the length of a space change, so views do not animate content from the old space
     /// into the new one.
     @Published var isSwitchingSpace: Bool = false
@@ -446,7 +457,7 @@ class BrowserManager: ObservableObject {
         self.tabs = tabs
         // The first space's data store is the one the app starts on.
         let initialProfile = tabs.orderedSpaces.first.flatMap { tabs.profile(forSpace: $0.id) }
-        self.currentProfile = initialProfile
+        self.currentProfileSubject = CurrentValueSubject(initialProfile)
 
         // settingsManager will be injected from NookApp
         self.dialogManager = DialogManager()
@@ -610,22 +621,25 @@ class BrowserManager: ObservableObject {
     /// follow it. Only the active window's space sets the app-wide managers.
     func windowSpaceChanged(_ windowState: BrowserWindowState) {
         guard !windowState.isIncognito else { return }
+
         guard windowRegistry?.activeWindow == nil || windowRegistry?.activeWindow?.id == windowState.id else { return }
+
         guard let spaceID = windowState.spaceID, let profile = tabs.profile(forSpace: spaceID),
               currentProfile?.id != profile.id else { return }
 
         isSwitchingSpace = true
-        withAnimation(.easeInOut(duration: Self.spaceSwitchDuration)) {
-            currentProfile = profile
-            // Settings loads these lists when it opens; reading every cookie and data record here stalled the switch.
-            cookieManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
-            cacheManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
-            historyManager.switchProfile(profile.id)
-        }
+        currentProfile = profile
+        // Data-store routing is immediate. Giving these service updates a separate
+        // animation transaction forces pending window changes to render mid-switch.
+        cookieManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
+        cacheManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
+        historyManager.switchProfile(profile.id)
         transitionEndTask?.cancel()
         transitionEndTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.spaceSwitchDuration))
+
             guard !Task.isCancelled else { return }
+
             self?.isSwitchingSpace = false
         }
     }
