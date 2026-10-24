@@ -13,26 +13,54 @@ extension BrowserManager {
     /// Import Data from arc
     func importArcData() async {
         let result = await importManager.importArcSidebarData()
-        guard let window = importWindow, let targetSpace = importSpaceID(window) else { return }
+        guard let window = importWindow else { return }
+        // A first launch starts with one empty space; next to Arc's spaces it is only an extra.
+        let emptyBefore = tabs.orderedSpaces.map(\.id).filter { tabs.items(inSpace: $0).isEmpty }
 
         var lastSpace = tabs.orderedSpaces.last?.id
+        var firstImported: UUID?
         for space in result.spaces {
             guard let spaceID = tabs.createSpace(
                 name: space.title, icon: space.emoji ?? "person.fill",
-                accentHex: "#7C7C7C", after: lastSpace
+                accentHex: space.accentHex ?? "#7C7C7C", after: lastSpace
             ) else { continue }
             lastSpace = spaceID
+            firstImported = firstImported ?? spaceID
 
-            importTabs(space.unpinnedTabs.map(\.url), into: .tabs(spaceID: spaceID), window: window)
-            // Folders are opened first so pinned tabs end up above them.
-            for folder in space.folders.reversed() {
-                guard let folderID = tabs.createFolder(title: folder.title, in: .pinned(spaceID: spaceID), after: nil) else { continue }
-                importTabs(folder.tabs.map(\.url), into: .folder(itemID: folderID), window: window)
-            }
-            importTabs(space.pinnedTabs.map(\.url), into: .pinned(spaceID: spaceID), window: window)
+            importArcNodes(space.favorites, into: .favorites(spaceID: spaceID), after: nil)
+            importArcNodes(space.pinned, into: .pinned(spaceID: spaceID), after: nil)
+            importArcNodes(space.unpinned, into: .tabs(spaceID: spaceID), after: nil)
         }
 
-        importTabs(result.topTabs.map(\.url), into: .favorites(spaceID: targetSpace), window: window)
+        guard let firstImported else { return }
+        if window.spaceID.map({ emptyBefore.contains($0) }) ?? true {
+            tabs.setSpace(firstImported, in: window)
+        }
+        emptyBefore.forEach { tabs.deleteSpace($0) }
+    }
+
+    /// Adds Arc's items under `parent` in Arc's order, folders nested, without loading pages.
+    /// Nook has no saved split, so a split's tabs go side by side where the split was.
+    /// Returns the last item added, for the next sibling to follow.
+    @discardableResult
+    private func importArcNodes(_ nodes: [ArcNode], into parent: Parent, after first: UUID?) -> UUID? {
+        var previous = first
+        for node in nodes {
+            switch node {
+            case .tab(let string, let pageTitle, let customTitle):
+                guard let url = URL(string: string), url.scheme != nil,
+                      let id = tabs.importTab(url: url, title: pageTitle, in: parent, after: previous) else { continue }
+                if let customTitle { tabs.rename(id, customTitle) }
+                previous = id
+            case .folder(let title, let children):
+                guard let id = tabs.createFolder(title: title, in: parent, after: previous) else { continue }
+                importArcNodes(children, into: .folder(itemID: id), after: nil)
+                previous = id
+            case .split(let halves):
+                previous = importArcNodes(halves, into: parent, after: previous) ?? previous
+            }
+        }
+        return previous
     }
 
     func importDiaData() async {

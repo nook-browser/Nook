@@ -574,6 +574,24 @@ extension TabsController {
         return id
     }
 
+    /// Adds a tab at an exact position with the source's page title, without opening a page.
+    /// For importers: `open(url:)` always inserts at the top and titles the tab with its host.
+    @discardableResult
+    public func importTab(url: URL, title: String, in parent: Parent, after: UUID?) -> UUID? {
+        let owner: TabsController.Owner?
+        switch parent {
+        case .favorites(let spaceID), .pinned(let spaceID), .tabs(let spaceID): owner = self.owner(ofSpace: spaceID)
+        case .folder(let folderID): owner = self.owner(ofItem: folderID)
+        }
+        guard let owner else { return nil }
+        let id = UUID()
+        let title = title.isEmpty ? (url.host ?? url.absoluteString) : title
+        guard perform(owner, "importTab", { try $0.createTab(id: id, url: url, title: title, in: parent, after: after) }) != nil else {
+            return nil
+        }
+        return id
+    }
+
     public func toggleFolder(_ folderID: UUID) {
         if isOpen(folder: folderID) {
             setFolder(folderID, open: false)

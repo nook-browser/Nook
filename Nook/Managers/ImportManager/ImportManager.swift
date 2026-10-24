@@ -17,14 +17,14 @@ class ImportManager: ObservableObject {
         let fileURL = getArcSidebarFileURL()
         
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            return ArcImportResult(topTabs: [], spaces: [])
+            return .empty
         }
         
         do {
             let result = try parseArcSidebarData(from: fileURL)
             return result
         } catch {
-            return ArcImportResult(topTabs: [], spaces: [])
+            return .empty
         }
     }
     
