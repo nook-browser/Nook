@@ -23,9 +23,13 @@ extension BrowserManager {
         pendingExtensionImports += importManager.arcExtensionIDs()
         installPendingExtensionImports()
         guard let window = importWindow else { return }
-        // Onboarding starts with one empty space; beside Arc's spaces it is only an extra.
+        // Onboarding starts with one space holding a Google tab; beside Arc's spaces it is only an extra.
         let starters = nookSettings?.didFinishOnboarding == false
-            ? tabs.orderedSpaces.filter { !$0.isAgent && tabs.items(inSpace: $0.id).isEmpty }.map(\.id) : []
+            ? tabs.orderedSpaces.filter { space in
+                !space.isAgent && tabs.items(inSpace: space.id).allSatisfy {
+                    $0.parent == .tabs(spaceID: space.id) && $0.url?.host == TabsController.homeURL.host
+                }
+            }.map(\.id) : []
 
         var lastSpace = tabs.orderedSpaces.last?.id
         var firstImported: UUID?
