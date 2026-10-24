@@ -68,7 +68,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
     case goToSpace6 = "go_to_space_6"
     case goToSpace7 = "go_to_space_7"
     case goToSpace8 = "go_to_space_8"
-    case goToLastSpace = "go_to_last_space"
+    case goToSpace9 = "go_to_space_9"
 
     // Window Management
     case newWindow = "new_window"
@@ -136,7 +136,7 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .goToSpace6: return "Go to Space 6"
         case .goToSpace7: return "Go to Space 7"
         case .goToSpace8: return "Go to Space 8"
-        case .goToLastSpace: return "Go to Last Space"
+        case .goToSpace9: return "Go to Space 9"
         case .newWindow: return "New Window"
         case .closeWindow: return "Close Window"
         case .closeBrowser: return "Close Browser"
@@ -166,13 +166,18 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         }
     }
 
+    static let goToSpaceActions: [ShortcutAction] = [.goToSpace1, .goToSpace2, .goToSpace3, .goToSpace4, .goToSpace5, .goToSpace6, .goToSpace7, .goToSpace8, .goToSpace9]
+
+    /// 0-based space for the Go to Space actions.
+    var spaceIndex: Int? { Self.goToSpaceActions.firstIndex(of: self) }
+
     var category: ShortcutCategory {
         switch self {
         case .goBack, .goForward, .refresh, .clearCookiesAndRefresh:
             return .navigation
         case .newTab, .closeTab, .undoCloseTab, .nextTab, .previousTab, .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8, .goToLastTab, .duplicateTab, .toggleTopBarAddressView:
             return .tabs
-        case .nextSpace, .previousSpace, .goToSpace1, .goToSpace2, .goToSpace3, .goToSpace4, .goToSpace5, .goToSpace6, .goToSpace7, .goToSpace8, .goToLastSpace:
+        case .nextSpace, .previousSpace, .goToSpace1, .goToSpace2, .goToSpace3, .goToSpace4, .goToSpace5, .goToSpace6, .goToSpace7, .goToSpace8, .goToSpace9:
             return .spaces
         case .newWindow, .closeWindow, .closeBrowser, .toggleFullScreen:
             return .window
@@ -243,9 +248,26 @@ struct KeyCombination: Hashable, Codable {
         self.modifiers = modifiers
     }
 
+    /// Arrow keys arrive from NSEvent as private-use function-key characters; store and match them by name.
+    static func keyName(_ key: String) -> String {
+        switch key {
+        case "\u{F700}": return "up"
+        case "\u{F701}": return "down"
+        case "\u{F702}": return "left"
+        case "\u{F703}": return "right"
+        default: return key
+        }
+    }
+
     var displayString: String {
         var parts = modifiers.displayStrings
-        parts.append(key.uppercased())
+        switch Self.keyName(key) {
+        case "up": parts.append("↑")
+        case "down": parts.append("↓")
+        case "left": parts.append("←")
+        case "right": parts.append("→")
+        default: parts.append(key.uppercased())
+        }
         return parts.joined(separator: " + ")
     }
 
@@ -255,8 +277,9 @@ struct KeyCombination: Hashable, Codable {
 
         // Try charactersIgnoringModifiers first (for bracket keys like [ ] { })
         // Fall back to characters for regular keys
-        let keyWithoutModifiers = event.charactersIgnoringModifiers?.lowercased() ?? ""
-        let keyWithModifiers = event.characters?.lowercased() ?? ""
+        let keyWithoutModifiers = Self.keyName(event.charactersIgnoringModifiers?.lowercased() ?? "")
+        let keyWithModifiers = Self.keyName(event.characters?.lowercased() ?? "")
+        let key = Self.keyName(self.key)
 
         // Match if either form matches (handles bracket keys on different layouts)
         let keyMatches = (keyWithoutModifiers == key) || (keyWithModifiers == key)
@@ -277,7 +300,7 @@ struct KeyCombination: Hashable, Codable {
         if modifiers.contains(.option) { parts.append("opt") }
         if modifiers.contains(.control) { parts.append("ctrl") }
         if modifiers.contains(.shift) { parts.append("shift") }
-        parts.append(key.lowercased())
+        parts.append(Self.keyName(key.lowercased()))
         return parts.joined(separator: "+")
     }
 
@@ -346,8 +369,8 @@ extension KeyboardShortcut {
             KeyboardShortcut(action: .toggleTopBarAddressView, keyCombination: KeyCombination(key: "t", modifiers: [.command, .option])),
 
             // Space Management
-            KeyboardShortcut(action: .nextSpace, keyCombination: KeyCombination(key: "]", modifiers: [.command, .control])),
-            KeyboardShortcut(action: .previousSpace, keyCombination: KeyCombination(key: "[", modifiers: [.command, .control])),
+            KeyboardShortcut(action: .nextSpace, keyCombination: KeyCombination(key: "right", modifiers: [.command, .option])),
+            KeyboardShortcut(action: .previousSpace, keyCombination: KeyCombination(key: "left", modifiers: [.command, .option])),
             KeyboardShortcut(action: .goToSpace1, keyCombination: KeyCombination(key: "1", modifiers: [.control])),
             KeyboardShortcut(action: .goToSpace2, keyCombination: KeyCombination(key: "2", modifiers: [.control])),
             KeyboardShortcut(action: .goToSpace3, keyCombination: KeyCombination(key: "3", modifiers: [.control])),
@@ -356,7 +379,7 @@ extension KeyboardShortcut {
             KeyboardShortcut(action: .goToSpace6, keyCombination: KeyCombination(key: "6", modifiers: [.control])),
             KeyboardShortcut(action: .goToSpace7, keyCombination: KeyCombination(key: "7", modifiers: [.control])),
             KeyboardShortcut(action: .goToSpace8, keyCombination: KeyCombination(key: "8", modifiers: [.control])),
-            KeyboardShortcut(action: .goToLastSpace, keyCombination: KeyCombination(key: "9", modifiers: [.control])),
+            KeyboardShortcut(action: .goToSpace9, keyCombination: KeyCombination(key: "9", modifiers: [.control])),
 
             // Window Management
             KeyboardShortcut(action: .newWindow, keyCombination: KeyCombination(key: "n", modifiers: [.command])),

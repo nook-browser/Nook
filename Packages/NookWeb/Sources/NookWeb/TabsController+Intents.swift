@@ -282,18 +282,18 @@ extension TabsController {
 
     /// 0-based over the window's switchable spaces, the Agent space left out.
     public func selectSpace(at index: Int, in window: BrowserWindowState) {
-        let spaces = switchableSpaces(for: window).filter { !$0.isAgent }
+        let spaces = userSpaces(for: window)
         guard spaces.indices.contains(index) else { return }
         setSpace(spaces[index].id, in: window)
     }
 
-    public func selectLastSpace(in window: BrowserWindowState) {
-        guard let last = switchableSpaces(for: window).last(where: { !$0.isAgent }) else { return }
-        setSpace(last.id, in: window)
+    /// The spaces a person switches between: the Agent space is reached only from its sidebar row.
+    public func userSpaces(for window: BrowserWindowState) -> [SpaceRecord] {
+        switchableSpaces(for: window).filter { !$0.isAgent }
     }
 
     private func stepSpace(_ offset: Int, in window: BrowserWindowState) {
-        let spaces = tree(owner(of: window)).orderedSpaces
+        let spaces = userSpaces(for: window)
         guard spaces.count > 1, let current = spaces.firstIndex(where: { $0.id == window.spaceID }) else { return }
         let next = current + offset
         guard spaces.indices.contains(next) else { return }

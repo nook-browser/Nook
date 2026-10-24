@@ -18,7 +18,13 @@ class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
-    private let currentVersion = 9 // Increment when adding new shortcuts; 9 added Go to Space 1-8 and Last Space (Ctrl+1-9)
+    private let currentVersion = 10 // Increment when adding new shortcuts; 10 added Go to Space 1-9 (Ctrl+1-9) and moved Next/Previous Space to Cmd+Opt+arrows
+
+    /// Defaults that changed key: a user still on the old key gets the new one.
+    private let movedDefaults: [(action: ShortcutAction, from: KeyCombination, version: Int)] = [
+        (.nextSpace, KeyCombination(key: "]", modifiers: [.command, .control]), 10),
+        (.previousSpace, KeyCombination(key: "[", modifiers: [.command, .control]), 10),
+    ]
 
     /// Hash-based storage for O(1) lookup: ["cmd+t": KeyboardShortcut]
     private var shortcutMap: [String: KeyboardShortcut] = [:]
@@ -72,6 +78,7 @@ class KeyboardShortcutManager {
 
             // Check if we need to merge new shortcuts
             if savedVersion < currentVersion {
+                moveDefaults(since: savedVersion)
                 mergeWithDefaults()
                 userDefaults.set(currentVersion, forKey: shortcutsVersionKey)
             }
@@ -84,6 +91,19 @@ class KeyboardShortcutManager {
             userDefaults.set(currentVersion, forKey: shortcutsVersionKey)
             saveShortcuts()
         }
+    }
+
+    private func moveDefaults(since savedVersion: Int) {
+        for moved in movedDefaults where moved.version > savedVersion {
+            guard let old = shortcutMap[moved.from.lookupKey], old.action == moved.action,
+                  let new = KeyboardShortcut.defaultShortcuts.first(where: { $0.action == moved.action }),
+                  shortcutMap[new.keyCombination.lookupKey] == nil else { continue }
+            var updated = old
+            updated.keyCombination = new.keyCombination
+            shortcutMap[old.keyCombination.lookupKey] = nil
+            shortcutMap[updated.keyCombination.lookupKey] = updated
+        }
+        saveShortcuts()
     }
 
     private func mergeWithDefaults() {
@@ -501,11 +521,8 @@ class KeyboardShortcutManager {
                 if let window { tabs.selectNextSpace(in: window) }
             case .previousSpace:
                 if let window { tabs.selectPreviousSpace(in: window) }
-            case .goToSpace1, .goToSpace2, .goToSpace3, .goToSpace4, .goToSpace5, .goToSpace6, .goToSpace7, .goToSpace8:
-                let spaceIndex = Int(action.rawValue.components(separatedBy: "_").last ?? "0") ?? 1
-                if let window { tabs.selectSpace(at: spaceIndex - 1, in: window) }
-            case .goToLastSpace:
-                if let window { tabs.selectLastSpace(in: window) }
+            case .goToSpace1, .goToSpace2, .goToSpace3, .goToSpace4, .goToSpace5, .goToSpace6, .goToSpace7, .goToSpace8, .goToSpace9:
+                if let window, let index = action.spaceIndex { tabs.selectSpace(at: index, in: window) }
 
             // Window Management
             case .newWindow:

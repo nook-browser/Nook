@@ -78,6 +78,13 @@ struct NookCommands: Commands {
         )
     }
 
+    private func spaceShortcut(_ index: Int) -> DynamicShortcutModifier {
+        guard let action = ShortcutAction.goToSpaceActions[safe: index] else {
+            return DynamicShortcutModifier(keyEquivalent: nil, modifiers: [])
+        }
+        return DynamicShortcutModifier(keyEquivalent: keyEquivalent(for: action), modifiers: eventModifiers(for: action))
+    }
+
     var body: some Commands {
         CommandGroup(replacing: .newItem) {}
         CommandGroup(replacing: .windowList) {}
@@ -289,6 +296,29 @@ struct NookCommands: Commands {
         }
 
         Group {
+            CommandMenu("Spaces") {
+                Button("Next Space") {
+                    if let window = windowRegistry.activeWindow { browserManager.tabs.selectNextSpace(in: window) }
+                }
+                .modifier(dynamicShortcut(.nextSpace))
+
+                Button("Previous Space") {
+                    if let window = windowRegistry.activeWindow { browserManager.tabs.selectPreviousSpace(in: window) }
+                }
+                .modifier(dynamicShortcut(.previousSpace))
+
+                if let window = windowRegistry.activeWindow {
+                    let spaces = browserManager.tabs.userSpaces(for: window)
+                    if !spaces.isEmpty { Divider() }
+                    ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                        Button(space.name) {
+                            browserManager.tabs.selectSpace(at: index, in: window)
+                        }
+                        .modifier(spaceShortcut(index))
+                    }
+                }
+            }
+
             CommandMenu("Privacy") {
                 Menu("Clear Cookies") {
                     Button("Clear Cookies for Current Site") {
