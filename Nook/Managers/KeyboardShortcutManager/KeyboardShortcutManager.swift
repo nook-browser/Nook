@@ -18,7 +18,7 @@ class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
-    private let currentVersion = 8 // Increment when adding new shortcuts; 8 added Pick Element (Cmd+Shift+X)
+    private let currentVersion = 9 // Increment when adding new shortcuts; 9 added Go to Space 1-8 and Last Space (Ctrl+1-9)
 
     /// Hash-based storage for O(1) lookup: ["cmd+t": KeyboardShortcut]
     private var shortcutMap: [String: KeyboardShortcut] = [:]
@@ -501,6 +501,11 @@ class KeyboardShortcutManager {
                 if let window { tabs.selectNextSpace(in: window) }
             case .previousSpace:
                 if let window { tabs.selectPreviousSpace(in: window) }
+            case .goToSpace1, .goToSpace2, .goToSpace3, .goToSpace4, .goToSpace5, .goToSpace6, .goToSpace7, .goToSpace8:
+                let spaceIndex = Int(action.rawValue.components(separatedBy: "_").last ?? "0") ?? 1
+                if let window { tabs.selectSpace(at: spaceIndex - 1, in: window) }
+            case .goToLastSpace:
+                if let window { tabs.selectLastSpace(in: window) }
 
             // Window Management
             case .newWindow:

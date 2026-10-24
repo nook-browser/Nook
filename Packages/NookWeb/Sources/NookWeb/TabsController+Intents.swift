@@ -280,6 +280,18 @@ extension TabsController {
         stepSpace(-1, in: window)
     }
 
+    /// 0-based over the window's switchable spaces, the Agent space left out.
+    public func selectSpace(at index: Int, in window: BrowserWindowState) {
+        let spaces = switchableSpaces(for: window).filter { !$0.isAgent }
+        guard spaces.indices.contains(index) else { return }
+        setSpace(spaces[index].id, in: window)
+    }
+
+    public func selectLastSpace(in window: BrowserWindowState) {
+        guard let last = switchableSpaces(for: window).last(where: { !$0.isAgent }) else { return }
+        setSpace(last.id, in: window)
+    }
+
     private func stepSpace(_ offset: Int, in window: BrowserWindowState) {
         let spaces = tree(owner(of: window)).orderedSpaces
         guard spaces.count > 1, let current = spaces.firstIndex(where: { $0.id == window.spaceID }) else { return }
