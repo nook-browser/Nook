@@ -38,7 +38,10 @@ public class BrowserConfiguration {
         // NOTE: "mediaDevicesEnabled" intentionally NOT set — it causes the WebContent
         // process to eagerly register with com.apple.audio.AudioComponentRegistrar,
         // which is sandbox-denied for third-party WKWebView apps and crashes the process.
-        // getUserMedia still works through WKUIDelegate permission prompts without this.
+        // WebKit exposes navigator.mediaDevices without it once the app has
+        // NSCameraUsageDescription / NSMicrophoneUsageDescription in Info.plist and the
+        // device.camera / device.audio-input entitlements; without those, pages see no
+        // mic or camera at all. Capture then goes through requestMediaCaptureAuthorization.
 
         // CRITICAL: Enable HTML5 Fullscreen API
         config.preferences.isElementFullscreenEnabled = true
