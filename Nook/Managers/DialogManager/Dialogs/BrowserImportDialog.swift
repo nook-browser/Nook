@@ -55,7 +55,13 @@ struct BrowserImportDialog: DialogPresentable {
     private func handleCreate() {
         let manager = browserManager
         onCancel()
-        Task { await manager.importArcData() }
+        Task {
+            guard await !manager.importArcData() else { return }
+            let alert = NSAlert()
+            alert.messageText = "Couldn't import from Arc"
+            alert.informativeText = "Nook didn't find any Arc spaces on this Mac."
+            alert.runModal()
+        }
     }
 }
 

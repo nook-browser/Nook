@@ -13,8 +13,9 @@ import SwiftUI
 extension BrowserManager {
     /// Arc's spaces in order, each with its pinned and Today sections, its profile's favorites,
     /// nested folders, custom tab names and theme color. Each Arc profile becomes a Nook profile
-    /// with Arc's name. Arc's member card is kept beside the tabs.
-    func importArcData() async {
+    /// with Arc's name. Arc's member card is kept beside the tabs. Returns whether any space came in.
+    @discardableResult
+    func importArcData() async -> Bool {
         let result = await importManager.importArcSidebarData()
         if let card = importManager.arcMembershipCard() {
             try? card.write(to: TabsController.defaultDirectory.deletingLastPathComponent()
@@ -22,7 +23,7 @@ extension BrowserManager {
         }
         pendingExtensionImports += importManager.arcExtensionIDs()
         installPendingExtensionImports()
-        guard let window = importWindow else { return }
+        guard let window = importWindow else { return false }
         // Onboarding starts with one space holding a Google tab; beside Arc's spaces it is only an extra.
         let starters = nookSettings?.didFinishOnboarding == false
             ? tabs.orderedSpaces.filter { space in
@@ -52,9 +53,10 @@ extension BrowserManager {
             tabs.setAllFolders(open: false, space: spaceID)
         }
 
-        guard let firstImported else { return }
+        guard let firstImported else { return false }
         if window.spaceID.map(starters.contains) ?? true { tabs.setSpace(firstImported, in: window) }
         starters.forEach { tabs.deleteSpace($0) }
+        return true
     }
 
     func importDiaData() async {
