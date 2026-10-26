@@ -165,6 +165,7 @@ public enum NookDesign {
             colors: [Color(hex: "#FFB000"), Color(hex: "#FF5A1F"), Color(hex: "#E5177E")],
             startPoint: .topLeading, endPoint: .bottomTrailing)
         public static let agentChromeOpacity: Double = 0.45   // over the sidebar's own background
+        public static let agentIconInactiveOpacity: Double = 0.4  // switcher icon while another space is open
         /// Onboarding's fixed backdrop: the app icon's forest green as a soft mesh, lightest at the
         /// top left. The stages draw white text on it, so it stays dark in either appearance.
         public static let onboardingBackdrop = MeshGradient(
