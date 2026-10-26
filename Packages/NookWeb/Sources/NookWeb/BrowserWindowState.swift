@@ -129,6 +129,9 @@ public class BrowserWindowState {
     /// The space this window shows.
     public var spaceID: UUID?
 
+    /// While a swipe moves the space pages: the spaces either side of it and how far it is between them.
+    public var spaceSwipe: SpaceSwipe?
+
     /// The selected item per space in this window.
     var selectedItemBySpace: [UUID: UUID] = [:]
 
@@ -183,5 +186,18 @@ struct WindowToastInfo: Equatable {
         self.message = message
         self.timestamp = Date()
         self.duration = duration
+    }
+}
+
+/// `progress` of the way from space `from` to space `to`, while a swipe is under way.
+public struct SpaceSwipe: Equatable, Sendable {
+    public let from: UUID
+    public let to: UUID
+    public let progress: Double
+
+    public init(from: UUID, to: UUID, progress: Double) {
+        self.from = from
+        self.to = to
+        self.progress = progress
     }
 }

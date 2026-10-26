@@ -2,21 +2,23 @@
 
 import SwiftUI
 
-// Nook: a trackpad pager of its own instead of NSPageController. The system pager eases each
-// swipe out with its own momentum after the fingers lift; here the lift hands off to a short
-// fixed animation.
+// Nook: a trackpad pager modeled on Arc's. Pages sit on one strip; fingers move it at half
+// speed with rubber-banded ends, lifting commits the selection at once, and a critically
+// damped spring settles it on the render server so a new swipe can grab it mid-flight.
 extension PlatformPageView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> SwipePagerView {
         let view = SwipePagerView()
         view.coordinator = context.coordinator
         context.coordinator.pager = view
+        context.coordinator.onSwipe = context.environment.pageSwipeAction
         context.coordinator.show(selection)
         return view
     }
 
     func updateNSView(_ view: SwipePagerView, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.onSwipe = context.environment.pageSwipeAction
         context.coordinator.refresh(to: selection, animated: context.transaction.animation != nil)
     }
 
@@ -30,198 +32,533 @@ extension PlatformPageView: NSViewRepresentable {
     final class Coordinator {
         var parent: PlatformPageView
         weak var pager: SwipePagerView?
-        private(set) var current: SelectionValue?
-        private var views: [SelectionValue: HostingView] = [:]
+        var onSwipe: ((PageSwipePosition?) -> Void)?
+        private var views: [SelectionValue: PageHostView] = [:]
 
         init(_ parent: PlatformPageView) {
             self.parent = parent
         }
 
-        func view(for value: SelectionValue) -> HostingView {
+        var current: SelectionValue? { pager?.selectedValue }
+
+        func view(for value: SelectionValue) -> PageHostView {
             if let view = views[value] {
                 view.rootView = parent.content(value)
                 return view
             }
-            let view = HostingView(rootView: parent.content(value))
+            let view = PageHostView(rootView: parent.content(value))
             views[value] = view
             return view
         }
 
-        /// Shows `value` with no animation and drops pages that are no longer neighbours.
+        /// Every page in order, walked out from the selection.
+        func order() -> [SelectionValue] {
+            var before: [SelectionValue] = []
+            var cursor = parent.selection
+            while let previous = parent.previous(cursor), before.count < 256 {
+                before.append(previous)
+                cursor = previous
+            }
+            var after: [SelectionValue] = []
+            cursor = parent.selection
+            while let next = parent.next(cursor), after.count < 256 {
+                after.append(next)
+                cursor = next
+            }
+            return before.reversed() + [parent.selection] + after
+        }
+
         func show(_ value: SelectionValue) {
-            current = value
-            let keep = Set([value, parent.previous(value), parent.next(value)].compactMap { $0 })
-            views = views.filter { keep.contains($0.key) }
-            pager?.present(view(for: value))
+            pager?.move(to: value, animated: false)
         }
 
         func refresh(to value: SelectionValue, animated: Bool) {
-            guard value != current else {
-                if let current { _ = view(for: current) }
-                return
-            }
-            guard animated, let pager, let from = current else { return show(value) }
-            let forward = parent.next(from) == value
-            pager.animate(to: view(for: value), forward: forward) { [weak self] in self?.show(value) }
-        }
-
-        func neighbour(forward: Bool) -> SelectionValue? {
-            guard let current else { return nil }
-            return forward ? parent.next(current) : parent.previous(current)
+            pager?.move(to: value, animated: animated)
         }
 
         func commit(_ value: SelectionValue) {
-            show(value)
             parent.selection = value
+        }
+
+        func evict(keeping keep: Set<SelectionValue>) {
+            views = views.filter { keep.contains($0.key) }
         }
     }
 
-    // MARK: - Views
+    // MARK: - Pager
 
     final class SwipePagerView: NSView {
         weak var coordinator: Coordinator?
-        private var page: HostingView?
-        private var incoming: HostingView?
-        private var isTracking = false
 
-        private static var settle: TimeInterval { 0.18 }
-        private static var curve: CAMediaTimingFunction { CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1) }
+        private let strip = NSView()
+        private var pages: [SelectionValue] = []
+        private var selected = 0
+        private var attached: [Int: PageHostView] = [:]
+        // Strip offset in points; page i starts at i * width. Unclamped while dragging.
+        private var raw: CGFloat = 0
+        private var lastWidth: CGFloat = 0
+        private var motion: Motion = .idle
+        private var motionID: UInt = 0
+        private var wheel = Wheel()
+
+        private struct Drag {
+            var samples: [(time: TimeInterval, position: CGFloat)] = []
+            var detent: Int
+            let adopted: Bool
+        }
+
+        private struct Settle {
+            let target: CGFloat
+        }
+
+        private struct Wheel {
+            var cumulative: CGFloat = 0
+            var lastEvent: CFTimeInterval = 0
+            var lastTrigger: CFTimeInterval = -1
+        }
+
+        private enum Motion {
+            case idle
+            case dragging(Drag)
+            case settling(Settle)
+        }
+
+        var isTracking: Bool {
+            if case .idle = motion { return false }
+
+            return true
+        }
+
+        var selectedValue: SelectionValue? {
+            pages.indices.contains(selected) ? pages[selected] : nil
+        }
 
         override init(frame: NSRect) {
             super.init(frame: frame)
             wantsLayer = true
             layer?.masksToBounds = true
+            strip.wantsLayer = true
+            addSubview(strip)
         }
 
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-        func present(_ view: HostingView) {
-            if let incoming, incoming !== view { incoming.removeFromSuperview() }
-            incoming = nil
-            if let page, page !== view { page.removeFromSuperview() }
-            page = view
-            view.frame = bounds
-            view.autoresizingMask = [.width, .height]
-            if view.superview !== self { addSubview(view) }
+        private var width: CGFloat { bounds.width }
+        private var maxPosition: CGFloat { CGFloat(max(pages.count - 1, 0)) * width }
+
+        // MARK: Selection
+
+        /// Shows `value`, sliding the strip there when `animated`.
+        func move(to value: SelectionValue, animated: Bool) {
+            guard let coordinator else { return }
+
+            pages = coordinator.order()
+            guard let index = pages.firstIndex(of: value) else { return }
+
+            if case .dragging = motion {
+                guard index != selected else { return }
+                // A keyboard or menu switch ends the swipe in place.
+                motion = .idle
+                report(nil)
+            }
+
+            // Our own commit at lift lands here while the strip is still settling.
+            if index == selected, isTracking || attached[index] != nil {
+                attach(index, refresh: true)
+                return
+            }
+
+            selected = index
+            if animated, window != nil, width > 0 {
+                settle(to: index, velocity: 0)
+            } else {
+                snap()
+            }
         }
+
+        private func snap() {
+            stopSettling()
+            motion = .idle
+            raw = CGFloat(selected) * width
+            attach(selected)
+            detach(keeping: [selected])
+            relayout()
+            evict()
+        }
+
+        private func evict() {
+            guard let coordinator, !pages.isEmpty else { return }
+
+            let keep = Set([selected - 1, selected, selected + 1].filter(pages.indices.contains).map { pages[$0] })
+            coordinator.evict(keeping: keep)
+        }
+
+        // MARK: Layout
 
         override func layout() {
             super.layout()
-            if !isTracking { page?.frame = bounds }
+
+            if width != lastWidth {
+                // A resize mid-motion lands on the selected page rather than at a stale offset.
+                if case .dragging = motion { report(nil) }
+                lastWidth = width
+                snap()
+                return
+            }
+            relayout()
         }
 
-        /// A programmatic change: the new page slides in from its side.
-        func animate(to view: HostingView, forward: Bool, completion: @escaping () -> Void) {
-            guard let page, !isTracking else { return completion() }
-            place(view)
-            setOffset(0, page: page, incoming: view, forward: forward)
-            run(to: forward ? -bounds.width : bounds.width, page: page, incoming: view, forward: forward, completion: completion)
+        private func relayout() {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            strip.frame = NSRect(x: -Self.rubberBand(raw, max: maxPosition), y: 0,
+                                 width: CGFloat(max(pages.count, 1)) * width, height: bounds.height)
+            for (index, view) in attached {
+                view.frame = NSRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height)
+            }
+            CATransaction.commit()
         }
+
+        // Content is set once per attach; only a SwiftUI update refreshes it, never a scroll event.
+        private func attach(_ index: Int, refresh: Bool = false) {
+            guard pages.indices.contains(index), let coordinator else { return }
+            if !refresh, let view = attached[index], view.superview === strip { return }
+
+            let view = coordinator.view(for: pages[index])
+            attached[index] = view
+            view.frame = NSRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height)
+            if view.superview !== strip { strip.addSubview(view) }
+        }
+
+        private func attach(range: ClosedRange<CGFloat>) {
+            guard width > 0 else { return }
+
+            let low = Int((range.lowerBound / width).rounded(.down))
+            let high = Int((range.upperBound / width).rounded(.up))
+            for index in max(low, 0)...max(min(high, pages.count - 1), 0) { attach(index) }
+        }
+
+        private func detach(keeping keep: Set<Int>) {
+            for (index, view) in attached where !keep.contains(index) {
+                if view.superview === strip { view.removeFromSuperview() }
+                attached[index] = nil
+            }
+        }
+
+        // MARK: Gestures
 
         override func wantsForwardedScrollEvents(for axis: NSEvent.GestureAxis) -> Bool {
             axis == .horizontal
         }
 
         override func scrollWheel(with event: NSEvent) {
-            guard !isTracking,
-                  event.phase == .began,
-                  event.hasPreciseScrollingDeltas,
+            let horizontal = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
+
+            if !event.hasPreciseScrollingDeltas || (event.phase == [] && event.momentumPhase == []) {
+                if !(horizontal && wheelPage(event)) { super.scrollWheel(with: event) }
+                return
+            }
+
+            guard event.phase == .began, horizontal,
                   NSEvent.isSwipeTrackingFromScrollEventsEnabled,
-                  abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY),
-                  let coordinator, let page
-            else { return super.scrollWheel(with: event) }
+                  beginDrag()
+            else {
+                // The momentum that follows a swipe belongs to the swipe.
+                if horizontal, event.momentumPhase != [] { return }
+                return super.scrollWheel(with: event)
+            }
 
-            let previous = coordinator.neighbour(forward: false)
-            let next = coordinator.neighbour(forward: true)
-            guard previous != nil || next != nil else { return super.scrollWheel(with: event) }
+            track()
+        }
 
-            isTracking = true
-            var target: (value: SelectionValue, view: HostingView, forward: Bool)?
-            var samples: [(amount: CGFloat, time: TimeInterval)] = []
-            var playedHaptic = false
-            let width = bounds.width
+        func beginDrag() -> Bool {
+            if case .dragging = motion { return false }
 
-            // Positive amounts drag the page right, toward the previous space.
-            event.trackSwipeEvent(
-                options: [.lockDirection, .clampGestureAmount],
-                dampenAmountThresholdMin: next == nil ? 0 : -1,
-                max: previous == nil ? 0 : 1
-            ) { [weak self] amount, phase, _, stop in
-                guard let self else { stop.pointee = true; return }
-                let forward = amount < 0
-                if amount != 0, target?.forward != forward, let value = forward ? next : previous {
-                    let view = coordinator.view(for: value)
-                    target = (value, view, forward)
-                    self.place(view)
-                }
+            guard let coordinator, width > 0 else { return false }
 
-                switch phase {
-                case .began, .changed:
-                    samples.append((amount, ProcessInfo.processInfo.systemUptime))
-                    if samples.count > 4 { samples.removeFirst() }
-                    self.setOffset(amount * width, page: page, incoming: target?.view, forward: target?.forward ?? forward)
-                    if !playedHaptic, abs(amount) > 0.15 {
-                        playedHaptic = true
-                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                    }
-                case .ended, .cancelled:
-                    // Take over from the system's momentum with a short animation of our own.
-                    stop.pointee = true
-                    let velocity = Self.velocity(samples)
-                    let commits = phase == .ended && target.map {
-                        $0.forward == (amount < 0)
-                            && (abs(amount) > 0.3 || ($0.forward ? velocity < -0.8 : velocity > 0.8))
-                    } == true
-                    if let target, commits {
-                        self.run(to: target.forward ? -width : width, page: page, incoming: target.view, forward: target.forward) {
-                            self.isTracking = false
-                            coordinator.commit(target.value)
-                        }
-                    } else {
-                        let incoming = target?.view
-                        self.run(to: 0, page: page, incoming: incoming, forward: target?.forward ?? true) {
-                            incoming?.removeFromSuperview()
-                            self.incoming = nil
-                            self.isTracking = false
-                            page.frame = self.bounds
-                        }
-                    }
-                default:
-                    break
+            pages = coordinator.order()
+            guard pages.count > 1 else { return false }
+
+            let adopted = adoptSettle()
+            let nearest = Self.nearest(raw, width: width, count: pages.count)
+            motion = .dragging(Drag(detent: nearest, adopted: adopted))
+            let shown = Self.rubberBand(raw, max: maxPosition)
+            attach(range: (shown - width)...(shown + 2 * width))
+            relayout()
+
+            return true
+        }
+
+        // Arc's pager runs its own loop while fingers are down, so every event of the swipe
+        // reaches it whichever view is under the pointer.
+        private func track() {
+            guard let window else {
+                motion = .idle
+                return
+            }
+
+            let mask: NSEvent.EventTypeMask = [.scrollWheel, .swipe, .mouseMoved, .mouseExited, .keyDown, .keyUp]
+            while case .dragging = motion,
+                  let event = window.nextEvent(matching: mask, until: .distantFuture, inMode: .eventTracking, dequeue: true) {
+                if event.type == .scrollWheel {
+                    drag(event.phase, delta: event.scrollingDeltaX, time: event.timestamp)
+                } else {
+                    NSApp.sendEvent(event)
                 }
             }
         }
 
-        private func place(_ view: HostingView) {
-            if let incoming, incoming !== view { incoming.removeFromSuperview() }
-            incoming = view
-            view.autoresizingMask = []
-            view.frame = bounds
-            if view.superview !== self { addSubview(view) }
-        }
+        func drag(_ phase: NSEvent.Phase, delta: CGFloat, time: TimeInterval) {
+            guard case .dragging(var drag) = motion else { return }
 
-        private func setOffset(_ offset: CGFloat, page: NSView, incoming: NSView?, forward: Bool) {
-            page.frame = bounds.offsetBy(dx: offset, dy: 0)
-            incoming?.frame = bounds.offsetBy(dx: offset + (forward ? bounds.width : -bounds.width), dy: 0)
-        }
+            switch phase {
+            case .changed:
+                raw += delta * -0.5
+                drag.samples.append((time, raw))
+                drag.samples.removeAll { time - $0.time > Self.velocityWindow }
 
-        private func run(to offset: CGFloat, page: NSView, incoming: NSView?, forward: Bool,
-                         completion: @escaping () -> Void) {
-            let width = bounds.width
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = Self.settle
-                context.timingFunction = Self.curve
-                page.animator().frame = bounds.offsetBy(dx: offset, dy: 0)
-                incoming?.animator().frame = bounds.offsetBy(dx: offset + (forward ? width : -width), dy: 0)
-            } completionHandler: {
-                MainActor.assumeIsolated { completion() }
+                let nearest = Self.nearest(raw, width: width, count: pages.count)
+                // Arc plays .alignment; .levelChange is the firmest pattern AppKit offers.
+                if nearest != drag.detent {
+                    drag.detent = nearest
+                    NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+                }
+
+                motion = .dragging(drag)
+                let shown = Self.rubberBand(raw, max: maxPosition)
+                attach(range: shown...(shown + width))
+                relayout()
+                reportPosition(shown)
+            case .ended:
+                var velocity = Self.velocity(drag.samples)
+                let target = Self.target(position: raw, velocity: velocity, width: width,
+                                         count: pages.count, adopted: drag.adopted)
+                // Carry the flick into the spring only when it heads for the target.
+                if (velocity >= 0) == (CGFloat(target) * width < raw) { velocity = 0 }
+
+                let changed = target != selected
+                selected = target
+                settle(to: target, velocity: velocity)
+                if changed { commitAfterSlideStarts(pages[target]) }
+            case .cancelled, []:
+                settle(to: selected, velocity: 0)
+            default:
+                break
             }
         }
 
-        /// Gesture amount per second over the last few samples, so a quick flick commits.
-        private static func velocity(_ samples: [(amount: CGFloat, time: TimeInterval)]) -> CGFloat {
-            guard let first = samples.first, let last = samples.last, last.time > first.time else { return 0 }
-            return (last.amount - first.amount) / (last.time - first.time)
+        /// Wheel paging: a burst of horizontal wheel movement flips one page, with a cooldown.
+        private func wheelPage(_ event: NSEvent) -> Bool {
+            guard let coordinator else { return false }
+            if case .dragging = motion { return true }
+
+            let now = CACurrentMediaTime()
+            guard now - wheel.lastTrigger > 0.25 else { return true }
+
+            if now - wheel.lastEvent > 0.05 { wheel.cumulative = 0 }
+            wheel.lastEvent = now
+            wheel.cumulative += event.scrollingDeltaX
+            guard abs(wheel.cumulative) > 1 else { return true }
+
+            var forward = wheel.cumulative < 0
+            if event.isDirectionInvertedFromDevice { forward.toggle() }
+            wheel.cumulative = 0
+            wheel.lastTrigger = now
+
+            pages = coordinator.order()
+            let target = selected + (forward ? 1 : -1)
+            guard pages.indices.contains(target) else { return true }
+
+            selected = target
+            settle(to: target, velocity: 0)
+            commitAfterSlideStarts(pages[target])
+            return true
+        }
+
+        /// Hands the slide to the render server before the switch's main-thread work, which
+        /// otherwise held the strip still for its length. The page still changes as it starts.
+        private func commitAfterSlideStarts(_ value: SelectionValue) {
+            CATransaction.flush()
+            coordinator?.commit(value)
+        }
+
+        // MARK: Settling
+
+        private func settle(to index: Int, velocity: CGFloat) {
+            guard width > 0 else { return snap() }
+
+            adoptSettle()
+            motionID &+= 1
+            let id = motionID
+            let target = CGFloat(index) * width
+            let offsets = Self.springOffsets(from: raw - target, velocity: velocity)
+            let shownNow = Self.rubberBand(raw, max: maxPosition)
+
+            attach(range: min(shownNow, target)...(max(shownNow, target) + width))
+            raw = target
+            motion = .settling(Settle(target: target))
+            report(nil)
+
+            CATransaction.begin()
+            CATransaction.setCompletionBlock { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.motionID == id else { return }
+                    self.motion = .idle
+                    self.detach(keeping: [self.selected])
+                    self.evict()
+                }
+            }
+            relayout()
+            if offsets.count > 1 {
+                // Additive keyframes of the strip's x, sampled at 240 Hz as Arc does.
+                let animation = CAKeyframeAnimation(keyPath: "position.x")
+                animation.isAdditive = true
+                animation.values = offsets.map { target - Self.rubberBand(target + $0, max: maxPosition) }
+                animation.keyTimes = offsets.indices.map { NSNumber(value: Double($0) / Double(offsets.count - 1)) }
+                animation.duration = Double(offsets.count - 1) * Self.sampleStep
+                animation.calculationMode = .linear
+                strip.layer?.add(animation, forKey: "settle")
+            }
+            CATransaction.commit()
+        }
+
+        /// Takes over a settle in flight at its on-screen position. Returns whether one was running.
+        @discardableResult
+        private func adoptSettle() -> Bool {
+            guard case .settling(let settle) = motion else { return false }
+
+            motionID &+= 1
+            if let layer = strip.layer, let presented = layer.presentation() {
+                let shown = settle.target - (presented.position.x - layer.position.x)
+                raw = Self.inverseRubberBand(shown, max: maxPosition)
+            }
+            stopSettling()
+            motion = .idle
+            relayout()
+
+            return true
+        }
+
+        private func stopSettling() {
+            strip.layer?.removeAnimation(forKey: "settle")
+        }
+
+        // MARK: Reporting
+
+        private func reportPosition(_ shown: CGFloat) {
+            guard width > 0, !pages.isEmpty else { return }
+
+            let fraction = min(max(shown / width, 0), CGFloat(pages.count - 1))
+            let floor = Int(fraction.rounded(.down))
+            let ceil = min(floor + 1, pages.count - 1)
+            report(PageSwipePosition(from: AnyHashable(pages[floor]), to: AnyHashable(pages[ceil]),
+                                     progress: Double(fraction - CGFloat(floor))))
+        }
+
+        private func report(_ position: PageSwipePosition?) {
+            coordinator?.onSwipe?(position)
+        }
+
+        // MARK: Arc's constants
+
+        static var velocityWindow: TimeInterval { 0.1 }
+        static var flingVelocity: CGFloat { 5 }
+        static var springResponse: Double { 0.25 }
+        static var sampleStep: Double { 1.0 / 240 }
+
+        /// Arc's end resistance: 255 points at most past either end.
+        static func rubberBand(_ raw: CGFloat, max upper: CGFloat) -> CGFloat {
+            let clamped = min(max(raw, 0), upper)
+            let over = abs(raw - clamped)
+            guard over > 0 else { return raw }
+
+            return clamped + (raw < clamped ? -1 : 1) * 255 * (1 - 1 / (over * 0.15 / 255 + 1))
+        }
+
+        static func inverseRubberBand(_ shown: CGFloat, max upper: CGFloat) -> CGFloat {
+            let clamped = min(max(shown, 0), upper)
+            let over = min(abs(shown - clamped), 254.9)
+            guard over > 0 else { return shown }
+
+            return clamped + (shown < clamped ? -1 : 1) * over * 255 / ((255 - over) * 0.15)
+        }
+
+        static func nearest(_ position: CGFloat, width: CGFloat, count: Int) -> Int {
+            min(max(Int((position / width).rounded()), 0), count - 1)
+        }
+
+        /// Points per second over the last 100 ms of samples.
+        static func velocity(_ samples: [(time: TimeInterval, position: CGFloat)]) -> CGFloat {
+            guard let first = samples.first, let last = samples.last else { return 0 }
+
+            let elapsed = last.time - first.time
+            guard elapsed > 0, elapsed < velocityWindow else { return 0 }
+
+            return (last.position - first.position) / elapsed
+        }
+
+        /// Arc's page choice at lift: any flick moves one page its way, otherwise the nearest page.
+        static func target(position: CGFloat, velocity: CGFloat, width: CGFloat, count: Int, adopted: Bool) -> Int {
+            guard count > 0, width > 0 else { return 0 }
+            guard position >= 0 else { return 0 }
+
+            let floor = min(Int((position / width).rounded(.down)), count - 1)
+            let pick: Int
+            if abs(velocity) >= flingVelocity {
+                pick = adopted ? floor + (velocity > 0 ? 1 : -1) : (velocity > 0 ? floor + 1 : floor)
+            } else {
+                pick = Int((position / width).rounded())
+            }
+
+            return min(max(pick, floor - 1, 0), floor + 1, count - 1)
+        }
+
+        /// A critically damped spring from `offset` toward 0, sampled at 240 Hz until it rests.
+        static func springOffsets(from offset: CGFloat, velocity: CGFloat) -> [CGFloat] {
+            let omega = 2 * Double.pi / springResponse
+            let x0 = Double(offset), v0 = Double(velocity)
+            var offsets: [CGFloat] = []
+            var t = 0.0
+            while t < 2 {
+                let decay = exp(-omega * t)
+                let x = (x0 + (v0 + omega * x0) * t) * decay
+                let v = (v0 - omega * (v0 + omega * x0) * t) * decay
+                offsets.append(CGFloat(x))
+                if t > 0, abs(x) < 0.1, abs(v) < 1 { break }
+                t += sampleStep
+            }
+            offsets[offsets.count - 1] = 0
+
+            return offsets
+        }
+    }
+
+    // Owns its frame outside SwiftUI so selection updates cannot interrupt the strip.
+    final class PageHostView: NSView {
+        private let hostingView: HostingView
+
+        var rootView: Content {
+            get { hostingView.rootView }
+            set { hostingView.rootView = newValue }
+        }
+
+        init(rootView: Content) {
+            hostingView = HostingView(rootView: rootView)
+            super.init(frame: .zero)
+            wantsLayer = true
+            hostingView.autoresizingMask = [.width, .height]
+            addSubview(hostingView)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func layout() {
+            super.layout()
+            hostingView.frame = bounds
+        }
+
+        override func wantsForwardedScrollEvents(for axis: NSEvent.GestureAxis) -> Bool {
+            axis == .horizontal
         }
     }
 

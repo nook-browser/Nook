@@ -357,8 +357,19 @@ class BrowserManager: ObservableObject {
     // Frame of the URL bar within the window; used to anchor the mini palette precisely
     @Published var urlBarFrame: CGRect = .zero
     @Published var shouldShowZoomPopup: Bool = false
-    /// The website data store of the active window's space.
-    @Published var currentProfile: Profile?
+    /// The website data store of the active window's space. Not @Published: a switch must not
+    /// redraw every view observing BrowserManager.
+    private let currentProfileSubject: CurrentValueSubject<Profile?, Never>
+
+    var currentProfile: Profile? {
+        get { currentProfileSubject.value }
+        set { currentProfileSubject.send(newValue) }
+    }
+
+    var currentProfilePublisher: AnyPublisher<Profile?, Never> {
+        currentProfileSubject.eraseToAnyPublisher()
+    }
+
     /// True for the length of a space change, so views do not animate content from the old space
     /// into the new one.
     @Published var isSwitchingSpace: Bool = false
@@ -446,7 +457,7 @@ class BrowserManager: ObservableObject {
         self.tabs = tabs
         // The first space's data store is the one the app starts on.
         let initialProfile = tabs.orderedSpaces.first.flatMap { tabs.profile(forSpace: $0.id) }
-        self.currentProfile = initialProfile
+        self.currentProfileSubject = CurrentValueSubject(initialProfile)
 
         // settingsManager will be injected from NookApp
         self.dialogManager = DialogManager()
@@ -615,13 +626,12 @@ class BrowserManager: ObservableObject {
               currentProfile?.id != profile.id else { return }
 
         isSwitchingSpace = true
-        withAnimation(.easeInOut(duration: Self.spaceSwitchDuration)) {
-            currentProfile = profile
-            // Settings loads these lists when it opens; reading every cookie and data record here stalled the switch.
-            cookieManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
-            cacheManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
-            historyManager.switchProfile(profile.id)
-        }
+        currentProfile = profile
+        // No animation transaction: one here made the window render mid-switch. Settings loads
+        // the cookie and data lists when it opens; reading them here stalled the switch.
+        cookieManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
+        cacheManager.switchDataStore(profile.dataStore, profileId: profile.id, eagerLoad: false)
+        historyManager.switchProfile(profile.id)
         transitionEndTask?.cancel()
         transitionEndTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.spaceSwitchDuration))

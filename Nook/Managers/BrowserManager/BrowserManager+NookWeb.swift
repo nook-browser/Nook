@@ -42,10 +42,6 @@ extension BrowserManager: WebViewProvider {
 // MARK: - PageSessionDelegate
 
 extension BrowserManager: PageSessionDelegate {
-    var currentProfilePublisher: AnyPublisher<Profile?, Never> {
-        $currentProfile.eraseToAnyPublisher()
-    }
-
     func navigateAcrossWindows(_ itemID: UUID, to url: URL) {
         navigateTabAcrossWindows(itemID, to: url)
     }

@@ -156,7 +156,7 @@ struct WindowView: View {
             }
         }
         // The app-wide accent follows the active window's space.
-        // Immediate, so the colour changes in the same frame as the page and URL.
+        // Keep the shared accent available to controls outside this window.
         .onChange(of: spaceAccentHex) { _, hex in applyAccent(hex) }
         .onChange(of: windowRegistry.activeWindowId) { _, _ in applyAccent(spaceAccentHex) }
         // Handle organize tabs notification from keyboard shortcut manager
@@ -202,7 +202,9 @@ struct WindowView: View {
     @ViewBuilder
     private func WindowBackground() -> some View {
         // Private windows keep the neutral incognito accent, never the space's color.
-        let accent = windowState.isIncognito ? SpaceGradient.incognito.primaryColor : browserManager.gradientColorManager.accentColor
+        let accent = windowState.isIncognito
+            ? SpaceGradient.incognito.primaryColor
+            : spaceAccentHex.map { SpaceGradient.accent(hex: $0).primaryColor } ?? SpaceGradient.default.primaryColor
         let isActive = windowRegistry.activeWindowId == windowState.id
 
         NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)

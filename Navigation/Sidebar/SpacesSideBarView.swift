@@ -26,10 +26,6 @@ struct SpacesSideBarView: View {
     @Environment(CommandPalette.self) var commandPalette
     @Environment(TabOrganizerManager.self) var tabOrganizerManager
 
-    // Space navigation. Keyed by space id: an index outlives the space it pointed at.
-    @State private var activeSpaceID: UUID?
-    @State private var activeTabRefreshTrigger: Bool = false
-
     // Hover states
     @State private var isSidebarHovered: Bool = false
     @State private var isMenuButtonHovered = false
@@ -99,7 +95,6 @@ struct SpacesSideBarView: View {
             SidebarUpdateNotification(downloadsMenuVisible: showDownloadsMenu)
                 .environmentObject(browserManager)
                 .environment(windowState)
-                .environment(nookSettings)
                 .padding(.horizontal, NookDesign.Spacing.sidebarInset)
                 .padding(.bottom, NookDesign.Spacing.sidebarInset)
 
@@ -193,8 +188,10 @@ struct SpacesSideBarView: View {
     private func spacesContent(spaces: [SpaceRecord]) -> some View {
         // A deleted (or private-window) space falls back to the first one still here.
         let selection = Binding<UUID> {
-            spaces.first { $0.id == activeSpaceID }?.id ?? spaces[0].id
-        } set: { activeSpaceID = $0 }
+            spaces.first { $0.id == windowState.spaceID }?.id ?? spaces[0].id
+        } set: { newID in
+            tabs.setSpace(newID, in: windowState)
+        }
 
         return PageView(selection: selection) {
             ForEach(spaces) { space in
@@ -202,29 +199,23 @@ struct SpacesSideBarView: View {
             }
         }
         .pageViewStyle(.scroll)
+        // The space dots follow the swipe, as Arc's do.
+        .onPageSwipe { position in
+            guard let position, let from = position.from.base as? UUID, let to = position.to.base as? UUID else {
+                withAnimation(NookDesign.Motion.pageSettle) { windowState.spaceSwipe = nil }
+                return
+            }
+            windowState.spaceSwipe = SpaceSwipe(from: from, to: to, progress: position.progress)
+        }
         .contentShape(Rectangle())
         // Pages are cached hosting views; a different set of spaces needs new pages.
-        .id("\(activeTabRefreshTrigger)|\(spaces.map(\.id.uuidString).joined(separator: ","))")
+        .id(spaces.map(\.id))
         .onAppear {
-            activeSpaceID = windowState.spaceID
             if !spaces.contains(where: { $0.id == windowState.spaceID }) {
                 tabs.setSpace(spaces[0].id, in: windowState)
             }
         }
-        .onChange(of: activeSpaceID) { _, newID in
-            handleSpaceSelectionChange(newID, spaces: spaces)
-        }
-        .onChange(of: windowState.spaceID) { _, newID in
-            // A swipe already shows this space; rebuilding every page after it stalled the swipe.
-            guard activeSpaceID != newID else { return }
-            activeSpaceID = newID
-            activeTabRefreshTrigger.toggle()
-        }
-        .onChange(of: windowState.sidebarContentWidth) { _, _ in
-            activeTabRefreshTrigger.toggle()
-        }
     }
-
 
     private var emptyStateView: some View {
         VStack(spacing: NookDesign.Spacing.xl) {
@@ -350,12 +341,6 @@ struct SpacesSideBarView: View {
         }
     }
 
-    private func handleSpaceSelectionChange(_ newID: UUID?, spaces: [SpaceRecord]) {
-        guard let newID, newID != windowState.spaceID, spaces.contains(where: { $0.id == newID }) else { return }
-        // Haptic fires during swipe at 15% offset in PlatformPageView
-        tabs.setSpace(newID, in: windowState)
-    }
-
     @ViewBuilder
     private func makeSpaceView(for space: SpaceRecord) -> some View {
         VStack(spacing: 0) {
@@ -368,7 +353,7 @@ struct SpacesSideBarView: View {
                 .environment(tabs)
                 .environment(windowState)
                 .environment(windowRegistry)
-                .environment(nookSettings)
+                .environment(\.nookSettings, nookSettings)
                 .padding(.horizontal, NookDesign.Spacing.sidebarInset)
                 .padding(.bottom, NookDesign.Spacing.sectionGap)
             }
@@ -386,7 +371,7 @@ struct SpacesSideBarView: View {
             .environment(windowRegistry)
             .environment(commandPalette)
             .environment(tabOrganizerManager)
-            .environment(nookSettings)
+            .environment(\.nookSettings, nookSettings)
             .environmentObject(browserManager.gradientColorManager)
             .environmentObject(browserManager.splitManager)
             .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")

@@ -139,6 +139,7 @@ public enum NookDesign {
         public static let wavePeriod: TimeInterval = 1.6                 // seconds for the wave to travel one cycle
         public static let flight = Animation.easeIn(duration: 0.6)       // a download flying from the page to its button
         public static let spring = Animation.snappy(duration: 0.3)      // palette, dialog, toast, drag reorder, gesture-tracked motion
+        public static let pageSettle = Animation.spring(response: 0.25, dampingFraction: 1)  // the space pager's settle, so the dots land with the pages
     }
 
     // MARK: - Surface
