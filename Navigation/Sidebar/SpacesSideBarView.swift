@@ -190,8 +190,6 @@ struct SpacesSideBarView: View {
         let selection = Binding<UUID> {
             spaces.first { $0.id == windowState.spaceID }?.id ?? spaces[0].id
         } set: { newID in
-            // Commit the page and title together. The pager separately owns its
-            // outgoing and incoming views until their slide completes.
             tabs.setSpace(newID, in: windowState)
         }
 
@@ -201,6 +199,14 @@ struct SpacesSideBarView: View {
             }
         }
         .pageViewStyle(.scroll)
+        // The space dots follow the swipe, as Arc's do.
+        .onPageSwipe { position in
+            guard let position, let from = position.from.base as? UUID, let to = position.to.base as? UUID else {
+                withAnimation(NookDesign.Motion.pageSettle) { windowState.spaceSwipe = nil }
+                return
+            }
+            windowState.spaceSwipe = SpaceSwipe(from: from, to: to, progress: position.progress)
+        }
         .contentShape(Rectangle())
         // Pages are cached hosting views; a different set of spaces needs new pages.
         .id(spaces.map(\.id))

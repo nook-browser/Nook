@@ -33,6 +33,7 @@ public struct SpacesList: View {
                             SpacesListItem(
                                 space: space,
                                 isActive: windowState.spaceID == space.id,
+                                selection: selection(of: space.id),
                                 isFaded: false,
                                 onHoverChange: { isHovering in
                                     if isHovering {
@@ -83,6 +84,15 @@ public struct SpacesList: View {
                     }
             }
             .animation(NookDesign.Motion.standard, value: visibleSpaces.count)
+    }
+
+    /// How selected a dot looks, 0 to 1: the swipe's position while one runs, else the space shown.
+    private func selection(of id: UUID) -> Double {
+        guard let swipe = windowState.spaceSwipe else { return windowState.spaceID == id ? 1 : 0 }
+
+        if swipe.from == swipe.to { return id == swipe.from ? 1 : 0 }
+        if id == swipe.from { return 1 - swipe.progress }
+        return id == swipe.to ? swipe.progress : 0
     }
 
 

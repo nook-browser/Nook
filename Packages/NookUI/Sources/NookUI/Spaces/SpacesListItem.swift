@@ -18,6 +18,7 @@ struct SpacesListItem: View {
 
     let space: SpaceRecord
     let isActive: Bool
+    let selection: Double
     let isFaded: Bool
     let onHoverChange: ((Bool) -> Void)?
 
@@ -32,11 +33,13 @@ struct SpacesListItem: View {
     init(
         space: SpaceRecord,
         isActive: Bool,
+        selection: Double? = nil,
         isFaded: Bool,
         onHoverChange: ((Bool) -> Void)? = nil
     ) {
         self.space = space
         self.isActive = isActive
+        self.selection = selection ?? (isActive ? 1 : 0)
         self.isFaded = isFaded
         self.onHoverChange = onHoverChange
     }
@@ -84,9 +87,11 @@ struct SpacesListItem: View {
     }
 
     private var plainDot: some View {
-        Circle()
-            .fill(isActive ? AnyShapeStyle(space.accentColor) : AnyShapeStyle(.tertiary))
-            .frame(width: isActive ? activeDotSize : dotSize, height: isActive ? activeDotSize : dotSize)
+        let size = dotSize + (activeDotSize - dotSize) * selection
+        return Circle()
+            .fill(.tertiary)
+            .overlay(Circle().fill(space.accentColor).opacity(selection))
+            .frame(width: size, height: size)
             .animation(NookDesign.Motion.standard, value: isActive)
     }
 }

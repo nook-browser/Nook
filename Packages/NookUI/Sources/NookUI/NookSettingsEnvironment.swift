@@ -12,9 +12,7 @@ import NookSettings
 import SwiftUI
 
 private struct NookSettingsServiceKey: EnvironmentKey {
-    // SwiftUI evaluates defaults while resolving environment values, including
-    // during updates to trees that inject the real service. Reuse one instance;
-    // constructing a service here repeatedly registers and reads all settings.
+    // SwiftUI reads the default even where the real service is injected; build it once.
     @MainActor
     static let defaultValue = NookSettingsService()
 }

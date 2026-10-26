@@ -23,6 +23,18 @@ extension View {
     public func pageContentBackground(_ visibility: Visibility) -> some View {
         self.environment(\.contentBackground, visibility)
     }
+
+    /// Calls `action` as a swipe moves the pages, and with nil once they settle. macOS only.
+    public func onPageSwipe(_ action: @escaping (PageSwipePosition?) -> Void) -> some View {
+        self.environment(\.pageSwipeAction, action)
+    }
+}
+
+/// Where a swipe sits: `progress` of the way from the page `from` to the page `to`.
+public struct PageSwipePosition {
+    public let from: AnyHashable
+    public let to: AnyHashable
+    public let progress: Double
 }
 
 extension EnvironmentValues {
@@ -63,6 +75,15 @@ extension EnvironmentValues {
         set { self[ContentBackgroundVisibilityKey.self] = newValue }
     }
     
+    struct PageSwipeActionKey: EnvironmentKey {
+        static var defaultValue: ((PageSwipePosition?) -> Void)? = nil
+    }
+
+    var pageSwipeAction: ((PageSwipePosition?) -> Void)? {
+        get { self[PageSwipeActionKey.self] }
+        set { self[PageSwipeActionKey.self] = newValue }
+    }
+
     struct NavigateActionKey: EnvironmentKey {
         static var defaultValue: PageViewNavigateAction = .default
     }
