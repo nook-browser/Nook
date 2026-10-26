@@ -126,8 +126,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     /// - **Button 2** (middle click/scroll wheel button): resets a hovered pinned tab to its
     ///   URL, closes a hovered sidebar tab, is left to the page when it lands on web content,
     ///   and otherwise opens the command palette
-    /// - **Button 3** (typically a side button labeled "Back"): Navigate back in history
-    /// - **Button 4** (typically a side button labeled "Forward"): Navigate forward in history
+    /// - **Button 3** (typically a side button labeled "Back"): Navigate back in history, or
+    ///   to the previous space when the pointer is over the sidebar
+    /// - **Button 4** (typically a side button labeled "Forward"): Navigate forward in history,
+    ///   or to the next space when the pointer is over the sidebar
     ///
     /// This is common in browsers - side buttons on gaming/office mice are often used for navigation.
     private func setupMouseButtonHandling() {
@@ -139,12 +141,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
             // Mouse events are delivered on the main thread, so we can safely assume main actor isolation
             MainActor.assumeIsolated {
+                let eventWindowState = registry.windows.values.first(where: { $0.window === event.window })
                 switch event.buttonNumber {
                 case 2:  // Middle mouse button
                     if let hoveredId = manager.hoveredPinnedTabId, manager.tabs.item(hoveredId)?.url != nil {
                         manager.tabs.resetToHome(hoveredId)
-                    } else if let hoveredId = registry.windows.values
-                        .first(where: { $0.window === event.window })?.hoveredItemID {
+                    } else if let hoveredId = eventWindowState?.hoveredItemID {
                         // Middle click closes a sidebar tab, the same way Cmd+W does: a
                         // pinned tab or favorite keeps its place, a regular tab goes to
                         // the reopen history.
@@ -157,6 +159,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                         registry.activeWindow?.commandPalette?.open()
                     }
                 case 3:  // Back button
+                    if let eventWindowState, eventWindowState.isSidebarHovered, !Self.isOverWebContent(event) {
+                        manager.tabs.selectPreviousSpace(in: eventWindowState)
+                        return
+                    }
                     guard let windowState = registry.activeWindow,
                           let session = manager.tabs.controllableSession(in: windowState)
                     else {
@@ -164,6 +170,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                     }
                     session.goBack(in: manager.getWebView(for: session.itemID, in: windowState.id))
                 case 4:  // Forward button
+                    if let eventWindowState, eventWindowState.isSidebarHovered, !Self.isOverWebContent(event) {
+                        manager.tabs.selectNextSpace(in: eventWindowState)
+                        return
+                    }
                     guard
                         let windowState = registry.activeWindow,
                         let itemID = windowState.selectedItemID,
@@ -181,7 +191,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     /// Whether a mouse event landed inside page content rather than Nook's own chrome.
-    /// Used to leave middle clicks over a page to the page's link handler.
+    /// Used to leave middle clicks over a page to the page's link handler, and to keep the
+    /// side buttons over a page on history.
     private static func isOverWebContent(_ event: NSEvent) -> Bool {
         guard let contentView = event.window?.contentView else { return false }
         var view = contentView.hitTest(event.locationInWindow)

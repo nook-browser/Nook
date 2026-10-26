@@ -40,6 +40,10 @@ struct SpacesSideBarView: View {
             .contentShape(Rectangle())
             .onHoverTracking { state in
                 isSidebarHovered = state
+                windowState.isSidebarHovered = state
+            }
+            .onDisappear {
+                windowState.isSidebarHovered = false
             }
             .contextMenu {
                 sidebarContextMenu

@@ -118,6 +118,10 @@ public class BrowserWindowState {
     /// renders from it, so tracking it would invalidate views for nothing.
     @ObservationIgnored public var hoveredItemID: UUID?
 
+    /// Whether the pointer is over the sidebar, for the mouse back and forward buttons to
+    /// switch spaces. Observation-ignored for the same reason as `hoveredItemID`.
+    @ObservationIgnored public var isSidebarHovered: Bool = false
+
     /// The platform window, set by the app once it exists.
     @ObservationIgnored public weak var windowHandle: WindowHandle? {
         didSet { applyPendingFrame() }
