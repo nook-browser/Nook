@@ -77,4 +77,19 @@ extension AgentSpaceTests {
         _ = try f.tree.deleteSpace(agent, now: fixedNow)
         #expect(f.tree.agentSpace == nil)
     }
+
+    @Test func staysLastWhenSpacesAreAddedOrMoved() throws {
+        var f = Fixture()
+        let created = f.tree.ensureAgentSpace(loginsFrom: f.spaceA, now: fixedNow)
+        let agent = try #require(created).id
+        let added = UUID()
+        f.tree.createSpace(id: added, name: "C", icon: "", accentHex: "#000", after: agent, now: fixedNow)
+        #expect(f.tree.orderedSpaces.map(\.id) == [f.spaceA, f.spaceB, added, agent])
+        #expect(f.tree.space(added)!.order < f.tree.space(agent)!.order)
+        try f.tree.moveSpace(f.spaceA, after: agent, now: fixedNow)
+        #expect(f.tree.orderedSpaces.last?.id == agent)
+        try f.tree.moveSpace(agent, after: nil, now: fixedNow)
+        #expect(f.tree.orderedSpaces.last?.id == agent)
+        checkInvariants(f.tree)
+    }
 }

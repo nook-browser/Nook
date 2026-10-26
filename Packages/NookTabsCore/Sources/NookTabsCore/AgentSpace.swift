@@ -17,7 +17,8 @@ extension SpaceRecord {
 
     public static func agentIcon(loginsFrom spaceID: UUID) -> String { agentIconPrefix + spaceID.uuidString }
 
-    public var isAgent: Bool { icon.hasPrefix(Self.agentIconPrefix) }
+    public var isAgent: Bool { Self.isAgentIcon(icon) }
+    static func isAgentIcon(_ icon: String) -> Bool { icon.hasPrefix(agentIconPrefix) }
 
     /// The space whose logins this agent space borrows, as recorded at creation.
     public var agentLoginSpaceID: UUID? {

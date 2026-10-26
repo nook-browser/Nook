@@ -148,6 +148,7 @@ extension TabTree {
     public mutating func createSpace(id: UUID = UUID(), name: String, icon: String, accentHex: String, after: UUID?, dataStoreID: UUID? = nil, profileName: String? = nil, now: Date = Date()) -> Change {
         var change = Change()
         let siblings = orderedSpaces
+        let after = placement(after, among: siblings, isAgent: SpaceRecord.isAgentIcon(icon))
         let order = key(after: after, among: siblings) ?? renumberSpaces(siblings, insertingAfter: after, change: &change, now: now)
         record(&change, space: SpaceRecord(id: id, name: name, icon: icon, accentHex: accentHex, order: order, modifiedAt: now, dataStoreID: dataStoreID, profileName: profileName))
         return change
@@ -172,6 +173,7 @@ extension TabTree {
         guard var target = space(id) else { throw TreeError.missingSpace }
         var change = Change()
         let siblings = orderedSpaces.filter { $0.id != id }
+        let after = placement(after, among: siblings, isAgent: target.isAgent)
         target.order = key(after: after, among: siblings) ?? renumberSpaces(siblings, insertingAfter: after, change: &change, now: now)
         target.modifiedAt = now
         record(&change, space: target)
@@ -297,6 +299,13 @@ extension TabTree {
             k += 1
         }
         return keys[index]
+    }
+
+    /// Where a space goes: the Agent space after every other, any other space ahead of it.
+    private func placement(_ after: UUID?, among siblings: [SpaceRecord], isAgent: Bool) -> UUID? {
+        if isAgent { return siblings.last?.id }
+        guard let after, space(after)?.isAgent == true else { return after }
+        return siblings.last { !$0.isAgent }?.id
     }
 
     private func key(after: UUID?, among siblings: [SpaceRecord]) -> OrderKey? {

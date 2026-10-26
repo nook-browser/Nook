@@ -4,7 +4,8 @@
 //  Nook
 //
 //  Debug-only MCP server so a coding agent can drive the running app during development.
-//  Streamable HTTP (JSON responses only) on 127.0.0.1, bearer token from a 0600 file.
+//  Streamable HTTP (JSON responses only) on 127.0.0.1, bearer token from a 0600 file. A client
+//  holds a GET stream open for as long as it runs, so the last one closing ends the agent's tabs.
 //
 //  claude mcp add --transport http nook http://127.0.0.1:47823/mcp \
 //    --header "Authorization: Bearer $(cat ~/Library/Application\ Support/com.gstudios.nook/dev-mcp-token)"
@@ -31,12 +32,19 @@ final class DevMCPServer {
     nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "DevMCP")
     nonisolated private static let maxBody = 8 * 1024 * 1024
     nonisolated private static let toolTimeout: Double = 30
+    /// How long a closed stream may take to reconnect before its agent counts as gone.
+    private static let reconnectGrace: Duration = .seconds(10)
+    /// Under the 300 s an idle response body may last in the client's fetch.
+    private static let keepAliveInterval: Duration = .seconds(120)
 
     private weak var browserManager: BrowserManager?
     private var listener: NWListener?
     /// Last snapshot per page and selector, so the next call can answer with a diff.
     private var snapshots: [String: String] = [:]
     private var token = ""
+    /// Each session's open GET stream, which carries nothing but keep-alives.
+    private var streams: [String: NWConnection] = [:]
+    private var keepAlive: Task<Void, Never>?
     private let queue = DispatchQueue(label: "com.gstudios.nook.devmcp")
 
     /// Remember the browser and start only if the user has turned the server on.
@@ -57,6 +65,9 @@ final class DevMCPServer {
         guard listener != nil else { return }
         listener?.cancel()
         listener = nil
+        let open = streams.values
+        streams = [:]
+        open.forEach { $0.cancel() }
         Self.log.notice("listener stopped")
     }
 
@@ -111,8 +122,13 @@ final class DevMCPServer {
             if let data { buffer.append(data) }
             if let request = HTTPRequest(buffer) {
                 Task { @MainActor in
+                    if request.method == "GET", self.rejection(request) == nil, let session = request.headers["mcp-session-id"] {
+                        self.openStream(conn, session: session)
+                        return
+                    }
                     let (status, body) = await self.handle(request)
-                    self.send(conn, status: status, body: body)
+                    // A request without a session starts one; clients send it back on every later request.
+                    self.send(conn, status: status, body: body, session: request.headers["mcp-session-id"] ?? UUID().uuidString)
                 }
             } else if error != nil || isComplete || buffer.count > Self.maxBody {
                 conn.cancel()
@@ -122,27 +138,78 @@ final class DevMCPServer {
         }
     }
 
-    private nonisolated func send(_ conn: NWConnection, status: Int, body: Data?) {
+    private nonisolated func send(_ conn: NWConnection, status: Int, body: Data?, session: String) {
         let reason = [200: "OK", 202: "Accepted", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed"][status] ?? "Error"
-        var head = "HTTP/1.1 \(status) \(reason)\r\nConnection: close\r\nContent-Length: \(body?.count ?? 0)\r\n"
+        var head = "HTTP/1.1 \(status) \(reason)\r\nConnection: close\r\nContent-Length: \(body?.count ?? 0)\r\nMcp-Session-Id: \(session)\r\n"
         if body != nil { head += "Content-Type: application/json\r\n" }
         var out = Data((head + "\r\n").utf8)
         if let body { out.append(body) }
         conn.send(content: out, completion: .contentProcessed { _ in conn.cancel() })
     }
 
-    private func handle(_ req: HTTPRequest) async -> (Int, Data?) {
+    // MARK: - Sessions
+
+    private func openStream(_ conn: NWConnection, session: String) {
+        streams.updateValue(conn, forKey: session)?.cancel()
+        let head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n"
+        conn.send(content: Data(head.utf8), completion: .contentProcessed { _ in })
+        watchClose(conn, session: session)
+        guard keepAlive == nil else { return }
+        keepAlive = Task {
+            while !streams.isEmpty {
+                try? await Task.sleep(for: Self.keepAliveInterval)
+                for stream in streams.values { stream.send(content: Data(":\n\n".utf8), completion: .contentProcessed { _ in }) }
+            }
+            keepAlive = nil
+        }
+    }
+
+    /// The client sends nothing on a stream, so a finished receive is the stream closing.
+    private nonisolated func watchClose(_ conn: NWConnection, session: String) {
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 1024) { [weak self] _, _, isComplete, error in
+            guard isComplete || error != nil else { self?.watchClose(conn, session: session); return }
+            conn.cancel()
+            Task { @MainActor in
+                guard let self, self.streams[session] === conn else { return }
+                self.endSession(session)
+            }
+        }
+    }
+
+    /// Forgets `session`, and once no client has reconnected within the grace, closes the
+    /// Agent space's tabs.
+    private func endSession(_ session: String?) {
+        guard let session else { return }
+        streams.removeValue(forKey: session)?.cancel()
+        guard streams.isEmpty else { return }
+        Task {
+            try? await Task.sleep(for: Self.reconnectGrace)
+            guard streams.isEmpty, listener != nil else { return }
+            Self.log.notice("last agent disconnected")
+            browserManager?.closeIdleAgentTabs()
+        }
+    }
+
+    /// The status refusing `req`, or nil when it may go ahead.
+    private func rejection(_ req: HTTPRequest) -> Int? {
         // Web pages cannot reach us: they would send an Origin, and could not know the token.
         // Compare the parsed host, not a string prefix: http://localhost.attacker.example passed.
         if let origin = req.headers["origin"] {
             let host = URL(string: origin)?.host
-            guard host == "127.0.0.1" || host == "localhost" || host == "::1" else { return (403, nil) }
+            guard host == "127.0.0.1" || host == "localhost" || host == "::1" else { return 403 }
         }
-        guard req.headers["authorization"] == "Bearer \(token)" else { return (401, nil) }
-        guard req.path.hasPrefix("/mcp") else { return (404, nil) }
+        guard req.headers["authorization"] == "Bearer \(token)" else { return 401 }
+        guard req.path.hasPrefix("/mcp") else { return 404 }
+        return nil
+    }
+
+    private func handle(_ req: HTTPRequest) async -> (Int, Data?) {
+        if let status = rejection(req) { return (status, nil) }
         switch req.method {
         case "POST": break
-        case "DELETE": return (200, nil)
+        case "DELETE":
+            endSession(req.headers["mcp-session-id"])
+            return (200, nil)
         default: return (405, nil)
         }
         guard let msg = try? JSONSerialization.jsonObject(with: req.body) as? [String: Any] else {

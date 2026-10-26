@@ -29,7 +29,8 @@ public struct TabTree: Codable, Equatable, Sendable {
     }
 
     public var orderedSpaces: [SpaceRecord] {
-        spaces.values.filter { $0.deletedAt == nil }.sorted(by: Self.sortKey)
+        // The Agent space always sorts last; a space placed after it gets renumbered ahead of it.
+        spaces.values.filter { $0.deletedAt == nil }.sorted { $0.isAgent != $1.isAgent ? $1.isAgent : Self.sortKey($0, $1) }
     }
 
     /// Live children of a parent in display order.

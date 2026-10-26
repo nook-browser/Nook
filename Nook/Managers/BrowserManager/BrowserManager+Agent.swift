@@ -20,6 +20,8 @@ import NookWeb
 
 extension BrowserManager {
     private static let agentIdleDelay: Duration = .seconds(30)
+    /// How long after parking the Agent space's tabs are closed.
+    private static let agentCloseDelay: Duration = .seconds(30 * 60)
 
     func installAgentPageHost() {
         tabs.onAgentPage = { [weak self] session in
@@ -81,7 +83,17 @@ extension BrowserManager {
                   view.superview is AgentPageHostView else { return }
             agentParked = true
             view.removeFromSuperview()
+            try? await Task.sleep(for: Self.agentCloseDelay)
+            if Task.isCancelled { return }
+            self.closeIdleAgentTabs()
         }
+    }
+
+    /// Closes the Agent space's regular tabs, unless a window is showing the space or a call runs.
+    func closeIdleAgentTabs() {
+        guard let agent = tabs.agentSpaceID, tabs.agentCallsInFlight == 0,
+              !tabs.regularWindows.contains(where: { $0.spaceID == agent }) else { return }
+        for item in tabs.children(of: .tabs(spaceID: agent)) { tabs.remove(item.id) }
     }
 }
 
