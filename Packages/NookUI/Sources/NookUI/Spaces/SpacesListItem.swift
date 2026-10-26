@@ -81,7 +81,7 @@ struct SpacesListItem: View {
             Image(systemName: "sparkles")
                 .font(.system(size: NookDesign.Size.spaceIcon, weight: .semibold))
                 .foregroundStyle(NookDesign.Surface.agentGradient)
-                .opacity(isActive ? 1 : NookDesign.Surface.agentIconInactiveOpacity)
+                .opacity(NookDesign.Surface.agentIconInactiveOpacity + (1 - NookDesign.Surface.agentIconInactiveOpacity) * selection)
                 .animation(NookDesign.Motion.standard, value: isActive)
         } else {
             plainDot
