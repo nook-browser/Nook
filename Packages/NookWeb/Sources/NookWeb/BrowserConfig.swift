@@ -35,13 +35,8 @@ public class BrowserConfiguration {
         // YouTube autoplay since SPA navigations call play() outside user-gesture context.
         config.mediaTypesRequiringUserActionForPlayback = []
         
-        // NOTE: "mediaDevicesEnabled" intentionally NOT set — it causes the WebContent
-        // process to eagerly register with com.apple.audio.AudioComponentRegistrar,
-        // which is sandbox-denied for third-party WKWebView apps and crashes the process.
-        // WebKit exposes navigator.mediaDevices without it once the app has
-        // NSCameraUsageDescription / NSMicrophoneUsageDescription in Info.plist and the
-        // device.camera / device.audio-input entitlements; without those, pages see no
-        // mic or camera at all. Capture then goes through requestMediaCaptureAuthorization.
+        // "mediaDevicesEnabled" stays unset: it crashes WebContent (sandbox-denied AudioComponentRegistrar).
+        // Pages still get mic and camera from the Info.plist usage strings and device entitlements.
 
         // CRITICAL: Enable HTML5 Fullscreen API
         config.preferences.isElementFullscreenEnabled = true
