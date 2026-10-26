@@ -836,7 +836,8 @@ class BrowserManager: ObservableObject {
         if savedWidth > 0 {
             // A width saved under an older, smaller minimum would hide the history buttons.
             savedSidebarWidth = max(savedWidth, NookDesign.Size.sidebarMin)
-            sidebarWidth = savedVisibility ? savedSidebarWidth : 0
+            // Kept while hidden: showing the sidebar does not restore it, and the hover overlay uses it.
+            sidebarWidth = savedSidebarWidth
         } else {
             // First launch: ensure sidebar is visible with default width
             savedSidebarWidth = 250

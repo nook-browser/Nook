@@ -53,7 +53,9 @@ struct BrowserImportDialog: DialogPresentable {
     }
 
     private func handleCreate() {
+        let manager = browserManager
         onCancel()
+        Task { await manager.importArcData() }
     }
 }
 
