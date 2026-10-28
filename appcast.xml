@@ -233,5 +233,22 @@
       length="18251990"
       type="application/octet-stream"/>
   </item>
+  <item>
+    <title>Version 1.4.0</title>
+    <link>https://github.com/nook-browser/Nook/releases/tag/v1.4.0</link>
+    <sparkle:releaseNotesLink>https://github.com/nook-browser/Nook/releases/tag/v1.4.0</sparkle:releaseNotesLink>
+    <sparkle:informationalUpdate>
+      <sparkle:belowVersion>110</sparkle:belowVersion>
+    </sparkle:informationalUpdate>
+    <pubDate>Wed, 28 Oct 2026 15:51:32 +0000</pubDate>
+    <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
+    <enclosure
+      url="https://github.com/nook-browser/Nook/releases/download/v1.4.0/Nook-v1.4.0.dmg"
+      sparkle:version="120"
+      sparkle:shortVersionString="1.4.0"
+      sparkle:edSignature="2kV5YQnFfzuYjvRN+BpTE7GCukPMgKrO5n5GeVw6t51MxgRzqzwHkhR/9N6FiKSPhFx+kQ2VhWOWvNtY4COHAg=="
+      length="20316340"
+      type="application/octet-stream"/>
+  </item>
 </channel>
 </rss>
