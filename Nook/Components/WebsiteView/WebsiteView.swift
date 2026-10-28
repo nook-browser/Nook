@@ -258,7 +258,7 @@ struct WebsiteView: View {
                 
             }
             
-            // WebKit's PDF bar is off (BrowserConfiguration.hidePDFHUD); these replace it.
+            // WebKit's PDF bar is off (BrowserConfiguration.applyPlatformPreferences); these replace it.
             if !shouldShowSplit,
                let session = browserManager.tabs.controllableSession(in: windowState),
                session.isDisplayingPDF,

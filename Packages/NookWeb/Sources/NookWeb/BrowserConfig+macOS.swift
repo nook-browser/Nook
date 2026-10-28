@@ -19,7 +19,10 @@ extension BrowserConfiguration {
         setPrivatePreference("allowsInlineMediaPlayback", in: config.preferences)
         // Puts Inspect Element in the page's context menu; isInspectable covers Safari's remote inspector.
         setPrivatePreference("developerExtrasEnabled", in: config.preferences)
-        hidePDFHUD(in: config.preferences)
+        // WebKit's PDF bar is replaced by `PDFControlsView`; both would show otherwise.
+        setFeature("PDFPluginHUDEnabled", false, in: config.preferences)
+        // Safari's default caps rendering at 60 fps; this lets ProMotion displays run at 120.
+        setFeature("PreferPageRenderingUpdatesNear60FPSEnabled", false, in: config.preferences)
     }
 
     /// KVC on a key WebKit has dropped throws NSUndefinedKeyException and would take down every
@@ -30,19 +33,17 @@ extension BrowserConfiguration {
         preferences.setValue(true, forKey: key)
     }
 
-    /// WebKit's PDF viewer draws its own zoom/save bar over the page. Nook draws its own controls
-    /// in its place (`PDFControlsView`), so WebKit's is switched off. `PDFPluginHUDEnabled` is an
-    /// embedder-facing feature flag, set through the private feature API; a WebKit without the
-    /// flag or the API leaves its own bar in place, and both bars would show.
-    static func hidePDFHUD(in preferences: WKPreferences) {
+    /// Sets a WebKit feature flag through the private feature API. A WebKit without the API or
+    /// the flag is left as it is.
+    static func setFeature(_ key: String, _ enabled: Bool, in preferences: WKPreferences) {
         let list = NSSelectorFromString("_features")
         let set = NSSelectorFromString("_setEnabled:forFeature:")
         guard (WKPreferences.self as AnyObject).responds(to: list), preferences.responds(to: set) else { return }
         typealias Features = @convention(c) (AnyClass, Selector) -> NSArray
         let features = unsafeBitCast((WKPreferences.self as AnyObject).method(for: list), to: Features.self)(WKPreferences.self, list)
-        guard let hud = features.first(where: { ($0 as AnyObject).value(forKey: "key") as? String == "PDFPluginHUDEnabled" }) else { return }
+        guard let feature = features.first(where: { ($0 as AnyObject).value(forKey: "key") as? String == key }) else { return }
         typealias Setter = @convention(c) (AnyObject, Selector, Bool, AnyObject) -> Void
-        unsafeBitCast(preferences.method(for: set), to: Setter.self)(preferences, set, false, hud as AnyObject)
+        unsafeBitCast(preferences.method(for: set), to: Setter.self)(preferences, set, enabled, feature as AnyObject)
     }
 }
 #endif
