@@ -27,9 +27,12 @@ struct ExtensionLibraryOverlay: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
     @State private var isShowingMoreMenu = false
+    @State private var appeared = false
 
     private let menuWidth: CGFloat = 300
-    private let gap: CGFloat = 6
+    private let gap: CGFloat = 10
+    private let notchWidth: CGFloat = 18
+    private let notchHeight: CGFloat = 8
 
     var body: some View {
         GeometryReader { proxy in
@@ -52,7 +55,23 @@ struct ExtensionLibraryOverlay: View {
                             onShowMoreMenu: { isShowingMoreMenu.toggle() }
                         )
                         .frame(width: menuWidth)
-                        .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.lg))
+                        .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.xl))
+                        // Arc's notch, pointing at the button the panel came from.
+                        .overlay(alignment: .topLeading) {
+                            PanelNotch()
+                                .fill(NookDesign.Surface.raised)
+                                .frame(width: notchWidth, height: notchHeight)
+                                .offset(x: buttonFrame.midX - originX(buttonFrame: buttonFrame, container: proxy.size) - notchWidth / 2,
+                                        y: -notchHeight + 1)
+                        }
+                        // Grows out of the button rather than appearing whole.
+                        .scaleEffect(appeared ? 1 : 0.88, anchor: UnitPoint(
+                            x: (buttonFrame.midX - originX(buttonFrame: buttonFrame, container: proxy.size)) / menuWidth, y: 0))
+                        .opacity(appeared ? 1 : 0)
+                        .onAppear {
+                            withAnimation(.interpolatingSpring(Spring(response: 0.3, dampingRatio: 0.86))) { appeared = true }
+                        }
+                        .onDisappear { appeared = false }
 
                         if isShowingMoreMenu {
                             MoreMenuView(
@@ -69,6 +88,7 @@ struct ExtensionLibraryOverlay: View {
                             y: buttonFrame.maxY + gap)
                 }
                 .animation(NookDesign.Motion.quick, value: isShowingMoreMenu)
+                .transition(.opacity)
                 .onExitCommand { close() }
                 .onChange(of: windowState.selectedItemID) { _, _ in close() }
             }
@@ -87,6 +107,20 @@ struct ExtensionLibraryOverlay: View {
 
     private func close() {
         isShowingMoreMenu = false
-        windowState.isExtensionLibraryVisible = false
+        withAnimation(.interpolatingSpring(Spring(response: 0.25, dampingRatio: 1))) {
+            windowState.isExtensionLibraryVisible = false
+        }
+    }
+}
+
+/// A small rounded triangle pointing up.
+private struct PanelNotch: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.minY), control: CGPoint(x: rect.midX - rect.width * 0.18, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.maxY), control: CGPoint(x: rect.midX + rect.width * 0.18, y: rect.minY))
+        path.closeSubpath()
+        return path
     }
 }

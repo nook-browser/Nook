@@ -6,8 +6,10 @@
 //  Created by Maciek Bagiński on 23/09/2025.
 //
 
+import AppKit
 import SwiftUI
 import NookDesign
+import NookTabsCore
 import NookWeb
 import NookUI
 
@@ -29,6 +31,8 @@ struct SidebarMenu: View {
                     SidebarMenuHistoryTab()
                 case .downloads:
                     SidebarMenuDownloadsTab()
+                case .spaces:
+                    SidebarMenuSpacesTab(onOpenSpace: openSpace, onNewSpace: newSpace)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -38,6 +42,24 @@ struct SidebarMenu: View {
         }
         .frame(maxWidth: .infinity)
         .ignoresSafeArea()
+    }
+
+    private func close() {
+        LibraryMotion.close(windowState)
+    }
+
+    private func openSpace(_ id: UUID) {
+        close()
+        withAnimation(NookDesign.Motion.standard) {
+            browserManager.tabs.setSpace(id, in: windowState)
+        }
+    }
+
+    private func newSpace() {
+        close()
+        withAnimation(NookDesign.Motion.standard) {
+            windowState.spaceDraftTheme = .randomPreset()
+        }
     }
 
     var tabs: some View{
@@ -55,6 +77,15 @@ struct SidebarMenu: View {
                     }
                 )
                 SidebarMenuTab(
+                    image: "square.on.square",
+                    activeImage: "square.fill.on.square.fill",
+                    title: "Spaces",
+                    isActive: windowState.sidebarMenuSelectedTab == .spaces,
+                    action: {
+                        windowState.sidebarMenuSelectedTab = .spaces
+                    }
+                )
+                SidebarMenuTab(
                     image: "arrow.down.circle",
                     activeImage: "arrow.down.circle.fill",
                     title: "Downloads",
@@ -67,14 +98,7 @@ struct SidebarMenu: View {
             
             Spacer()
             HStack {
-                Button("Back", systemImage: "arrow.backward") {
-                    withAnimation(NookDesign.Motion.standard) {
-                        windowState.isSidebarMenuVisible = false
-                        let restoredWidth = windowState.savedSidebarWidth
-                        windowState.sidebarWidth = restoredWidth
-                        windowState.sidebarContentWidth = max(restoredWidth - 16, 0)
-                    }
-                }
+                Button("Back", systemImage: "arrow.backward", action: close)
                 .nookIconButtons()
                 Spacer()
             }

@@ -32,6 +32,7 @@ struct SpacesSideBarView: View {
     @State private var isDownloadsHovered = false
     @State private var showDownloadsMenu = false
     @State private var animateDownloadsMenu: Bool = false
+    @State private var showThemeEditor = false
 
     var body: some View {
         sidebarContent
@@ -42,15 +43,35 @@ struct SpacesSideBarView: View {
             .contextMenu {
                 sidebarContextMenu
             }
+            // Beside the sidebar, low down, so the panel covers the page rather than the tabs.
+            .popover(
+                isPresented: $showThemeEditor,
+                attachmentAnchor: .point(UnitPoint(x: nookSettings.sidebarPosition == .left ? 1 : 0, y: 0.7)),
+                arrowEdge: nookSettings.sidebarPosition == .left ? .trailing : .leading
+            ) {
+                if let space = themeableSpace {
+                    SpaceThemeEditor(space: space)
+                        .environment(tabs)
+                }
+            }
+    }
+
+    /// The window's space when it can take a theme: not a private window, not the Agent space.
+    private var themeableSpace: SpaceRecord? {
+        guard !windowState.isIncognito, let spaceID = windowState.spaceID,
+              let space = tabs.space(spaceID), !space.isAgent else { return nil }
+        return space
     }
 
     // MARK: - Main Content
 
     private var sidebarContent: some View {
         ZStack {
-            if windowState.isSidebarMenuVisible {
-                SidebarMenu()
-                    .transition(menuTransition)
+            // The library floats over the window (`LibraryOverlay`), so the sidebar keeps its content.
+            if windowState.spaceDraftTheme != nil {
+                SpaceCreationSidebar()
+                    .padding(.top, nookSettings.sidebarPosition == .left ? NookDesign.Spacing.sidebarTop : NookDesign.Spacing.sidebarInset)
+                    .transition(.opacity)
             } else {
                 mainSidebarContent
                     .transition(.opacity)
@@ -199,6 +220,20 @@ struct SpacesSideBarView: View {
             }
         }
         .pageViewStyle(.scroll)
+        // While the library is out the swipe is its own; the spaces under it stay put.
+        .pageSwipeEnabled(!windowState.isSidebarMenuVisible)
+        // Pulling past the first space draws the library out on its Spaces page, as in Arc.
+        .onPageOverscrollLeading { pull in
+            guard !windowState.isIncognito else { return }
+            switch pull {
+            case .changed(let distance):
+                if windowState.libraryDrag == nil, distance > 0 { windowState.sidebarMenuSelectedTab = .spaces }
+                // Nil, not zero, once the pull is back home: a held zero would pin the library shut.
+                windowState.libraryDrag = distance > 0 ? distance : nil
+            case .ended(let distance, let velocity):
+                LibraryMotion.release(windowState, distance: distance, velocity: velocity, width: LibraryMotion.width(for: .spaces))
+            }
+        }
         // The space dots follow the swipe, as Arc's do.
         .onPageSwipe { position in
             guard let position, let from = position.from.base as? UUID, let to = position.to.base as? UUID else {
@@ -290,6 +325,16 @@ struct SpacesSideBarView: View {
                 }
             }
 
+            if themeableSpace != nil {
+                Divider()
+
+                Button {
+                    showThemeEditor = true
+                } label: {
+                    Label("Edit Theme Color…", systemImage: "paintpalette")
+                }
+            }
+
             Divider()
 
             Menu {
@@ -310,15 +355,7 @@ struct SpacesSideBarView: View {
     // MARK: - Helper Functions
 
     private func handleMenuTap() {
-        withAnimation(NookDesign.Motion.standard) {
-            windowState.isSidebarMenuVisible = true
-            windowState.isSidebarAIChatVisible = false
-            let previousWidth = windowState.sidebarWidth
-            windowState.savedSidebarWidth = previousWidth
-            let newWidth: CGFloat = 400
-            windowState.sidebarWidth = newWidth
-            windowState.sidebarContentWidth = max(newWidth - 16, 0)
-        }
+        LibraryMotion.present(windowState)
     }
 
     private func handleMenuHover(_ isHovered: Bool) {
@@ -393,26 +430,12 @@ struct SpacesSideBarView: View {
 
     // MARK: - Dialogs
 
+    /// Opens Create a Space in the sidebar, with a random preset previewing in the window.
     private func showSpaceCreationDialog() {
-        browserManager.dialogManager.showDialog(
-            SpaceCreationDialog(
-                onCreate: { name, accentHex in
-                    if let spaceID = tabs.createSpace(
-                        name: name.isEmpty ? "New Space" : name,
-                        icon: "square.grid.2x2",
-                        accentHex: accentHex,
-                        after: tabs.orderedSpaces.last?.id,
-                        sharingLoginsWith: windowState.spaceID
-                    ) {
-                        tabs.setSpace(spaceID, in: windowState)
-                    }
-                    browserManager.dialogManager.closeDialog()
-                },
-                onCancel: {
-                    browserManager.dialogManager.closeDialog()
-                }
-            )
-        )
+        withAnimation(NookDesign.Motion.standard) {
+            windowState.isSidebarMenuVisible = false
+            windowState.spaceDraftTheme = .randomPreset()
+        }
     }
 
 

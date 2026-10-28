@@ -42,7 +42,10 @@ extension PlatformImage {
 }
 
 extension Image {
-    public init(platformImage: PlatformImage) { self.init(nsImage: platformImage) }
+    /// A template image (an inked favicon) draws in the foreground style, as text does.
+    public init(platformImage: PlatformImage) {
+        self = platformImage.isTemplate ? Image(nsImage: platformImage).renderingMode(.template) : Image(nsImage: platformImage)
+    }
 }
 
 extension Color {
@@ -56,6 +59,14 @@ extension PlatformColor {
 
 extension PlatformImage {
     var singlePixelCGImage: CGImage? { cgImage(forProposedRect: nil, context: nil, hints: nil) }
+
+    /// A black-and-white favicon as a template glyph (`FaviconInk`); any other icon as it is.
+    var inkedFavicon: PlatformImage {
+        guard let cg = singlePixelCGImage, let glyph = FaviconInk.glyph(from: cg) else { return self }
+        let image = NSImage(cgImage: glyph, size: size)
+        image.isTemplate = true
+        return image
+    }
 }
 
 /// Hands a URL WebKit cannot load (mailto:, tel:, an app's own scheme) to the app registered for it.
@@ -114,6 +125,12 @@ extension PlatformColor {
 
 extension PlatformImage {
     var singlePixelCGImage: CGImage? { cgImage }
+
+    /// A black-and-white favicon as a template glyph (`FaviconInk`); any other icon as it is.
+    var inkedFavicon: PlatformImage {
+        guard let cg = cgImage, let glyph = FaviconInk.glyph(from: cg) else { return self }
+        return UIImage(cgImage: glyph).withRenderingMode(.alwaysTemplate)
+    }
 }
 
 @MainActor func openWithSystem(_ url: URL) { UIApplication.shared.open(url) }

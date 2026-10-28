@@ -23,6 +23,8 @@ public final class FaviconCache: @unchecked Sendable {
     }
 
     private var memory: [String: Entry] = [:]
+    /// Each memory icon's main colors, worked out on first ask (`FaviconTint`).
+    private var tints: [String: [FaviconTint.Swatch]] = [:]
     /// Insertion order for LRU eviction.
     private var order: [String] = []
     private let lock = NSLock()
@@ -44,6 +46,16 @@ public final class FaviconCache: @unchecked Sendable {
         lock.withLock { memory[key]?.nsImage }
     }
 
+    /// The cached icon's main colors, for lighting a selected favorite; empty for a gray or
+    /// not-yet-cached icon. Worked out once per icon from a 32 px sample.
+    public func tint(for key: String) -> [FaviconTint.Swatch] {
+        if let known = lock.withLock({ tints[key] }) { return known }
+        guard let image = image(for: key), let cg = image.singlePixelCGImage else { return [] }
+        let swatches = FaviconTint.swatches(from: cg)
+        lock.withLock { tints[key] = swatches }
+        return swatches
+    }
+
     /// Memory cache only, as a SwiftUI image.
     public func swiftUIImage(for key: String) -> SwiftUI.Image? {
         lock.withLock { memory[key]?.image }
@@ -54,7 +66,7 @@ public final class FaviconCache: @unchecked Sendable {
         if let hit = image(for: key) { return hit }
         return await withCheckedContinuation { continuation in
             queue.async {
-                let image = self.readFromDisk(key)
+                let image = self.readFromDisk(key)?.inkedFavicon
                 if let image { self.insert(Entry(nsImage: image, image: SwiftUI.Image(platformImage: image)), for: key) }
                 continuation.resume(returning: image)
             }
@@ -63,7 +75,7 @@ public final class FaviconCache: @unchecked Sendable {
 
     /// Synchronous disk read with promotion to memory. For startup restore of a few visible rows.
     public func imageFromDiskSync(for key: String) -> PlatformImage? {
-        guard let image = readFromDisk(key) else { return nil }
+        guard let image = readFromDisk(key)?.inkedFavicon else { return nil }
         insert(Entry(nsImage: image, image: SwiftUI.Image(platformImage: image)), for: key)
         return image
     }
@@ -89,8 +101,10 @@ public final class FaviconCache: @unchecked Sendable {
         store(image, for: key, toDisk: true)
     }
 
+    /// Memory keeps the drawn form (inked if black and white); disk keeps the site's original.
     func store(_ image: PlatformImage, for key: String, toDisk: Bool) {
-        insert(Entry(nsImage: image, image: SwiftUI.Image(platformImage: image)), for: key)
+        let shown = image.inkedFavicon
+        insert(Entry(nsImage: shown, image: SwiftUI.Image(platformImage: shown)), for: key)
         guard toDisk else { return }
         // PNG encoding is CPU work, not I/O; do it on the caller.
         guard let png = image.pngData() else { return }
@@ -132,6 +146,7 @@ public final class FaviconCache: @unchecked Sendable {
         var evicted: [String] = []
         lock.withLock {
             memory[key] = entry
+            tints[key] = nil
             order.removeAll { $0 == key }
             order.append(key)
             if memory.count > Self.maxMemoryEntries {

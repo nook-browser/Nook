@@ -159,7 +159,26 @@ extension TabTree {
         guard var target = space(id) else { throw TreeError.missingSpace }
         if let name { target.name = name }
         if let icon { target.icon = icon }
-        if let accentHex { target.accentHex = accentHex }
+        if let accentHex {
+            target.accentHex = accentHex
+            // An accent picked elsewhere (Settings > Spaces) moves the theme's color with it.
+            if target.theme != nil, target.accentHex != spaces[id]?.accentHex {
+                target.theme?.points = SpaceTheme(accentHex: accentHex).points
+            }
+        }
+        guard target != spaces[id] else { return Change() }
+        target.modifiedAt = now
+        var change = Change()
+        record(&change, space: target)
+        return change
+    }
+
+    /// Sets a space's theme and the accent derived from it, so dots and folder icons follow.
+    @discardableResult
+    public mutating func setTheme(_ id: UUID, theme: SpaceTheme, now: Date = Date()) throws -> Change {
+        guard var target = space(id) else { throw TreeError.missingSpace }
+        target.theme = theme
+        target.accentHex = SpaceTheme.accentColor(theme.points[0]).hex
         guard target != spaces[id] else { return Change() }
         target.modifiedAt = now
         var change = Change()

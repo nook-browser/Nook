@@ -187,6 +187,7 @@ private struct PinnedTile: View {
                 isUnloaded: session?.isUnloaded ?? true,
                 hasLeftPinnedURL: tabs.hasLeftHome(item.id),
                 onResetToPinnedURL: { tabs.resetToHome(item.id) },
+                tint: (item.url?.host).map { FaviconCache.shared.tint(for: $0).map { Color(.sRGB, red: $0.red, green: $0.green, blue: $0.blue) } } ?? [],
                 action: {
                     FavoritePreview.shared.dismiss()
                     tabs.select(item.id, in: windowState)

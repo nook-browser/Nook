@@ -255,6 +255,8 @@ struct KeyCombination: Hashable, Codable {
         case "\u{F701}": return "down"
         case "\u{F702}": return "left"
         case "\u{F703}": return "right"
+        // An event reads Tab as "\t" (Shift-Tab as backtab) while shortcuts store "tab".
+        case "\t", "\u{19}": return "tab"
         default: return key
         }
     }

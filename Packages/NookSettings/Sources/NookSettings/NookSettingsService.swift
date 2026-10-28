@@ -53,12 +53,16 @@ public final class NookSettingsService {
     private let customSearchEnginesKey = "settings.customSearchEngines"
     private let appearanceModeKey = "settings.appearanceMode"
     private let pinnedExtensionIDsKey = "settings.pinnedExtensionIDs"
+    private let developerSitesKey = "settings.developerSites"
     private let tabOrganizerEnabledKey = "settings.tabOrganizerEnabled"
     private let autoRenamePinnedTabsKey = "settings.autoRenamePinnedTabs"
+    private let tidyDownloadsKey = "settings.tidyDownloads"
+    private let linkPreviewsKey = "settings.linkPreviews"
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
     private let siteRoutingRulesKey = "settings.siteRoutingRules"
+    private let boostsKey = "settings.boosts"
     private let sitePermissionsKey = "settings.sitePermissions"
     private let youTubeHideShortsKey = "settings.youTubeHideShorts"
     private let youTubeHiddenHomeSectionsKey = "settings.youTubeHiddenHomeSections"
@@ -111,6 +115,14 @@ public final class NookSettingsService {
             sitePermissions.removeValue(forKey: key)
         } else {
             sitePermissions[key] = record
+        }
+    }
+
+    public var boosts: [Boost] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(boosts) {
+                userDefaults.set(data, forKey: boostsKey)
+            }
         }
     }
 
@@ -174,6 +186,30 @@ public final class NookSettingsService {
             if let data = try? JSONEncoder().encode(adBlockerWhitelist) {
                 userDefaults.set(data, forKey: adBlockerWhitelistKey)
             }
+        }
+    }
+
+    /// Hosts with Arc-style Developer Mode on: the page gets the developer bar and its tab a
+    /// dashed outline. Turning one on also turns Settings > Developer > Developer Mode on.
+    public var developerSites: [String] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(developerSites) {
+                userDefaults.set(data, forKey: developerSitesKey)
+            }
+        }
+    }
+
+    public func isDeveloperSite(_ host: String?) -> Bool {
+        guard let host, !host.isEmpty else { return false }
+        return developerSites.contains(host.lowercased())
+    }
+
+    public func setDeveloperSite(_ host: String, on: Bool) {
+        let host = host.lowercased()
+        developerSites.removeAll { $0 == host }
+        if on {
+            developerSites.append(host)
+            if !developerModeEnabled { developerModeEnabled = true }
         }
     }
 
@@ -375,6 +411,20 @@ public final class NookSettingsService {
         }
     }
 
+    /// Renames downloads with meaningless names (ids, hashes) on the on-device model.
+    public var tidyDownloads: Bool {
+        didSet {
+            userDefaults.set(tidyDownloads, forKey: tidyDownloadsKey)
+        }
+    }
+
+    /// Shift-hover over a link shows an on-device summary of the page it opens.
+    public var linkPreviews: Bool {
+        didSet {
+            userDefaults.set(linkPreviews, forKey: linkPreviewsKey)
+        }
+    }
+
     public var tabOrganizerEnabled: Bool {
         didSet {
             userDefaults.set(tabOrganizerEnabled, forKey: tabOrganizerEnabledKey)
@@ -482,6 +532,8 @@ public final class NookSettingsService {
             appearanceModeKey: AppearanceMode.system.rawValue,
             tabOrganizerEnabledKey: false,
             autoRenamePinnedTabsKey: true,
+            tidyDownloadsKey: true,
+            linkPreviewsKey: true,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
         ])
@@ -504,6 +556,11 @@ public final class NookSettingsService {
             self.sitePermissions = decodedPermissions
         } else {
             self.sitePermissions = [:]
+        }
+
+        if let data = userDefaults.data(forKey: boostsKey),
+           let decoded = try? JSONDecoder().decode(LossyBoosts.self, from: data) {
+            self.boosts = decoded.boosts
         }
 
         if let srData = userDefaults.data(forKey: siteRoutingRulesKey),
@@ -541,6 +598,10 @@ public final class NookSettingsService {
             self.adBlockerWhitelist = decoded
         } else {
             self.adBlockerWhitelist = []
+        }
+        if let sitesData = userDefaults.data(forKey: developerSitesKey),
+           let sites = try? JSONDecoder().decode([String].self, from: sitesData) {
+            self.developerSites = sites
         }
         if let pinnedData = userDefaults.data(forKey: pinnedExtensionIDsKey),
            let pinnedIDs = try? JSONDecoder().decode([String].self, from: pinnedData) {
@@ -587,6 +648,8 @@ public final class NookSettingsService {
         self.didFinishOnboarding = userDefaults.bool(forKey: didFinishOnboardingKey)
         self.tabOrganizerEnabled = userDefaults.bool(forKey: tabOrganizerEnabledKey)
         self.autoRenamePinnedTabs = userDefaults.bool(forKey: autoRenamePinnedTabsKey)
+        self.tidyDownloads = userDefaults.bool(forKey: tidyDownloadsKey)
+        self.linkPreviews = userDefaults.bool(forKey: linkPreviewsKey)
         self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
         self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)
         if let sbData = userDefaults.data(forKey: sponsorBlockCategoryOptionsKey),

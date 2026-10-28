@@ -18,9 +18,12 @@ public struct PinnedTabView<Icon: View>: View {
     /// The favorite's open page has left its pinned URL; hovering shows a reset button.
     var hasLeftPinnedURL: Bool = false
     var onResetToPinnedURL: () -> Void = {}
+    /// The icon's own colors; a selected tile glows with them, as Arc's do.
+    var tint: [Color] = []
     var action: () -> Void
 
     @State private var isHovered: Bool = false
+    private let glowWidth: CGFloat = 1.5
 
     public init(
         tabName: String,
@@ -30,8 +33,10 @@ public struct PinnedTabView<Icon: View>: View {
         isUnloaded: Bool = false,
         hasLeftPinnedURL: Bool = false,
         onResetToPinnedURL: @escaping () -> Void = {},
+        tint: [Color] = [],
         action: @escaping () -> Void
     ) {
+        self.tint = tint
         self.tabName = tabName
         self.tabURL = tabURL
         self.tabIcon = tabIcon
@@ -49,10 +54,26 @@ public struct PinnedTabView<Icon: View>: View {
                     .fill(backgroundColor)
                     .animation(NookDesign.Motion.quick, value: isHovered)
 
+                // Lit from within by the icon's own color when selected: a faint wash over the tile
+                // and a soft glow around its inside edge.
+                if isActive, !tint.isEmpty {
+                    let shape = NookDesign.Radius.shape(NookDesign.Radius.lg)
+                    let rim = AngularGradient(colors: tint + [tint[0]], center: .center)
+                    shape.fill(LinearGradient(colors: tint.map { $0.opacity(0.16) }, startPoint: .topLeading, endPoint: .bottomTrailing))
+                    shape.strokeBorder(rim, lineWidth: glowWidth * 2)
+                        .blur(radius: glowWidth * 2)
+                        .opacity(0.9)
+                        .clipShape(shape)
+                    shape.strokeBorder(rim, lineWidth: glowWidth)
+                }
+
                 tabIcon
                     .frame(height: NookDesign.Size.essentialsFavicon)
+                    // A little lift, so the icon sits on the tile rather than printed on it.
+                    .shadow(color: .black.opacity(0.28), radius: 2, y: 1)
                     .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
             }
+            .animation(NookDesign.Motion.standard, value: isActive)
             .overlay(alignment: .topTrailing) {
                 if hasLeftPinnedURL && isHovered {
                     Button(action: onResetToPinnedURL) {

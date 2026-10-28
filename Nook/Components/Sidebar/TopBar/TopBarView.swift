@@ -28,7 +28,7 @@ struct TopBarView: View {
     @State private var previousTabId: UUID? = nil
 
     var body: some View {
-        let cornerRadius: CGFloat = nookSettings.hideWebContentBorder ? 0 : NookDesign.Radius.md
+        let cornerRadius: CGFloat = nookSettings.hideWebContentBorder ? 0 : NookDesign.Radius.page
 
         ZStack {
             // Main content

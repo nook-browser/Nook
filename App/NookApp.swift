@@ -182,6 +182,7 @@ struct NookApp: App {
         browserManager.keyboardShortcutManager = keyboardShortcutManager
         browserManager.mcpManager = mcpManager
         browserManager.tabOrganizerManager = tabOrganizerManager
+        browserManager.downloadManager.tidyDownloadsEnabled = { [settingsManager] in settingsManager.tidyDownloads }
         browserManager.tabs.onTabsPinned = { [weak browserManager, tabOrganizerManager, settingsManager] itemIDs in
             guard settingsManager.autoRenamePinnedTabs, let tabs = browserManager?.tabs else { return }
             tabOrganizerManager.autoRename(itemIDs, using: tabs)

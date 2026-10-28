@@ -111,6 +111,10 @@ public final class PageSession: NSObject, Identifiable {
     public var canGoForward: Bool = false
     /// WebKit's own PDF viewer is showing the page, so Nook draws its controls over it.
     public var isDisplayingPDF: Bool = false
+    /// A small picture of the page taken as the window left it, for the Control-Tab switcher.
+    public var switcherSnapshot: PlatformImage?
+    /// The link under the pointer while Shift is held, for Link Previews; nil otherwise.
+    public var linkPreview: LinkPreviewTarget?
     /// Bumped whenever the PDF controls should show: a PDF loads, or the pointer moves over one.
     public private(set) var pdfControlsReveal = 0
     @ObservationIgnored private var lastPDFControlsReveal: ContinuousClock.Instant?
@@ -757,7 +761,7 @@ public final class PageSession: NSObject, Identifiable {
         // page skips it and takes the root icon below.
         if !isPrivate, let nsImage = await Self.fetchFaviconImage(for: url) {
             FaviconCache.shared.store(nsImage, for: cacheKey)
-            favicon = SwiftUI.Image(platformImage: nsImage)
+            favicon = SwiftUI.Image(platformImage: FaviconCache.shared.image(for: cacheKey) ?? nsImage)
             hasFavicon = true
             return
         }
@@ -767,7 +771,7 @@ public final class PageSession: NSObject, Identifiable {
            let nsImage = await Self.downloadImage(from: rootFaviconURL, isPrivate: isPrivate) {
             // A private page's host must not reach ~/Library/Caches/FaviconCache.
             FaviconCache.shared.store(nsImage, for: cacheKey, toDisk: !isPrivate)
-            favicon = SwiftUI.Image(platformImage: nsImage)
+            favicon = SwiftUI.Image(platformImage: FaviconCache.shared.image(for: cacheKey) ?? nsImage)
             hasFavicon = true
             return
         }
