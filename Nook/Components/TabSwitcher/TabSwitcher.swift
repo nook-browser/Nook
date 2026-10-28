@@ -19,6 +19,8 @@ enum TabSwitcher {
     /// Watches for Control being let go (and Escape) while the card is open, and only then:
     /// a modifier release reaches no view, so nothing else can see it.
     private static var monitor: Any?
+    private static var resignObserver: NSObjectProtocol?
+    private static var presentWork: DispatchWorkItem?
     private static let maxTabs = 8
 
     /// Control-Tab (`step` 1) or Control-Shift-Tab (-1): opens the card, or moves along it.
@@ -36,6 +38,20 @@ enum TabSwitcher {
         }
         window.tabSwitcher = state
         install(window: window, tabs: tabs)
+        schedulePresent(window)
+    }
+
+    /// Shows the card once Control has been held `presentDelay`; a tap let go sooner never draws it.
+    private static func schedulePresent(_ window: BrowserWindowState) {
+        let started = ProcessInfo.processInfo.systemUptime
+        let work = DispatchWorkItem { [weak window] in
+            guard let window, var state = window.tabSwitcher,
+                  TabSwitcherState.shouldPresent(elapsed: ProcessInfo.processInfo.systemUptime - started) else { return }
+            state.isPresented = true
+            withAnimation(NookDesign.Motion.quick) { window.tabSwitcher = state }
+        }
+        presentWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + TabSwitcherState.presentDelay, execute: work)
     }
 
     /// Switches to the highlighted tab, or to `itemID` when one was clicked.
@@ -48,13 +64,22 @@ enum TabSwitcher {
     static func cancel(_ window: BrowserWindowState) { finish(window) }
 
     private static func finish(_ window: BrowserWindowState) {
+        presentWork?.cancel()
+        presentWork = nil
         window.tabSwitcher = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        resignObserver = nil
     }
 
     private static func install(window: BrowserWindowState, tabs: TabsController) {
         if let monitor { NSEvent.removeMonitor(monitor) }
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        // Control let go in another app is never seen here, so losing focus closes the card.
+        resignObserver = NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak window] _ in
+            MainActor.assumeIsolated { if let window { cancel(window) } }
+        }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak window] event in
             guard let window, window.tabSwitcher != nil else { return event }
             switch event.type {
@@ -80,7 +105,7 @@ struct TabSwitcherOverlay: View {
     private let pictureHeight: CGFloat = 112
 
     var body: some View {
-        if let state = windowState.tabSwitcher {
+        if let state = windowState.tabSwitcher, state.isPresented {
             HStack(spacing: NookDesign.Spacing.sm) {
                 ForEach(Array(state.items.enumerated()), id: \.element) { index, itemID in
                     if let item = tabs.item(itemID) {

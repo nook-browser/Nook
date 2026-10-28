@@ -10,10 +10,15 @@
 import Foundation
 
 enum LibrarySwipeDecision {
-    /// Faster than this (points a second) at lift, the direction alone decides, as in Arc.
+    /// Faster than this (points a second) at lift, the direction alone decides. Nook's own value.
     static let flick: Double = 150
-    /// A slow drag commits this far past where it started.
+    /// A slow drag commits this far past where it started. Nook's own value.
     static let commit: Double = 40
+
+    /// The library's width: `max(417, min(preferred, windowWidth - 56))`, Arc's rule.
+    static func width(preferred: Double, windowWidth: Double, minimum: Double = 417, edgeGap: Double = 56) -> Double {
+        max(minimum, min(preferred, windowWidth - edgeGap))
+    }
 
     /// Whether the library ends open. `distance` is how far out it is (0 shut, `width` open);
     /// `velocity` is positive toward open; `wasOpen` is where the swipe started.

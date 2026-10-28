@@ -19,6 +19,10 @@ struct TabSwitcherStateCheck {
 
         // Opened backwards: the oldest.
         precondition(TabSwitcherState.start(items: [a, b, c], step: -1)!.highlighted == c)
+        // The card waits 0.1 s; a quicker release switches with no card.
+        precondition(!TabSwitcherState.shouldPresent(elapsed: 0.05))
+        precondition(TabSwitcherState.shouldPresent(elapsed: 0.1))
+        precondition(!TabSwitcherState.start(items: [a, b], step: 1)!.isPresented)
         print("TabSwitcherStateCheck passed")
     }
 }

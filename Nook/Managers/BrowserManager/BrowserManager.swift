@@ -350,7 +350,7 @@ class BrowserManager: ObservableObject {
     // Legacy global state - kept for backward compatibility during transition
     /// Tracks which pinned tab tile is hovered (for middle-click → reset to pinned URL)
     @Published var hoveredPinnedTabId: UUID? = nil
-    @Published var sidebarWidth: CGFloat = 250
+    @Published var sidebarWidth: CGFloat = 228
     @Published var sidebarContentWidth: CGFloat = 234
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
@@ -426,7 +426,7 @@ class BrowserManager: ObservableObject {
     weak var webViewCoordinator: WebViewCoordinator?
     weak var windowRegistry: WindowRegistry?
 
-    private var savedSidebarWidth: CGFloat = 250
+    private var savedSidebarWidth: CGFloat = 228
     private let userDefaults = UserDefaults.standard
     private var cancellables: Set<AnyCancellable> = []
 
@@ -859,13 +859,13 @@ class BrowserManager: ObservableObject {
 
         if savedWidth > 0 {
             // A width saved under an older, smaller minimum would hide the history buttons.
-            savedSidebarWidth = max(savedWidth, NookDesign.Size.sidebarMin)
+            savedSidebarWidth = min(min(max(savedWidth, SidebarWidth.min), SidebarWidth.max), 500)
             // Kept while hidden: showing the sidebar does not restore it, and the hover overlay uses it.
             sidebarWidth = savedSidebarWidth
         } else {
             // First launch: ensure sidebar is visible with default width
-            savedSidebarWidth = 250
-            sidebarWidth = 250
+            savedSidebarWidth = 228
+            sidebarWidth = 228
         }
         sidebarContentWidth = max(sidebarWidth - 16, 0)
 

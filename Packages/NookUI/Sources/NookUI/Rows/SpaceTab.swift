@@ -223,10 +223,11 @@ public struct SpaceTab: View {
 
     private var accentColor: Color { actions?.accentColor ?? .accentColor }
 
-    /// A search results tab reads as Arc's does: the query, then the site in a softer tone.
+    /// The row text: tidied (`TidyTitles`), and a search page's site in a softer tone after its query.
     private func label(_ title: String) -> Text {
-        guard let search = tabs.searchTitle(for: item) else { return Text(title) }
-        return Text(search.query) + Text("  " + search.site).foregroundColor(.secondary)
+        let tidy = tabs.tidyTitle(for: item)
+        guard tidy.showsSite, let site = tidy.siteName else { return Text(tidy.title) }
+        return Text(tidy.title) + Text("  " + site).foregroundColor(.secondary)
     }
 
     private var isCurrentTab: Bool {

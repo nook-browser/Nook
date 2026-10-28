@@ -3,7 +3,7 @@
 //  SpaceSwitcherTitle.swift
 //  Nook
 //
-//  The current space's name in the traffic-light row. Clicking it lists every space.
+//  A space's name row between its favorites and its pinned tabs, as in Arc. Clicking it lists every space.
 //
 
 import SwiftUI
@@ -20,10 +20,11 @@ struct SpaceSwitcherTitle: View {
     @ObservedObject private var dragSession = NookDragSessionManager.shared
     @State private var isHovering = false
 
+    let spaceID: UUID
     let onNewSpace: () -> Void
 
     private var currentSpace: SpaceRecord? {
-        windowState.spaceID.flatMap { tabs.space($0) }
+        tabs.space(spaceID)
     }
 
     var body: some View {

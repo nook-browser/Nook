@@ -11,8 +11,8 @@ import NookDesign
 import NookWeb
 import NookUI
 
-/// Back, forward and reload in the title row, as separate icon buttons. The space name gives
-/// way before it does, and `Size.sidebarMin` keeps the sidebar wide enough to show it whole.
+/// Back, forward and reload in the title row, as separate icon buttons. A sidebar dragged too
+/// narrow for them drops them from the row.
 struct SidebarHistoryButtons: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState

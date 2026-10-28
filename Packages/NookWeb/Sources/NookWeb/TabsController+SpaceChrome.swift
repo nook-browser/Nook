@@ -43,11 +43,12 @@ extension TabsController {
         return item.url?.host ?? "New Tab"
     }
 
-    /// A search results page's query and site, so its row reads "arc  google.com" as Arc's
-    /// does. Nil for any other page, or a tab the person named.
-    public func searchTitle(for item: Item) -> (query: String, site: String)? {
-        guard item.customTitle?.isEmpty ?? true, let url = currentURL(for: item) else { return nil }
-        return SearchPage.query(in: url)
+    /// The row's title with the site's own suffix, counters and the like trimmed, or a search
+    /// page's query (`TidyTitles`). Display only; a tab the person named keeps its name.
+    public func tidyTitle(for item: Item) -> TidyTitles.Result {
+        let title = self.title(for: item)
+        guard item.customTitle?.isEmpty ?? true else { return TidyTitles.Result(title: title, siteName: nil, showsSite: false) }
+        return TidyTitles.result(title: title, url: currentURL(for: item))
     }
 
     /// Current page URL: the live page, else the saved URL.
