@@ -25,38 +25,51 @@ struct SidebarBottomBar: View {
     let onMenuHover: (Bool) -> Void
     
     var body: some View {
-        HStack(alignment: .center, spacing: NookDesign.SidebarChrome.gap) {
-            // Above the space dots, so its hint draws over them.
-            menuButton
-                .zIndex(1)
-
-            if nookSettings.showAIAssistant {
-                Button("Toggle AI Assistant", systemImage: "sparkle") {
-                    browserManager.toggleAISidebar(for: windowState)
+        GeometryReader { geo in
+            let reserve = sideReserve
+            ZStack {
+                // The space dots sit on the bar's center line whatever the side clusters hold.
+                if !windowState.isIncognito {
+                    SpacesList()
+                        .frame(width: max(geo.size.width - 2 * reserve, 0))
+                        .environmentObject(browserManager)
+                        .environment(windowState)
                 }
-                .nookSidebarIconButtons()
-                .help("Toggle AI Assistant")
-            }
 
-            // Hide spaces list in incognito windows (only one ephemeral space)
-            if !windowState.isIncognito {
-                SpacesList()
-                    .frame(maxWidth: .infinity)
-                    .environmentObject(browserManager)
-                    .environment(windowState)
-            }
+                HStack(alignment: .center, spacing: NookDesign.SidebarChrome.gap) {
+                    // Above the space dots, so its hint draws over them.
+                    menuButton
+                        .zIndex(1)
 
-            // Hide new space button in incognito windows
-            if !windowState.isIncognito {
-                newSpaceButton
-            } else {
-                Spacer(minLength: 0)
+                    if nookSettings.showAIAssistant {
+                        Button("Toggle AI Assistant", systemImage: "sparkle") {
+                            browserManager.toggleAISidebar(for: windowState)
+                        }
+                        .nookSidebarIconButtons()
+                        .help("Toggle AI Assistant")
+                    }
+
+                    Spacer(minLength: 0)
+
+                    // Hide new space button in incognito windows
+                    if !windowState.isIncognito {
+                        newSpaceButton
+                    }
+                }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
         .frame(height: NookDesign.Size.bottomBar)
         .padding(.horizontal, NookDesign.Spacing.sidebarInset)
     }
-    
+
+    /// Room kept clear on each side of the dots: the wider cluster plus a gap.
+    private var sideReserve: CGFloat {
+        let button = NookDesign.SidebarChrome.button, gap = NookDesign.SidebarChrome.gap
+        let left = nookSettings.showAIAssistant ? 2 * button + gap : button
+        return left + gap
+    }
+
     private var menuButton: some View {
         ZStack {
             Button("Menu", systemImage: "archivebox") {

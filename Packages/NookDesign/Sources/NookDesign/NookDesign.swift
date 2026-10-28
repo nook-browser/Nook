@@ -81,6 +81,8 @@ public enum NookDesign {
         public static let iconButton: CGFloat = 28
         public static let favoriteTile: CGFloat = 47   // a favorite tile, as in Arc: four fit the 228 pt sidebar
         public static let favoriteBorder: CGFloat = 2  // the selected favorite's edge
+        public static let favoriteGlowScale: CGFloat = 2   // pixels per point of the blurred favicon behind a tile
+        public static let favoriteGlowBlur: CGFloat = 0.25 // its blur radius as a fraction of the tile
         public static let themeKnob: CGFloat = 56      // the theme editor's noise knob
         public static let favicon: CGFloat = 16
         public static let essentialsTile: CGFloat = 44
@@ -207,6 +209,16 @@ public enum NookDesign {
         public static let mediaScrim = Color.black.opacity(0.35)           // controls over video
         public static let hairline = Color.primary.opacity(0.08)
         public static let unloadedOpacity: Double = 0.55
+        /// A selected favorite tile's fill, as Arc draws it: white, halved in an inactive window.
+        public static func favoriteSelectedFill(dark: Bool, dimmed: Bool) -> Color {
+            Color.white.opacity((dark ? 0.45 : 0.8) * (dimmed ? 0.5 : 1))
+        }
+        /// Opacity of the blurred favicon behind a favorite tile.
+        public static func favoriteGlowOpacity(dark: Bool, hovered: Bool, dimmed: Bool) -> Double {
+            if dimmed { return 0 }
+            return dark ? (hovered ? 0.3 : 0.2) : (hovered ? 0.1 : 0)
+        }
+        public static let favoriteDimmedBorderOpacity: Double = 0.2
         public static let dropBorderIdle = Color.secondary.opacity(0.3)    // dashed empty-state drop target
         public static let dropBorderActive = Color.primary.opacity(0.4)    // dashed drop target while dragging
         /// Destructive action fill. Kept at the value the dialog buttons shipped with.
