@@ -55,11 +55,13 @@ public extension View {
         background(shape.fill(NookDesign.Surface.mediaScrim))
     }
 
-    /// The selected sidebar row or pinned tile: Arc's translucent white, no outline, so the
-    /// space's color carries through. Branch-free so view identity is stable and the change
-    /// animates; the row applies its own `.raised` elevation.
+    /// Anything chosen from a set outside the tab list (Settings sidebar, library tabs, history):
+    /// a solid raised fill and hairline, readable on plain backgrounds. Tab rows use
+    /// `nookTabSurface`. Branch-free; the row applies its own `.raised` elevation.
     func nookRowSelection(_ isSelected: Bool, radius: CGFloat = NookDesign.Radius.md) -> some View {
-        background(NookDesign.Radius.shape(radius).fill(isSelected ? NookDesign.Surface.selection : .clear))
+        let shape = NookDesign.Radius.shape(radius)
+        return background(shape.fill(isSelected ? NookDesign.Surface.raised : .clear))
+            .overlay(shape.strokeBorder(NookDesign.Surface.hairline.opacity(isSelected ? 1 : 0), lineWidth: NookDesign.Size.hairlineWidth))
     }
 
     /// A sidebar chrome control or group: history, sidebar and AI toggles, bottom bar buttons,
