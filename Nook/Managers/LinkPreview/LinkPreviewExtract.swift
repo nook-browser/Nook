@@ -15,6 +15,8 @@ struct LinkPreviewPage: Equatable {
     var title: String?
     var description: String?
     var imageURL: URL?
+    /// The page's `<link rel=icon>`, when it names one.
+    var iconURL: URL? = nil
     /// The site's own name (`og:site_name`), for the shared card's footer.
     var siteName: String? = nil
     /// Where the link landed after redirects (a search result's link goes through the engine
@@ -33,6 +35,9 @@ enum LinkPreviewExtract {
         let description = meta(head, "og:description") ?? meta(head, "description")
         let image = (meta(head, "og:image") ?? meta(head, "twitter:image")).flatMap { URL(string: $0, relativeTo: baseURL)?.absoluteURL }
 
+        let icon = firstMatch(#"<link\b[^>]*\brel\s*=\s*["'][^"']*\bicon\b[^"']*["'][^>]*\bhref\s*=\s*["']([^"']*)["']"#, in: head)
+            ?? firstMatch(#"<link\b[^>]*\bhref\s*=\s*["']([^"']*)["'][^>]*\brel\s*=\s*["'][^"']*\bicon\b"#, in: head)
+
         let body = html.replacingOccurrences(of: #"<(script|style|noscript|svg|nav|footer|header)\b[\s\S]*?</\1>"#, with: " ",
                                              options: [.regularExpression, .caseInsensitive])
         var text = ""
@@ -47,6 +52,8 @@ enum LinkPreviewExtract {
             title: title.flatMap { $0.isEmpty ? nil : $0 },
             description: description.flatMap { $0.isEmpty ? nil : $0 },
             imageURL: image.flatMap { ["http", "https"].contains($0.scheme?.lowercased() ?? "") ? $0 : nil },
+            iconURL: icon.flatMap { URL(string: clean($0), relativeTo: baseURL)?.absoluteURL }
+                .flatMap { ["http", "https"].contains($0.scheme?.lowercased() ?? "") ? $0 : nil },
             siteName: meta(head, "og:site_name").flatMap { $0.isEmpty ? nil : $0 },
             text: String(text.prefix(maxText)))
     }

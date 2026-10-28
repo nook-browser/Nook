@@ -34,11 +34,12 @@ public struct BoostPanel: View {
     @State private var renaming = false
     @State private var showingLibrary = false
     @State private var zapping = false
-    @State private var lastZap: String?
+    @State private var lastZap: String?  // the selector Zap added last
     @State private var importing = false
     @State private var exporting = false
     @State private var pending: [Boost] = []
     @State private var message: String?
+    @State private var baitWarning = false
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -135,6 +136,11 @@ public struct BoostPanel: View {
             let hosts = Set(pending.map(\.host)).sorted().joined(separator: ", ")
             let scripts = pending.contains { !$0.script.isEmpty } ? " Scripts are imported turned off." : ""
             Text("\(pending.count) Boost(s) for \(hosts).\(scripts)")
+        }
+        .alert("CSS Not Saved", isPresented: $baitWarning) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Rules that mention player-ads were removed. Hiding it makes YouTube refuse to play.")
         }
         .alert("Can't Import", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK", role: .cancel) {}
@@ -429,7 +435,7 @@ public struct BoostPanel: View {
     private static let zapRule = " { display: none !important; }"
 
     /// How many elements Zap has hidden on this site.
-    private var zapCount: Int { draft.css.components(separatedBy: Self.zapRule).count - 1 }
+    private var zapCount: Int { draft.zaps.count + draft.css.components(separatedBy: Self.zapRule).count - 1 }
 
     private var zapRow: some View {
         rowButton(zapping ? "Click an element" : "Zap", trailing: zapping ? "esc" : "\(zapCount)") {
@@ -437,7 +443,7 @@ public struct BoostPanel: View {
         }
         .contextMenu {
             Button("Undo Last Zap") {
-                if let lastZap { draft.css = draft.css.replacingOccurrences(of: lastZap, with: "") }
+                if let lastZap, let i = draft.zaps.lastIndex(of: lastZap) { draft.zaps.remove(at: i) }
                 lastZap = nil
             }
             .disabled(lastZap == nil)
@@ -549,8 +555,15 @@ public struct BoostPanel: View {
     }
 
     private func save() {
+        // Edits made before the file loads would be overwritten by the load.
+        guard settings.boostsLoaded else { return }
         var boost = draft
         boost.updated = Date()
+        let cleaned = Boost.removingBaitRules(boost.css)
+        if cleaned != boost.css {
+            boost.css = cleaned
+            baitWarning = true
+        }
         if let i = settings.boosts.firstIndex(where: { $0.id == boost.id }) {
             settings.boosts[i] = boost
         } else if settings.boosts.count < Boost.maxCount {
@@ -577,11 +590,11 @@ public struct BoostPanel: View {
             let selector = await onZap()
             zapping = false
             guard let selector else { return }
-            // Hides it on this site from now on once saved; "Undo last Zap" or the CSS takes it back.
-            let rule = "\n\(selector)\(Self.zapRule)"
-            guard draft.css.utf8.count + rule.utf8.count <= Boost.maxCSSBytes else { return }
-            draft.css += rule
-            lastZap = rule
+            // Hides it on this site from now on once saved; "Undo last Zap" takes it back. A selector
+            // Nook refuses (YouTube's ad-block bait) is dropped.
+            guard Boost.isAllowedZap(selector), !draft.zaps.contains(selector), draft.zaps.count < 200 else { return }
+            draft.zaps.append(selector)
+            lastZap = selector
         }
     }
 

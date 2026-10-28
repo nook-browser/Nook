@@ -71,11 +71,12 @@
     return chunks.join('\n');
   }
 
-  function inject(css) {
+  function inject(css, id) {
     if (!css) return;
     try {
       var style = document.createElement('style');
       style.setAttribute('type', 'text/css');
+      if (id) style.id = id;
       style.textContent = css;
       var parent = document.head || document.documentElement;
       if (parent) {
@@ -97,6 +98,8 @@
   function apply(config) {
     if (!config) return;
     inject(buildCss(config));
+    // The page's Boost, in the element the Boost style script and live preview also write.
+    if (typeof config.boostCSS === 'string') inject(config.boostCSS, 'nook-boost-style');
   }
 
   try {

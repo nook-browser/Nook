@@ -9,56 +9,112 @@ import NookBlocker
 import NookSettings
 import WebKit
 
-/// Injects the user's Boosts for the page about to load. Stateless, like `YouTubeTweaks`.
+/// Applies the user's Boosts. Stateless apart from the set of controllers already installed.
 @MainActor
 public enum BoostTweaks {
     private static let styleMarker = "// Nook Boost Style"
-    private static let scriptMarker = "// Nook Boost Script"
     // Styles go in their own world; scripts in another with no message handlers, so a Boost
     // script reaches neither the page's JS world nor any Nook bridge.
     private static let styleWorld = WKContentWorld.world(name: "NookBoostStyle")
     private static let scriptWorld = WKContentWorld.world(name: "NookBoostScript")
+    private static let handlerName = "nookBoostStyle"
 
-    /// Main-frame navigation hook. Changes apply from the page being loaded; the next
-    /// navigation removes them again once a Boost stops matching.
-    public static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
-        let matches = Boost.matching(url, in: settings.boosts)
-        let css = matches.map(\.compiledCSS).filter { !$0.isEmpty }.joined(separator: "\n")
-        let code = matches.filter { $0.scriptEnabled && !$0.script.isEmpty }.map(\.script)
+    private static let installed = NSHashTable<WKUserContentController>.weakObjects()
+    private static var zapKey: String?
 
-        let styleSource = css.isEmpty ? nil : styleScript(css)
-        let scriptSource = code.isEmpty ? nil : userScript(code)
-
+    /// Main-frame navigation hook. Installs the style script once per controller and returns:
+    /// nothing is rewritten on a navigation or a Boost change.
+    public static func apply(for url: URL, in webView: WKWebView, settings: NookSettingsService, blocker: ContentBlockerManager) {
         let ucc = webView.configuration.userContentController
-        // Read everything from the lazily bridged array before removeAllUserScripts() (Release-only trap).
-        let all = ucc.userScripts
-        let currentStyle = all.first { $0.source.hasPrefix(styleMarker) }?.source
-        let currentScript = all.first { $0.source.hasPrefix(scriptMarker) }?.source
-        // The no-Boost path ends here without touching the controller.
-        guard currentStyle != styleSource || currentScript != scriptSource else { return }
-
-        let others = all.nookOwned.filter { !$0.source.hasPrefix(styleMarker) && !$0.source.hasPrefix(scriptMarker) }
-        ucc.removeAllUserScripts()
-        others.forEach { ucc.addUserScript($0) }
-        if let styleSource {
-            ucc.addUserScript(WKUserScript(source: styleSource, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: styleWorld))
+        if !installed.contains(ucc) {
+            installed.add(ucc)
+            ucc.addScriptMessageHandler(StyleHandler(settings: settings), contentWorld: styleWorld, name: handlerName)
+            ucc.addUserScript(WKUserScript(source: styleScriptSource, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: styleWorld))
         }
-        if let scriptSource {
-            ucc.addUserScript(WKUserScript(source: scriptSource, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: scriptWorld))
+        syncZapList(settings: settings, blocker: blocker)
+    }
+
+    /// The user's zaps as their own small rule list in the blocker, rebuilt only when they change.
+    public static func syncZapList(settings: NookSettingsService, blocker: ContentBlockerManager) {
+        Task {
+            await settings.waitForBoosts()
+            let lines = Boost.zapFilterLines(settings.boosts)
+            let key = lines.joined(separator: "\n")
+            guard key != zapKey else { return }
+            zapKey = key
+            // A failed compile clears the key so the next navigation tries again.
+            if await !blocker.setUserCosmeticRules(lines) { zapKey = nil }
         }
     }
 
-    /// Shows the edit on the open page now. The user scripts for later loads catch up in `apply`
-    /// when the panel closes, so a slider drag never rewrites the controller.
-    /// `draft` is an unsaved edit: it stands in for the saved Boost with its id, or joins the list
-    /// when it is new, so nothing is written to settings while the person is still choosing.
+    /// Runs the page's enabled Boost scripts once it has loaded. Boosts with scripts are off
+    /// until the person turns each one on, and only matching hosts get any.
+    public static func runScripts(for url: URL, in webView: WKWebView, settings: NookSettingsService) {
+        Task {
+            await settings.waitForBoosts()
+            for boost in Boost.matching(url, in: settings.boosts) where boost.scriptEnabled && !boost.script.isEmpty {
+                // The page may have navigated while the Boosts loaded or an earlier script ran.
+                guard let now = webView.url?.host?.lowercased(), now == url.host?.lowercased() else { return }
+                _ = try? await webView.callAsyncJavaScript(
+                    "try {\n\(boost.script)\n} catch (e) { console.error('Nook Boost script:', e); }",
+                    arguments: [:], in: nil, contentWorld: scriptWorld)
+            }
+        }
+    }
+
+    /// Answers the style script's question from the isolated world. The frame is checked by
+    /// WebKit's `frameInfo`, never by anything in the message, and the host comes from that
+    /// frame's own request.
+    private final class StyleHandler: NSObject, WKScriptMessageHandlerWithReply {
+        private weak var settings: NookSettingsService?
+        init(settings: NookSettingsService) { self.settings = settings }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) async -> (Any?, String?) {
+            guard message.frameInfo.isMainFrame, let url = message.frameInfo.request.url, let settings else { return ("", nil) }
+            await settings.waitForBoosts()
+            return (BoostTweaks.css(for: url, boosts: settings.boosts), nil)
+        }
+    }
+
+    static func css(for url: URL, boosts: [Boost]) -> String {
+        Boost.css(for: url, in: boosts)
+    }
+
+    /// Document start: asks for this host's CSS and keeps one `<style>`. The edit path
+    /// (`preview`) writes the same element.
+    private static var styleScriptSource: String {
+        """
+        \(styleMarker)
+        (function(){
+          var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.\(handlerName);
+          if(!h)return;
+          h.postMessage(1).then(function(css){\(styleApplier)},function(){});
+        })();
+        """
+    }
+
+    /// Uses the reply named `css`. One element, found by id, so a repeat never adds a second;
+    /// an empty reply removes it.
+    private static let styleApplier = """
+    var s=document.getElementById('nook-boost-style');
+    if(!css){if(s)s.remove();return;}
+    if(s&&s.textContent===css)return;
+    if(!s){s=document.createElement('style');s.id='nook-boost-style';}
+    s.textContent=css;
+    var p=document.head||document.documentElement;
+    if(p)p.appendChild(s);
+    else document.addEventListener('DOMContentLoaded',function(){if(!document.getElementById('nook-boost-style'))(document.head||document.documentElement).appendChild(s);},{once:true});
+    """
+
+    /// Shows the edit on the open page now; nothing is written anywhere. `draft` is an unsaved
+    /// edit: it stands in for the saved Boost with its id, or joins the list when it is new.
     public static func preview(for url: URL, in webView: WKWebView, settings: NookSettingsService, draft: Boost? = nil) {
         var boosts = settings.boosts
         if let draft {
             if let i = boosts.firstIndex(where: { $0.id == draft.id }) { boosts[i] = draft } else { boosts.append(draft) }
         }
-        let css = Boost.matching(url, in: boosts).map(\.compiledCSS).filter { !$0.isEmpty }.joined(separator: "\n")
-        webView.evaluateJavaScript(styleJS(css), in: nil, in: styleWorld) { _ in }
+        let css = css(for: url, boosts: boosts)
+        webView.evaluateJavaScript("(function(css){\(styleApplier)})(\(jsonString(css)));", in: nil, in: styleWorld) { _ in }
     }
 
     /// Zap: lets the person click one element on the page and returns a CSS selector for it, or
@@ -108,27 +164,6 @@ public enum BoostTweaks {
       window.__nookZapCancel=function(){done('');};
     });
     """
-
-    /// One element, found by id, so a repeat run or an SPA navigation never adds a second.
-    /// An empty stylesheet removes it.
-    private static func styleJS(_ css: String) -> String {
-        """
-        (function(css){var s=document.getElementById('nook-boost-style');
-        if(!css){if(s)s.remove();return;}
-        if(!s){s=document.createElement('style');s.id='nook-boost-style';}
-        s.textContent=css;(document.head||document.documentElement).appendChild(s);})(\(jsonString(css)));
-        """
-    }
-
-    private static func styleScript(_ css: String) -> String {
-        "\(styleMarker)\n\(styleJS(css))"
-    }
-
-    /// Each script runs in its own try, so one error neither stops the others nor reaches the page.
-    private static func userScript(_ code: [String]) -> String {
-        let body = code.map { "try{\n\($0)\n}catch(e){console.error('Nook Boost script:',e);}" }.joined(separator: "\n")
-        return "\(scriptMarker)\n(function(){\n\(body)\n})();"
-    }
 
     private static func jsonString(_ s: String) -> String {
         guard let data = try? JSONSerialization.data(withJSONObject: [s]),

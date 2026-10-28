@@ -8,9 +8,9 @@
 //
 
 import AppKit
-import FaviconFinder
 import Foundation
 import FoundationModels
+import NookBlocker
 import NookWeb
 import Observation
 import os
@@ -57,12 +57,31 @@ final class LinkPreviewService {
 
     func state(for url: URL) -> State? { states[url] }
 
-    /// Starts loading `url` unless it is loaded or loading already.
-    func load(_ url: URL) {
+    static func mayFetch(url: URL, isPrivate: Bool, isAgent: Bool, blocked: Bool) -> Bool {
+        LinkPreviewGate.mayFetch(url: url, isPrivate: isPrivate, isAgent: isAgent, blocked: blocked)
+    }
+
+    /// Starts loading `url` unless it is loaded or loading already. The request goes to the
+    /// link with tracking parameters stripped and redirectors skipped, and only when the
+    /// blocker would let the page itself load it.
+    func load(_ link: URL, from session: PageSession, blocker: ContentBlockerManager) {
+        let url = link
         guard states[url] == nil else { return }
+        var target = link
+        if let skipped = blocker.urlSkipTarget(for: target, from: session.webView?.url, tab: session) { target = skipped }
+        if let stripped = blocker.strippedTrackingParams(for: target, tab: session) { target = stripped }
+        let engine = blocker.advancedRulesEngine.engine
+        // An enabled blocker with no engine yet cannot vouch for the link; an allowlisted site is exempt from the check.
+        let blocked = blocker.isEnabled && !blocker.isDomainAllowed(target.host)
+            && (!engine.isLoaded
+                || engine.matches(url: target.absoluteString, sourceURL: session.webView?.url?.absoluteString ?? "", type: "document"))
+        guard Self.mayFetch(url: target, isPrivate: session.isPrivate, isAgent: session.isAgentPage, blocked: blocked) else {
+            set(.failed, for: url)
+            return
+        }
         set(.loading, for: url)
         Task {
-            guard let page = await Self.fetch(url) else {
+            guard let page = await Self.fetch(target) else {
                 set(.failed, for: url)
                 return
             }
@@ -74,8 +93,9 @@ final class LinkPreviewService {
                 }
             }
             if let landed = page.landedURL, let host = landed.host {
+                let iconURL = page.iconURL ?? URL(string: "/favicon.ico", relativeTo: landed)?.absoluteURL
                 Task {
-                    if let icon = await Self.icon(for: landed, host: host) { icons[url] = icon }
+                    if let icon = await Self.icon(at: iconURL, host: host) { icons[url] = icon }
                 }
             }
             guard canSummarize else { return }
@@ -99,41 +119,59 @@ final class LinkPreviewService {
 
     // MARK: - Fetching
 
-    /// Off the main actor: decoding and scanning a large page would otherwise stall scrolling.
-    private nonisolated static func fetch(_ url: URL) async -> LinkPreviewPage? {
+    /// A redirect is held to the same rule as the link: a public page cannot bounce the fetch onto this network.
+    private final class RedirectGate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest) async -> URLRequest? {
+            guard let url = request.url, await LinkPreviewService.mayReach(url) else { return nil }
+            return request
+        }
+    }
+
+    /// The gate plus a DNS check: a public-looking name that resolves to a reserved address is refused.
+    private nonisolated static func mayReach(_ url: URL) async -> Bool {
+        guard LinkPreviewGate.mayFetch(url: url, isPrivate: false, isAgent: false, blocked: false),
+              let host = url.host else { return false }
+        return await LinkPreviewGate.resolvesToPublic(host)
+    }
+
+    /// Every preview request (page, image, icon) goes through here: gated, redirect-gated, cookie-free.
+    private nonisolated static func gatedData(_ url: URL, accept: String? = nil) async -> (Data, HTTPURLResponse)? {
+        guard await mayReach(url) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 8)
-        request.setValue("text/html,application/xhtml+xml", forHTTPHeaderField: "Accept")
+        if let accept { request.setValue(accept, forHTTPHeaderField: "Accept") }
         // No cookies: a preview never signs in as the person or changes anything server side.
         request.httpShouldHandleCookies = false
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-                  http.mimeType?.contains("html") ?? true
-            else { return nil }
-            let html = String(decoding: data.prefix(maxBytes), as: UTF8.self)
-            var page = LinkPreviewExtract.page(fromHTML: html, baseURL: http.url ?? url)
-            page.landedURL = http.url ?? url
-            return page
+            let (data, response) = try await URLSession.shared.data(for: request, delegate: RedirectGate())
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return nil }
+            return (data, http)
         } catch {
             Self.log.debug("Preview fetch failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
 
-    /// The site's favicon: the shared cache first, else found and stored there like a tab's.
-    private static func icon(for url: URL, host: String) async -> NSImage? {
+    /// Off the main actor: decoding and scanning a large page would otherwise stall scrolling.
+    private nonisolated static func fetch(_ url: URL) async -> LinkPreviewPage? {
+        guard let (data, http) = await gatedData(url, accept: "text/html,application/xhtml+xml"),
+              http.mimeType?.contains("html") ?? true else { return nil }
+        let html = String(decoding: data.prefix(maxBytes), as: UTF8.self)
+        var page = LinkPreviewExtract.page(fromHTML: html, baseURL: http.url ?? url)
+        page.landedURL = http.url ?? url
+        return page
+    }
+
+    /// The site's favicon: the shared cache first, else fetched through the gate and stored there like a tab's.
+    private static func icon(at url: URL?, host: String) async -> NSImage? {
         if let cached = await FaviconCache.shared.cachedImage(for: host) { return cached }
-        guard let found = try? await FaviconFinder(url: url).fetchFaviconURLs().download().largest().image?.image else { return nil }
+        guard let url, let (data, _) = await gatedData(url), data.count < 1_000_000, let found = NSImage(data: data) else { return nil }
         FaviconCache.shared.store(found, for: host)
         return FaviconCache.shared.image(for: host) ?? found
     }
 
     private nonisolated static func image(at url: URL) async -> NSImage? {
-        var request = URLRequest(url: url, timeoutInterval: 8)
-        request.httpShouldHandleCookies = false
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? false,
-              data.count < 8_000_000 else { return nil }
+        guard let (data, _) = await gatedData(url), data.count < 8_000_000 else { return nil }
         return NSImage(data: data)
     }
 

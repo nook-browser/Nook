@@ -20,7 +20,11 @@ struct BoostOverlay: View {
     private var session: PageSession? { browserManager.tabs.selectedSession(in: windowState) }
 
     var body: some View {
-        if windowState.isBoostPanelVisible, let settings = browserManager.nookSettings, let session,
+        content.task(id: windowState.isBoostPanelVisible) { await browserManager.nookSettings?.waitForBoosts() }
+    }
+
+    @ViewBuilder private var content: some View {
+        if windowState.isBoostPanelVisible, let settings = browserManager.nookSettings, settings.boostsLoaded, let session,
            case let host = Boost.normalizeHost(session.url.host ?? ""), !host.isEmpty
         {
             BoostPanel(
@@ -48,12 +52,12 @@ struct BoostOverlay: View {
         }
     }
 
-    /// Whatever was not saved goes away: the page shows the saved Boosts again, and the scripts
-    /// used for later loads catch up with them.
+    /// Whatever was not saved goes away: the page shows the saved Boosts again, and the zap list
+    /// catches up with them.
     private func close(_ session: PageSession, _ settings: NookSettingsService) {
         if let webView = session.webView {
             BoostTweaks.preview(for: session.url, in: webView, settings: settings)
-            BoostTweaks.apply(for: session.url, in: webView, settings: settings)
+            BoostTweaks.syncZapList(settings: settings, blocker: browserManager.contentBlockerManager)
         }
         windowState.isBoostPanelVisible = false
     }

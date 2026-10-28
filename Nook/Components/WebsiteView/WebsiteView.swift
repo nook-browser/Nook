@@ -278,10 +278,12 @@ struct WebsiteView: View {
 
             // Link Previews: Shift held over a link in the page.
             if nookSettings.linkPreviews, !shouldShowSplit,
-               let session = browserManager.tabs.controllableSession(in: windowState) {
+               let session = browserManager.tabs.controllableSession(in: windowState),
+               !session.isPrivate, !session.isAgentPage {
                 LinkPreviewHost(
                     session: session,
-                    zoom: browserManager.getWebView(for: session.itemID, in: windowState.id)?.pageZoom ?? 1)
+                    zoom: browserManager.getWebView(for: session.itemID, in: windowState.id)?.pageZoom ?? 1,
+                    blocker: browserManager.contentBlockerManager)
                     .id(session.itemID)
             }
 

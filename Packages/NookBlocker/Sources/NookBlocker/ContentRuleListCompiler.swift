@@ -120,6 +120,25 @@ final class ContentRuleListCompiler {
         )
     }
 
+    /// The person's own cosmetic filters (Boost zaps) as one small list of its own, so editing
+    /// them never recompiles the big lists. Its identifier is outside the prefix `removeAll` clears.
+    /// `ok` is false when a compile failed, so the caller can try again.
+    static func compileUser(rules: [String]) async -> (list: WKContentRuleList?, ok: Bool) {
+        guard let store = WKContentRuleListStore.default() else { return (nil, false) }
+        let identifier = "NookUserCosmetic"
+        let entries = rules.isEmpty ? [] : await Task.detached(priority: .userInitiated) {
+            RustContentBlockingConverter.convert(rules: rules).entries
+        }.value
+        guard !entries.isEmpty else {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                store.removeContentRuleList(forIdentifier: identifier) { _ in cont.resume() }
+            }
+            return (nil, true)
+        }
+        let list = await compileChunk(entries, identifier: identifier, store: store)
+        return (list, list != nil)
+    }
+
     /// Remove all previously compiled rule lists from the store.
     static func removeAll() async {
         guard let store = WKContentRuleListStore.default() else { return }

@@ -118,12 +118,31 @@ public final class NookSettingsService {
         }
     }
 
+    /// Empty until `waitForBoosts()` returns on a launch: the file loads off the main thread.
     public var boosts: [Boost] = [] {
         didSet {
-            if let data = try? JSONEncoder().encode(boosts) {
-                userDefaults.set(data, forKey: boostsKey)
+            if boostsLoaded { boostStore.save(boosts) }
+        }
+    }
+    @ObservationIgnored private let boostStore = BoostStore()
+    @ObservationIgnored private var boostsLoad: Task<Void, Never>?
+    public private(set) var boostsLoaded = false
+
+    /// Waits for queued Boost writes; called at quit.
+    public func flushBoosts() { boostStore.flush() }
+
+    /// Starts the Boosts load on first use and returns once they are in `boosts`.
+    public func waitForBoosts() async {
+        if boostsLoad == nil {
+            // The old defaults blob migrates into the file once and is left where it was.
+            let legacy = userDefaults.data(forKey: boostsKey)
+            boostsLoad = Task {
+                let loaded = await boostStore.load(legacy: legacy)
+                boosts = loaded
+                boostsLoaded = true
             }
         }
+        await boostsLoad?.value
     }
 
     public var siteRoutingRules: [SiteRoutingRule] = [] {
@@ -190,7 +209,7 @@ public final class NookSettingsService {
     }
 
     /// Hosts with Arc-style Developer Mode on: the page gets the developer bar and its tab a
-    /// dashed outline. Turning one on also turns Settings > Developer > Developer Mode on.
+    /// dashed outline. Per host: it never turns the global Developer Mode (and its capture scripts) on.
     public var developerSites: [String] = [] {
         didSet {
             if let data = try? JSONEncoder().encode(developerSites) {
@@ -209,7 +228,6 @@ public final class NookSettingsService {
         developerSites.removeAll { $0 == host }
         if on {
             developerSites.append(host)
-            if !developerModeEnabled { developerModeEnabled = true }
         }
     }
 
@@ -418,10 +436,15 @@ public final class NookSettingsService {
         }
     }
 
+    public static let linkPreviewsDidChange = Notification.Name("NookLinkPreviewsDidChange")
+
     /// Shift-hover over a link shows an on-device summary of the page it opens.
     public var linkPreviews: Bool {
         didSet {
             userDefaults.set(linkPreviews, forKey: linkPreviewsKey)
+            if linkPreviews != oldValue {
+                NotificationCenter.default.post(name: Self.linkPreviewsDidChange, object: nil, userInfo: ["enabled": linkPreviews])
+            }
         }
     }
 
@@ -533,7 +556,7 @@ public final class NookSettingsService {
             tabOrganizerEnabledKey: false,
             autoRenamePinnedTabsKey: true,
             tidyDownloadsKey: false,
-            linkPreviewsKey: true,
+            linkPreviewsKey: false,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
         ])
@@ -556,11 +579,6 @@ public final class NookSettingsService {
             self.sitePermissions = decodedPermissions
         } else {
             self.sitePermissions = [:]
-        }
-
-        if let data = userDefaults.data(forKey: boostsKey),
-           let decoded = try? JSONDecoder().decode(LossyBoosts.self, from: data) {
-            self.boosts = decoded.boosts
         }
 
         if let srData = userDefaults.data(forKey: siteRoutingRulesKey),
