@@ -1,6 +1,6 @@
 # Contributing to Nook
 
-Thank you for your interest in contributing to Nook! This document provides guidelines and instructions for contributing to the project.
+Thanks for your interest in contributing to Nook. This covers how to set up the project, what we expect in a pull request, and how to report issues.
 
 ## AI Assistance Notice
 
@@ -12,7 +12,9 @@ When using AI assistance, we expect contributors to understand the code that is 
 
 Please be respectful to maintainers and disclose AI assistance.
 
-## 🚀 Development Setup
+## Development Setup
+
+You need an Apple Silicon Mac and Xcode 26 or later.
 
 1. **Clone the repository**
    ```bash
@@ -20,42 +22,58 @@ Please be respectful to maintainers and disclose AI assistance.
    cd Nook
    ```
 
-2. **Open in Xcode**
+2. **Install the Metal Toolchain** (Xcode 26 and later ship without it; Nook has one shader)
+   ```bash
+   xcodebuild -downloadComponent MetalToolchain
+   ```
+
+3. **Open in Xcode**
    ```bash
    open Nook.xcodeproj
    ```
+   Swift packages resolve on their own the first time the project opens.
 
-3. **Build and run**
+4. **Build and run**
    - Set your Development Team under Signing & Capabilities
    - Press `Cmd + R` to build and run
 
-## 📝 Code Style & Standards
+   To check that your change compiles without a signing team:
+   ```bash
+   xcodebuild -scheme Nook -configuration Debug -arch arm64 -derivedDataPath build \
+     CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+   ```
+
+There is no app test target. Logic with its own checks lives in `Checks/` folders beside each package's sources and in `scripts/tests/`; each file says how to run it. `Packages/NookTabsCore` also has a `swift test` suite.
+
+## Code Style & Standards
 
 ### Conventions
 
 - Follow existing SwiftUI/AppKit patterns in the codebase
 - Use the established file organization structure
+- Use the design tokens in `Packages/NookDesign` for sizes, spacing, colors, fonts and animations instead of literal values
 - Prefer modern Swift/SwiftUI APIs when possible
 
 ### Compatibility & OS Versions
 
-- **Minimum deployment target is macOS 26.0.** Nook tracks the current macOS release and does not support older systems; do not add `#available` guards for versions below the deployment target.
-- **New features requiring a newer OS** than the deployment target should use `#available` checks until the target is raised.
+- **Minimum deployment target is macOS 15.5 (Sequoia), Apple Silicon.** Do not add `#available` guards for versions below it.
+- **APIs newer than macOS 15.5** (macOS 26 and 27) need an `#available` check with a Sequoia fallback. Every pull request's build is launched on macOS 15 in CI to catch a missed guard.
 
-## 📋 Pull Request Process
+## Pull Request Process
 
 ### Before You Start
 
 - **Check for duplicates**: Search existing issues and PRs to ensure no one is already working on the same feature or bug
 - **Avoid duplicate work**: Comment on relevant issues to indicate you're working on them
-- **For major changes**, consider opening an issue first to discuss the approach
+- **For major changes**, open an issue first to discuss the approach
+- **Keep pull requests focused**: one feature or fix per PR. Large PRs that mix several features are hard to review and may be split or closed.
 
 ### Creating Pull Requests
 
-1. **Create your branch from `main`**:
+1. **Create your branch from `develop`**:
    ```bash
-   git checkout main
-   git pull origin main
+   git checkout develop
+   git pull origin develop
    git checkout -b feature/your-feature-name
    ```
 
@@ -66,15 +84,16 @@ Please be respectful to maintainers and disclose AI assistance.
    git push origin feature/your-feature-name
    ```
 
-4. **Open a Pull Request to `main`**
+4. **Open a Pull Request to `develop`**
    - Provide a clear description of the changes
    - Reference any related issues
    - Include screenshots or videos for UI changes
+   - List any new or changed text a user will see, so it can be reviewed
    - Disclose any AI assistance used (see AI Assistance Notice above)
 
 5. **Respond to review feedback** promptly and constructively
 
-## 🐛 Issue Reporting
+## Issue Reporting
 
 ### Bug Reports
 
@@ -92,11 +111,11 @@ Be descriptive and thorough. Include:
 Provide detailed context. Include:
 
 - **Clear description of the feature and its use case**
-- **Explain how it fits with Nook's goals** (fast, secure, beautiful)
+- **Explain how it fits with Nook's goals** (fast, built-in ad blocking, light on battery)
 - **Consider implementation complexity and user impact**
 - **Check that similar functionality doesn't already exist**
 
-## 💬 Community Guidelines
+## Community Guidelines
 
 - Be respectful and constructive
 - Help maintain a welcoming environment for all contributors
