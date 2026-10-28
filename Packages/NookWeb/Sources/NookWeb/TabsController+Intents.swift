@@ -292,11 +292,14 @@ extension TabsController {
         }
     }
 
-    public func selectNextSpace(in window: BrowserWindowState) {
+    /// False when there is no next space, the window being on the last one or the Agent space.
+    @discardableResult
+    public func selectNextSpace(in window: BrowserWindowState) -> Bool {
         stepSpace(1, in: window)
     }
 
-    public func selectPreviousSpace(in window: BrowserWindowState) {
+    @discardableResult
+    public func selectPreviousSpace(in window: BrowserWindowState) -> Bool {
         stepSpace(-1, in: window)
     }
 
@@ -312,12 +315,13 @@ extension TabsController {
         switchableSpaces(for: window).filter { !$0.isAgent }
     }
 
-    private func stepSpace(_ offset: Int, in window: BrowserWindowState) {
+    private func stepSpace(_ offset: Int, in window: BrowserWindowState) -> Bool {
         let spaces = userSpaces(for: window)
-        guard spaces.count > 1, let current = spaces.firstIndex(where: { $0.id == window.spaceID }) else { return }
+        guard spaces.count > 1, let current = spaces.firstIndex(where: { $0.id == window.spaceID }) else { return false }
         let next = current + offset
-        guard spaces.indices.contains(next) else { return }
+        guard spaces.indices.contains(next) else { return false }
         setSpace(spaces[next].id, in: window)
+        return true
     }
 
     // MARK: - Close
