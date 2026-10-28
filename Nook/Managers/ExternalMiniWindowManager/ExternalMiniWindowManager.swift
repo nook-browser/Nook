@@ -39,13 +39,15 @@ final class ExternalMiniWindowManager {
     func present(_ page: PageSession) {
         guard let browserManager else { return }
         let tabs = browserManager.tabs
-        let target = browserManager.windowRegistry?.activeWindow?.spaceID.flatMap { tabs.space($0) }
+        let target = page.detachedWindow?.spaceID.flatMap { tabs.space($0) }
             ?? tabs.orderedSpaces.first
         let controller = MiniBrowserWindowController(
             page: page,
             targetSpaceName: target?.name ?? "Current Space",
             otherSpaces: tabs.orderedSpaces.filter { $0.id != target?.id }.map { ($0.id, $0.name) },
-            adoptAction: { [weak self] spaceID in self?.adopt(page, in: spaceID) },
+            adoptAction: { [weak self] spaceID in
+                self?.adopt(page, in: spaceID, originalSpaceID: target?.id)
+            },
             onClose: { [weak self, weak browserManager] in
                 self?.controllers[page.itemID] = nil
                 browserManager?.tabs.endDetached(page)
@@ -58,8 +60,8 @@ final class ExternalMiniWindowManager {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// Returns the page to its originating window, unless the person chooses another space.
-    private func adopt(_ page: PageSession, in spaceID: UUID? = nil) {
+    /// Returns to the window and Space captured at presentation, unless another Space is chosen.
+    private func adopt(_ page: PageSession, in spaceID: UUID?, originalSpaceID: UUID?) {
         guard let browserManager,
               controllers[page.itemID] != nil else {
             return
@@ -81,8 +83,8 @@ final class ExternalMiniWindowManager {
             return
         }
 
-        if let spaceID {
-            browserManager.tabs.setSpace(spaceID, in: window)
+        if let targetSpaceID = spaceID ?? originalSpaceID {
+            browserManager.tabs.setSpace(targetSpaceID, in: window)
         }
 
         browserManager.tabs.adopt(page, in: window)

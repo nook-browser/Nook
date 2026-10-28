@@ -106,6 +106,33 @@ struct BrowserWindowOpeningCheck {
         precondition(manager.tabs.tree.items.values.contains { $0.url?.fragment == "mini" })
         closeBrowserWindows()
 
+        // The button's named Space stays the destination after the source window switches Spaces.
+        let source = manager.createNewWindow()!
+        let originalSpace = source.spaceID!
+        let originalSpaceName = manager.tabs.space(originalSpace)!.name
+        let otherSpace = manager.tabs.createSpace(name: "Other", icon: "briefcase", accentHex: "#777777", after: originalSpace)!
+        let stickyURL = URL(string: "about:blank#sticky-space")!
+
+        manager.tabs.setSpace(originalSpace, in: source)
+        manager.externalMiniWindowManager.present(url: stickyURL)
+
+        let stickyMini = app.windows.compactMap { $0 as? MiniBrowserWindow }.first { $0.isVisible }!
+        let openItem = stickyMini.toolbar!.items.first { $0.itemIdentifier.rawValue == "com.nook.miniwindow.openInSpace" }!
+
+        precondition(openItem.title == "Open in \(originalSpaceName)")
+        manager.tabs.setSpace(otherSpace, in: source)
+        precondition(source.spaceID == otherSpace)
+        precondition(openItem.title == "Open in \(originalSpaceName)")
+        stickyMini.openInSpaceAction!()
+
+        let stickyTabs = manager.tabs.tree.items.values.filter { $0.url == stickyURL }
+
+        precondition(registry.activeWindow === source && source.spaceID == originalSpace)
+        precondition(stickyTabs.count == 1 && manager.tabs.spaceID(of: stickyTabs[0].id) == originalSpace,
+                     "The mini page must open in the Space named by its button, even after the source window switches")
+        try await Task.sleep(for: .milliseconds(200))
+        closeBrowserWindows()
+
         // Matching external links must still route when no regular window exists, even with mini enabled.
         let target = manager.tabs.orderedSpaces.first!.id
         let routedURL = URL(string: "https://window-check.invalid/routed")!
