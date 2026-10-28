@@ -449,9 +449,7 @@ public final class TabsController {
         device.openPages[itemID] = nil
         guard let session else { return }
         session.tearDown()
-        if !session.isPrivate {
-            tabEvents?.tabClosed(itemID: itemID)
-        }
+        tabEvents?.tabClosed(itemID: itemID)
     }
 
     /// The website data store of a space, made on first use and shared by every space that uses

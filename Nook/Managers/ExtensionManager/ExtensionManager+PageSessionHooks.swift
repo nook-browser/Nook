@@ -4,7 +4,8 @@
 //  Nook
 //
 //  Extension notifications TabsController and PageSession call. Adapters are keyed by item
-//  id (ExtensionManager+TabNotifications.swift). Private sessions are never reported.
+//  id (ExtensionManager+TabNotifications.swift). Private pages are reported with their private
+//  window, and WebKit hides them from extensions without `hasAccessToPrivateData`.
 //
 
 import Foundation
@@ -14,15 +15,18 @@ import NookWeb
 extension ExtensionManager {
     /// Called once a session has a web view, before it loads, so content scripts can resolve it.
     func notifyTabOpened(_ session: PageSession) {
-        guard !session.isPrivate, let controller = extensionController,
-              !openedTabIDs.contains(session.itemID)
-        else { return }
+        guard let controller = extensionController, !openedTabIDs.contains(session.itemID) else { return }
         guard let adapter = session.isDetached ? detachedAdapter(for: session) : adapter(for: session.itemID) else {
             Self.logger.notice("Page not announced to extensions: no adapter (item \(session.itemID.uuidString, privacy: .public))")
             return
         }
-        // The window must be known to the controller before its tab.
+        // The window must be known to the controller before its tab. WebKit caches a tab's
+        // privacy from its first window, so a private page without its private window stays hidden.
         let window = adapter.hostWindow
+        if session.isPrivate, window?.privateTree == nil {
+            tabAdapters[session.itemID] = nil
+            return
+        }
         _ = window.flatMap { windowAdapter(for: $0) }
         openedTabIDs.insert(session.itemID)
         controller.didOpenTab(adapter)
@@ -51,6 +55,7 @@ extension ExtensionManager {
     /// open, so a popover it still holds but no longer shows is closed first. Reading
     /// `popupPopover` would build and load a new popup, hence the weak reference.
     func performAction(_ context: WKWebExtensionContext, for tab: ExtensionTabAdapter?) {
+        let tab = tab.flatMap { $0.isPrivate && !context.hasAccessToPrivateData ? nil : $0 }
         if let popover = shownPopover, !popover.isShown {
             context.action(for: tab)?.closePopup()
             shownPopover = nil
@@ -67,9 +72,9 @@ extension ExtensionManager {
 
     func notifyTabActivated(new: PageSession, previous: PageSession?) {
         guard let controller = extensionController else { return }
-        let oldAdapter = previous.flatMap { $0.isPrivate ? nil : openedAdapter(for: $0.itemID) }
-        guard !new.isPrivate, let newAdapter = openedAdapter(for: new.itemID) else {
-            // Switching to a private or unopened page: just deselect the previous one.
+        let oldAdapter = previous.flatMap { openedAdapter(for: $0.itemID) }
+        guard let newAdapter = openedAdapter(for: new.itemID) else {
+            // Switching to an unopened page: just deselect the previous one.
             if let oldAdapter { controller.didDeselectTabs([oldAdapter]) }
             return
         }
@@ -81,7 +86,7 @@ extension ExtensionManager {
         // newly active tab.
         wakeBackgroundWorkers()
 
-        grantExtensionAccessToURL(new.url)
+        grantExtensionAccessToURL(new.url, private: new.isPrivate)
 
         // Background workers re-evaluate the page (autofill detection, badge text,
         // declarativeContent rules).
@@ -116,7 +121,7 @@ extension ExtensionManager {
     }
 
     func notifyTabPropertiesChanged(_ session: PageSession, properties: WKWebExtension.TabChangedProperties) {
-        guard !session.isPrivate, let controller = extensionController,
+        guard let controller = extensionController,
               let adapter = openedAdapter(for: session.itemID)
         else { return }
         controller.didChangeTabProperties(properties, for: adapter)

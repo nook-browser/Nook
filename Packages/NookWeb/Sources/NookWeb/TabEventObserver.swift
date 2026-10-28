@@ -18,7 +18,7 @@ public protocol TabEventObserver: AnyObject {
     func tabPropertiesChanged(_ session: PageSession, properties: WKWebExtension.TabChangedProperties)
 
     /// Lets extensions with host permissions for this URL inject before the load starts.
-    func grantAccess(to url: URL)
+    func grantAccess(to url: URL, private: Bool)
     /// MV3 service workers die after about five minutes idle; a page load wakes them.
     func wakeBackgroundWorkers()
     /// The controller new web view configurations are attached to, nil when extensions are off.

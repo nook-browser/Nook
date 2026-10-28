@@ -81,7 +81,7 @@ extension PageSession: WKNavigationDelegate {
             // where decidePolicyFor only granted access to the initial URL, not the
             // redirect target. Without this, content scripts can't inject on the
             // redirected page and chrome.tabs.query() won't return the URL.
-            controller?.tabEvents?.grantAccess(to: newURL)
+            controller?.tabEvents?.grantAccess(to: newURL, private: isPrivate)
             controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
         }
     }
@@ -101,7 +101,7 @@ extension PageSession: WKNavigationDelegate {
             // decidePolicyFor only grants access to the initial navigation URL;
             // server-side redirects land here with a different URL that needs
             // its own grant for content scripts and chrome.tabs.query().
-            controller?.tabEvents?.grantAccess(to: newURL)
+            controller?.tabEvents?.grantAccess(to: newURL, private: isPrivate)
             controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
 
             // Wake MV3 background workers so they can process the new page
@@ -353,7 +353,7 @@ extension PageSession: WKNavigationDelegate {
 
             // Grant extension access to this URL BEFORE navigation starts
             // so content scripts can inject at document_start
-            controller?.tabEvents?.grantAccess(to: url)
+            controller?.tabEvents?.grantAccess(to: url, private: isPrivate)
 
             // Setup content blocker scripts before navigation starts
             controller?.blocker.setupContentBlockerScripts(for: url, in: webView, tab: self)

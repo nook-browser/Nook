@@ -121,16 +121,17 @@ extension ExtensionManager {
         _ controller: WKWebExtensionController,
         focusedWindowFor extensionContext: WKWebExtensionContext
     ) -> (any WKWebExtensionWindow)? {
-        // nil while a private window is focused.
         if let popup = extensionPopupWindows.first(where: { $0.window.isKeyWindow }) { return popup }
+        // A private window is nil to an extension not allowed there.
         return browserManagerRef?.windowRegistry?.activeWindow.flatMap { windowAdapter(for: $0) }
+            .flatMap { $0.isPrivate && !extensionContext.hasAccessToPrivateData ? nil : $0 }
     }
 
     func webExtensionController(
         _ controller: WKWebExtensionController,
         openWindowsFor extensionContext: WKWebExtensionContext
     ) -> [any WKWebExtensionWindow] {
-        openWindowAdapters + extensionPopupWindows
+        openWindowAdapters.filter { !$0.isPrivate || extensionContext.hasAccessToPrivateData } + extensionPopupWindows
     }
 
     // MARK: - Permission prompting helper (invoked by delegate when needed)
@@ -272,13 +273,13 @@ extension ExtensionManager {
 
     // MARK: - Opening tabs/windows requested by extensions
 
-    /// The regular window an extension request targets: the window it names, else the focused
-    /// regular window, else any regular window.
+    /// The window an extension request targets: the window it names, else the focused regular
+    /// window, else any regular window.
     private func targetWindow(_ requested: (any WKWebExtensionWindow)?) -> BrowserWindowState? {
         if let adapter = requested as? ExtensionWindowAdapter, let state = adapter.state { return state }
         guard let registry = browserManagerRef?.windowRegistry else { return nil }
-        if let active = registry.activeWindow, windowAdapter(for: active) != nil { return active }
-        return registry.allWindows.first { windowAdapter(for: $0) != nil }
+        if let active = registry.activeWindow, active.privateTree == nil { return active }
+        return registry.allWindows.first { $0.privateTree == nil }
     }
 
     private static func noWindowError() -> NSError {

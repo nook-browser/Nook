@@ -368,6 +368,7 @@ extension ExtensionManager {
         }
 
         extensionContext.isInspectable = true
+        extensionContext.hasAccessToPrivateData = entity.allowsPrivateBrowsing
         extensionContexts[entity.id] = extensionContext
 
         do {
@@ -394,7 +395,7 @@ extension ExtensionManager {
         // Tabs that navigated before this extension loaded missed their URL grants.
         if let bm = browserManagerRef {
             for session in bm.tabs.sessions where openedTabIDs.contains(session.itemID) {
-                grantExtensionAccessToURL(session.url)
+                grantExtensionAccessToURL(session.url, private: session.isPrivate)
             }
         }
 
@@ -562,6 +563,21 @@ extension ExtensionManager {
             }
         }
         updateExtensionEnabled(extensionId, enabled: false)
+    }
+
+    /// WebKit adds or removes the extension's content scripts in private pages at once.
+    func setAllowsPrivateBrowsing(_ extensionId: String, allowed: Bool) {
+        guard let entity = fetchEntity(id: extensionId) else { return }
+        entity.allowsPrivateBrowsing = allowed
+        do {
+            try context.save()
+        } catch {
+            Self.logger.error("Failed to save private browsing access: \(error.localizedDescription, privacy: .public)")
+        }
+        extensionContexts[extensionId]?.hasAccessToPrivateData = allowed
+        if let index = installedExtensions.firstIndex(where: { $0.id == extensionId }) {
+            installedExtensions[index] = InstalledExtension(from: entity, manifest: installedExtensions[index].manifest)
+        }
     }
 
     func uninstallExtension(_ extensionId: String) {
