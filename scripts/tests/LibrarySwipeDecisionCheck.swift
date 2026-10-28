@@ -15,6 +15,12 @@ struct LibrarySwipeDecisionCheck {
         precondition(!LibrarySwipeDecision.opens(distance: w - 20, velocity: -600, width: w, wasOpen: true))
         precondition(!LibrarySwipeDecision.opens(distance: w - 60, velocity: 0, width: w, wasOpen: true))
         precondition(LibrarySwipeDecision.opens(distance: w - 20, velocity: 0, width: w, wasOpen: true))
+        // Width: the preferred width, held back 56 pt from the window's far edge, never under 417.
+        precondition(LibrarySwipeDecision.width(preferred: 840, windowWidth: 1600) == 840)
+        precondition(LibrarySwipeDecision.width(preferred: 840, windowWidth: 800) == 744)
+        precondition(LibrarySwipeDecision.width(preferred: 420, windowWidth: 800) == 420)
+        precondition(LibrarySwipeDecision.width(preferred: 420, windowWidth: 440) == 417, "floor")
+        precondition(LibrarySwipeDecision.width(preferred: 840, windowWidth: 300) == 417, "floor in a tiny window")
         print("LibrarySwipeDecisionCheck passed")
     }
 }

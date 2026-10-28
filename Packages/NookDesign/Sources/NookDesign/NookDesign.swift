@@ -107,10 +107,12 @@ public enum NookDesign {
         public static let pipSkip: CGFloat = 48        // PiP skip buttons, as in the system PiP window
         public static let pipPlay: CGFloat = 64        // PiP play/pause, as in the system PiP window
         public static let pipScrub: CGFloat = 4        // PiP scrubber track
-        // Native lights (88), sidebar toggle (28), navigation (88), and breathing room.
-        public static let sidebarMin: CGFloat = 230
+        public static let sidebarMin: CGFloat = 164    // narrowest the sidebar drags to before it hides
         public static let spaceTarget: CGFloat = 32    // space switcher button
-        public static let spaceTargetMin: CGFloat = 24 // ...squeezed when many spaces
+        public static let libraryList: CGFloat = 420   // preferred width of the library's History and Downloads
+        public static let librarySpaces: CGFloat = 840 // ...and of its Spaces page
+        public static let libraryMin: CGFloat = 417    // narrowest the library gets, whatever the window
+        public static let libraryEdgeGap: CGFloat = 56 // window width the library leaves uncovered
 
         // Settings
         public static let settingsChip: CGFloat = 22           // tinted icon chip in the settings sidebar
@@ -190,6 +192,11 @@ public enum NookDesign {
         public static let flight = Animation.easeIn(duration: 0.6)       // a download flying from the page to its button
         public static let spring = Animation.snappy(duration: 0.3)      // palette, dialog, toast, drag reorder, gesture-tracked motion
         public static let pageSettle = Animation.spring(response: 0.25, dampingFraction: 1)  // the space pager's settle, so the dots land with the pages
+        public static let librarySpring = Spring(response: 0.25, dampingRatio: 1)   // library open, close and release, the pager's spring
+        public static let libraryRubberBand: CGFloat = 0.55              // resistance past fully open
+        public static let libraryVelocityWindow: TimeInterval = 0.1      // swipe samples older than this are dropped from the velocity
+        public static let swipeAxisLock: CGFloat = 10                    // points of travel before a swipe commits to an axis
+        public static let swipeIdleTimeout: TimeInterval = 1             // a tracked swipe with no event this long is over
     }
 
     // MARK: - Surface

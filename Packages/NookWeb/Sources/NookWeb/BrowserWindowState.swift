@@ -28,12 +28,12 @@ public class BrowserWindowState {
     public let id: UUID
 
     /// Sidebar width for this window
-    public var sidebarWidth: CGFloat = 250
+    public var sidebarWidth: CGFloat = 228
     public var isSidebarResizeHovered = false
     public var isAddressEditing = false
 
     /// Last non-zero sidebar width so we can restore when toggling visibility
-    public var savedSidebarWidth: CGFloat = 250
+    public var savedSidebarWidth: CGFloat = 228
 
     /// Width for the AI assistant sidebar when visible
     public var aiSidebarWidth: CGFloat = 350

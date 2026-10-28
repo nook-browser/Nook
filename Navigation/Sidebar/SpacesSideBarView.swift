@@ -89,8 +89,8 @@ struct SpacesSideBarView: View {
                     .padding(.horizontal, NookDesign.Spacing.sidebarInset)
             }
 
-            // Header (space name, URL bar and its anchored suggestions)
-            SidebarHeader(isSidebarHovered: isSidebarHovered, onNewSpace: showSpaceCreationDialog)
+            // Header (URL bar and its anchored suggestions)
+            SidebarHeader(isSidebarHovered: isSidebarHovered)
                 .environmentObject(browserManager)
                 .environment(windowState)
                 .zIndex(10)
@@ -232,7 +232,10 @@ struct SpacesSideBarView: View {
                 // Nil, not zero, once the pull is back home: a held zero would pin the library shut.
                 windowState.libraryDrag = distance > 0 ? distance : nil
             case .ended(let distance, let velocity):
-                LibraryMotion.release(windowState, distance: distance, velocity: velocity, width: LibraryMotion.width(for: .spaces))
+                LibraryMotion.release(windowState, distance: distance, velocity: velocity, width: LibraryMotion.width(
+                    for: .spaces,
+                    windowWidth: windowState.window?.contentView?.bounds.width ?? .greatestFiniteMagnitude
+                ))
             }
         }
         // The space dots follow the swipe, as Arc's do.
@@ -393,6 +396,13 @@ struct SpacesSideBarView: View {
                 .padding(.bottom, NookDesign.Spacing.sectionGap)
             }
 
+            // Between favorites and pinned tabs, as in Arc.
+            SpaceSwitcherTitle(spaceID: space.id, onNewSpace: showSpaceCreationDialog)
+                .environment(tabs)
+                .environment(windowState)
+                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                .padding(.bottom, NookDesign.Spacing.sectionGap)
+
             SpaceView(
                 spaceID: space.id,
                 isActive: windowState.spaceID == space.id,
@@ -419,13 +429,21 @@ struct SpacesSideBarView: View {
     /// The sidebar toggle beside the traffic lights, then back, forward and reload at the
     /// trailing edge unless the URL bar mode has them.
     private var titleRow: some View {
+        // The history buttons drop out of a sidebar dragged too narrow for them.
+        ViewThatFits(in: .horizontal) {
+            titleRow(showsHistory: true)
+            titleRow(showsHistory: false)
+        }
+    }
+
+    private func titleRow(showsHistory: Bool) -> some View {
         HStack(spacing: NookDesign.SidebarChrome.gap) {
             Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
                 browserManager.toggleSidebar(for: windowState)
             }
             .nookSidebarIconButtons()
             Spacer(minLength: 0)
-            if !nookSettings.topBarAddressView {
+            if showsHistory, !nookSettings.topBarAddressView {
                 SidebarHistoryButtons()
                     .environmentObject(browserManager)
                     .environment(windowState)

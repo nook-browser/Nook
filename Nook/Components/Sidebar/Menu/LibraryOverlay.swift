@@ -21,15 +21,13 @@ import NookUI
 enum LibraryMotion {
     private static let log = Logger(subsystem: "com.gstudios.nook", category: "Library")
 
-    /// Critically damped for a tap; a released swipe gets a touch of bounce (`release`).
-    static let open = Animation.interpolatingSpring(Spring(response: 0.32, dampingRatio: 1))
-    static let dismiss = Animation.interpolatingSpring(Spring(response: 0.28, dampingRatio: 1))
+    /// The pager's spring: response 0.25, critically damped.
+    static let open = Animation.interpolatingSpring(NookDesign.Motion.librarySpring)
+    static let dismiss = open
 
-    private static let listWidth: CGFloat = 420
-    private static let spacesWidth: CGFloat = 840
-
-    static func width(for tab: NookWeb.SidebarMenuTab) -> CGFloat {
-        tab == .spaces ? spacesWidth : listWidth
+    /// The width the tab asks for before the window's size limits it.
+    static func preferredWidth(for tab: NookWeb.SidebarMenuTab) -> CGFloat {
+        tab == .spaces ? NookDesign.Size.librarySpaces : NookDesign.Size.libraryList
     }
 
     /// Settles a swipe: open or shut by where it was heading, from where the fingers left it.
@@ -39,8 +37,7 @@ enum LibraryMotion {
         log.debug("Library release: distance \(distance, format: .fixed(precision: 0)) velocity \(velocity, format: .fixed(precision: 0)) wasOpen \(wasOpen) opens \(opens)")
         let remaining = (opens ? width : 0) - min(max(distance, 0), width)
         let relativeVelocity = abs(remaining) > 1 ? velocity / remaining : 0
-        let spring = Spring(response: 0.32, dampingRatio: opens && velocity > 0 ? 0.86 : 1)
-        withAnimation(.interpolatingSpring(spring, initialVelocity: relativeVelocity)) {
+        withAnimation(.interpolatingSpring(NookDesign.Motion.librarySpring, initialVelocity: relativeVelocity)) {
             windowState.libraryDrag = nil
             windowState.isSidebarMenuVisible = opens
         }
@@ -63,11 +60,13 @@ enum LibraryMotion {
 }
 
 extension LibraryMotion {
-    /// Room left for the page at the far edge, so the window never fills with library.
-    static let pageMargin: CGFloat = 160
-
     static func width(for tab: NookWeb.SidebarMenuTab, windowWidth: CGFloat) -> CGFloat {
-        min(width(for: tab), max(windowWidth - pageMargin, 0))
+        CGFloat(LibrarySwipeDecision.width(
+            preferred: preferredWidth(for: tab),
+            windowWidth: windowWidth,
+            minimum: NookDesign.Size.libraryMin,
+            edgeGap: NookDesign.Size.libraryEdgeGap
+        ))
     }
 
     /// How far the library is out: where a swipe holds it, rubber-banded past fully open,
@@ -76,7 +75,8 @@ extension LibraryMotion {
         guard let drag = windowState.libraryDrag else { return windowState.isSidebarMenuVisible ? width : 0 }
         guard drag > width else { return max(drag, 0) }
         let over = drag - width
-        return width + over * 0.55 * width / (width + 0.55 * over)
+        let k = NookDesign.Motion.libraryRubberBand
+        return width + over * k * width / (width + k * over)
     }
 }
 
@@ -196,7 +196,7 @@ struct LibraryPanel: View {
 
 /// While the library is open: a sideways swipe anywhere in the window pushes it shut under the
 /// fingers. It tracks as the space pager does, in its own event loop, so it sees every event of the
-/// swipe through to the end; nothing can leave it half way. Only scroll events reach it (clicks
+/// swipe through to the end; it also ends when the window or app loses focus, or goes quiet. Only scroll events reach it (clicks
 /// pass straight through), and only a sideways swipe is kept: the rest go to the view beneath.
 /// shortcut: a sideways swipe over Spaces columns that overflow closes rather than scrolls them;
 /// give the columns their own surface if many spaces become common.
@@ -252,12 +252,12 @@ final class LibrarySwipeSurfaceView: NSView {
         case .changed where claimed == nil:
             travel.width += event.scrollingDeltaX
             travel.height += event.scrollingDeltaY
-            // Ten points of hysteresis, then commit to an axis, as Apple's gestures do.
-            if abs(travel.width) > 10, abs(travel.width) > abs(travel.height) {
+            // A little hysteresis, then commit to an axis, as Apple's gestures do.
+            if abs(travel.width) > NookDesign.Motion.swipeAxisLock, abs(travel.width) > abs(travel.height) {
                 claimed = true
                 keptLast = true
                 track(from: event)
-            } else if abs(travel.height) > 10 {
+            } else if abs(travel.height) > NookDesign.Motion.swipeAxisLock {
                 claimed = false
                 forward(event)
             } else {
@@ -278,8 +278,27 @@ final class LibrarySwipeSurfaceView: NSView {
         var distance = width + travel.width * (onRight ? -1 : 1)
         var samples: [(time: TimeInterval, distance: CGFloat)] = [(first.timestamp, distance)]
         onChange(distance)
-        let mask: NSEvent.EventTypeMask = [.scrollWheel, .mouseMoved, .mouseExited, .keyDown, .keyUp, .swipe]
-        tracking: while let event = window.nextEvent(matching: mask, until: .distantFuture, inMode: .eventTracking, dequeue: true) {
+
+        // A swipe cut short by the window or the app losing focus never gets its `.ended`; the
+        // notifications wake the loop and the idle timeout below covers a missed one.
+        var interrupted = false
+        let wake = {
+            interrupted = true
+            if let event = NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0) {
+                NSApp.postEvent(event, atStart: true)
+            }
+        }
+        let center = NotificationCenter.default
+        let observers = [
+            center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: nil) { _ in wake() },
+            center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: nil) { _ in wake() },
+        ]
+        defer { observers.forEach(center.removeObserver) }
+
+        let mask: NSEvent.EventTypeMask = [.scrollWheel, .mouseMoved, .mouseExited, .keyDown, .keyUp, .swipe, .applicationDefined]
+        tracking: while !interrupted, NSApp.isActive,
+                        let event = window.nextEvent(matching: mask, until: Date(timeIntervalSinceNow: NookDesign.Motion.swipeIdleTimeout), inMode: .eventTracking, dequeue: true) {
+            if event.type == .applicationDefined { break tracking }
             guard event.type == .scrollWheel else {
                 NSApp.sendEvent(event)
                 continue
@@ -289,7 +308,7 @@ final class LibrarySwipeSurfaceView: NSView {
             case .changed:
                 distance += towardOpen(event)
                 samples.append((event.timestamp, distance))
-                samples.removeAll { event.timestamp - $0.time > 0.1 }
+                samples.removeAll { event.timestamp - $0.time > NookDesign.Motion.libraryVelocityWindow }
                 onChange(distance)
             case .ended, .cancelled:
                 break tracking
@@ -297,8 +316,11 @@ final class LibrarySwipeSurfaceView: NSView {
                 continue
             }
         }
+        // Drop the wake event if the loop left before reading it.
+        if interrupted { _ = window.nextEvent(matching: .applicationDefined, until: .distantPast, inMode: .eventTracking, dequeue: true) }
+        // An interrupted swipe settles where it is, with no flick to carry it.
         var velocity: CGFloat = 0
-        if let a = samples.first, let b = samples.last, b.time > a.time { velocity = (b.distance - a.distance) / CGFloat(b.time - a.time) }
+        if !interrupted, let a = samples.first, let b = samples.last, b.time > a.time { velocity = (b.distance - a.distance) / CGFloat(b.time - a.time) }
         claimed = nil
         onEnd(distance, velocity)
     }

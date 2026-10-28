@@ -13,6 +13,8 @@ struct SidebarResizeView: View {
     @Environment(\.nookUsesDefaultSpaceTheme) private var usesDefaultTheme
     @Environment(\.colorScheme) private var colorScheme
     @State private var startingWidth: CGFloat = 0
+    @State private var drag = SidebarDrag(startingWidth: 0)
+    @State private var didHide = false
     @State private var sessionID = UUID().uuidString
 
     private var indicatorColor: NSColor {
@@ -32,27 +34,49 @@ struct SidebarResizeView: View {
                 guard windowState.isSidebarVisible,
                       DragLockManager.shared.startDrag(ownerID: sessionID) else { return false }
                 startingWidth = windowState.sidebarWidth
+                drag = SidebarDrag(startingWidth: startingWidth)
+                didHide = false
                 return true
             },
-            onDrag: { delta in
+            onDrag: { delta, velocity in
+                guard !didHide else { return }
                 let direction: CGFloat = settings.sidebarPosition == .right ? -1 : 1
-                let width = min(520, max(NookDesign.Size.sidebarMin, startingWidth + delta * direction))
-                guard width != windowState.sidebarWidth else { return }
+                let step = drag.update(
+                    raw: startingWidth + delta * direction,
+                    velocity: velocity * direction,
+                    now: ProcessInfo.processInfo.systemUptime
+                )
+                if step.haptic { Haptics.alignment() }
+                if step.width == 0 {
+                    // Dragged shut: keep the old width for the next time it opens. The handle goes
+                    // away before mouseUp, so release the drag here.
+                    didHide = true
+                    DragLockManager.shared.endDrag(ownerID: sessionID)
+                    windowState.isSidebarResizeHovered = false
+                    browserManager.updateSidebarWidth(
+                        min(max(startingWidth, SidebarWidth.min), SidebarWidth.max), for: windowState)
+                    browserManager.saveSidebarWidthToDefaults()
+                    browserManager.toggleSidebar(for: windowState)
+                    return
+                }
+                guard step.width != windowState.sidebarWidth else { return }
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
                     // Do not broadcast BrowserManager.objectWillChange on every mouse event.
-                    windowState.sidebarWidth = width
-                    windowState.sidebarContentWidth = max(width - 16, 0)
+                    windowState.sidebarWidth = step.width
+                    windowState.sidebarContentWidth = max(step.width - 16, 0)
                 }
             },
             onEnd: {
-                browserManager.updateSidebarWidth(windowState.sidebarWidth, for: windowState)
-                browserManager.saveSidebarWidthToDefaults()
+                if !didHide {
+                    browserManager.updateSidebarWidth(windowState.sidebarWidth, for: windowState)
+                    browserManager.saveSidebarWidthToDefaults()
+                }
                 DragLockManager.shared.endDrag(ownerID: sessionID)
             },
             onReset: {
-                browserManager.updateSidebarWidth(250, for: windowState)
+                browserManager.updateSidebarWidth(SidebarWidth.standard, for: windowState)
                 browserManager.saveSidebarWidthToDefaults()
             }
         )
@@ -69,7 +93,7 @@ private struct SidebarResizeHandle: NSViewRepresentable {
     var color: NSColor
     var onHover: (Bool) -> Void
     var onStart: () -> Bool
-    var onDrag: (CGFloat) -> Void
+    var onDrag: (CGFloat, CGFloat) -> Void
     var onEnd: () -> Void
     var onReset: () -> Void
 
@@ -85,6 +109,7 @@ private struct SidebarResizeHandle: NSViewRepresentable {
         private var hovered = false
         private var dragging = false
         private var startX: CGFloat = 0
+        private var velocity = DragVelocity(startTime: 0)
         private var mouseMonitor: Any?
         private var waitsForPointerMovement = false
         private var pendingAppearance: DispatchWorkItem?
@@ -202,6 +227,7 @@ private struct SidebarResizeHandle: NSViewRepresentable {
             if event.clickCount == 2 { callbacks?.onReset(); return }
             dragging = callbacks?.onStart() ?? false
             startX = NSEvent.mouseLocation.x
+            velocity = DragVelocity(startTime: event.timestamp)
             if dragging {
                 pendingAppearance?.cancel()
                 pendingAppearance = nil
@@ -213,7 +239,9 @@ private struct SidebarResizeHandle: NSViewRepresentable {
         override func mouseDragged(with event: NSEvent) {
             guard dragging else { return }
             NSCursor.resizeLeftRight.set()
-            callbacks?.onDrag(NSEvent.mouseLocation.x - startX)
+            let x = NSEvent.mouseLocation.x
+            let speed = velocity.add(dx: event.deltaX, time: event.timestamp)
+            callbacks?.onDrag(x - startX, speed)
         }
         override func mouseUp(with event: NSEvent) {
             guard dragging else { return }

@@ -18,7 +18,8 @@ extension PageSession {
         configuration.snapshotWidth = NSNumber(value: Double(Self.switcherSnapshotWidth))
         configuration.afterScreenUpdates = false
         webView.takeSnapshot(with: configuration) { [weak self] image, _ in
-            if let image { self?.switcherSnapshot = image }
+            // A picture that arrives after the page unloaded would pin its memory again.
+            if let image, self?.primaryWebView != nil { self?.switcherSnapshot = image }
         }
     }
 }

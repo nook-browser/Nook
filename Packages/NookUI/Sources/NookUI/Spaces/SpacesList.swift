@@ -24,42 +24,38 @@ public struct SpacesList: View {
 
     public var body: some View {
         GeometryReader { geometry in
-            let count = CGFloat(max(visibleSpaces.count, 1))
+            // Items shrink to fit as Arc's dock does. At the 8 pt floor a row that still does
+            // not fit scrolls sideways, so every space stays reachable.
+            let count = visibleSpaces.count
             let width = max(geometry.size.width, 0)
-            // Compress gaps first, then targets to the minimum; overflow remains scrollable.
-            let gap = min(NookDesign.Spacing.md, max(0, (width - count * NookDesign.Size.spaceTarget) / max(count - 1, 1)))
-            let target = max(NookDesign.Size.spaceTargetMin, min(NookDesign.Size.spaceTarget, width / count))
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal) {
-                    HStack(alignment: .center, spacing: gap) {
-                        ForEach(visibleSpaces, id: \.id) { space in
-                            SpacesListItem(
-                                space: space,
-                                isActive: windowState.spaceID == space.id,
-                                selection: selection(of: space.id),
-                                isFaded: false,
-                                buttonSize: target
-                            )
-                            .environment(windowState)
-                            .id(space.id)
-                            .transition(.asymmetric(
-                                insertion: .scale.combined(with: .opacity),
-                                removal: .scale.combined(with: .opacity)
-                            ))
-                        }
-                    }
-                    .fixedSize(horizontal: true, vertical: true)
-                    .frame(minWidth: geometry.size.width, alignment: .center)
+            let size = SpaceSwitcher.itemSize(available: width, count: count)
+            let gap = SpaceSwitcher.gap(available: width, count: count, size: size)
+            let compact = SpaceSwitcher.isCompact(itemSize: size)
+            let overflows = size * CGFloat(count) > width
+            let row = HStack(alignment: .center, spacing: gap) {
+                ForEach(visibleSpaces, id: \.id) { space in
+                    SpacesListItem(
+                        space: space,
+                        isActive: windowState.spaceID == space.id,
+                        selection: selection(of: space.id),
+                        isFaded: false,
+                        buttonSize: size,
+                        forceDot: compact
+                    )
+                    .environment(windowState)
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
                 }
-                .scrollIndicators(.hidden)
-                .defaultScrollAnchor(.center)
-                .onChange(of: windowState.spaceID) { _, id in
-                    if let id { proxy.scrollTo(id, anchor: .center) }
-                }
-                // Keep the scrolling content at button height, then center that viewport
-                // in the footer. Extra footer height must not become scrollable content.
-                .frame(height: NookDesign.Size.spaceTarget)
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .center)
+            }
+            if overflows {
+                ScrollView(.horizontal, showsIndicators: false) { row }
+                    .frame(width: width, height: geometry.size.height)
+            } else {
+                row
+                    .frame(width: width, height: geometry.size.height, alignment: .center)
+                    .clipped()
             }
         }
         .animation(NookDesign.Motion.standard, value: visibleSpaces.count)

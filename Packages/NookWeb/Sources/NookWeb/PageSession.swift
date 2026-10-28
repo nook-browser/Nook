@@ -471,6 +471,8 @@ public final class PageSession: NSObject, Identifiable {
         hasPlayingAudio = false
         hasAudioContent = false
         hasVideoContent = false
+        // Also covers `tearDown`, which unloads first.
+        switcherSnapshot = nil
     }
 
     /// Final cleanup when the page ends (item closed, pinned page closed, window closed).
