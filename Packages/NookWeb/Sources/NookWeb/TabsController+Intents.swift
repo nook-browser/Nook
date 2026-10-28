@@ -214,7 +214,10 @@ extension TabsController {
         window.recentItemsBySpace[spaceID] = recent.suffix(Self.recentLimit)
 
         if let session = ensureSession(for: itemID) {
-            if let previous, previous !== session { previous.captureSwitcherSnapshot() }
+            if let previous, previous !== session {
+                previous.captureSwitcherSnapshot()
+                dropStaleSwitcherSnapshots()
+            }
             session.loadWebViewIfNeeded()
             session.checkMediaState()
             if session !== previous, !session.isPrivate {
@@ -223,6 +226,14 @@ extension TabsController {
         }
         mirror(window)
         window.refreshCompositor()
+    }
+
+    /// Keeps switcher pictures only for each window's 8 most recent tabs (what the card can show).
+    private func dropStaleSwitcherSnapshots() {
+        let keep = Set(allWindows.flatMap { recentItems(in: $0).prefix(8) })
+        for session in sessions where session.switcherSnapshot != nil && !keep.contains(session.itemID) {
+            session.switcherSnapshot = nil
+        }
     }
 
     /// This window's tabs in the space it shows, most recently chosen first, still open ones only.

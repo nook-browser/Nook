@@ -107,7 +107,6 @@ public enum NookDesign {
         public static let pipSkip: CGFloat = 48        // PiP skip buttons, as in the system PiP window
         public static let pipPlay: CGFloat = 64        // PiP play/pause, as in the system PiP window
         public static let pipScrub: CGFloat = 4        // PiP scrubber track
-        public static let sidebarMin: CGFloat = 164    // narrowest the sidebar drags to before it hides
         public static let spaceTarget: CGFloat = 32    // space switcher button
         public static let libraryList: CGFloat = 420   // preferred width of the library's History and Downloads
         public static let librarySpaces: CGFloat = 840 // ...and of its Spaces page

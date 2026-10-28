@@ -21,6 +21,7 @@ struct WindowView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
     @Environment(WindowRegistry.self) private var windowRegistry
+    @Environment(\.colorScheme) private var systemColorScheme
     @Environment(AIService.self) private var aiService
     @Environment(TabOrganizerManager.self) private var tabOrganizerManager
     @Environment(\.nookSettings) var nookSettings
@@ -300,6 +301,7 @@ struct WindowView: View {
     private func SpacesSidebar() -> some View {
         if windowState.isSidebarVisible {
             SpacesSideBarView()
+                .environment(\.nookBaseColorScheme, systemColorScheme)
                 .spaceThemeAppearance(spaceTheme)
                 // Becomes its column in the library as the library comes out, as in Arc.
                 .modifier(LibraryFade())
@@ -491,6 +493,7 @@ final class TrafficLightsView: NSView {
     private func apply() {
         for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             window?.standardWindowButton(type)?.isHidden = !visible || exitingFullScreen
+            window?.standardWindowButton(type)?.alphaValue = alpha
         }
     }
 }

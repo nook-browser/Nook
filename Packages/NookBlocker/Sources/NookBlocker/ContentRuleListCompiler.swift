@@ -126,6 +126,15 @@ final class ContentRuleListCompiler {
     static func compileUser(rules: [String]) async -> (list: WKContentRuleList?, ok: Bool) {
         guard let store = WKContentRuleListStore.default() else { return (nil, false) }
         let identifier = "NookUserCosmetic"
+        let defaults = UserDefaults.standard
+        let key = userKey(rules)
+        // Same zaps as the last successful compile: the list is already in the store.
+        if !rules.isEmpty, defaults.string(forKey: userKeyDefaults) == key {
+            let existing = await withCheckedContinuation { (cont: CheckedContinuation<WKContentRuleList?, Never>) in
+                store.lookUpContentRuleList(forIdentifier: identifier) { list, _ in cont.resume(returning: list) }
+            }
+            if let existing { return (existing, true) }
+        }
         let entries = rules.isEmpty ? [] : await Task.detached(priority: .userInitiated) {
             RustContentBlockingConverter.convert(rules: rules).entries
         }.value
@@ -133,10 +142,24 @@ final class ContentRuleListCompiler {
             await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
                 store.removeContentRuleList(forIdentifier: identifier) { _ in cont.resume() }
             }
+            defaults.set(userKey([]), forKey: userKeyDefaults)
             return (nil, true)
         }
         let list = await compileChunk(entries, identifier: identifier, store: store)
+        if list != nil { defaults.set(key, forKey: userKeyDefaults) }
         return (list, list != nil)
+    }
+
+    private static let userKeyDefaults = "NookUserCosmeticKey"
+
+    /// Hash of the zap lines and the converter stamp, so a converter change recompiles.
+    static func userKey(_ rules: [String]) -> String {
+        rules.isEmpty ? "" : computeRulesHash([converterStampFile.lastPathComponent] + rules)
+    }
+
+    /// True when nothing was ever compiled for the empty set, so there is nothing to remove.
+    static func userListIsAbsent(for rules: [String]) -> Bool {
+        rules.isEmpty && UserDefaults.standard.string(forKey: userKeyDefaults) == ""
     }
 
     /// Remove all previously compiled rule lists from the store.

@@ -20,6 +20,7 @@ enum TabSwitcher {
     /// a modifier release reaches no view, so nothing else can see it.
     private static var monitor: Any?
     private static var resignObserver: NSObjectProtocol?
+    private static var closeObserver: NSObjectProtocol?
     private static var presentWork: DispatchWorkItem?
     private static let maxTabs = 8
 
@@ -71,11 +72,18 @@ enum TabSwitcher {
         monitor = nil
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
         resignObserver = nil
+        if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+        closeObserver = nil
     }
 
     private static func install(window: BrowserWindowState, tabs: TabsController) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+        // A closing window takes the card with it (the key window is the one the keystroke came from).
+        closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: NSApp.keyWindow, queue: .main) { [weak window] _ in
+            MainActor.assumeIsolated { if let window { cancel(window) } }
+        }
         // Control let go in another app is never seen here, so losing focus closes the card.
         resignObserver = NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak window] _ in
             MainActor.assumeIsolated { if let window { cancel(window) } }

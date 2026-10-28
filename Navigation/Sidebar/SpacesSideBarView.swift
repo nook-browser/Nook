@@ -21,6 +21,7 @@ struct SpacesSideBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookBaseColorScheme) private var baseColorScheme
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.nookSettings) var nookSettings
     @Environment(CommandPalette.self) var commandPalette
@@ -422,7 +423,7 @@ struct SpacesSideBarView: View {
             .id(space.id)
             Spacer()
         }
-        .modifier(SpaceThemeScope(spaceID: space.id))
+        .modifier(SpaceThemeScope(spaceID: space.id, isIncognito: windowState.isIncognito, base: baseColorScheme))
         .environment(tabs)
     }
 
@@ -514,12 +515,35 @@ private struct ResizableSpaceFavorites: View {
     }
 }
 
-/// The paging host caches its content; observe theme edits inside each cached page.
+/// The color scheme the window had before the current space's theme forced one on its chrome.
+private struct BaseColorSchemeKey: EnvironmentKey { static let defaultValue: ColorScheme? = nil }
+
+extension EnvironmentValues {
+    var nookBaseColorScheme: ColorScheme? {
+        get { self[BaseColorSchemeKey.self] }
+        set { self[BaseColorSchemeKey.self] = newValue }
+    }
+}
+
+/// The paging host caches its content; observe theme edits inside each cached page. Each page
+/// takes its own space's forced scheme, so a neighbour mid-swipe is not drawn in the current one's.
 private struct SpaceThemeScope: ViewModifier {
     @Environment(TabsController.self) private var tabs
     let spaceID: UUID
+    let isIncognito: Bool
+    let base: ColorScheme?
 
     func body(content: Content) -> some View {
-        content.environment(\.nookUsesDefaultSpaceTheme, tabs.space(spaceID)?.theme == nil)
+        let space = tabs.space(spaceID)
+        let theme = isIncognito || space?.isAgent == true ? nil : space?.theme
+        content
+            .environment(\.nookUsesDefaultSpaceTheme, space?.theme == nil)
+            .transformEnvironment(\.colorScheme) { scheme in
+                switch theme?.mode {
+                case .light?: scheme = .light
+                case .dark?: scheme = .dark
+                case .auto?, nil: if let base { scheme = base }
+                }
+            }
     }
 }

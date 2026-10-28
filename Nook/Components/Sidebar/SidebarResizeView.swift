@@ -110,7 +110,6 @@ private struct SidebarResizeHandle: NSViewRepresentable {
         private var dragging = false
         private var startX: CGFloat = 0
         private var velocity = DragVelocity(startTime: 0)
-        private var mouseMonitor: Any?
         private var waitsForPointerMovement = false
         private var pendingAppearance: DispatchWorkItem?
         private let indicator = CALayer()
@@ -139,24 +138,6 @@ private struct SidebarResizeHandle: NSViewRepresentable {
         }
 
         override var mouseDownCanMoveWindow: Bool { false }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
-            mouseMonitor = nil
-            guard let window else { return }
-            // Receive movement outside the handle too. Tracking-area exit events can
-            // be lost when SwiftUI moves the handle during a drag.
-            window.acceptsMouseMovedEvents = true
-            mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
-                guard let self else { return event }
-                if !self.dragging {
-                    self.waitsForPointerMovement = false
-                    self.setHovered(self.containsPointer(event))
-                }
-                return event
-            }
-        }
 
         private func containsPointer(_ event: NSEvent) -> Bool {
             guard let window, event.window === window, window.isKeyWindow else { return false }
@@ -204,14 +185,13 @@ private struct SidebarResizeHandle: NSViewRepresentable {
 
         deinit {
             pendingAppearance?.cancel()
-            if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
         }
 
         override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeLeftRight) }
         override func updateTrackingAreas() {
             super.updateTrackingAreas()
             if let tracking { removeTrackingArea(tracking) }
-            let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .cursorUpdate, .activeInKeyWindow, .inVisibleRect, .enabledDuringMouseDrag], owner: self, userInfo: nil)
+            let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .cursorUpdate, .activeInKeyWindow, .inVisibleRect, .enabledDuringMouseDrag], owner: self, userInfo: nil)
             addTrackingArea(area)
             tracking = area
         }
@@ -223,6 +203,11 @@ private struct SidebarResizeHandle: NSViewRepresentable {
             setHovered(containsPointer(event))
         }
         override func mouseExited(with event: NSEvent) { setHovered(false) }
+        override func mouseMoved(with event: NSEvent) {
+            guard !dragging else { return }
+            waitsForPointerMovement = false
+            setHovered(containsPointer(event))
+        }
         override func mouseDown(with event: NSEvent) {
             if event.clickCount == 2 { callbacks?.onReset(); return }
             dragging = callbacks?.onStart() ?? false

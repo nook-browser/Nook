@@ -47,6 +47,7 @@ public final class ContentBlockerManager: NSObject {
     /// The person's own cosmetic filters, compiled apart from the big lists.
     private var userRuleList: WKContentRuleList?
     private var userRuleGeneration = 0
+    private var userRuleKey: String?
     private var activeRuleLists: [WKContentRuleList] { compiledRuleLists + (userRuleList.map { [$0] } ?? []) }
     private var updateTimer: Timer?
     /// How often to look for due lists; each list's own `! Expires:` decides whether it is fetched.
@@ -154,6 +155,12 @@ public final class ContentBlockerManager: NSObject {
     private func activateBlocking() async {
         let start = CFAbsoluteTimeGetCurrent()
         isCompiling = true
+
+        // The person's zaps load beside the big lists, so the first page already has them.
+        Task { [settings] in
+            await settings.waitForBoosts()
+            await setUserCosmeticRules(Boost.zapFilterLines(settings.boosts))
+        }
 
         // Bundled snapshots of every default list guarantee rules on first run; the
         // network refresh happens afterwards via scheduleAutoUpdate().
@@ -268,12 +275,18 @@ public final class ContentBlockerManager: NSObject {
     /// newer one changes nothing.
     @discardableResult
     public func setUserCosmeticRules(_ lines: [String]) async -> Bool {
+        // Empty to empty: nothing in the store, nothing to apply.
+        if userRuleList == nil, ContentRuleListCompiler.userListIsAbsent(for: lines) { return true }
+        let key = ContentRuleListCompiler.userKey(lines)
+        if key == userRuleKey { return true }
         userRuleGeneration += 1
         let generation = userRuleGeneration
         let result = await ContentRuleListCompiler.compileUser(rules: lines)
         guard generation == userRuleGeneration else { return true }
+        if result.ok { userRuleKey = key }
+        let changed = result.list !== userRuleList
         userRuleList = result.list
-        if isEnabled, host != nil {
+        if changed, isEnabled, host != nil {
             applyToSharedConfiguration()
             applyToExistingWebViews()
         }
