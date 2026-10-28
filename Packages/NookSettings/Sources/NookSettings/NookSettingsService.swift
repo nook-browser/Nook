@@ -45,6 +45,7 @@ public final class NookSettingsService {
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     private let favoritePreviewsKey = "settings.favoritePreviews"
+    private let themeTranslucencyKey = "settings.themeTranslucency"
     private let searchPageTextInHistoryKey = "settings.searchPageTextInHistory"
     private let hideWebContentBorderKey = "settings.hideWebContentBorder"
     private let siteSearchEntriesKey = "settings.siteSearchEntries"
@@ -378,6 +379,14 @@ public final class NookSettingsService {
         }
     }
 
+    /// Themed spaces let the desktop show through (Arc). Off by default: the blur costs
+    /// WindowServer about 6% of a core while anything moves behind the window.
+    public var themeTranslucency: Bool {
+        didSet {
+            userDefaults.set(themeTranslucency, forKey: themeTranslucencyKey)
+        }
+    }
+
     /// The card under a favorite the pointer rests on.
     public var favoritePreviews: Bool {
         didSet {
@@ -548,6 +557,7 @@ public final class NookSettingsService {
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
             favoritePreviewsKey: true,
+            themeTranslucencyKey: false,
             searchPageTextInHistoryKey: true,
             hideWebContentBorderKey: false,
             didFinishOnboardingKey: false,
@@ -659,6 +669,7 @@ public final class NookSettingsService {
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
         self.favoritePreviews = userDefaults.bool(forKey: favoritePreviewsKey)
+        self.themeTranslucency = userDefaults.bool(forKey: themeTranslucencyKey)
         self.searchPageTextInHistory = userDefaults.bool(forKey: searchPageTextInHistoryKey)
         self.hideWebContentBorder = userDefaults.bool(forKey: hideWebContentBorderKey)
         self.tabLayout = TabLayout(rawValue: userDefaults.string(forKey: tabLayoutKey) ?? TabLayout.sidebar.rawValue) ?? .sidebar

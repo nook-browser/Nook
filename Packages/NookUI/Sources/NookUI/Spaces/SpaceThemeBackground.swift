@@ -22,6 +22,7 @@ public struct SpaceChromeBackground: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.nookSettings) private var settings
 
     public init(theme: SpaceTheme?, accent: Color, isActive: Bool, blursBehind: Bool = true) {
         self.theme = theme
@@ -29,6 +30,8 @@ public struct SpaceChromeBackground: View {
         self.isActive = isActive
         self.blursBehind = blursBehind
     }
+
+    private var translucent: Bool { blursBehind && settings.themeTranslucency && !reduceTransparency }
 
     public var body: some View {
         if let theme {
@@ -39,10 +42,10 @@ public struct SpaceChromeBackground: View {
                 startPoint: twoTone ? .topLeading : .top,
                 endPoint: twoTone ? .bottomTrailing : .bottom)
                 // Intensity is how much of the desktop shows through, as in Arc.
-                .opacity(reduceTransparency || !blursBehind ? 1 : NookDesign.Surface.themeTintOpacity(intensity: theme.intensity))
+                .opacity(!translucent ? 1 : NookDesign.Surface.themeTintOpacity(intensity: theme.intensity))
                 .background {
                     #if os(macOS)
-                    if !reduceTransparency && blursBehind { BehindWindowBlur(isDark: resolved.isDark) }
+                    if translucent { BehindWindowBlur(isDark: resolved.isDark) }
                     #endif
                 }
                 .overlay {

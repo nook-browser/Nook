@@ -158,6 +158,7 @@ private struct PinnedTile: View {
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.nookSettings) private var settings
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
     private var tabs: TabsController { browserManager.tabs }
@@ -179,7 +180,7 @@ private struct PinnedTile: View {
         if let theme = space.theme {
             let resolved = theme.resolve(systemDark: colorScheme == .dark, dimmed: !isActive)
             guard let stop = resolved.stops.first else { return nil }
-            let opacity = reduceTransparency ? 1 : NookDesign.Surface.themeTintOpacity(intensity: theme.intensity)
+            let opacity = reduceTransparency || !settings.themeTranslucency ? 1 : NookDesign.Surface.themeTintOpacity(intensity: theme.intensity)
             let base = NSColor(srgbRed: stop.r, green: stop.g, blue: stop.b, alpha: 1)
             guard let chrome = blend(base, toward: 1 - opacity) else { return nil }
             return SpaceTheme.tileColors(chrome: chrome, dark: resolved.isDark)
