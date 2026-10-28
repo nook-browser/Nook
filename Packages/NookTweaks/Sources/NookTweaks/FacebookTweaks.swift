@@ -3,7 +3,7 @@
 //  FacebookTweaks.swift
 //  Nook
 //
-//  Created by Claude on 16/09/2026.
+//  Created by Bain Gurley on 16/09/2026.
 //
 
 import Foundation

@@ -3,7 +3,7 @@
 //  Tweaks.swift
 //  Nook
 //
-//  Created by Claude on 15/09/2026.
+//  Created by Bain Gurley on 15/09/2026.
 //
 
 import SwiftUI

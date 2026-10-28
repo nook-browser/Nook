@@ -3,7 +3,7 @@
 //  TabContextMenu.swift
 //  Nook
 //
-//  Created by Claude on 2026-09-14.
+//  Created by Bain Gurley on 2026-09-14.
 //
 
 import SwiftUI

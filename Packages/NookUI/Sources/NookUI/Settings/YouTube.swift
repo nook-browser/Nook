@@ -3,7 +3,7 @@
 //  YouTube.swift
 //  Nook
 //
-//  Created by Claude on 26/03/2026.
+//  Created by Bain Gurley on 26/03/2026.
 //
 
 import NookSettings

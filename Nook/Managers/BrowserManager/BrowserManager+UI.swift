@@ -3,7 +3,7 @@
 //  BrowserManager+UI.swift
 //  Nook
 //
-//  Created by Claude on 17/09/2026.
+//  Created by Bain Gurley on 17/09/2026.
 //
 //  The app side of NookUI's seam: the split view, the floating dialogs, the tab-closure
 //  toast, the window accent, and the two AppKit services the shared menus need.

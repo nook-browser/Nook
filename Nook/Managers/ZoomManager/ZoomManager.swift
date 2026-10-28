@@ -3,7 +3,7 @@
 //  ZoomManager.swift
 //  Nook
 //
-//  Created by Assistant on 13/10/2025.
+//  Created by Jonathan Caudill on 13/10/2025.
 //
 
 import Foundation

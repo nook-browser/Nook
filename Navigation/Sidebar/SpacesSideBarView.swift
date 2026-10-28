@@ -39,7 +39,14 @@ struct SpacesSideBarView: View {
         sidebarContent
             .contentShape(Rectangle())
             .onHoverTracking { state in
+                guard state != isSidebarHovered else { return }
                 isSidebarHovered = state
+                windowState.sidebarHoverCount += state ? 1 : -1
+            }
+            .onDisappear {
+                guard isSidebarHovered else { return }
+                isSidebarHovered = false
+                windowState.sidebarHoverCount -= 1
             }
             .contextMenu {
                 sidebarContextMenu

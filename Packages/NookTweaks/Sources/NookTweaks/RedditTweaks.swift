@@ -3,7 +3,7 @@
 //  RedditTweaks.swift
 //  Nook
 //
-//  Created by Claude on 22/10/2026.
+//  Created by Bain Gurley on 22/10/2026.
 //
 
 import Foundation

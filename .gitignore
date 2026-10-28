@@ -134,10 +134,15 @@ build-release/
 build-release-signed/
 
 # Everything under docs/ stays local: designs, specs, reviews, handoffs, working
-# notes. adblocker-architecture.md is the one committed doc, referenced by CLAUDE.md.
+# notes. adblocker-architecture.md is the one committed doc.
 docs/*
 !docs/adblocker-architecture.md
 tasks/
 .superpowers/
 .playwright-mcp/
 build-ios/
+
+# Local maintainer notes
+CLAUDE.md
+Nook/Managers/ExtensionManager/CLAUDE.md
+ASSESSMENT.md
