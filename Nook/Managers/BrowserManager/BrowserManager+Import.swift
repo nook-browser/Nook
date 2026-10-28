@@ -37,7 +37,7 @@ extension BrowserManager {
         var profileSpaces: [String: UUID] = [:]
         for space in result.spaces {
             guard let spaceID = tabs.createSpace(
-                name: space.title, icon: space.emoji ?? "person.fill",
+                name: space.title, icon: space.emoji ?? "",
                 accentHex: space.accentHex ?? "#7C7C7C", after: lastSpace,
                 sharingLoginsWith: profileSpaces[space.profile],
                 profileName: result.profileNames[space.profile]

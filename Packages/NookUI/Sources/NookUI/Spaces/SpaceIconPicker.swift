@@ -36,10 +36,10 @@ public struct SpaceIconPicker: View {
     @State private var emojiQuery = ""
     @FocusState private var searchFocused: Bool
     let onSelect: () -> Void
-    private let symbols = ["house", "briefcase", "book", "globe", "heart", "star", "leaf", "airplane", "gamecontroller", "music.note", "paintpalette", "curlybraces", "camera", "cup.and.saucer", "cart", "square.grid.2x2"]
+    private let symbols = ["house.fill", "briefcase", "book", "globe", "heart", "star", "leaf", "airplane", "gamecontroller", "music.note", "paintpalette", "curlybraces", "camera", "cup.and.saucer", "cart", "square.grid.3x3"]
     private let emojis = ["🏠", "💼", "📚", "🌍", "❤️", "⭐️", "🌿", "✈️", "🎮", "🎵", "🎨", "🚀", "🐈", "☕️", "🌈", "🧠"]
-    private let symbolNames = ["maison home", "travail bureau work office", "livre lecture reading", "monde internet world", "coeur amour love", "étoile favori favorite", "feuille nature plant", "avion voyage travel", "jeu jeux gaming", "musique audio", "peinture art couleurs", "code développement development", "photo appareil", "café coffee", "achats shopping", "grille applications apps"]
-    private let emojiNames = ["maison home house", "travail bureau work office briefcase", "livres lecture books reading", "monde terre earth world", "coeur amour heart love", "étoile star favori", "feuille plante leaf nature", "avion voyage airplane travel", "jeux games gaming", "musique music", "peinture art paint", "fusée rocket espace space", "chat cat", "café coffee", "arc-en-ciel rainbow", "cerveau brain"]
+    private let symbolNames = ["home", "work office", "reading books", "world internet", "love heart", "favorite", "nature plant", "travel", "gaming games", "music audio", "art colors paint", "code development", "photo", "coffee", "shopping", "apps grid"]
+    private let emojiNames = ["home house", "work office briefcase", "books reading", "earth world", "heart love", "star favorite", "leaf plant nature", "airplane travel", "games gaming", "music", "paint art", "rocket space", "cat", "coffee", "rainbow", "brain"]
 
     public init(icon: Binding<String>, onSelect: @escaping () -> Void = {}) {
         _icon = icon
@@ -53,10 +53,12 @@ public struct SpaceIconPicker: View {
         let values = category == .icons ? symbols : emojis
         let names = category == .icons ? symbolNames : emojiNames
         let words = query.wrappedValue.split(whereSeparator: \.isWhitespace).map(String.init)
-        return values.enumerated().compactMap { index, value in
+        let matches: [String] = values.enumerated().compactMap { index, value in
             let searchable = value + " " + names[index]
             return words.allSatisfy { searchable.localizedStandardContains($0) } ? value : nil
         }
+        // The dot is the first cell of both tabs.
+        return words.isEmpty ? [""] + matches : matches
     }
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -86,9 +88,6 @@ public struct SpaceIconPicker: View {
                 .buttonStyle(.plain)
                 #endif
             }
-            Divider()
-            Button("Use a dot") { choose("") }
-                .buttonStyle(.plain)
         }
         .padding(16)
         .frame(width: 320)
@@ -104,13 +103,16 @@ public struct SpaceIconPicker: View {
                 Button { choose(value) } label: {
                     SpaceIcon(value)
                         .frame(width: 28, height: 30)
-                        .background(icon == value ? Color.accentColor.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                        .background(isSelected(value) ? Color.accentColor.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 6))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(value)
+                .accessibilityLabel(value.isEmpty ? "Dot" : value)
             }
         }
+    }
+    private func isSelected(_ value: String) -> Bool {
+        value.isEmpty ? SpaceIcon.isDot(icon) : icon == value
     }
     private func choose(_ value: String) {
         icon = value

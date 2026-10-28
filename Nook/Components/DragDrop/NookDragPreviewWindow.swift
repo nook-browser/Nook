@@ -60,8 +60,8 @@ final class NookDragPreviewWindow: NSWindow {
         let rowWidth = sourceWasTile
             ? manager.sidebarScreenFrame.width - NookDesign.Spacing.sidebarInset * 2
             : manager.sourceRowFrame.width
-        let cardWidth = isTile ? NookDesign.Size.essentialsTile : max(NookDesign.Size.iconButton, rowWidth)
-        let cardHeight = isTile ? NookDesign.Size.essentialsTile : NookDesign.Tab.height
+        let cardWidth = isTile ? NookDesign.Size.favoriteTile : max(NookDesign.Size.iconButton, rowWidth)
+        let cardHeight = isTile ? NookDesign.Size.favoriteTile : NookDesign.Tab.height
         let grabFraction = manager.sourceRowFrame.width > 0 ? manager.grabOffset.x / manager.sourceRowFrame.width : 0.5
         // Follow both pointer axes, including inside the sidebar. Drop targets choose
         // the insertion slot; they must never pin the floating card to the sidebar edge.

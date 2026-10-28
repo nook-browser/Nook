@@ -47,6 +47,7 @@ public enum NookDesign {
         public static let xxxl: CGFloat = 24
 
         public static let sidebarInset: CGFloat = 8
+        public static let favoriteGap: CGFloat = 8     // between favorite tiles
         public static let rowGap: CGFloat = 2
         public static let sectionGap: CGFloat = 10
         public static let rowPadding: CGFloat = 8
@@ -78,6 +79,9 @@ public enum NookDesign {
         public static let row: CGFloat = 32
         #endif
         public static let iconButton: CGFloat = 28
+        public static let favoriteTile: CGFloat = 47   // a favorite tile, as in Arc: four fit the 228 pt sidebar
+        public static let favoriteBorder: CGFloat = 2  // the selected favorite's edge
+        public static let themeKnob: CGFloat = 56      // the theme editor's noise knob
         public static let favicon: CGFloat = 16
         public static let essentialsTile: CGFloat = 44
         public static let essentialsFavicon: CGFloat = 20
@@ -224,7 +228,7 @@ public enum NookDesign {
                 Color(hex: "#13261E"), Color(hex: "#0F1F19"), Color(hex: "#0A1612"),
             ])
         public static let grainOpacity: Double = 0.08         // film grain over a fixed backdrop
-        public static let themeGrainOpacity: Double = 0.7     // a space theme's grain at the dial's maximum
+        public static let themeGrainOpacity: Double = 0.4     // a space theme's noise at the knob's maximum
         /// A space theme's color over the blurred desktop: mostly see-through at the slider's
         /// left end, nearly solid at its right.
         public static func themeTintOpacity(intensity: Double) -> Double { 0.3 + 0.62 * intensity }

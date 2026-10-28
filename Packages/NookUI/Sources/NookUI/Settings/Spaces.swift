@@ -206,7 +206,7 @@ public struct SpacesSettingsView: View {
         actions?.presentSpaceCreation { name, accentHex in
             tabs.createSpace(
                 name: name.isEmpty ? "New Space" : name,
-                icon: "square.grid.2x2",
+                icon: "",
                 accentHex: accentHex,
                 after: tabs.orderedSpaces.last?.id,
                 sharingLoginsWith: tabs.windowRegistry.activeWindow?.spaceID ?? tabs.regularWindows.first?.spaceID

@@ -31,20 +31,98 @@ public struct SpaceTheme: Codable, Hashable, Sendable {
         }
 
         public var saturation: Double { min(1, hypot(x - 0.5, y - 0.5) / 0.5) }
+
+        /// The point whose accent is closest to `rgb`: its hue, and its chroma as saturation.
+        public init(rgb: ThemeRGB) {
+            let lch = rgb.oklch
+            self.init(hue: lch.h, saturation: lch.c / SpaceTheme.accentChroma)
+        }
     }
 
-    public static let maxPoints = 2
+    /// How the other colors sit around the key color on the wheel, as in Arc.
+    public enum Wheel: String, Codable, Sendable, CaseIterable { case analogous, complementary }
 
-    public var points: [Point]
+    /// The noise texture laid over the chrome.
+    public enum Overlay: String, Codable, Sendable, CaseIterable { case grain, sand, denim, tweed }
+
+    public static let maxPoints = 3
+
+    /// The key color first, then the colors derived from it by `wheel` (kept in step by
+    /// `didSet`, so moving the key moves the rest, as Arc's knobs do).
+    public var points: [Point] { didSet { if points != oldValue { sync() } } }
     public var mode: Mode
     public var intensity: Double
     public var grain: Double
+    public var wheel: Wheel { didSet { if wheel != oldValue { sync() } } }
+    public var overlay: Overlay
+    /// The key color's lightness, 0 black to 1 white, set by a grey preset (Arc's key color
+    /// carries lightness); nil follows the key's saturation.
+    public var tone: Double?
+    public var colorCount: Int {
+        didSet {
+            colorCount = min(Self.maxPoints, max(1, colorCount))
+            if colorCount != oldValue { sync() }
+        }
+    }
 
-    public init(points: [Point], mode: Mode = .auto, intensity: Double = 0.6, grain: Double = 0) {
-        self.points = Array((points.isEmpty ? [.center] : points).prefix(Self.maxPoints))
+    public init(
+        points: [Point], mode: Mode = .auto, intensity: Double = 0.6, grain: Double = 0,
+        wheel: Wheel = .analogous, overlay: Overlay = .grain, colorCount: Int? = nil, tone: Double? = nil
+    ) {
+        let key = points.first ?? .center
+        self.points = [key]
         self.mode = mode
         self.intensity = min(1, max(0, intensity))
         self.grain = min(1, max(0, grain))
+        self.wheel = wheel
+        self.overlay = overlay
+        self.tone = tone.map { min(1, max(0, $0)) }
+        self.colorCount = min(Self.maxPoints, max(1, colorCount ?? points.count))
+        sync()
+    }
+
+    // MARK: - Arc's color rules
+
+    /// Hues of `count` colors around `key`: N=2 +40 (analogous) or +180; N=3 +-40 or +150/+210;
+    /// beyond that evenly spaced.
+    public static func hues(key: Double, count: Int, wheel: Wheel) -> [Double] {
+        let offsets: [Double]
+        switch (count, wheel) {
+        case (...1, _): offsets = [0]
+        case (2, .analogous): offsets = [0, 40]
+        case (2, .complementary): offsets = [0, 180]
+        case (3, .analogous): offsets = [0, 40, -40]
+        case (3, .complementary): offsets = [0, 150, 210]
+        default: offsets = (0..<count).map { Double($0) * 360 / Double(count) }
+        }
+        return offsets.map { offset in
+            let h = (key + offset).truncatingRemainder(dividingBy: 360)
+            return h < 0 ? h + 360 : h
+        }
+    }
+
+    /// The lightness a forced appearance allows; unconstrained is 0.01...0.97.
+    public static func lightnessRange(forced mode: Mode) -> ClosedRange<Double> {
+        switch mode {
+        case .auto: return 0.01...0.97
+        case .light: return 0.575...0.97
+        case .dark: return 0.01...0.425
+        }
+    }
+
+    public static func clampLightness(_ l: Double, forced mode: Mode) -> Double {
+        let range = lightnessRange(forced: mode)
+        return min(range.upperBound, max(range.lowerBound, l))
+    }
+
+    /// Keeps `points` at the key plus `colorCount - 1` companions. A theme saved with free
+    /// second points (the first editor) keeps its key and takes derived companions.
+    private mutating func sync() {
+        let key = points.first ?? .center
+        let hues = Self.hues(key: key.hue, count: colorCount, wheel: wheel)
+        let derived = hues.dropFirst().map { Point(hue: $0, saturation: key.saturation) }
+        let next = [key] + derived
+        if next != points { points = next }
     }
 
     /// A theme matching an existing accent, so opening the editor changes nothing until the
@@ -63,7 +141,11 @@ public struct SpaceTheme: Codable, Hashable, Sendable {
             points: (try? c.decode([Point].self, forKey: .points)) ?? [.center],
             mode: (try? c.decode(Mode.self, forKey: .mode)) ?? .auto,
             intensity: (try? c.decode(Double.self, forKey: .intensity)) ?? 0.6,
-            grain: (try? c.decode(Double.self, forKey: .grain)) ?? 0)
+            grain: (try? c.decode(Double.self, forKey: .grain)) ?? 0,
+            wheel: (try? c.decode(Wheel.self, forKey: .wheel)) ?? .analogous,
+            overlay: (try? c.decode(Overlay.self, forKey: .overlay)) ?? .grain,
+            colorCount: try? c.decode(Int.self, forKey: .colorCount),
+            tone: try? c.decode(Double.self, forKey: .tone))
     }
 
     // MARK: - Resolving
@@ -77,6 +159,7 @@ public struct SpaceTheme: Codable, Hashable, Sendable {
         public var accent: ThemeRGB
         public var isDark: Bool
         public var grain: Double
+        public var overlay: Overlay
     }
 
     public func isDark(systemDark: Bool) -> Bool {
@@ -92,7 +175,7 @@ public struct SpaceTheme: Codable, Hashable, Sendable {
         let dark = isDark(systemDark: systemDark)
         // Some tint survives at zero intensity, as in Arc, so the slider never reads as off.
         let strength = (0.25 + 0.75 * intensity) * (dimmed ? 0.55 : 1)
-        var stops = points.map { Self.chromeColor($0, dark: dark, strength: strength) }
+        var stops = points.map { Self.chromeColor($0, dark: dark, strength: strength, tone: tone) }
         if stops.count == 1 {
             // One color still reads as a gradient: a touch lighter at the top.
             let lch = stops[0]
@@ -102,14 +185,47 @@ public struct SpaceTheme: Codable, Hashable, Sendable {
             stops: stops.map(\.rgb),
             accent: Self.accentColor(points[0]),
             isDark: dark,
-            grain: grain)
+            grain: grain,
+            overlay: overlay)
     }
 
-    static func chromeColor(_ p: Point, dark: Bool, strength: Double) -> OKLCH {
+    /// A favorite tile's colors over the chrome `chrome`. Light follows Arc, measured on a
+    /// #B1DAEA sidebar: tile #A7CEDD, selected #D0E6F1 with a #A6BFC8 edge. Dark is not measured:
+    /// the same steps toward white instead of black.
+    public struct TileColors: Hashable, Sendable {
+        public var fill: ThemeRGB
+        public var hoverFill: ThemeRGB
+        public var selectedFill: ThemeRGB
+        public var selectedBorder: ThemeRGB
+    }
+
+    public static func tileColors(chrome: ThemeRGB, dark: Bool) -> TileColors {
+        func mix(_ a: ThemeRGB, _ b: ThemeRGB, _ t: Double) -> ThemeRGB {
+            ThemeRGB(r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t)
+        }
+        let white = ThemeRGB(r: 1, g: 1, b: 1), black = ThemeRGB(r: 0, g: 0, b: 0)
+        if dark {
+            let selected = mix(chrome, white, 0.18)
+            return TileColors(
+                fill: mix(chrome, white, 0.07), hoverFill: mix(chrome, white, 0.12),
+                selectedFill: selected, selectedBorder: mix(selected, white, 0.14))
+        }
+        let selected = mix(chrome, white, 0.36)
+        return TileColors(
+            fill: mix(chrome, black, 0.054), hoverFill: mix(chrome, selected, 0.5),
+            selectedFill: selected, selectedBorder: mix(selected, black, 0.2))
+    }
+
+    static func chromeColor(_ p: Point, dark: Bool, strength: Double, tone: Double? = nil) -> OKLCH {
         let s = p.saturation * strength
-        return dark
-            ? OKLCH(l: 0.21 + 0.17 * s, c: 0.13 * s, h: p.hue)
-            : OKLCH(l: 0.955 - 0.11 * s, c: 0.11 * s, h: p.hue)
+        var l = dark ? 0.21 + 0.17 * s : 0.955 - 0.11 * s
+        if let tone {
+            // The tone's departure from the neutral chrome, scaled like a color's saturation.
+            let neutral = dark ? 0.21 : 0.955
+            let target = dark ? 0.12 + 0.30 * tone : 0.80 + 0.17 * tone
+            l = neutral + (target - neutral) * strength
+        }
+        return OKLCH(l: clampLightness(l, forced: dark ? .dark : .light), c: dark ? 0.13 * s : 0.11 * s, h: p.hue)
     }
 
     /// The fill of a puck on the canvas: the color at full strength, black or white at center.
@@ -140,6 +256,20 @@ public struct ThemeRGB: Hashable, Sendable {
 
     public init(r: Double, g: Double, b: Double) {
         self.r = r; self.g = g; self.b = b
+    }
+
+    /// A Display P3 color (Arc's presets are stored in it), converted to sRGB. Out-of-gamut
+    /// channels stay outside 0...1; `Point(rgb:)` only needs the hue and chroma.
+    public init(displayP3 r: Double, _ g: Double, _ b: Double) {
+        let lr = Self.linear(r), lg = Self.linear(g), lb = Self.linear(b)
+        self.init(
+            r: Self.encodedUnclamped(1.2249401 * lr - 0.2249404 * lg),
+            g: Self.encodedUnclamped(-0.0420569 * lr + 1.0420571 * lg),
+            b: Self.encodedUnclamped(-0.0196376 * lr - 0.0786361 * lg + 1.0982735 * lb))
+    }
+
+    private static func encodedUnclamped(_ c: Double) -> Double {
+        c < 0 ? -encoded(-c) : encoded(c)
     }
 
     public init?(hex: String) {

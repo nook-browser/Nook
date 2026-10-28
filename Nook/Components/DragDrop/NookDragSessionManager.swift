@@ -308,8 +308,8 @@ final class NookDragSessionManager: ObservableObject {
             return DropPosition(zone: zone, index: 0, placement: .before)
         case .grid(let count, let columns):
             let cols = max(1, columns)
-            let rowHeight = NookDesign.Size.essentialsTile + NookDesign.Spacing.xs
-            let colWidth = max(1, width / CGFloat(cols))
+            let rowHeight = NookDesign.Size.favoriteTile + NookDesign.Spacing.favoriteGap
+            let colWidth = max(1, (width + NookDesign.Spacing.favoriteGap) / CGFloat(cols))
             let col = min(max(0, Int((point.x / colWidth).rounded())), cols)
             let row = max(0, Int(point.y / rowHeight))
             return DropPosition(zone: zone, index: min(max(0, row * cols + col), count), placement: .before)
