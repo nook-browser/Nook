@@ -105,10 +105,9 @@ struct CommandPaletteView: View {
             Color.clear
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
-                .onTapGesture {
+                .backgroundDraggable(onClick: {
                     commandPalette.close()
-                }
-                .gesture(WindowDragGesture())
+                })
 
             VStack {
                 Spacer()

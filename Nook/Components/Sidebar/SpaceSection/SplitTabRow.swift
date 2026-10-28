@@ -14,6 +14,7 @@ struct SplitTabRow: View {
     let zoneID: DropZoneID
 
     @Environment(BrowserWindowState.self) private var windowState
+    @State private var isHovering = false
 
     /// The whole row is the selection while the window shows the pair.
     private var isActive: Bool {
@@ -29,10 +30,10 @@ struct SplitTabRow: View {
                 .padding(.vertical, NookDesign.Spacing.sm)
             SplitHalfTab(item: right, zoneID: zoneID)
         }
-        .frame(height: NookDesign.Size.row)
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-        .nookRowSelection(isActive)
-        .nookElevation(isActive ? .raised : .flat)
+        .frame(height: NookDesign.Tab.height)
+        .nookTabSurface(selected: isActive, hovered: isHovering)
+        .padding(.vertical, NookDesign.Tab.verticalInset)
+        .onHoverTracking { isHovering = $0 }
     }
 }
 

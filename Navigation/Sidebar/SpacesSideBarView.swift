@@ -21,6 +21,7 @@ struct SpacesSideBarView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookBaseColorScheme) private var baseColorScheme
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.nookSettings) var nookSettings
     @Environment(CommandPalette.self) var commandPalette
@@ -32,6 +33,7 @@ struct SpacesSideBarView: View {
     @State private var isDownloadsHovered = false
     @State private var showDownloadsMenu = false
     @State private var animateDownloadsMenu: Bool = false
+    @State private var showThemeEditor = false
 
     var body: some View {
         sidebarContent
@@ -42,15 +44,35 @@ struct SpacesSideBarView: View {
             .contextMenu {
                 sidebarContextMenu
             }
+            // Beside the sidebar, low down, so the panel covers the page rather than the tabs.
+            .popover(
+                isPresented: $showThemeEditor,
+                attachmentAnchor: .point(UnitPoint(x: nookSettings.sidebarPosition == .left ? 1 : 0, y: 0.7)),
+                arrowEdge: nookSettings.sidebarPosition == .left ? .trailing : .leading
+            ) {
+                if let space = themeableSpace {
+                    SpaceThemeEditor(space: space)
+                        .environment(tabs)
+                }
+            }
+    }
+
+    /// The window's space when it can take a theme: not a private window, not the Agent space.
+    private var themeableSpace: SpaceRecord? {
+        guard !windowState.isIncognito, let spaceID = windowState.spaceID,
+              let space = tabs.space(spaceID), !space.isAgent else { return nil }
+        return space
     }
 
     // MARK: - Main Content
 
     private var sidebarContent: some View {
         ZStack {
-            if windowState.isSidebarMenuVisible {
-                SidebarMenu()
-                    .transition(menuTransition)
+            // The library floats over the window (`LibraryOverlay`), so the sidebar keeps its content.
+            if windowState.spaceDraftTheme != nil {
+                SpaceCreationSidebar()
+                    .padding(.top, nookSettings.sidebarPosition == .left ? NookDesign.Spacing.sidebarTop : NookDesign.Spacing.sidebarInset)
+                    .transition(.opacity)
             } else {
                 mainSidebarContent
                     .transition(.opacity)
@@ -63,15 +85,16 @@ struct SpacesSideBarView: View {
     private var mainSidebarContent: some View {
         return VStack(spacing: NookDesign.Spacing.sectionGap) {
             // History buttons: share the traffic-light row on the left, their own row on the right.
-            if nookSettings.sidebarPosition != .left && !nookSettings.topBarAddressView {
+            if nookSettings.sidebarPosition != .left {
                 titleRow
                     .padding(.horizontal, NookDesign.Spacing.sidebarInset)
             }
 
-            // Header (window controls, nav buttons, URL bar)
-            SidebarHeader(isSidebarHovered: isSidebarHovered, onNewSpace: showSpaceCreationDialog)
+            // Header (URL bar and its anchored suggestions)
+            SidebarHeader(isSidebarHovered: isSidebarHovered)
                 .environmentObject(browserManager)
                 .environment(windowState)
+                .zIndex(10)
 
             // Spaces page view with draggable spacer
             ZStack {
@@ -138,7 +161,7 @@ struct SpacesSideBarView: View {
             if nookSettings.sidebarPosition == .left {
                 titleRow
                     .frame(height: NookDesign.Spacing.sidebarTop)
-                    .padding(.leading, NookDesign.Spacing.trafficLights)
+                    .padding(.leading, NookDesign.SidebarChrome.trafficLightsInset)
                     .padding(.trailing, NookDesign.Spacing.sidebarInset)
             }
         }
@@ -199,6 +222,23 @@ struct SpacesSideBarView: View {
             }
         }
         .pageViewStyle(.scroll)
+        // While the library is out the swipe is its own; the spaces under it stay put.
+        .pageSwipeEnabled(!windowState.isSidebarMenuVisible)
+        // Pulling past the first space draws the library out on its Spaces page, as in Arc.
+        .onPageOverscrollLeading { pull in
+            guard !windowState.isIncognito else { return }
+            switch pull {
+            case .changed(let distance):
+                if windowState.libraryDrag == nil, distance > 0 { windowState.sidebarMenuSelectedTab = .spaces }
+                // Nil, not zero, once the pull is back home: a held zero would pin the library shut.
+                windowState.libraryDrag = distance > 0 ? distance : nil
+            case .ended(let distance, let velocity):
+                LibraryMotion.release(windowState, distance: distance, velocity: velocity, width: LibraryMotion.width(
+                    for: .spaces,
+                    windowWidth: windowState.window?.contentView?.bounds.width ?? .greatestFiniteMagnitude
+                ))
+            }
+        }
         // The space dots follow the swipe, as Arc's do.
         .onPageSwipe { position in
             guard let position, let from = position.from.base as? UUID, let to = position.to.base as? UUID else {
@@ -290,6 +330,16 @@ struct SpacesSideBarView: View {
                 }
             }
 
+            if themeableSpace != nil {
+                Divider()
+
+                Button {
+                    showThemeEditor = true
+                } label: {
+                    Label("Edit Theme Color…", systemImage: "paintpalette")
+                }
+            }
+
             Divider()
 
             Menu {
@@ -310,15 +360,7 @@ struct SpacesSideBarView: View {
     // MARK: - Helper Functions
 
     private func handleMenuTap() {
-        withAnimation(NookDesign.Motion.standard) {
-            windowState.isSidebarMenuVisible = true
-            windowState.isSidebarAIChatVisible = false
-            let previousWidth = windowState.sidebarWidth
-            windowState.savedSidebarWidth = previousWidth
-            let newWidth: CGFloat = 400
-            windowState.sidebarWidth = newWidth
-            windowState.sidebarContentWidth = max(newWidth - 16, 0)
-        }
+        LibraryMotion.present(windowState)
     }
 
     private func handleMenuHover(_ isHovered: Bool) {
@@ -345,10 +387,7 @@ struct SpacesSideBarView: View {
     private func makeSpaceView(for space: SpaceRecord) -> some View {
         VStack(spacing: 0) {
             if !windowState.isIncognito {
-                PinnedGrid(
-                    width: windowState.sidebarContentWidth,
-                    spaceID: space.id
-                )
+                ResizableSpaceFavorites(spaceID: space.id)
                 .environmentObject(browserManager)
                 .environment(tabs)
                 .environment(windowState)
@@ -357,6 +396,13 @@ struct SpacesSideBarView: View {
                 .padding(.horizontal, NookDesign.Spacing.sidebarInset)
                 .padding(.bottom, NookDesign.Spacing.sectionGap)
             }
+
+            // Between favorites and pinned tabs, as in Arc.
+            SpaceSwitcherTitle(spaceID: space.id, onNewSpace: showSpaceCreationDialog)
+                .environment(tabs)
+                .environment(windowState)
+                .padding(.horizontal, NookDesign.Spacing.sidebarInset)
+                .padding(.bottom, NookDesign.Spacing.sectionGap)
 
             SpaceView(
                 spaceID: space.id,
@@ -374,16 +420,31 @@ struct SpacesSideBarView: View {
             .environment(\.nookSettings, nookSettings)
             .environmentObject(browserManager.gradientColorManager)
             .environmentObject(browserManager.splitManager)
-            .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
+            .id(space.id)
             Spacer()
+        }
+        .modifier(SpaceThemeScope(spaceID: space.id, isIncognito: windowState.isIncognito, base: baseColorScheme))
+        .environment(tabs)
+    }
+
+    /// The sidebar toggle beside the traffic lights, then back, forward and reload at the
+    /// trailing edge unless the URL bar mode has them.
+    private var titleRow: some View {
+        // The history buttons drop out of a sidebar dragged too narrow for them.
+        ViewThatFits(in: .horizontal) {
+            titleRow(showsHistory: true)
+            titleRow(showsHistory: false)
         }
     }
 
-    /// Back, forward and reload at the trailing edge, unless the URL bar mode has them.
-    private var titleRow: some View {
-        HStack(spacing: 0) {
+    private func titleRow(showsHistory: Bool) -> some View {
+        HStack(spacing: NookDesign.SidebarChrome.gap) {
+            Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
+                browserManager.toggleSidebar(for: windowState)
+            }
+            .nookSidebarIconButtons()
             Spacer(minLength: 0)
-            if !nookSettings.topBarAddressView {
+            if showsHistory, !nookSettings.topBarAddressView {
                 SidebarHistoryButtons()
                     .environmentObject(browserManager)
                     .environment(windowState)
@@ -393,26 +454,12 @@ struct SpacesSideBarView: View {
 
     // MARK: - Dialogs
 
+    /// Opens Create a Space in the sidebar, with a random preset previewing in the window.
     private func showSpaceCreationDialog() {
-        browserManager.dialogManager.showDialog(
-            SpaceCreationDialog(
-                onCreate: { name, accentHex in
-                    if let spaceID = tabs.createSpace(
-                        name: name.isEmpty ? "New Space" : name,
-                        icon: "square.grid.2x2",
-                        accentHex: accentHex,
-                        after: tabs.orderedSpaces.last?.id,
-                        sharingLoginsWith: windowState.spaceID
-                    ) {
-                        tabs.setSpace(spaceID, in: windowState)
-                    }
-                    browserManager.dialogManager.closeDialog()
-                },
-                onCancel: {
-                    browserManager.dialogManager.closeDialog()
-                }
-            )
-        )
+        withAnimation(NookDesign.Motion.standard) {
+            windowState.isSidebarMenuVisible = false
+            windowState.spaceDraftTheme = .randomPreset()
+        }
     }
 
 
@@ -455,5 +502,48 @@ private struct AgentSpaceRow: View {
         .onHoverTracking { hovering in
             withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
         }
+    }
+}
+
+/// Observe width inside the cached page rather than rebuilding the paging controller.
+private struct ResizableSpaceFavorites: View {
+    @Environment(BrowserWindowState.self) private var windowState
+    let spaceID: UUID
+
+    var body: some View {
+        PinnedGrid(width: windowState.sidebarContentWidth, spaceID: spaceID)
+    }
+}
+
+/// The color scheme the window had before the current space's theme forced one on its chrome.
+private struct BaseColorSchemeKey: EnvironmentKey { static let defaultValue: ColorScheme? = nil }
+
+extension EnvironmentValues {
+    var nookBaseColorScheme: ColorScheme? {
+        get { self[BaseColorSchemeKey.self] }
+        set { self[BaseColorSchemeKey.self] = newValue }
+    }
+}
+
+/// The paging host caches its content; observe theme edits inside each cached page. Each page
+/// takes its own space's forced scheme, so a neighbour mid-swipe is not drawn in the current one's.
+private struct SpaceThemeScope: ViewModifier {
+    @Environment(TabsController.self) private var tabs
+    let spaceID: UUID
+    let isIncognito: Bool
+    let base: ColorScheme?
+
+    func body(content: Content) -> some View {
+        let space = tabs.space(spaceID)
+        let theme = isIncognito || space?.isAgent == true ? nil : space?.theme
+        content
+            .environment(\.nookUsesDefaultSpaceTheme, space?.theme == nil)
+            .transformEnvironment(\.colorScheme) { scheme in
+                switch theme?.mode {
+                case .light?: scheme = .light
+                case .dark?: scheme = .dark
+                case .auto?, nil: if let base { scheme = base }
+                }
+            }
     }
 }

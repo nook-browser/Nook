@@ -12,7 +12,9 @@ import WebKit
 @Observable
 @MainActor
 class ZoomManager {
-    private static let presets: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+    // Match the familiar browser zoom ladder. In particular, the first step down
+    // from the default 100% is 90%, not 75%.
+    private static let presets: [Double] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]
 
     private var tabZoomLevels: [UUID: Double] = [:]
 

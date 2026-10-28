@@ -218,6 +218,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         let start = CFAbsoluteTimeGetCurrent()
         if let manager = browserManager {
             manager.tabs.flushSync()
+            manager.nookSettings?.flushBoosts()
             do {
                 try manager.modelContext.save()
             } catch {

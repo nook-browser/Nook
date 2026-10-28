@@ -45,6 +45,7 @@ public final class NookSettingsService {
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     private let favoritePreviewsKey = "settings.favoritePreviews"
+    private let themeTranslucencyKey = "settings.themeTranslucency"
     private let searchPageTextInHistoryKey = "settings.searchPageTextInHistory"
     private let hideWebContentBorderKey = "settings.hideWebContentBorder"
     private let siteSearchEntriesKey = "settings.siteSearchEntries"
@@ -53,12 +54,16 @@ public final class NookSettingsService {
     private let customSearchEnginesKey = "settings.customSearchEngines"
     private let appearanceModeKey = "settings.appearanceMode"
     private let pinnedExtensionIDsKey = "settings.pinnedExtensionIDs"
+    private let developerSitesKey = "settings.developerSites"
     private let tabOrganizerEnabledKey = "settings.tabOrganizerEnabled"
     private let autoRenamePinnedTabsKey = "settings.autoRenamePinnedTabs"
+    private let tidyDownloadsKey = "settings.tidyDownloads"
+    private let linkPreviewsKey = "settings.linkPreviews"
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
     private let siteRoutingRulesKey = "settings.siteRoutingRules"
+    private let boostsKey = "settings.boosts"
     private let sitePermissionsKey = "settings.sitePermissions"
     private let youTubeHideShortsKey = "settings.youTubeHideShorts"
     private let youTubeHiddenHomeSectionsKey = "settings.youTubeHiddenHomeSections"
@@ -112,6 +117,33 @@ public final class NookSettingsService {
         } else {
             sitePermissions[key] = record
         }
+    }
+
+    /// Empty until `waitForBoosts()` returns on a launch: the file loads off the main thread.
+    public var boosts: [Boost] = [] {
+        didSet {
+            if boostsLoaded { boostStore.save(boosts) }
+        }
+    }
+    @ObservationIgnored private let boostStore = BoostStore()
+    @ObservationIgnored private var boostsLoad: Task<Void, Never>?
+    public private(set) var boostsLoaded = false
+
+    /// Waits for queued Boost writes; called at quit.
+    public func flushBoosts() { boostStore.flush() }
+
+    /// Starts the Boosts load on first use and returns once they are in `boosts`.
+    public func waitForBoosts() async {
+        if boostsLoad == nil {
+            // The old defaults blob migrates into the file once and is left where it was.
+            let legacy = userDefaults.data(forKey: boostsKey)
+            boostsLoad = Task {
+                let loaded = await boostStore.load(legacy: legacy)
+                boosts = loaded
+                boostsLoaded = true
+            }
+        }
+        await boostsLoad?.value
     }
 
     public var siteRoutingRules: [SiteRoutingRule] = [] {
@@ -174,6 +206,29 @@ public final class NookSettingsService {
             if let data = try? JSONEncoder().encode(adBlockerWhitelist) {
                 userDefaults.set(data, forKey: adBlockerWhitelistKey)
             }
+        }
+    }
+
+    /// Hosts with Arc-style Developer Mode on: the page gets the developer bar and its tab a
+    /// dashed outline. Per host: it never turns the global Developer Mode (and its capture scripts) on.
+    public var developerSites: [String] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(developerSites) {
+                userDefaults.set(data, forKey: developerSitesKey)
+            }
+        }
+    }
+
+    public func isDeveloperSite(_ host: String?) -> Bool {
+        guard let host, !host.isEmpty else { return false }
+        return developerSites.contains(host.lowercased())
+    }
+
+    public func setDeveloperSite(_ host: String, on: Bool) {
+        let host = host.lowercased()
+        developerSites.removeAll { $0 == host }
+        if on {
+            developerSites.append(host)
         }
     }
 
@@ -324,6 +379,14 @@ public final class NookSettingsService {
         }
     }
 
+    /// Themed spaces let the desktop show through (Arc). Off by default: the blur costs
+    /// WindowServer about 6% of a core while anything moves behind the window.
+    public var themeTranslucency: Bool {
+        didSet {
+            userDefaults.set(themeTranslucency, forKey: themeTranslucencyKey)
+        }
+    }
+
     /// The card under a favorite the pointer rests on.
     public var favoritePreviews: Bool {
         didSet {
@@ -372,6 +435,25 @@ public final class NookSettingsService {
     public var autoRenamePinnedTabs: Bool {
         didSet {
             userDefaults.set(autoRenamePinnedTabs, forKey: autoRenamePinnedTabsKey)
+        }
+    }
+
+    /// Renames downloads with meaningless names (ids, hashes) on the on-device model.
+    public var tidyDownloads: Bool {
+        didSet {
+            userDefaults.set(tidyDownloads, forKey: tidyDownloadsKey)
+        }
+    }
+
+    public static let linkPreviewsDidChange = Notification.Name("NookLinkPreviewsDidChange")
+
+    /// Shift-hover over a link shows an on-device summary of the page it opens.
+    public var linkPreviews: Bool {
+        didSet {
+            userDefaults.set(linkPreviews, forKey: linkPreviewsKey)
+            if linkPreviews != oldValue {
+                NotificationCenter.default.post(name: Self.linkPreviewsDidChange, object: nil, userInfo: ["enabled": linkPreviews])
+            }
         }
     }
 
@@ -475,6 +557,7 @@ public final class NookSettingsService {
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
             favoritePreviewsKey: true,
+            themeTranslucencyKey: false,
             searchPageTextInHistoryKey: true,
             hideWebContentBorderKey: false,
             didFinishOnboardingKey: false,
@@ -482,6 +565,8 @@ public final class NookSettingsService {
             appearanceModeKey: AppearanceMode.system.rawValue,
             tabOrganizerEnabledKey: false,
             autoRenamePinnedTabsKey: true,
+            tidyDownloadsKey: false,
+            linkPreviewsKey: false,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
         ])
@@ -542,6 +627,10 @@ public final class NookSettingsService {
         } else {
             self.adBlockerWhitelist = []
         }
+        if let sitesData = userDefaults.data(forKey: developerSitesKey),
+           let sites = try? JSONDecoder().decode([String].self, from: sitesData) {
+            self.developerSites = sites
+        }
         if let pinnedData = userDefaults.data(forKey: pinnedExtensionIDsKey),
            let pinnedIDs = try? JSONDecoder().decode([String].self, from: pinnedData) {
             self.pinnedExtensionIDs = pinnedIDs
@@ -580,6 +669,7 @@ public final class NookSettingsService {
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
         self.favoritePreviews = userDefaults.bool(forKey: favoritePreviewsKey)
+        self.themeTranslucency = userDefaults.bool(forKey: themeTranslucencyKey)
         self.searchPageTextInHistory = userDefaults.bool(forKey: searchPageTextInHistoryKey)
         self.hideWebContentBorder = userDefaults.bool(forKey: hideWebContentBorderKey)
         self.tabLayout = TabLayout(rawValue: userDefaults.string(forKey: tabLayoutKey) ?? TabLayout.sidebar.rawValue) ?? .sidebar
@@ -587,6 +677,8 @@ public final class NookSettingsService {
         self.didFinishOnboarding = userDefaults.bool(forKey: didFinishOnboardingKey)
         self.tabOrganizerEnabled = userDefaults.bool(forKey: tabOrganizerEnabledKey)
         self.autoRenamePinnedTabs = userDefaults.bool(forKey: autoRenamePinnedTabsKey)
+        self.tidyDownloads = userDefaults.bool(forKey: tidyDownloadsKey)
+        self.linkPreviews = userDefaults.bool(forKey: linkPreviewsKey)
         self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
         self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)
         if let sbData = userDefaults.data(forKey: sponsorBlockCategoryOptionsKey),

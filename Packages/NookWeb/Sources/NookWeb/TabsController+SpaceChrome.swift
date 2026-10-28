@@ -43,6 +43,14 @@ extension TabsController {
         return item.url?.host ?? "New Tab"
     }
 
+    /// The row's title with the site's own suffix, counters and the like trimmed, or a search
+    /// page's query (`TidyTitles`). Display only; a tab the person named keeps its name.
+    public func tidyTitle(for item: Item) -> TidyTitles.Result {
+        let title = self.title(for: item)
+        guard item.customTitle?.isEmpty ?? true else { return TidyTitles.Result(title: title, siteName: nil, showsSite: false) }
+        return TidyTitles.result(title: title, url: currentURL(for: item))
+    }
+
     /// Current page URL: the live page, else the saved URL.
     public func currentURL(for item: Item) -> URL? {
         session(for: item.id)?.url ?? item.url

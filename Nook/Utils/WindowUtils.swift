@@ -10,8 +10,8 @@ import Foundation
 import SwiftUI
 
 extension View {
-    public func backgroundDraggable() -> some View {
-        modifier(BackgroundDraggableModifier(gesture: WindowDragGesture()))
+    public func backgroundDraggable(onClick: (() -> Void)? = nil) -> some View {
+        overlay(WindowFrameInteractionSurface(onClick: onClick))
     }
 
     public func backgroundDraggable<G: Gesture>(gesture: G) -> some View {
@@ -35,51 +35,26 @@ private struct BackgroundDraggableModifier<G: Gesture>: ViewModifier {
 }
 
 private struct ConditionalWindowDragModifier: ViewModifier {
-    @StateObject private var dragLockManager = DragLockManager.shared
-
     func body(content: Content) -> some View {
-        content
-            .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                    .onChanged { value in
-                        // Only allow window dragging if no active drag of any type
-                        if dragLockManager.canStartAnyDrag() {
-                            let sessionID = UUID().uuidString
-                            if dragLockManager.startDrag(ownerID: sessionID) {
-                                if let window = NSApp.keyWindow {
-                                    window.performDrag(with: NSApp.currentEvent!)
-                                }
-                            }
-                        }
-                    }
-                    .onEnded { value in
-                        dragLockManager.forceReleaseAll()
-                    }
-            )
+        content.overlay(WindowFrameInteractionSurface())
     }
 }
 
-struct WindowDragGesture: Gesture {
-    var body: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .global)
-            .onChanged { value in
-                // Check global drag lock directly from shared instance
-                let dragLockManager = DragLockManager.shared
+private struct WindowFrameInteractionSurface: NSViewRepresentable {
+    var onClick: (() -> Void)? = nil
 
-                if dragLockManager.canStartAnyDrag() {
-                    // Generate a session ID for this specific drag attempt
-                    let sessionID = UUID().uuidString
+    func makeNSView(context: Context) -> WindowFrameInteractionView {
+        let view = WindowFrameInteractionView()
+        view.beginDrag = {
+            let owner = UUID().uuidString
+            return DragLockManager.shared.startDrag(ownerID: owner) ? owner : nil
+        }
+        view.endDrag = { DragLockManager.shared.endDrag(ownerID: $0) }
+        view.clickAction = onClick
+        return view
+    }
 
-                    if dragLockManager.startDrag(ownerID: sessionID) {
-                        if let window = NSApp.keyWindow {
-                            window.performDrag(with: NSApp.currentEvent!)
-                        }
-                    }
-                }
-            }
-            .onEnded { value in
-                // We can't reliably track session ID in a struct, so force release all locks
-                DragLockManager.shared.forceReleaseAll()
-            }
+    func updateNSView(_ nsView: WindowFrameInteractionView, context: Context) {
+        nsView.clickAction = onClick
     }
 }

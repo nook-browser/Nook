@@ -214,6 +214,10 @@ extension TabsController {
         window.recentItemsBySpace[spaceID] = recent.suffix(Self.recentLimit)
 
         if let session = ensureSession(for: itemID) {
+            if let previous, previous !== session {
+                previous.captureSwitcherSnapshot()
+                dropStaleSwitcherSnapshots()
+            }
             session.loadWebViewIfNeeded()
             session.checkMediaState()
             if session !== previous, !session.isPrivate {
@@ -222,6 +226,21 @@ extension TabsController {
         }
         mirror(window)
         window.refreshCompositor()
+    }
+
+    /// Keeps switcher pictures only for each window's 8 most recent tabs (what the card can show).
+    private func dropStaleSwitcherSnapshots() {
+        let keep = Set(allWindows.flatMap { recentItems(in: $0).prefix(8) })
+        for session in sessions where session.switcherSnapshot != nil && !keep.contains(session.itemID) {
+            session.switcherSnapshot = nil
+        }
+    }
+
+    /// This window's tabs in the space it shows, most recently chosen first, still open ones only.
+    public func recentItems(in window: BrowserWindowState) -> [UUID] {
+        guard let spaceID = window.spaceID else { return [] }
+        let source = tree(owner(of: window))
+        return (window.recentItemsBySpace[spaceID] ?? []).reversed().filter { source.item($0) != nil }
     }
 
     public func selectNext(in window: BrowserWindowState) {
@@ -629,6 +648,12 @@ extension TabsController {
     public func updateSpace(_ spaceID: UUID, name: String?, icon: String?, accentHex: String?) {
         guard let owner = owner(ofSpace: spaceID), spaceID != agentSpaceID else { return }
         perform(owner, "updateSpace") { try $0.updateSpace(spaceID, name: name, icon: icon, accentHex: accentHex) }
+    }
+
+    /// Not undoable: the editor writes on every drag step, and each would be an undo entry.
+    public func setTheme(_ theme: SpaceTheme, forSpace spaceID: UUID) {
+        guard let owner = owner(ofSpace: spaceID), spaceID != agentSpaceID else { return }
+        perform(owner, "setTheme", undoable: false) { try $0.setTheme(spaceID, theme: theme) }
     }
 
     func moveSpace(_ spaceID: UUID, after: UUID?) {

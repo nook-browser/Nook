@@ -444,6 +444,11 @@ struct NookCommands: Commands {
                 }
                 .modifier(dynamicShortcut(.customizeSpaceGradient))
                 .disabled(windowRegistry.activeWindow?.spaceID == nil)
+
+                Button("Boost This Site...") {
+                    browserManager.boostCurrentSite()
+                }
+                .disabled(browserManager.tabs.activeWindowSession == nil)
             }
         }
     }

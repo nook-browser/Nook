@@ -10,6 +10,7 @@
 import AppKit
 import SwiftUI
 import NookDesign
+import NookTabsCore
 import NookWeb
 import NookUI
 
@@ -20,6 +21,7 @@ struct WindowView: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
     @Environment(WindowRegistry.self) private var windowRegistry
+    @Environment(\.colorScheme) private var systemColorScheme
     @Environment(AIService.self) private var aiService
     @Environment(TabOrganizerManager.self) private var tabOrganizerManager
     @Environment(\.nookSettings) var nookSettings
@@ -38,7 +40,15 @@ struct WindowView: View {
                     .disabled(windowState.spaceID.flatMap { tabs.space($0) } == nil)
                 }
 
-            SidebarWebViewStack()
+            // The library sits on the window background; the browser slides off it, as in Arc.
+            // In its own view, so a swipe re-renders the push and not this whole window.
+            // The window buttons sit in the sidebar's header, so they come and go with it, and
+            // with the library while it is out (the container knows how far that is).
+            LibraryPushContainer(lightsVisible: windowState.isSidebarVisible || hoverSidebarManager.isOverlayVisible) {
+                SidebarWebViewStack()
+            }
+            .environmentObject(browserManager)
+            .environment(windowState)
 
             // Hover-reveal Sidebar overlay (slides in over web content)
             SidebarHoverOverlayView()
@@ -56,8 +66,7 @@ struct WindowView: View {
                 .zIndex(10000)
 
         }
-        // The window buttons sit in the sidebar's header, so they come and go with it.
-        .background(TrafficLights(visible: windowState.isSidebarVisible || hoverSidebarManager.isOverlayVisible))
+
         .overlayPreferenceValue(DownloadsButtonAnchorKey.self) { anchor in
             DownloadFlightOverlay(target: anchor)
                 .zIndex(8000)
@@ -67,6 +76,24 @@ struct WindowView: View {
             ExtensionLibraryOverlay(anchor: anchor)
                 .zIndex(9000)
         }
+        .overlay { BoostOverlay().zIndex(9500) }
+        // Control-Tab's card of recent tabs.
+        .overlay {
+            TabSwitcherOverlay()
+                .environment(windowState)
+                .environment(tabs)
+                .animation(NookDesign.Motion.quick, value: windowState.tabSwitcher == nil)
+                .zIndex(9700)
+        }
+        // A download opened in place, in the window that is in front.
+        .overlay {
+            if let download = browserManager.downloadManager.previewing,
+               windowRegistry.activeWindowId == windowState.id {
+                DownloadPreviewOverlay(downloads: browserManager.downloadManager, download: download)
+                    .zIndex(9600)
+            }
+        }
+
         .overlayPreferenceValue(FavoritePreviewAnchorKey.self) { anchor in
             FavoritePreviewOverlay(anchor: anchor)
                 .zIndex(7000)
@@ -77,6 +104,13 @@ struct WindowView: View {
                 // Tab closure toast
                 if browserManager.showTabClosureToast && browserManager.tabClosureToastCount > 0 {
                     TabClosureToast()
+                }
+
+                // Tidy Downloads rename, in the window it started from
+                if let tidied = browserManager.downloadManager.lastTidied,
+                   windowRegistry.activeWindowId == windowState.id {
+                    TidyDownloadToast(download: tidied, downloads: browserManager.downloadManager)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
                 }
 
                 // Copy URL toast
@@ -101,6 +135,7 @@ struct WindowView: View {
             // Animate toast insertions/removals
             .animation(.smooth(duration: 0.25), value: browserManager.showTabClosureToast)
             .animation(.smooth(duration: 0.25), value: windowState.isShowingCopyURLToast)
+            .animation(.smooth(duration: 0.25), value: browserManager.downloadManager.lastTidied?.id)
             .animation(.smooth(duration: 0.25), value: windowState.isShowingShortcutConflictToast)
         }
         // Zoom control popup - separate from system toasts
@@ -172,12 +207,21 @@ struct WindowView: View {
         .environmentObject(browserManager.splitManager)
         .environmentObject(hoverSidebarManager)
         .preferredColorScheme(resolvedColorScheme)
+        .environment(\.nookUsesDefaultSpaceTheme, spaceTheme == nil)
     }
 
     /// Accent of the space this window shows; nil for private windows, which keep their own look.
     private var spaceAccentHex: String? {
         guard !windowState.isIncognito, let spaceID = windowState.spaceID else { return nil }
         return tabs.space(spaceID)?.accentHex
+    }
+
+    /// The space's Edit Theme Color theme. Private windows and the Agent space never take one.
+    private var spaceTheme: SpaceTheme? {
+        guard !windowState.isIncognito else { return nil }
+        if let draft = windowState.spaceDraftTheme { return draft }
+        guard !showsAgentSpace, let spaceID = windowState.spaceID else { return nil }
+        return tabs.space(spaceID)?.theme
     }
 
     private func applyAccent(_ hex: String?) {
@@ -207,11 +251,14 @@ struct WindowView: View {
             : spaceAccentHex.map { SpaceGradient.accent(hex: $0).primaryColor } ?? SpaceGradient.default.primaryColor
         let isActive = windowRegistry.activeWindowId == windowState.id
 
-        NookDesign.Surface.containerGradient(accent: accent, isActive: isActive)
+        SpaceChromeBackground(theme: spaceTheme, accent: accent, isActive: isActive)
+            .spaceThemeAppearance(spaceTheme)
+            .animation(NookDesign.Motion.standard, value: windowState.spaceID)
+            .animation(NookDesign.Motion.standard, value: windowState.spaceDraftTheme == nil)
             // Private windows tint all chrome so they are never mistaken for a regular window.
             .overlay(windowState.isIncognito ? NookDesign.Surface.privateTint : Color.clear)
             // So is the Agent space, with its fixed gradient.
-            .overlay(Rectangle().fill(NookDesign.Surface.agentGradient).opacity(showsAgentSpace ? NookDesign.Surface.agentChromeOpacity : 0))
+            .overlay(Rectangle().fill(NookDesign.Surface.agentGradient).opacity(showsAgentSpace && windowState.spaceDraftTheme == nil ? NookDesign.Surface.agentChromeOpacity : 0))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .backgroundDraggable()
             .environment(windowState)
@@ -230,6 +277,7 @@ struct WindowView: View {
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
                 SpacesSidebar()
+                    .zIndex(10)
                 WebContent()
                 if aiVisible {
                     AISidebar()
@@ -240,26 +288,34 @@ struct WindowView: View {
                 }
                 WebContent()
                 SpacesSidebar()
+                    .zIndex(10)
             }
         }
         // Apply padding similar to regular sidebar: remove padding when sidebar/AI is visible on that side
         // When sidebar is on left, AI appears on right (trailing); when sidebar is on right, AI appears on left (leading)
-        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : 8)
-        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : 8)
+        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : NookDesign.Chrome.pageInset)
+        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : NookDesign.Chrome.pageInset)
     }
 
     @ViewBuilder
     private func SpacesSidebar() -> some View {
         if windowState.isSidebarVisible {
             SpacesSideBarView()
+                .environment(\.nookBaseColorScheme, systemColorScheme)
+                .spaceThemeAppearance(spaceTheme)
+                // Becomes its column in the library as the library comes out, as in Arc.
+                .modifier(LibraryFade())
+                .scrollIndicators(windowState.isSidebarResizeHovered ? .hidden : .automatic)
                 .frame(width: windowState.sidebarWidth)
                 .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
-                    SidebarResizeView()
-                        .frame(maxHeight: .infinity)
-                        .environmentObject(browserManager)
-                        .environment(windowState)
-                        .zIndex(2000)
-                        .environment(windowState)
+                    // The expanded address panel extends across this edge. Suspend the
+                    // native resize target so it cannot paint or steal clicks over the panel.
+                    if !windowState.isAddressEditing {
+                        SidebarResizeView()
+                            .frame(maxHeight: .infinity)
+                            .environmentObject(browserManager)
+                            .environment(windowState)
+                    }
                 }
                 .environmentObject(browserManager)
                 .environment(windowState)
@@ -270,10 +326,7 @@ struct WindowView: View {
 
     @ViewBuilder
     private func WebContent() -> some View {
-        let cornerRadius: CGFloat = {
-            return 8
-        }()
-        
+        let cornerRadius = NookDesign.Radius.page
         let hasTopBar = nookSettings.topBarAddressView
         let bordered = !nookSettings.hideWebContentBorder
 
@@ -284,6 +337,7 @@ struct WindowView: View {
                         .zIndex(3000)
                 }
 
+                VStack(spacing: 0) {
                 if hasTopBar {
                     TopBarView()
                         .environmentObject(browserManager)
@@ -291,26 +345,35 @@ struct WindowView: View {
                         .zIndex(2500)
                 }
 
+                // Developer Mode on this site: Arc's address and tools bar over the page.
+                if browserManager.showsDeveloperBar(in: windowState),
+                   let session = browserManager.tabs.selectedSession(in: windowState) {
+                    DeveloperBar(session: session)
+                        .environmentObject(browserManager)
+                        .environment(windowState)
+                        .clipShape(UnevenRoundedRectangle(
+                            topLeadingRadius: hasTopBar ? 0 : cornerRadius, bottomLeadingRadius: 0,
+                            bottomTrailingRadius: 0, topTrailingRadius: hasTopBar ? 0 : cornerRadius, style: .continuous))
+                        .zIndex(2400)
+                }
+
                 WebsiteView()
                     .zIndex(2000)
-            }
-
-            // Shadow shape positioned behind both top bar and webview
-            // The webview will block the bottom shadow, leaving only top/left/right shadows visible
-            if hasTopBar && bordered {
-                UnevenRoundedRectangle(
-                    topLeadingRadius: cornerRadius + 1,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: cornerRadius + 1,
-                    style: .continuous
-                )
-                .frame(height: TopBarMetrics.height)
-                .frame(maxWidth: .infinity)
-                .offset(y: 8)
-                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
-                .allowsHitTesting(false)
-                .zIndex(-1)
+                    .overlay(alignment: .topTrailing) {
+                        if windowState.isPortraitCaptureVisible,
+                           let session = browserManager.tabs.selectedSession(in: windowState) {
+                            PortraitCaptureView(session: session)
+                                .environmentObject(browserManager)
+                                .environment(windowState)
+                                .padding(NookDesign.Spacing.md)
+                                .transition(.scale(scale: 0.92, anchor: .topTrailing).combined(with: .opacity))
+                                .zIndex(2600)
+                        }
+                    }
+                }
+                // The loading indicator sits in the window's top inset, outside the frame
+                // whose edges cast the shadow.
+                .nookWebPageShadow(in: NookDesign.Radius.shape(cornerRadius), enabled: bordered)
             }
 
             // No inset to sit in, so it floats over the page's top edge.
@@ -326,7 +389,7 @@ struct WindowView: View {
                     .allowsHitTesting(false)
             }
         }
-        .padding(.bottom, bordered ? 8 : 0)
+        .padding(.bottom, bordered ? NookDesign.Chrome.pageInset : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -366,18 +429,37 @@ struct WindowView: View {
     }
 }
 
-private struct TrafficLights: NSViewRepresentable {
+struct TrafficLights: NSViewRepresentable, Animatable {
     let visible: Bool
+    /// Fades them with whatever they belong to at the moment (the sidebar, then the library).
+    var alpha: CGFloat = 1
+
+    /// So the library's spring fades them frame by frame instead of jumping at the end.
+    var animatableData: CGFloat {
+        get { alpha }
+        set { alpha = newValue }
+    }
 
     func makeNSView(context: Context) -> TrafficLightsView { TrafficLightsView() }
-    func updateNSView(_ view: TrafficLightsView, context: Context) { view.visible = visible }
+    func updateNSView(_ view: TrafficLightsView, context: Context) {
+        view.visible = visible
+        view.alpha = alpha
+    }
 }
 
 /// The only code that shows or hides the window buttons. Leaving full screen paints a frame with
 /// them at the bare inset before the toolbar is back, so they stay hidden until the exit ends.
-private final class TrafficLightsView: NSView {
+final class TrafficLightsView: NSView {
     var visible = true {
         didSet { if visible != oldValue { apply() } }
+    }
+    var alpha: CGFloat = 1 {
+        didSet {
+            guard alpha != oldValue else { return }
+            for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                window?.standardWindowButton(type)?.alphaValue = alpha
+            }
+        }
     }
     private var exitingFullScreen = false
     private var observers: [any NSObjectProtocol] = []
@@ -411,6 +493,7 @@ private final class TrafficLightsView: NSView {
     private func apply() {
         for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             window?.standardWindowButton(type)?.isHidden = !visible || exitingFullScreen
+            window?.standardWindowButton(type)?.alphaValue = alpha
         }
     }
 }

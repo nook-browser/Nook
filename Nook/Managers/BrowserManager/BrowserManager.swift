@@ -350,7 +350,7 @@ class BrowserManager: ObservableObject {
     // Legacy global state - kept for backward compatibility during transition
     /// Tracks which pinned tab tile is hovered (for middle-click → reset to pinned URL)
     @Published var hoveredPinnedTabId: UUID? = nil
-    @Published var sidebarWidth: CGFloat = 250
+    @Published var sidebarWidth: CGFloat = SidebarWidth.standard
     @Published var sidebarContentWidth: CGFloat = 234
     @Published var isSidebarVisible: Bool = true
     @Published var isCommandPaletteVisible: Bool = false
@@ -426,7 +426,7 @@ class BrowserManager: ObservableObject {
     weak var webViewCoordinator: WebViewCoordinator?
     weak var windowRegistry: WindowRegistry?
 
-    private var savedSidebarWidth: CGFloat = 250
+    private var savedSidebarWidth: CGFloat = SidebarWidth.standard
     private let userDefaults = UserDefaults.standard
     private var cancellables: Set<AnyCancellable> = []
 
@@ -820,6 +820,20 @@ class BrowserManager: ObservableObject {
         openSettings(tab: .spaces)
     }
 
+    /// Opens the Boost panel over the selected page. Nothing is saved until the person saves.
+    func openBoostPanel(in windowState: BrowserWindowState) {
+        guard let url = tabs.selectedSession(in: windowState)?.url,
+              url.scheme == "http" || url.scheme == "https",
+              !Boost.normalizeHost(url.host ?? "").isEmpty
+        else { return }
+        windowState.isBoostPanelVisible = true
+    }
+
+    func boostCurrentSite() {
+        guard let windowState = windowRegistry?.activeWindow else { return }
+        openBoostPanel(in: windowState)
+    }
+
     func openSettings(tab: SettingsTabs) {
         SettingsNavigation.shared.currentSettingsTab = tab
         openSettingsAction?.callAsFunction()
@@ -845,13 +859,13 @@ class BrowserManager: ObservableObject {
 
         if savedWidth > 0 {
             // A width saved under an older, smaller minimum would hide the history buttons.
-            savedSidebarWidth = max(savedWidth, NookDesign.Size.sidebarMin)
+            savedSidebarWidth = min(min(max(savedWidth, SidebarWidth.min), SidebarWidth.max), SidebarWidth.max)
             // Kept while hidden: showing the sidebar does not restore it, and the hover overlay uses it.
             sidebarWidth = savedSidebarWidth
         } else {
             // First launch: ensure sidebar is visible with default width
-            savedSidebarWidth = 250
-            sidebarWidth = 250
+            savedSidebarWidth = SidebarWidth.standard
+            sidebarWidth = SidebarWidth.standard
         }
         sidebarContentWidth = max(sidebarWidth - 16, 0)
 
@@ -1170,28 +1184,15 @@ class BrowserManager: ObservableObject {
     /// Show the downloads panel in the sidebar
     func showDownloads() {
         guard let windowState = windowRegistry?.activeWindow else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            windowState.sidebarMenuSelectedTab = .downloads
-            windowState.isSidebarMenuVisible = true
-            windowState.isSidebarAIChatVisible = false
-            windowState.savedSidebarWidth = windowState.sidebarWidth
-            let newWidth: CGFloat = 400
-            windowState.sidebarWidth = newWidth
-            windowState.sidebarContentWidth = max(newWidth - 16, 0)
-        }
+        windowState.sidebarMenuSelectedTab = .downloads
+        LibraryMotion.present(windowState)
     }
 
-    /// Show the history panel in the sidebar
+    /// Shows History as a page over the web content, as Arc does; again hides it.
     func showHistory() {
         guard let windowState = windowRegistry?.activeWindow else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            windowState.sidebarMenuSelectedTab = .history
-            windowState.isSidebarMenuVisible = true
-            windowState.isSidebarAIChatVisible = false
-            windowState.savedSidebarWidth = windowState.sidebarWidth
-            let newWidth: CGFloat = 400
-            windowState.sidebarWidth = newWidth
-            windowState.sidebarContentWidth = max(newWidth - 16, 0)
+        withAnimation(NookDesign.Motion.standard) {
+            windowState.isHistoryPageVisible.toggle()
         }
     }
 

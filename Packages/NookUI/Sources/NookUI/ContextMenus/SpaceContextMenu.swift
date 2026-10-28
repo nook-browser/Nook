@@ -16,17 +16,20 @@ struct SpaceContextMenu: View {
     @Environment(\.tabActions) private var actions
     let space: SpaceRecord
     let canDelete: Bool
+    let onEditThemeColor: () -> Void
     let onOpenSettings: () -> Void
     let onDeleteSpace: () -> Void
 
     init(
         space: SpaceRecord,
+        onEditThemeColor: @escaping () -> Void,
         canDelete: Bool,
         onOpenSettings: @escaping () -> Void,
         onDeleteSpace: @escaping () -> Void
     ) {
         self.space = space
         self.canDelete = canDelete
+        self.onEditThemeColor = onEditThemeColor
         self.onOpenSettings = onOpenSettings
         self.onDeleteSpace = onDeleteSpace
     }
@@ -38,6 +41,14 @@ struct SpaceContextMenu: View {
                 onOpenSettings()
             } label: {
                 Label("Space Settings", systemImage: "gear")
+            }
+
+            if !space.isAgent {
+                Button {
+                    onEditThemeColor()
+                } label: {
+                    Label("Edit Theme Color…", systemImage: "paintpalette")
+                }
             }
 
             Divider()

@@ -279,9 +279,14 @@ class KeyboardShortcutManager {
             }
         }
 
+        // Read now: the action runs on the next turn of the run loop, when this event is gone.
+        lastShortcutWasControlTab = Self.isControlTab(event)
         executeAction(shortcut.action)
         return true
     }
+
+    /// Whether the shortcut being run came from Control-Tab, which opens the tab switcher.
+    private var lastShortcutWasControlTab = false
     
     /// Forward a keyboard event directly to the active WebView
     private func forwardEventToWebView(_ event: NSEvent) {
@@ -451,6 +456,11 @@ class KeyboardShortcutManager {
         }
     }
 
+    private static func isControlTab(_ event: NSEvent) -> Bool {
+        guard event.type == .keyDown, event.keyCode == 48 else { return false } // Tab
+        return event.modifierFlags.contains(.control) && !event.modifierFlags.contains(.command)
+    }
+
     private func executeAction(_ action: ShortcutAction) {
         guard let browserManager = browserManager else { return }
 
@@ -495,10 +505,18 @@ class KeyboardShortcutManager {
                 }
             case .undoCloseTab:
                 if let window { tabs.reopenLastClosed(in: window) }
-            case .nextTab:
-                if let window { tabs.selectNext(in: window) }
-            case .previousTab:
-                if let window { tabs.selectPrevious(in: window) }
+            case .nextTab, .previousTab:
+                guard let window else { break }
+                let step = action == .nextTab ? 1 : -1
+                // Control-Tab is Arc's switcher over recent tabs; any other key a person gave these
+                // actions keeps stepping through the sidebar in order.
+                if self.lastShortcutWasControlTab {
+                    TabSwitcher.step(step, in: window, tabs: tabs)
+                } else if step > 0 {
+                    tabs.selectNext(in: window)
+                } else {
+                    tabs.selectPrevious(in: window)
+                }
             case .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8:
                 let tabIndex = Int(action.rawValue.components(separatedBy: "_").last ?? "0") ?? 1
                 if let window { tabs.select(index: tabIndex - 1, in: window) }

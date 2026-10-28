@@ -48,11 +48,14 @@ extension BrowserManager: PageSessionDelegate {
 
     func addDownload(_ download: WKDownload, originalURL: URL, suggestedFilename: String) {
         _ = downloadManager.addDownload(
-            download, originalURL: originalURL, suggestedFilename: suggestedFilename)
+            download, originalURL: originalURL, suggestedFilename: suggestedFilename,
+            origin: DownloadOrigin(session: (download.webView as? FocusableWKWebView)?.owningSession))
     }
 
     func saveFile(_ data: Data, suggestedFilename: String, originalURL: URL, from webView: WKWebView) {
-        downloadManager.saveCompletedFile(data, suggestedFilename: suggestedFilename, originalURL: originalURL, from: webView.window)
+        downloadManager.saveCompletedFile(
+            data, suggestedFilename: suggestedFilename, originalURL: originalURL, from: webView.window,
+            origin: DownloadOrigin(session: (webView as? FocusableWKWebView)?.owningSession))
     }
 
     func toggleFullScreen(for webView: WKWebView) -> Bool {

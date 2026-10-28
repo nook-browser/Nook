@@ -50,6 +50,14 @@ public struct NookIconButtonStyle: ButtonStyle {
 }
 
 public extension View {
+    /// Larger navigation and footer symbols, without changing tab or URL-bar controls.
+    func nookSidebarIconButtons() -> some View {
+        labelStyle(.iconOnly)
+            .font(.system(size: NookDesign.SidebarChrome.icon, weight: .regular))
+            .buttonStyle(NookIconButtonStyle(size: NookDesign.SidebarChrome.button))
+            .foregroundStyle(.primary)
+    }
+
     /// Standalone icon buttons, Nook's one button look: no container, a fill only on hover.
     func nookIconButtons() -> some View {
         labelStyle(.iconOnly)

@@ -28,10 +28,12 @@ public class BrowserWindowState {
     public let id: UUID
 
     /// Sidebar width for this window
-    public var sidebarWidth: CGFloat = 250
+    public var sidebarWidth: CGFloat = SidebarWidth.standard
+    public var isSidebarResizeHovered = false
+    public var isAddressEditing = false
 
     /// Last non-zero sidebar width so we can restore when toggling visibility
-    public var savedSidebarWidth: CGFloat = 250
+    public var savedSidebarWidth: CGFloat = SidebarWidth.standard
 
     /// Width for the AI assistant sidebar when visible
     public var aiSidebarWidth: CGFloat = 350
@@ -44,6 +46,23 @@ public class BrowserWindowState {
 
     /// Whether the sidebar menu is visible in this window
     public var isSidebarMenuVisible: Bool = false
+
+    /// The theme of the space being made while the sidebar's Create a Space flow is open, nil
+    /// otherwise. The window shows it as a preview before the space exists.
+    public var spaceDraftTheme: SpaceTheme?
+
+    /// How far the library has been pulled open by a swipe in progress, in points; nil while no
+    /// swipe drives it and `isSidebarMenuVisible` alone says where it sits.
+    public var libraryDrag: CGFloat?
+
+    /// Whether the Portrait capture card (a framed screenshot of the page) is open.
+    public var isPortraitCaptureVisible: Bool = false
+
+    /// The Control-Tab switcher while it is open over this window.
+    public var tabSwitcher: TabSwitcherState?
+
+    /// Whether the full History page covers the web content (Cmd-Y), as Arc's history tab does.
+    public var isHistoryPageVisible: Bool = false
 
     /// The selected tab in the sidebar menu (history or downloads)
     public var sidebarMenuSelectedTab: SidebarMenuTab = .history
@@ -61,6 +80,9 @@ public class BrowserWindowState {
 
     /// Whether the extension library panel is visible in this window
     public var isExtensionLibraryVisible: Bool = false
+
+    /// Whether the Boost panel for the selected page is open in this window
+    public var isBoostPanelVisible: Bool = false
 
     // MARK: - App-side objects
     //
@@ -174,6 +196,7 @@ public class BrowserWindowState {
 public enum SidebarMenuTab: Hashable, Sendable {
     case history
     case downloads
+    case spaces
 }
 
 /// Toast information specific to a window

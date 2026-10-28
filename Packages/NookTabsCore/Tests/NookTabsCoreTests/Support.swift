@@ -10,10 +10,12 @@ func url(_ s: String) -> URL { URL(string: "https://example.com/\(s.replacingOcc
 /// Two spaces and their sections.
 struct Fixture {
     var tree = TabTree()
-    let spaceA = UUID()
-    let spaceB = UUID()
+    let spaceA: UUID
+    let spaceB: UUID
 
-    init() {
+    init(spaceA: UUID = UUID(), spaceB: UUID = UUID()) {
+        self.spaceA = spaceA
+        self.spaceB = spaceB
         tree.createSpace(id: spaceA, name: "A", icon: "a", accentHex: "#000", after: nil, now: fixedNow)
         tree.createSpace(id: spaceB, name: "B", icon: "b", accentHex: "#000", after: spaceA, now: fixedNow)
     }

@@ -6,6 +6,8 @@
 //  Created by Codex on 09/02/2025.
 //
 
+import NookBlocker
+import NookSettings
 import WebKit
 
 /// What the page reported under the cursor when the context menu opened.
@@ -162,7 +164,7 @@ public enum WebContextMenuPayload {
 
 
 @MainActor
-public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
+public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandlerWithReply {
     private weak var session: PageSession?
     private weak var userContentController: WKUserContentController?
 
@@ -174,10 +176,60 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
 
         controller.add(self, contentWorld: Self.world, name: Self.handlerName)
         controller.addUserScript(Self.script)
+        controller.addScriptMessageHandler(self, contentWorld: Self.world, name: Self.gateName)
+        if session?.controller?.settings.linkPreviews == true { controller.addUserScript(Self.previewUserScript) }
+        Self.live.add(self)
+        Self.observeSetting()
+    }
+
+    // MARK: - Setting changes
+
+    private static let live = NSHashTable<WebContextMenuBridge>.weakObjects()
+    private static var observing = false
+    private static let previewMarker = "// Nook Link Preview"
+
+    private static func observeSetting() {
+        guard !observing else { return }
+        observing = true
+        NotificationCenter.default.addObserver(forName: NookSettingsService.linkPreviewsDidChange, object: nil, queue: .main) { note in
+            let on = note.userInfo?["enabled"] as? Bool ?? false
+            MainActor.assumeIsolated { syncPreviewScripts(on: on) }
+        }
+    }
+
+    /// Runs once per toggle of the setting: adds the preview script to live controllers, or takes
+    /// it out by keeping the other Nook-owned scripts (the pattern the tweaks use).
+    private static func syncPreviewScripts(on: Bool) {
+        var seen = Set<ObjectIdentifier>()
+        for bridge in live.allObjects {
+            guard let ucc = bridge.userContentController, seen.insert(ObjectIdentifier(ucc)).inserted else { continue }
+            let all = ucc.userScripts
+            guard all.contains(where: { $0.source.hasPrefix(previewMarker) }) != on else { continue }
+            if on {
+                ucc.addUserScript(previewUserScript)
+            } else {
+                let others = all.nookOwned.filter { !$0.source.hasPrefix(previewMarker) }
+                ucc.removeAllUserScripts()
+                others.forEach { ucc.addUserScript($0) }
+            }
+        }
+    }
+
+    /// Link Previews listen only on a page that asked and was told yes: the setting is on and
+    /// the page is neither private nor the Agent's. Checked again for every message received.
+    private var previewsAllowed: Bool {
+        guard let session else { return false }
+        return session.controller?.settings.linkPreviews == true && !session.isPrivate && !session.isAgentPage
+    }
+
+    public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
+                                      replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
+        replyHandler(message.name == Self.gateName && message.frameInfo.isMainFrame && previewsAllowed, nil)
     }
 
     public func detach() {
         userContentController?.removeScriptMessageHandler(forName: Self.handlerName, contentWorld: Self.world)
+        userContentController?.removeScriptMessageHandler(forName: Self.gateName, contentWorld: Self.world)
         userContentController = nil
     }
 
@@ -195,11 +247,20 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             }
             return
         }
+        if dictionary.keys.contains("linkPreview") {
+            guard message.frameInfo.isMainFrame, previewsAllowed || dictionary["linkPreview"] is NSNull else { return }
+            session?.linkPreview = (dictionary["linkPreview"] as? String).flatMap(URL.init(string:)).map { url in
+                let number = { (key: String) in (dictionary[key] as? NSNumber)?.doubleValue ?? 0 }
+                return LinkPreviewTarget(url: url, rect: CGRect(x: number("x"), y: number("y"), width: number("width"), height: number("height")))
+            }
+            return
+        }
         let payload = WebContextMenuPayload(dictionary: dictionary)
         session?.deliverContextMenuPayload(payload)
     }
 
     private static let handlerName = "contextMenuPayload"
+    private static let gateName = "nookLinkPreviewGate"
 
     /// The bridge runs in its own world so the page cannot reach the handler. Now that this
     /// handler can open a tab, leaving it in the page world would let any site call
@@ -334,6 +395,60 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
         console.log('[Nook Context Menu] Event listener registered');
     })();
     """
+    // Link Previews: Shift pressed while the pointer rests on a link reports it with its box in
+    // the viewport; leaving, scrolling, typing or switching away takes the preview down. Main
+    // frame only, so the box is in the web view's own coordinates. Every listener ignores events
+    // the page dispatched itself (isTrusted), and none is added until the app answers the gate.
+    private static let previewSource = """
+    // Nook Link Preview
+    (function() {
+        if (window.__nookLinkPreviewInstalled) { return; }
+        window.__nookLinkPreviewInstalled = true;
+        var handlers = window.webkit && window.webkit.messageHandlers;
+        if (!handlers || !handlers.nookLinkPreviewGate || !handlers.contextMenuPayload) { return; }
+        handlers.nookLinkPreviewGate.postMessage(1).then(function(allowed) {
+            if (allowed === true) { install(handlers.contextMenuPayload); }
+        }, function() {});
+
+        function install(handler) {
+            var previewLink = null;
+            var pointerTarget = null;
+            function webLink(target) {
+                var link = target && target.closest ? target.closest('a[href]') : null;
+                return link && /^https?:/i.test(link.href) ? link : null;
+            }
+            function reportPreview(link) {
+                if (link === previewLink) { return; }
+                previewLink = link;
+                if (!link) { handler.postMessage({ linkPreview: null }); return; }
+                var box = link.getBoundingClientRect();
+                handler.postMessage({ linkPreview: link.href, x: box.left, y: box.top, width: box.width, height: box.height });
+            }
+            document.addEventListener('mouseover', function(event) {
+                if (!event.isTrusted) { return; }
+                pointerTarget = event.target;
+                var link = webLink(event.target);
+                if (event.shiftKey && link) { reportPreview(link); }
+                else if (previewLink && link !== previewLink) { reportPreview(null); }
+            }, true);
+            window.addEventListener('keydown', function(event) {
+                if (!event.isTrusted) { return; }
+                if (event.key !== 'Shift') { reportPreview(null); return; }
+                if (event.repeat) { return; }
+                var active = document.activeElement;
+                if (active && (active.isContentEditable || /^(input|textarea|select)$/i.test(active.tagName))) { return; }
+                reportPreview(webLink(pointerTarget));
+            }, true);
+            window.addEventListener('scroll', function() { reportPreview(null); }, true);
+            window.addEventListener('blur', function() { reportPreview(null); });
+            document.addEventListener('mouseleave', function() { pointerTarget = null; reportPreview(null); });
+        }
+    })();
+    """
+    private static var previewUserScript: WKUserScript {
+        WKUserScript(source: previewSource, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world)
+    }
+
     private static var script: WKUserScript {
         WKUserScript(
             source: scriptSource,
@@ -342,4 +457,10 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             in: world
         )
     }
+}
+
+/// A link the person is holding Shift over, with its box in the page's viewport (CSS pixels).
+public struct LinkPreviewTarget: Equatable, Sendable {
+    public let url: URL
+    public let rect: CGRect
 }
