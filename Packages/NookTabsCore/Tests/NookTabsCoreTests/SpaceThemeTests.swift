@@ -60,9 +60,9 @@ struct SpaceThemeTests {
         #expect(ThemeRGB(hex: "nonsense") == nil)
     }
 
-    @Test func pointCountIsOneOrTwo() {
+    @Test func colorCountIsOneToThree() {
         #expect(SpaceTheme(points: []).points.count == 1)
-        #expect(SpaceTheme(points: [.center, .center, .center]).points.count == 2)
+        #expect(SpaceTheme(points: [.center, .center, .center, .center]).points.count == 3)
     }
 
     @Test func decodingToleratesUnknownValues() throws {

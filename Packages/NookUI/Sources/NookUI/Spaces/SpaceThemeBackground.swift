@@ -49,7 +49,7 @@ public struct SpaceChromeBackground: View {
                     // Only when there is grain: an overlay blend is its own compositing pass every
                     // frame the window redraws, invisible or not.
                     if resolved.grain > 0.001 {
-                        FilmGrain(opacity: resolved.grain * NookDesign.Surface.themeGrainOpacity)
+                        FilmGrain(opacity: resolved.grain * NookDesign.Surface.themeGrainOpacity, overlay: resolved.overlay, blend: .normal)
                     }
                 }
         } else {

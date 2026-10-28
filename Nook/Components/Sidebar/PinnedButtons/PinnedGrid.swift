@@ -6,6 +6,7 @@
 //      Created by Maciek Bagiński on 30/07/2025.
 //
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 import NookDesign
 import NookTabsCore
@@ -88,12 +89,12 @@ struct PinnedGrid: View {
                     let preview = favoritePreview(in: zone, items: items)
                     let displayedIDs = preview?.itemIDs ?? items.map(\.id)
                     let previewColumns = columnCount(for: width, itemCount: displayedIDs.count)
-                    LazyVGrid(columns: makeColumns(count: previewColumns), alignment: .center, spacing: NookDesign.Spacing.sm) {
+                    LazyVGrid(columns: makeColumns(count: previewColumns), alignment: .center, spacing: NookDesign.Spacing.favoriteGap) {
                         ForEach(displayedIDs, id: \.self) { id in
                             if preview?.placeholderID == id {
                                 essentialsPlaceholder
                             } else if let item = items.first(where: { $0.id == id }) {
-                                PinnedTile(item: item, zone: zone)
+                                PinnedTile(item: item, zone: zone, spaceID: spaceID)
                                     .opacity(dragSession.draggedItem?.tabId == id ? 0.0 : 1.0)
                             }
                         }
@@ -121,14 +122,14 @@ struct PinnedGrid: View {
     private var essentialsPlaceholder: some View {
         NookDesign.Radius.shape(NookDesign.Radius.lg)
             .fill(NookDesign.Surface.fillPressed)
-            .frame(minWidth: NookDesign.Size.essentialsTile, minHeight: NookDesign.Size.essentialsTile)
+            .frame(minWidth: NookDesign.Size.favoriteTile, minHeight: NookDesign.Size.favoriteTile)
     }
 
     private func columnCount(for width: CGFloat, itemCount: Int) -> Int {
         guard width > 0, itemCount > 0 else { return 1 }
         var cols = min(maxColumns, itemCount)
         while cols > 1 {
-            let needed = CGFloat(cols) * NookDesign.Size.essentialsTile + CGFloat(cols - 1) * NookDesign.Spacing.sm
+            let needed = CGFloat(cols) * NookDesign.Size.favoriteTile + CGFloat(cols - 1) * NookDesign.Spacing.favoriteGap
             if needed <= width { break }
             cols -= 1
         }
@@ -138,8 +139,8 @@ struct PinnedGrid: View {
     private func makeColumns(count: Int) -> [GridItem] {
         Array(
             repeating: GridItem(
-                .flexible(minimum: NookDesign.Size.essentialsTile),
-                spacing: NookDesign.Spacing.sm,
+                .flexible(minimum: NookDesign.Size.favoriteTile),
+                spacing: NookDesign.Spacing.favoriteGap,
                 alignment: .center
             ),
             count: count
@@ -150,12 +151,42 @@ struct PinnedGrid: View {
 private struct PinnedTile: View {
     let item: Item
     let zone: DropZoneID
+    let spaceID: UUID
 
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(WindowRegistry.self) private var windowRegistry
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ObservedObject private var dragSession = NookDragSessionManager.shared
 
     private var tabs: TabsController { browserManager.tabs }
+
+    /// Tile colors from the chrome the sidebar actually shows: the theme stop or the accent's
+    /// gradient top, blended toward the window background as the chrome blends it.
+    private var tileColors: SpaceTheme.TileColors? {
+        guard !windowState.isIncognito, let space = tabs.space(spaceID), !space.isAgent else { return nil }
+        let isActive = windowRegistry.activeWindowId == windowState.id
+        let scheme = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+        func blend(_ base: NSColor, toward amount: Double) -> ThemeRGB? {
+            var out: NSColor?
+            scheme?.performAsCurrentDrawingAppearance {
+                out = base.blended(withFraction: amount, of: .windowBackgroundColor)?.usingColorSpace(.sRGB)
+            }
+            guard let c = out else { return nil }
+            return ThemeRGB(r: Double(c.redComponent), g: Double(c.greenComponent), b: Double(c.blueComponent))
+        }
+        if let theme = space.theme {
+            let resolved = theme.resolve(systemDark: colorScheme == .dark, dimmed: !isActive)
+            guard let stop = resolved.stops.first else { return nil }
+            let opacity = reduceTransparency ? 1 : NookDesign.Surface.themeTintOpacity(intensity: theme.intensity)
+            let base = NSColor(srgbRed: stop.r, green: stop.g, blue: stop.b, alpha: 1)
+            guard let chrome = blend(base, toward: 1 - opacity) else { return nil }
+            return SpaceTheme.tileColors(chrome: chrome, dark: resolved.isDark)
+        }
+        guard let chrome = blend(NSColor(space.accentColor), toward: isActive ? 0.55 : 0.8) else { return nil }
+        return SpaceTheme.tileColors(chrome: chrome, dark: colorScheme == .dark)
+    }
 
     var body: some View {
         let session = tabs.session(for: item.id)
@@ -174,6 +205,7 @@ private struct PinnedTile: View {
                 isUnloaded: session?.isUnloaded ?? true,
                 hasLeftPinnedURL: tabs.hasLeftHome(item.id),
                 onResetToPinnedURL: { tabs.resetToHome(item.id) },
+                colors: tileColors,
                 action: {
                     FavoritePreview.shared.dismiss()
                     tabs.select(item.id, in: windowState)

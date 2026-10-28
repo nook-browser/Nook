@@ -18,6 +18,8 @@ struct SpaceCreationSidebar: View {
     @Environment(BrowserWindowState.self) private var windowState
 
     @State private var name = ""
+    @State private var icon = ""
+    @State private var showIconPicker = false
     /// The space whose logins the new one shares; nil is a new profile.
     @State private var loginsFrom: UUID?
     @State private var showThemeEditor = false
@@ -105,8 +107,16 @@ struct SpaceCreationSidebar: View {
 
     private var nameField: some View {
         HStack(spacing: NookDesign.Spacing.sm) {
-            Image(systemName: "plus.square.dashed")
-                .foregroundStyle(.secondary)
+            Button { showIconPicker = true } label: {
+                SpaceIcon(icon)
+                    .foregroundStyle(icon.isEmpty ? Color(hex: SpaceTheme.accentColor(theme.points[0]).hex) : .secondary)
+                    .frame(width: NookDesign.Size.iconButton, height: NookDesign.Size.iconButton)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Space icon")
+            .popover(isPresented: $showIconPicker) {
+                SpaceIconPicker(icon: $icon, onSelect: { showIconPicker = false })
+            }
             TextField("Space name…", text: $name)
                 .textFieldStyle(.plain)
                 .focused($nameFocused)
@@ -183,7 +193,7 @@ struct SpaceCreationSidebar: View {
         let theme = self.theme
         guard let spaceID = tabs.createSpace(
             name: trimmed.isEmpty ? "New Space" : trimmed,
-            icon: "square.grid.2x2",
+            icon: icon,
             accentHex: SpaceTheme.accentColor(theme.points[0]).hex,
             after: tabs.orderedSpaces.last { !$0.isAgent }?.id,
             sharingLoginsWith: loginsFrom
