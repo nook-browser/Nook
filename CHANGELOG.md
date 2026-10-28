@@ -22,14 +22,16 @@
 - Split view panes resize
 - Tidier tab titles
 - Pages scroll at 120 Hz
+- Smoother space switching
 
 ### Fixed
 
+- Microphone and camera for websites
 - Bugs
 
 ### Thanks
 
-- @Fenrur, @AbdulRehman-18
+- @Fenrur, @AbdulRehman-18, @autaut03, @QusaiiSaleem
 
 ## 1.3.0
 
