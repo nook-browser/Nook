@@ -29,6 +29,8 @@ public class BrowserWindowState {
 
     /// Sidebar width for this window
     public var sidebarWidth: CGFloat = 250
+    public var isSidebarResizeHovered = false
+    public var isAddressEditing = false
 
     /// Last non-zero sidebar width so we can restore when toggling visibility
     public var savedSidebarWidth: CGFloat = 250

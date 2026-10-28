@@ -34,7 +34,6 @@ struct PinnedGrid: View {
         let effectiveSpaceID = spaceID ?? windowState.spaceID
         let items: [Item] = effectiveSpaceID.map { tabs.favorites(of: $0) } ?? []
         let colsCount: Int = columnCount(for: width, itemCount: items.count)
-        let columns: [GridItem] = makeColumns(count: colsCount)
 
         let shouldAnimate = (windowRegistry.activeWindow?.id == windowState.id) && !browserManager.isSwitchingSpace
 
@@ -86,25 +85,20 @@ struct PinnedGrid: View {
                     manager: dragSession,
                     onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
                 ) {
-                    LazyVGrid(columns: columns, alignment: .center, spacing: NookDesign.Spacing.sm) {
-                        let insertionIdx = insertionIndex(in: zone, items: items)
-
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            let isDraggedItem = dragSession.draggedItem?.tabId == item.id
-
-                            if let ins = insertionIdx, ins == index, !isDraggedItem {
+                    let preview = favoritePreview(in: zone, items: items)
+                    let displayedIDs = preview?.itemIDs ?? items.map(\.id)
+                    let previewColumns = columnCount(for: width, itemCount: displayedIDs.count)
+                    LazyVGrid(columns: makeColumns(count: previewColumns), alignment: .center, spacing: NookDesign.Spacing.sm) {
+                        ForEach(displayedIDs, id: \.self) { id in
+                            if preview?.placeholderID == id {
                                 essentialsPlaceholder
+                            } else if let item = items.first(where: { $0.id == id }) {
+                                PinnedTile(item: item, zone: zone)
+                                    .opacity(dragSession.draggedItem?.tabId == id ? 0.0 : 1.0)
                             }
-
-                            PinnedTile(item: item, zone: zone)
-                                .opacity(isDraggedItem ? 0.0 : 1.0)
-                        }
-
-                        if let ins = insertionIdx, ins >= items.count {
-                            essentialsPlaceholder
                         }
                     }
-                    .animation(NookDesign.Motion.spring, value: insertionIndex(in: zone, items: items))
+                    .animation(NookDesign.Motion.spring, value: displayedIDs)
                 }
                 .contentShape(Rectangle())
                 .fixedSize(horizontal: false, vertical: true)
@@ -115,20 +109,13 @@ struct PinnedGrid: View {
         }
     }
 
-    /// The insertion index for the grid during a drag, or nil when no placeholder should show.
-    private func insertionIndex(in zone: DropZoneID, items: [Item]) -> Int? {
+    /// Preview the committed order without mutating the favorites while dragging.
+    private func favoritePreview(in zone: DropZoneID, items: [Item]) -> FavoriteDropPreview? {
         guard dragSession.isDragging, dragSession.activeZone == zone,
-              let position = dragSession.dropPosition, position.zone == zone else {
-            return nil
-        }
-        // Reordering within the grid: no placeholder at the dragged tile's own slot.
-        if dragSession.sourceZone == zone,
-           let dragged = dragSession.draggedItem?.tabId,
-           let from = items.firstIndex(where: { $0.id == dragged }),
-           position.index == from || position.index == from + 1 {
-            return nil
-        }
-        return position.index
+              let position = dragSession.dropPosition, position.zone == zone,
+              let draggedID = dragSession.draggedItem?.tabId else { return nil }
+        return FavoriteDropPreview(itemIDs: items.map(\.id), draggedID: draggedID,
+                                   destinationBoundary: position.index)
     }
 
     private var essentialsPlaceholder: some View {

@@ -188,7 +188,11 @@ struct TabTreeTests {
     @Test(arguments: [1, 2, 3, 42, 2026] as [UInt64])
     func randomEditsKeepRulesAndUndo(seed: UInt64) {
         var rng = SplitMix64(seed: seed)
-        var f = Fixture()
+        // UUIDs affect the sorted candidate lists, so they must replay along with the RNG.
+        func stableID(_ index: Int) -> UUID {
+            UUID(uuidString: String(format: "00000000-0000-0000-0000-%012llX", UInt64(index)))!
+        }
+        var f = Fixture(spaceA: stableID(0), spaceB: stableID(1))
         var closed: [ClosedEntry] = []
         var history: [Change] = []
         var applied = 0
@@ -225,10 +229,10 @@ struct TabTreeTests {
                 switch op {
                 case 0, 1:
                     let p = randomParent()
-                    change = try f.tree.createTab(url: url("t\(step)"), title: "t\(step)", in: p, after: randomAfter(p), now: fixedNow)
+                    change = try f.tree.createTab(id: stableID(step + 2), url: url("t\(step)"), title: "t\(step)", in: p, after: randomAfter(p), now: fixedNow)
                 case 2:
                     let p = randomParent()
-                    change = try f.tree.createFolder(title: "f\(step)", in: p, after: randomAfter(p), now: fixedNow)
+                    change = try f.tree.createFolder(id: stableID(step + 2), title: "f\(step)", in: p, after: randomAfter(p), now: fixedNow)
                 case 3, 4:
                     guard let id = liveItems.randomElement(using: &rng) else { continue }
                     let p = randomParent()
@@ -245,7 +249,7 @@ struct TabTreeTests {
                     guard let entry = closed.popLast(), let space = spaces.first else { continue }
                     change = try f.tree.reopen(entry, fallback: .tabs(spaceID: space), now: fixedNow)
                 case 8:
-                    change = f.tree.createSpace(name: "s\(step)", icon: "i", accentHex: "#000",
+                    change = f.tree.createSpace(id: stableID(step + 2), name: "s\(step)", icon: "i", accentHex: "#000",
                                                 after: Bool.random(using: &rng) ? nil : spaces.randomElement(using: &rng), now: fixedNow)
                 case 9:
                     let result = try f.tree.deleteSpace(spaces.randomElement(using: &rng)!, now: fixedNow)
@@ -253,7 +257,7 @@ struct TabTreeTests {
                     change = result.change
                 case 10:
                     let p = randomParent()
-                    change = try f.tree.createFolder(title: "g\(step)", in: p, after: randomAfter(p), now: fixedNow)
+                    change = try f.tree.createFolder(id: stableID(step + 2), title: "g\(step)", in: p, after: randomAfter(p), now: fixedNow)
                 case 11:
                     change = try f.tree.moveSpace(spaces.randomElement(using: &rng)!,
                                                   after: Bool.random(using: &rng) ? nil : spaces.randomElement(using: &rng), now: fixedNow)

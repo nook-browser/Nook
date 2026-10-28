@@ -1,34 +1,22 @@
 // Licensed under GPL-3.0. See LICENSE.
-//
-//  NookDragPreviewWindow.swift
-//  Nook
-//
-
 import SwiftUI
 import NookDesign
+import NookTabsCore
+import NookUI
 import AppKit
 import Combine
+import QuartzCore
 
-// MARK: - NookDragPreviewWindow
-
-class NookDragPreviewWindow: NSWindow {
-    static let previewSize = NSSize(width: 320, height: 160)
-
-    private var hostingView: NSHostingView<AnyView>?
+/// A lifted tab retains its actual sidebar width, theme and pointer grab position.
+/// The native drag session transports the item; this passive window draws its SwiftUI card.
+final class NookDragPreviewWindow: NSWindow {
     private var cancellables = Set<AnyCancellable>()
     private weak var manager: NookDragSessionManager?
 
     @MainActor
     init(manager: NookDragSessionManager) {
         self.manager = manager
-
-        super.init(
-            contentRect: NSRect(origin: .zero, size: Self.previewSize),
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: true
-        )
-
+        super.init(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: true)
         isOpaque = false
         backgroundColor = .clear
         level = .floating
@@ -36,277 +24,111 @@ class NookDragPreviewWindow: NSWindow {
         hasShadow = false
         isReleasedWhenClosed = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        contentView = NSHostingView(rootView: NookDragPreviewContent(manager: manager))
 
-        let content = NookDragPreviewContent(manager: manager)
-        let hosting = NSHostingView(rootView: AnyView(content))
-        hosting.translatesAutoresizingMaskIntoConstraints = false
-        self.contentView = hosting
-        self.hostingView = hosting
-
-        observeManager(manager)
-    }
-
-    @MainActor
-    private func observeManager(_ manager: NookDragSessionManager) {
         manager.$draggedItem
             .map { $0 != nil }
             .removeDuplicates()
             .receive(on: RunLoop.main)
-            .sink { [weak self] (show: Bool) in
+            .sink { [weak self] show in
+                guard let self else { return }
                 if show {
-                    // Position at cursor before showing to prevent flash at screen origin
-                    if let mgr = self?.manager {
-                        self?.updatePosition(screenPoint: mgr.cursorScreenLocation)
+                    if let manager = self.manager {
+                        self.appearance = NSAppearance(named: manager.draggedColorScheme == .dark ? .darkAqua : .aqua)
+                        self.updatePosition(manager.cursorScreenLocation)
                     }
-                    self?.orderFront(nil)
+                    self.orderFront(nil)
                 } else {
-                    self?.orderOut(nil)
+                    self.orderOut(nil)
                 }
             }
             .store(in: &cancellables)
 
         manager.cursorScreenLocationSubject
-            .receive(on: RunLoop.main)
-            .sink { [weak self] screenPoint in
-                self?.updatePosition(screenPoint: screenPoint)
-            }
+            .sink { [weak self] point in self?.updatePosition(point) }
             .store(in: &cancellables)
     }
 
     @MainActor
-    private func updatePosition(screenPoint: NSPoint) {
-        guard let manager = manager, manager.isDragging else { return }
+    private func updatePosition(_ point: CGPoint) {
+        guard let manager, manager.isDragging else { return }
+        let inset = NookDesign.Tab.previewPadding
+        let isTile: Bool
+        if case .favorites = manager.activeZone { isTile = true } else { isTile = false }
+        let sourceWasTile: Bool
+        if case .favorites = manager.sourceZone { sourceWasTile = true } else { sourceWasTile = false }
+        let rowWidth = sourceWasTile
+            ? manager.sidebarScreenFrame.width - NookDesign.Spacing.sidebarInset * 2
+            : manager.sourceRowFrame.width
+        let cardWidth = isTile ? NookDesign.Size.essentialsTile : max(NookDesign.Size.iconButton, rowWidth)
+        let cardHeight = isTile ? NookDesign.Size.essentialsTile : NookDesign.Tab.height
+        let grabFraction = manager.sourceRowFrame.width > 0 ? manager.grabOffset.x / manager.sourceRowFrame.width : 0.5
+        // Follow both pointer axes, including inside the sidebar. Drop targets choose
+        // the insertion slot; they must never pin the floating card to the sidebar edge.
+        let x = point.x - cardWidth * grabFraction
+        let y = point.y - manager.grabOffset.y - cardHeight / 2
+        let frame = CGRect(x: x - inset, y: y - inset, width: cardWidth + inset * 2, height: cardHeight + inset * 2)
+        if frame.size != self.frame.size { setFrame(frame, display: true) }
+        else { setFrameOrigin(frame.origin) }
+    }
 
-        let windowSize = Self.previewSize
-
-        var overFavorites = false
-        if case .favorites = manager.activeZone { overFavorites = true }
-        // A row preview lines up with the sidebar rows wherever it shows over the sidebar.
-        if manager.isCursorInSidebar && !manager.isOutsideWindow && !overFavorites {
-            let sidebarFrame = manager.sidebarScreenFrame
-            let centerX = sidebarFrame.midX
-            let origin = NSPoint(
-                x: centerX - windowSize.width / 2,
-                y: screenPoint.y - windowSize.height / 2
-            )
-            setFrame(NSRect(origin: origin, size: windowSize), display: true)
-        } else {
-            let origin = NSPoint(
-                x: screenPoint.x - windowSize.width / 2,
-                y: screenPoint.y - windowSize.height / 2
-            )
-            setFrame(NSRect(origin: origin, size: windowSize), display: true)
+    @MainActor
+    func land(on cardFrame: CGRect, completion: @escaping () -> Void) {
+        let inset = NookDesign.Tab.previewPadding
+        let frame = cardFrame.insetBy(dx: -inset, dy: -inset)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = NookDesign.Motion.tabLandingDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().setFrame(frame, display: true)
+        } completionHandler: {
+            MainActor.assumeIsolated { completion() }
         }
     }
 }
-
-// MARK: - Preview Style
-
-private enum NookPreviewStyle: Equatable {
-    case tabRow
-    case pinnedTile
-    case ghost
-
-    var showTitle: Bool {
-        switch self {
-        case .pinnedTile: return false
-        default: return true
-        }
-    }
-
-    var showGhostTitleBar: Bool { self == .ghost }
-}
-
-// MARK: - Preview Content
 
 private struct NookDragPreviewContent: View {
     @ObservedObject var manager: NookDragSessionManager
 
-    private var morphSpring: Animation {
-        NookDesign.Motion.spring
+    private var isTile: Bool {
+        if case .favorites = manager.activeZone { return true }
+        return false
     }
 
     var body: some View {
-        ZStack {
-            if manager.draggedItem != nil {
-                NookMorphingPreview(
-                    icon: manager.draggedIcon,
-                    title: manager.draggedItem?.title ?? "",
-                    style: currentStyle,
-                    sidebarWidth: manager.sidebarScreenFrame.width,
-                    folderDepth: currentStyle == .tabRow && manager.dropPosition != nil ? manager.dropDepth : 0
-                )
-                .animation(morphSpring, value: currentStyle)
-                .animation(morphSpring, value: manager.dropDepth)
-            }
-        }
-        .frame(width: NookDragPreviewWindow.previewSize.width, height: NookDragPreviewWindow.previewSize.height)
-    }
-
-    /// Tile over the favorites grid, row anywhere else over the sidebar (including gaps between
-    /// drop zones), and the window-shaped ghost only once the cursor leaves the sidebar.
-    private var currentStyle: NookPreviewStyle {
-        switch manager.activeZone {
-        case .favorites:
-            return .pinnedTile
-        case .section, .target:
-            return .tabRow
-        case nil:
-            return manager.isCursorInSidebar && !manager.isOutsideWindow ? .tabRow : .ghost
-        }
-    }
-}
-
-// MARK: - Morphing Preview
-
-private struct NookMorphingPreview: View {
-    let icon: Image?
-    let title: String
-    let style: NookPreviewStyle
-    let sidebarWidth: CGFloat
-    /// Folder levels the drop lands inside. Inside a folder the row narrows from the leading
-    /// edge so the folder shows beside it, a little more for each deeper level.
-    let folderDepth: Int
-
-    private let sidebarHorizontalPadding: CGFloat = 16
-    /// A lifted row narrows a little so the rows under it show.
-    private let liftedWidthFraction: CGFloat = 0.85
-    private let insideFolderWidthFraction: CGFloat = 0.55
-    private let perLevelWidthFraction: CGFloat = 0.08
-    private let minimumWidthFraction: CGFloat = 0.3
-
-    private var effectiveWidth: CGFloat {
-        switch style {
-        case .tabRow:
-            if sidebarWidth > 0 {
-                return max(120, sidebarWidth - sidebarHorizontalPadding)
-            }
-            return 200
-        case .pinnedTile:
-            return NookDesign.Size.essentialsTile
-        case .ghost:
-            return 160
-        }
-    }
-
-    private var effectiveHeight: CGFloat {
-        switch style {
-        case .tabRow: return 36
-        case .pinnedTile: return NookDesign.Size.essentialsTile
-        case .ghost: return 100
-        }
-    }
-
-    private var effectiveCornerRadius: CGFloat {
-        switch style {
-        case .tabRow: return NookDesign.Radius.lg
-        case .pinnedTile: return NookDesign.Radius.lg
-        case .ghost: return NookDesign.Radius.md
-        }
-    }
-
-    private var backgroundColor: Color {
-        switch style {
-        case .ghost:
-            return Color(nsColor: .windowBackgroundColor).opacity(0.95)
-        case .pinnedTile:
-            return NookDesign.Surface.fill
-        case .tabRow:
-            return Color(nsColor: .controlBackgroundColor).opacity(0.95)
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            if style == .pinnedTile {
-                pinnedTilePreview
-            } else {
-                standardPreview
-            }
-        }
-        .nookElevation(.floating)
-    }
-
-    private var pinnedTilePreview: some View {
-        ZStack {
-            NookDesign.Radius.shape(NookDesign.Radius.lg)
-                .fill(backgroundColor)
-
-            if let icon {
-                icon
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFit()
-                    .frame(height: NookDesign.Size.essentialsFavicon)
-            } else {
-                Image(systemName: "globe")
-                    .font(.system(size: NookDesign.Size.essentialsFavicon, weight: .medium))
-                    .foregroundColor(.secondary)
-            }
-        }
-        .frame(width: NookDesign.Size.essentialsTile, height: NookDesign.Size.essentialsTile)
-        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
-    }
-
-    private var standardPreview: some View {
-        VStack(spacing: 0) {
-            if style.showGhostTitleBar {
-                HStack(spacing: 4) {
-                    Circle().fill(Color.red.opacity(0.7)).frame(width: 8, height: 8)
-                    Circle().fill(Color.yellow.opacity(0.7)).frame(width: 8, height: 8)
-                    Circle().fill(Color.green.opacity(0.7)).frame(width: 8, height: 8)
-                    Spacer()
+        GeometryReader { geometry in
+            let inset = NookDesign.Tab.previewPadding
+            let size = CGSize(width: max(1, geometry.size.width - inset * 2), height: max(1, geometry.size.height - inset * 2))
+            ZStack {
+                // Keep the space's colored material under the same selected-tab surface.
+                SpaceChromeBackground(theme: manager.draggedTheme, accent: manager.draggedAccent, isActive: true, blursBehind: false)
+                Color.clear.nookTabSurface(selected: true)
+                HStack(spacing: NookDesign.Spacing.md) {
+                    if let icon = manager.draggedIcon {
+                        icon.resizable().scaledToFit()
+                            .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
+                            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
+                    } else {
+                        Image(systemName: "globe")
+                            .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
+                            .foregroundStyle(.secondary)
+                    }
+                    if !isTile {
+                        Text(manager.draggedItem?.title ?? "")
+                            .font(NookDesign.Tab.font)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer(minLength: 0)
+                    }
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                Divider().opacity(0.3)
-            }
-
-            HStack(spacing: 8) {
-                if let icon {
-                    icon
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
-                } else {
-                    Image(systemName: "globe")
-                        .font(NookDesign.Font.body)
-                        .foregroundColor(.secondary)
-                }
-
-                if style.showTitle {
-                    Text(title)
-                        .font(style == .ghost ? NookDesign.Font.caption : NookDesign.Font.body)
-                        .foregroundColor(style == .ghost ? .secondary : .primary)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            if style.showGhostTitleBar {
-                Spacer(minLength: 0)
-            }
+                .padding(.horizontal, NookDesign.Spacing.rowPadding)
+                            }
+            .frame(width: size.width, height: size.height)
+            .clipShape(NookDesign.Radius.shape(isTile ? NookDesign.Radius.lg : NookDesign.Tab.radius))
+            .shadow(color: .black.opacity(NookDesign.Tab.liftShadowOpacity), radius: NookDesign.Tab.liftShadowRadius, y: NookDesign.Tab.liftShadowY)
+            .padding(inset)
         }
-        .frame(width: rowWidth, height: effectiveHeight)
-        .background(
-            NookDesign.Radius.shape(effectiveCornerRadius)
-                .fill(backgroundColor)
-        )
-        .overlay(
-            NookDesign.Radius.shape(effectiveCornerRadius)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-        )
-        // Keep the trailing edge where the full row's was, revealing the folder on the left.
-        .offset(x: (effectiveWidth - rowWidth) / 2)
-    }
-
-    private var rowWidth: CGFloat {
-        guard folderDepth > 0 else { return style == .tabRow ? effectiveWidth * liftedWidthFraction : effectiveWidth }
-        let fraction = insideFolderWidthFraction - CGFloat(folderDepth - 1) * perLevelWidthFraction
-        return effectiveWidth * max(minimumWidthFraction, fraction)
+        .environment(\.colorScheme, manager.draggedColorScheme)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }

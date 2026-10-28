@@ -20,33 +20,32 @@ struct SpacesListItem: View {
     let isActive: Bool
     let selection: Double
     let isFaded: Bool
-    let onHoverChange: ((Bool) -> Void)?
 
-    @State private var isHovering: Bool = false
     @State private var showThemePicker = false
+    @State private var showsIconPicker = false
     @Environment(\.tabActions) private var actions
 
     private let dotSize: CGFloat = NookDesign.Spacing.sm
     private let activeDotSize: CGFloat = NookDesign.Spacing.md
-    // A tight hit target so the 28pt default icon-button padding doesn't push the dots apart.
-    private let buttonSize: CGFloat = NookDesign.Spacing.xl
+    private let buttonSize: CGFloat
 
     init(
         space: SpaceRecord,
         isActive: Bool,
         selection: Double? = nil,
         isFaded: Bool,
-        onHoverChange: ((Bool) -> Void)? = nil
+        buttonSize: CGFloat = NookDesign.Spacing.xxl
     ) {
         self.space = space
         self.isActive = isActive
         self.selection = selection ?? (isActive ? 1 : 0)
         self.isFaded = isFaded
-        self.onHoverChange = onHoverChange
+        self.buttonSize = buttonSize
     }
 
     var body: some View {
         Button {
+            guard windowState.spaceID != space.id else { return }
             Haptics.alignment()
             withAnimation(NookDesign.Motion.standard) {
                 tabs.setSpace(space.id, in: windowState)
@@ -58,15 +57,24 @@ struct SpacesListItem: View {
         .buttonStyle(NookIconButtonStyle(size: buttonSize))
         .layoutPriority(isActive ? 1 : 0)
         .opacity(isFaded ? 0.3 : 1.0)
-        .onHoverTracking { hovering in
-            isHovering = hovering
-            onHoverChange?(hovering)
-        }
+        .accessibilityLabel(space.name)
         .popover(isPresented: $showThemePicker, arrowEdge: .top) {
             SpaceThemeEditor(space: space)
                 .environment(tabs)
         }
+        .popover(isPresented: $showsIconPicker) {
+            SpaceIconPicker(icon: Binding(
+                get: { tabs.space(space.id)?.icon ?? space.icon },
+                set: { tabs.updateSpace(space.id, name: nil, icon: $0, accentHex: nil) }
+            ), onSelect: { showsIconPicker = false })
+        }
         .contextMenu {
+            if !space.isAgent {
+                Button("Change Icon or Emoji…", systemImage: "face.smiling") {
+                    DispatchQueue.main.async { showsIconPicker = true }
+                }
+                Divider()
+            }
             SpaceContextMenu(
                 space: space,
                 onEditThemeColor: { showThemePicker = true },
@@ -89,8 +97,11 @@ struct SpacesListItem: View {
                 .foregroundStyle(NookDesign.Surface.agentGradient)
                 .opacity(NookDesign.Surface.agentIconInactiveOpacity + (1 - NookDesign.Surface.agentIconInactiveOpacity) * selection)
                 .animation(NookDesign.Motion.standard, value: isActive)
-        } else {
+        } else if SpaceIcon.isDot(space.icon) {
             plainDot
+        } else {
+            SpaceIcon(space.icon)
+                .foregroundStyle(isActive ? Color.primary : Color.secondary)
         }
     }
 

@@ -84,15 +84,16 @@ struct SpacesSideBarView: View {
     private var mainSidebarContent: some View {
         return VStack(spacing: NookDesign.Spacing.sectionGap) {
             // History buttons: share the traffic-light row on the left, their own row on the right.
-            if nookSettings.sidebarPosition != .left && !nookSettings.topBarAddressView {
+            if nookSettings.sidebarPosition != .left {
                 titleRow
                     .padding(.horizontal, NookDesign.Spacing.sidebarInset)
             }
 
-            // Header (window controls, nav buttons, URL bar)
+            // Header (space name, URL bar and its anchored suggestions)
             SidebarHeader(isSidebarHovered: isSidebarHovered, onNewSpace: showSpaceCreationDialog)
                 .environmentObject(browserManager)
                 .environment(windowState)
+                .zIndex(10)
 
             // Spaces page view with draggable spacer
             ZStack {
@@ -159,7 +160,7 @@ struct SpacesSideBarView: View {
             if nookSettings.sidebarPosition == .left {
                 titleRow
                     .frame(height: NookDesign.Spacing.sidebarTop)
-                    .padding(.leading, NookDesign.Spacing.trafficLights)
+                    .padding(.leading, NookDesign.SidebarChrome.trafficLightsInset)
                     .padding(.trailing, NookDesign.Spacing.sidebarInset)
             }
         }
@@ -382,10 +383,7 @@ struct SpacesSideBarView: View {
     private func makeSpaceView(for space: SpaceRecord) -> some View {
         VStack(spacing: 0) {
             if !windowState.isIncognito {
-                PinnedGrid(
-                    width: windowState.sidebarContentWidth,
-                    spaceID: space.id
-                )
+                ResizableSpaceFavorites(spaceID: space.id)
                 .environmentObject(browserManager)
                 .environment(tabs)
                 .environment(windowState)
@@ -411,14 +409,21 @@ struct SpacesSideBarView: View {
             .environment(\.nookSettings, nookSettings)
             .environmentObject(browserManager.gradientColorManager)
             .environmentObject(browserManager.splitManager)
-            .id(space.id.uuidString + "-w\(Int(windowState.sidebarContentWidth))")
+            .id(space.id)
             Spacer()
         }
+        .modifier(SpaceThemeScope(spaceID: space.id))
+        .environment(tabs)
     }
 
-    /// Back, forward and reload at the trailing edge, unless the URL bar mode has them.
+    /// The sidebar toggle beside the traffic lights, then back, forward and reload at the
+    /// trailing edge unless the URL bar mode has them.
     private var titleRow: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: NookDesign.SidebarChrome.gap) {
+            Button("Toggle Sidebar", systemImage: nookSettings.sidebarPosition == .left ? "sidebar.left" : "sidebar.right") {
+                browserManager.toggleSidebar(for: windowState)
+            }
+            .nookSidebarIconButtons()
             Spacer(minLength: 0)
             if !nookSettings.topBarAddressView {
                 SidebarHistoryButtons()
@@ -478,5 +483,25 @@ private struct AgentSpaceRow: View {
         .onHoverTracking { hovering in
             withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
         }
+    }
+}
+
+/// Observe width inside the cached page rather than rebuilding the paging controller.
+private struct ResizableSpaceFavorites: View {
+    @Environment(BrowserWindowState.self) private var windowState
+    let spaceID: UUID
+
+    var body: some View {
+        PinnedGrid(width: windowState.sidebarContentWidth, spaceID: spaceID)
+    }
+}
+
+/// The paging host caches its content; observe theme edits inside each cached page.
+private struct SpaceThemeScope: ViewModifier {
+    @Environment(TabsController.self) private var tabs
+    let spaceID: UUID
+
+    func body(content: Content) -> some View {
+        content.environment(\.nookUsesDefaultSpaceTheme, tabs.space(spaceID)?.theme == nil)
     }
 }

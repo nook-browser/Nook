@@ -30,7 +30,8 @@ class NookDropZoneNSView: NSView {
     weak var coordinator: NookDropZoneCoordinator?
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        guard let coordinator = coordinator else { return [] }
+        guard let coordinator = coordinator,
+              NookDragItem.fromPasteboard(sender.draggingPasteboard) != nil else { return [] }
         MainActor.assumeIsolated {
             coordinator.manager.cursorEnteredZone(coordinator.zoneID)
         }
@@ -39,6 +40,8 @@ class NookDropZoneNSView: NSView {
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard let coordinator, NookDragItem.fromPasteboard(sender.draggingPasteboard) != nil else { return [] }
+        coordinator.manager.cursorEnteredZone(coordinator.zoneID)
         updatePosition(sender)
         return .move
     }
@@ -57,11 +60,8 @@ class NookDropZoneNSView: NSView {
         let width = bounds.width
         MainActor.assumeIsolated {
             let position = NookDragSessionManager.position(in: coordinator.zoneID, layout: coordinator.layout, point: point, width: width)
-            coordinator.manager.hapticFeedback(.generic)
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                coordinator.manager.clearDrag()
+            let screenFrame = window?.convertToScreen(convert(bounds, to: nil)) ?? .zero
+            coordinator.manager.finishDrag(at: position, layout: coordinator.layout, zoneScreenFrame: screenFrame) {
                 coordinator.onDrop(item.tabId, position)
             }
         }

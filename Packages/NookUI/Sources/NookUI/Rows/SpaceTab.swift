@@ -86,6 +86,7 @@ public struct SpaceTab: View {
                                 .offset(x: NookDesign.Spacing.xs, y: NookDesign.Spacing.xs)
                         }
                     }
+                    .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
                 if let session, session.hasAudioContent || session.hasPlayingAudio || session.isAudioMuted {
                     Button(action: { session.toggleMute() }) {
                         Image(systemName: session.isAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
@@ -99,8 +100,9 @@ public struct SpaceTab: View {
 
                 if isRenaming {
                     TextField("", text: $draftName)
-                        .font(NookDesign.Font.body)
-                        .foregroundStyle(isUnloaded ? .secondary : .primary)
+                        .font(NookDesign.Tab.font)
+                        .foregroundStyle(.primary)
+                        .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
                         .textFieldStyle(.plain)
                         .onSubmit { commitRename() }
                         .onEscapeKey { renameState.itemID = nil }
@@ -113,13 +115,13 @@ public struct SpaceTab: View {
                     // Hidden shrinkable copy sizes the row; the visible copy is laid out at
                     // full width and faded, so long titles never widen the row.
                     Text(title)
-                        .font(NookDesign.Font.body)
+                        .font(NookDesign.Tab.font)
                         .lineLimit(1)
                         .hidden()
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .overlay(alignment: .leading) {
                             label(title)
-                                .font(NookDesign.Font.body)
+                                .font(NookDesign.Tab.font)
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
@@ -131,6 +133,7 @@ public struct SpaceTab: View {
                         // On hover the text ends before the close button.
                         .nookTrailingFade(reserving: isHovering ? NookDesign.Size.row + (showsReset ? NookDesign.Size.rowButton : 0) : 0)
                         .textSelection(.disabled)
+                        .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
                 }
             }
             .overlay(alignment: .trailing) {
@@ -172,27 +175,25 @@ public struct SpaceTab: View {
                 }
             }
             .padding(.horizontal, NookDesign.Spacing.rowPadding)
-            .frame(height: NookDesign.Size.row)
+            .frame(height: NookDesign.Tab.height)
             .frame(minWidth: 0, maxWidth: .infinity)
-            .background(backgroundColor)
             .overlay {
                 if isRenaming {
-                    NookDesign.Radius.shape(NookDesign.Radius.md)
+                    NookDesign.Radius.shape(NookDesign.Tab.radius)
                         .strokeBorder(accentColor, lineWidth: NookDesign.Size.hairlineWidth)
                 }
             }
-            .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-            .nookRowSelection(isCurrentTab)
+            .nookTabSurface(selected: isCurrentTab, hovered: isHovering)
             // Developer Mode on this tab's site, marked as Arc marks it.
             .overlay {
                 if nookSettings.isDeveloperSite(tabs.currentURL(for: item)?.host) {
-                    NookDesign.Radius.shape(NookDesign.Radius.md)
+                    NookDesign.Radius.shape(NookDesign.Tab.radius)
                         .strokeBorder(Color.yellow, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                 }
             }
-            .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(NookTabButtonStyle())
+        .padding(.vertical, NookDesign.Tab.verticalInset)
         .onHoverTracking { hovering in
             withAnimation(NookDesign.Motion.quick) {
                 isHovering = hovering
@@ -218,7 +219,6 @@ public struct SpaceTab: View {
                 .environment(tabs)
                 .environment(\.tabActions, actions)
         }
-        .nookElevation(isCurrentTab ? .raised : .flat)
     }
 
     private var accentColor: Color { actions?.accentColor ?? .accentColor }
@@ -234,16 +234,6 @@ public struct SpaceTab: View {
     }
 
     private var showsReset: Bool { tabs.hasLeftHome(item.id) }
-
-    private var backgroundColor: Color {
-        if isCurrentTab {
-            return Color.clear
-        } else if isHovering {
-            return NookDesign.Surface.fill
-        } else {
-            return Color.clear
-        }
-    }
 
     private func startRename(_ title: String) {
         draftName = title

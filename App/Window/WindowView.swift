@@ -206,6 +206,7 @@ struct WindowView: View {
         .environmentObject(browserManager.splitManager)
         .environmentObject(hoverSidebarManager)
         .preferredColorScheme(resolvedColorScheme)
+        .environment(\.nookUsesDefaultSpaceTheme, spaceTheme == nil)
     }
 
     /// Accent of the space this window shows; nil for private windows, which keep their own look.
@@ -275,6 +276,7 @@ struct WindowView: View {
         HStack(spacing: 0) {
             if aiAppearsOnTrailingEdge {
                 SpacesSidebar()
+                    .zIndex(10)
                 WebContent()
                 if aiVisible {
                     AISidebar()
@@ -285,12 +287,13 @@ struct WindowView: View {
                 }
                 WebContent()
                 SpacesSidebar()
+                    .zIndex(10)
             }
         }
         // Apply padding similar to regular sidebar: remove padding when sidebar/AI is visible on that side
         // When sidebar is on left, AI appears on right (trailing); when sidebar is on right, AI appears on left (leading)
-        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : NookDesign.Spacing.md)
-        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : NookDesign.Spacing.md)
+        .padding(.trailing, !bordered || (sidebarVisible && sidebarOnRight) || (aiVisible && sidebarOnLeft) ? 0 : NookDesign.Chrome.pageInset)
+        .padding(.leading, !bordered || (sidebarVisible && sidebarOnLeft) || (aiVisible && sidebarOnRight) ? 0 : NookDesign.Chrome.pageInset)
     }
 
     @ViewBuilder
@@ -300,14 +303,17 @@ struct WindowView: View {
                 .spaceThemeAppearance(spaceTheme)
                 // Becomes its column in the library as the library comes out, as in Arc.
                 .modifier(LibraryFade())
+                .scrollIndicators(windowState.isSidebarResizeHovered ? .hidden : .automatic)
                 .frame(width: windowState.sidebarWidth)
                 .overlay(alignment: nookSettings.sidebarPosition == .left ? .trailing : .leading) {
-                    SidebarResizeView()
-                        .frame(maxHeight: .infinity)
-                        .environmentObject(browserManager)
-                        .environment(windowState)
-                        .zIndex(2000)
-                        .environment(windowState)
+                    // The expanded address panel extends across this edge. Suspend the
+                    // native resize target so it cannot paint or steal clicks over the panel.
+                    if !windowState.isAddressEditing {
+                        SidebarResizeView()
+                            .frame(maxHeight: .infinity)
+                            .environmentObject(browserManager)
+                            .environment(windowState)
+                    }
                 }
                 .environmentObject(browserManager)
                 .environment(windowState)
@@ -329,6 +335,7 @@ struct WindowView: View {
                         .zIndex(3000)
                 }
 
+                VStack(spacing: 0) {
                 if hasTopBar {
                     TopBarView()
                         .environmentObject(browserManager)
@@ -361,24 +368,10 @@ struct WindowView: View {
                                 .zIndex(2600)
                         }
                     }
-            }
-
-            // Shadow shape positioned behind both top bar and webview
-            // The webview will block the bottom shadow, leaving only top/left/right shadows visible
-            if hasTopBar && bordered {
-                UnevenRoundedRectangle(
-                    topLeadingRadius: cornerRadius,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: cornerRadius,
-                    style: .continuous
-                )
-                .frame(height: TopBarMetrics.height)
-                .frame(maxWidth: .infinity)
-                .offset(y: NookDesign.Spacing.md)
-                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 0)
-                .allowsHitTesting(false)
-                .zIndex(-1)
+                }
+                // The loading indicator sits in the window's top inset, outside the frame
+                // whose edges cast the shadow.
+                .nookWebPageShadow(in: NookDesign.Radius.shape(cornerRadius), enabled: bordered)
             }
 
             // No inset to sit in, so it floats over the page's top edge.
@@ -394,7 +387,7 @@ struct WindowView: View {
                     .allowsHitTesting(false)
             }
         }
-        .padding(.bottom, bordered ? NookDesign.Spacing.md : 0)
+        .padding(.bottom, bordered ? NookDesign.Chrome.pageInset : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

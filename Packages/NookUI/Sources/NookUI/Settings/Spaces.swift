@@ -19,6 +19,7 @@ public struct SpacesSettingsView: View {
     /// Data size per profile, filled in as each store answers.
     @State private var stats: [UUID: String] = [:]
     @State private var showAccentPickerFor: UUID?
+    @State private var showIconPickerFor: UUID?
     /// A move that would leave its profile empty, waiting on confirmation.
     @State private var pendingMove: (space: UUID, to: UUID?, profile: String)?
 
@@ -140,6 +141,24 @@ public struct SpacesSettingsView: View {
                     set: { tabs.updateSpace(space.id, name: nil, icon: nil, accentHex: $0) }
                 ))
                 .padding(NookDesign.Spacing.lg)
+            }
+
+            Button { showIconPickerFor = space.id } label: {
+                SpaceIcon(space.icon)
+                    .frame(width: NookDesign.Size.spaceTarget, height: NookDesign.Size.spaceTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Change Icon or Emoji…")
+            .accessibilityLabel("Space icon for \(space.name)")
+            .popover(isPresented: Binding(
+                get: { showIconPickerFor == space.id },
+                set: { if !$0 { showIconPickerFor = nil } }
+            )) {
+                SpaceIconPicker(icon: Binding(
+                    get: { tabs.space(space.id)?.icon ?? space.icon },
+                    set: { tabs.updateSpace(space.id, name: nil, icon: $0, accentHex: nil) }
+                ), onSelect: { showIconPickerFor = nil })
             }
 
             VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {

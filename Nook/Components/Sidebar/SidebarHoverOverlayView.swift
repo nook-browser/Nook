@@ -50,8 +50,12 @@ struct SidebarHoverOverlayView: View {
                         .environment(commandPalette)
                         .environmentObject(browserManager.gradientColorManager)
                         .frame(maxHeight: .infinity)
-                        .background(sidebarBackground)
-                        .nookFloatingSurface(in: NookDesign.Radius.shape(cornerRadius))
+                        // Clip the floating surface, not descendants: the expanded address
+                        // panel is anchored here but deliberately extends over the page.
+                        .background {
+                            sidebarBackground
+                                .nookFloatingSurface(in: NookDesign.Radius.shape(cornerRadius))
+                        }
                         .alwaysArrowCursor()
                         .padding(nookSettings.sidebarPosition == .left ? .leading : .trailing, horizontalInset)
                         .padding(.vertical, verticalInset)
