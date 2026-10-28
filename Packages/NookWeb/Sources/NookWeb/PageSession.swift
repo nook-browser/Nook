@@ -207,6 +207,14 @@ public final class PageSession: NSObject, Identifiable {
     @ObservationIgnored var jsDialogsSuppressed = false
     /// An open-in-another-app sheet is up, so a redirect loop cannot stack more.
     @ObservationIgnored var externalAppConfirmPending = false
+    /// Downloads since the last commit, the person's answer about more of them, and the answers
+    /// waiting on that question. Requests made inside a click are remembered until their response.
+    @ObservationIgnored var downloadsThisPage = 0
+    @ObservationIgnored var moreDownloadsAllowed: Bool?
+    @ObservationIgnored var downloadDecisionsWaiting: [(Bool) -> Void] = []
+    @ObservationIgnored var clickedRequestURLs: [URL] = []
+    /// The page's main response said `Cache-Control: no-store`, so its text stays out of history.
+    @ObservationIgnored var pageAskedNotToStore = false
     @ObservationIgnored var hasFavicon: Bool = false
     @ObservationIgnored var faviconFetchInFlight: Bool = false
     @ObservationIgnored var faviconFetchAttempts: Int = 0

@@ -9,6 +9,7 @@
 import SwiftUI
 import WebKit
 
+import NookDesign
 import NookSettings
 import NookWeb
 
@@ -104,7 +105,15 @@ struct PrivacySettingsView: View {
                     .onChange(of: nookSettings.blockCrossSiteTracking) { _, enabled in
                         browserManager.contentBlockerManager.setEnabled(enabled)
                     }
-                Toggle("Search Page Text in History", isOn: $settings.searchPageTextInHistory)
+                Toggle(isOn: $settings.searchPageTextInHistory) {
+                    VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                        Text("Search Page Text in History")
+                            .font(NookDesign.Font.body)
+                        Text("Saves the text of pages you visit on this Mac so history search can find them. Private windows, pages with a password field, and pages that ask not to be stored are skipped.")
+                            .font(NookDesign.Font.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                     .onChange(of: nookSettings.searchPageTextInHistory) { _, enabled in
                         if !enabled { browserManager.historyManager.erasePageText() }
                     }

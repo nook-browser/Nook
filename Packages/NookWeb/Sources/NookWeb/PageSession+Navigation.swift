@@ -61,9 +61,11 @@ extension PageSession: WKNavigationDelegate {
         // First commit of the process is the launch-to-first-paint mark; later ones no-op.
         LaunchMetrics.markFirstPaint()
         controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
-        // A new page gets its dialogs back.
+        // A new page gets its dialogs back, and asks again before downloading more than once.
         jsDialogCount = 0
         jsDialogsSuppressed = false
+        downloadsThisPage = 0
+        moreDownloadsAllowed = nil
         resetTranslation()
 
         if let newURL = webView.url {
@@ -384,8 +386,12 @@ extension PageSession: WKNavigationDelegate {
             return
         }
 
+        if navigationAction.nookIsUserInitiated, let url = navigationAction.request.url {
+            clickedRequestURLs = Array((clickedRequestURLs + [url]).suffix(8))
+        }
+
         if navigationAction.shouldPerformDownload {
-            decisionHandler(.download)
+            allowDownload(clicked: navigationAction.nookIsUserInitiated, in: webView) { decisionHandler($0 ? .download : .cancel) }
             return
         }
 
@@ -427,20 +433,43 @@ extension PageSession: WKNavigationDelegate {
         decidePolicyFor navigationResponse: WKNavigationResponse,
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
-        if let response = navigationResponse.response as? HTTPURLResponse,
-            let disposition = response.allHeaderFields["Content-Disposition"] as? String,
-            disposition.lowercased().contains("attachment")
-        {
-            decisionHandler(.download)
+        let http = navigationResponse.response as? HTTPURLResponse
+        let attachment = http?.value(forHTTPHeaderField: "Content-Disposition")?.lowercased().contains("attachment") == true
+        if attachment || (navigationResponse.isForMainFrame && !navigationResponse.canShowMIMEType) {
+            // A redirected click loses its URL here and counts as unclicked: the first still goes.
+            let url = navigationResponse.response.url
+            let clicked = url.map { clickedRequestURLs.contains($0) } ?? false
+            if let url { clickedRequestURLs.removeAll { $0 == url } }
+            allowDownload(clicked: clicked, in: webView) { decisionHandler($0 ? .download : .cancel) }
             return
         }
 
-        if navigationResponse.isForMainFrame && !navigationResponse.canShowMIMEType {
-            decisionHandler(.download)
-            return
+        if navigationResponse.isForMainFrame {
+            pageAskedNotToStore = http?.value(forHTTPHeaderField: "Cache-Control")?.lowercased().contains("no-store") == true
         }
-
         decisionHandler(.allow)
+    }
+
+    /// A clicked download goes, and so does a page's first. Further ones nobody clicked ask once per
+    /// page, so an ad frame or script cannot fill the Downloads folder.
+    func allowDownload(clicked: Bool, in webView: WKWebView, _ decide: @escaping (Bool) -> Void) {
+        downloadsThisPage += 1
+        if clicked || downloadsThisPage == 1 || moreDownloadsAllowed == true { return decide(true) }
+        guard moreDownloadsAllowed == nil, !isAgentPage, let alerts = controller?.alerts else { return decide(false) }
+        downloadDecisionsWaiting.append(decide)
+        guard downloadDecisionsWaiting.count == 1 else { return }
+        let host = webView.url?.host ?? "this page"
+        // Holds self until the sheet closes: WebKit throws if a decision handler is never called.
+        alerts.presentQuestion(
+            "Allow \(host) to download multiple files?",
+            detail: "The page is downloading another file you didn't click.",
+            allowTitle: "Allow", denyTitle: "Don't Allow", over: webView
+        ) { allowed in
+            self.moreDownloadsAllowed = allowed
+            let waiting = self.downloadDecisionsWaiting
+            self.downloadDecisionsWaiting = []
+            waiting.forEach { $0(allowed) }
+        }
     }
 
     //MARK: - Downloads
@@ -474,18 +503,21 @@ extension PageSession: WKNavigationDelegate {
 // MARK: - Page Text for History Search
 extension PageSession {
     private static let pageTextWorld = WKContentWorld.world(name: "NookHistoryText")
+    /// Nothing from a page with a password field: sign-in and account pages stay out of history.
     private static let pageTextScript = """
-        (() => [document.title, ((document.body && document.body.innerText) || '').trim().slice(0, 20000)])()
+        (() => document.querySelector('input[type=password]') ? null
+            : [document.title, ((document.body && document.body.innerText) || '').trim().slice(0, 20000)])()
         """
 
     /// Reads the page's text into history search once it has settled. A same-document
     /// navigation reads again only when the path changed.
     func schedulePageTextCapture(in webView: WKWebView, sameDocument: Bool) {
         guard let url = webView.url, url.scheme == "http" || url.scheme == "https",
-              !isPrivate, !isAgentPage, controller?.settings.searchPageTextInHistory == true else { return }
+              !isPrivate, !isAgentPage, !pageAskedNotToStore,
+              controller?.settings.searchPageTextInHistory == true else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + (sameDocument ? 1.5 : 1)) { [weak self, weak webView] in
             guard let self, let webView, webView.url == url, !webView.isLoading, !self.isDisplayingPDF,
-                  self.profile?.isEphemeral != true,
+                  self.profile?.isEphemeral != true, !self.pageAskedNotToStore,
                   self.controller?.settings.searchPageTextInHistory == true else { return }
             if let last = self.lastTextCapture {
                 if sameDocument, last.url.host == url.host, last.url.path == url.path { return }
