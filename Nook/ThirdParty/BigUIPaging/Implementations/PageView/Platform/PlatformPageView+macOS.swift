@@ -12,6 +12,8 @@ extension PlatformPageView: NSViewRepresentable {
         view.coordinator = context.coordinator
         context.coordinator.pager = view
         context.coordinator.onSwipe = context.environment.pageSwipeAction
+        context.coordinator.onLeadingOverscroll = context.environment.pageLeadingOverscrollAction
+        context.coordinator.swipeEnabled = context.environment.pageSwipeEnabled
         context.coordinator.show(selection)
         return view
     }
@@ -19,6 +21,8 @@ extension PlatformPageView: NSViewRepresentable {
     func updateNSView(_ view: SwipePagerView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.onSwipe = context.environment.pageSwipeAction
+        context.coordinator.onLeadingOverscroll = context.environment.pageLeadingOverscrollAction
+        context.coordinator.swipeEnabled = context.environment.pageSwipeEnabled
         context.coordinator.refresh(to: selection, animated: context.transaction.animation != nil)
     }
 
@@ -33,6 +37,8 @@ extension PlatformPageView: NSViewRepresentable {
         var parent: PlatformPageView
         weak var pager: SwipePagerView?
         var onSwipe: ((PageSwipePosition?) -> Void)?
+        var onLeadingOverscroll: ((PageLeadingPull) -> Void)?
+        var swipeEnabled = true
         private var views: [SelectionValue: PageHostView] = [:]
 
         init(_ parent: PlatformPageView) {
@@ -100,6 +106,8 @@ extension PlatformPageView: NSViewRepresentable {
         private var motion: Motion = .idle
         private var motionID: UInt = 0
         private var wheel = Wheel()
+        /// How far a pull past the first page has gone, while its listener has not heard it end.
+        private var leadingPull: CGFloat?
 
         private struct Drag {
             var samples: [(time: TimeInterval, position: CGFloat)] = []
@@ -211,7 +219,9 @@ extension PlatformPageView: NSViewRepresentable {
         private func relayout() {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            strip.frame = NSRect(x: -Self.rubberBand(raw, max: maxPosition), y: 0,
+            // A leading pull belongs to its listener, so the first page does not band away.
+            let position = coordinator?.onLeadingOverscroll != nil && selected == 0 ? max(raw, 0) : raw
+            strip.frame = NSRect(x: -Self.rubberBand(position, max: maxPosition), y: 0,
                                  width: CGFloat(max(pages.count, 1)) * width, height: bounds.height)
             for (index, view) in attached {
                 view.frame = NSRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height)
@@ -252,6 +262,7 @@ extension PlatformPageView: NSViewRepresentable {
         }
 
         override func scrollWheel(with event: NSEvent) {
+            guard coordinator?.swipeEnabled ?? true else { return super.scrollWheel(with: event) }
             let horizontal = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
 
             if !event.hasPreciseScrollingDeltas || (event.phase == [] && event.momentumPhase == []) {
@@ -277,7 +288,8 @@ extension PlatformPageView: NSViewRepresentable {
             guard let coordinator, width > 0 else { return false }
 
             pages = coordinator.order()
-            guard pages.count > 1 else { return false }
+            // One page still drags when something listens for the pull past it.
+            guard pages.count > 1 || (pages.count == 1 && coordinator.onLeadingOverscroll != nil) else { return false }
 
             let adopted = adoptSettle()
             let nearest = Self.nearest(raw, width: width, count: pages.count)
@@ -306,6 +318,14 @@ extension PlatformPageView: NSViewRepresentable {
                     NSApp.sendEvent(event)
                 }
             }
+            // However the loop ended, a pull the listener is holding must be let go, or the
+            // library would stay where the fingers left it.
+            if let distance = leadingPull { endLeadingPull(distance: distance, velocity: 0) }
+        }
+
+        private func endLeadingPull(distance: CGFloat, velocity: CGFloat) {
+            leadingPull = nil
+            coordinator?.onLeadingOverscroll?(.ended(distance: distance, velocity: velocity))
         }
 
         func drag(_ phase: NSEvent.Phase, delta: CGFloat, time: TimeInterval) {
@@ -315,6 +335,18 @@ extension PlatformPageView: NSViewRepresentable {
             case .changed:
                 raw += delta * -0.5
                 drag.samples.append((time, raw))
+                // Past the first page with a listener, the fingers drive what it shows (Arc's
+                // library) one to one, and the strip holds still at the first page.
+                if raw < 0, selected == 0, let action = coordinator?.onLeadingOverscroll {
+                    drag.samples.removeAll { time - $0.time > Self.velocityWindow }
+                    motion = .dragging(drag)
+                    relayout()
+                    leadingPull = -raw * 2
+                    action(.changed(distance: -raw * 2))
+                    return
+                }
+                // Back past the first page the other way: the pull is over, so let it go.
+                if leadingPull != nil { endLeadingPull(distance: 0, velocity: 0) }
                 drag.samples.removeAll { time - $0.time > Self.velocityWindow }
 
                 let nearest = Self.nearest(raw, width: width, count: pages.count)
@@ -329,6 +361,13 @@ extension PlatformPageView: NSViewRepresentable {
                 attach(range: shown...(shown + width))
                 relayout()
                 reportPosition(shown)
+            case .ended where leadingPull != nil:
+                let velocity = Self.velocity(drag.samples)
+                let distance = max(-raw * 2, 0)
+                raw = 0
+                motion = .idle
+                relayout()
+                endLeadingPull(distance: distance, velocity: -velocity * 2)
             case .ended:
                 var velocity = Self.velocity(drag.samples)
                 let target = Self.target(position: raw, velocity: velocity, width: width,
@@ -341,6 +380,10 @@ extension PlatformPageView: NSViewRepresentable {
                 settle(to: target, velocity: velocity)
                 if changed { commitAfterSlideStarts(pages[target]) }
             case .cancelled, []:
+                if leadingPull != nil {
+                    raw = 0
+                    endLeadingPull(distance: 0, velocity: 0)
+                }
                 settle(to: selected, velocity: 0)
             default:
                 break

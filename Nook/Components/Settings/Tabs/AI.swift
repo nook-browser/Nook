@@ -57,6 +57,24 @@ struct SettingsAITab: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    Toggle(isOn: $settings.linkPreviews) {
+                        VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                            Text("Link Previews")
+                                .font(NookDesign.Font.body)
+                            Text("Hold Shift while hovering a link to see a short summary of the page")
+                                .font(NookDesign.Font.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Toggle(isOn: $settings.tidyDownloads) {
+                        VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                            Text("Tidy Downloads")
+                                .font(NookDesign.Font.body)
+                            Text("Renames downloads with meaningless names, such as 387494876.pdf, after the page they came from")
+                                .font(NookDesign.Font.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             } header: {
                 Text("Tab Organizer")

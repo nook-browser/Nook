@@ -65,6 +65,7 @@ public struct SettingsTweaksTab: View {
                 Text("Opens the home feed, subreddits and custom feeds sorted by Hot instead of Best. Choosing another sort still works.")
             }
 
+
             YouTubeSettingsSections()
         }
         .formStyle(.grouped)

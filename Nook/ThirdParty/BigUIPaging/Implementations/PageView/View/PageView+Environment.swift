@@ -28,6 +28,24 @@ extension View {
     public func onPageSwipe(_ action: @escaping (PageSwipePosition?) -> Void) -> some View {
         self.environment(\.pageSwipeAction, action)
     }
+
+    /// Whether a swipe pages at all. Off while something over the pages owns the gesture.
+    public func pageSwipeEnabled(_ enabled: Bool) -> some View {
+        self.environment(\.pageSwipeEnabled, enabled)
+    }
+
+    /// Hands a pull past the first page to `action`, finger distance as it moves and the
+    /// release with its velocity, instead of rubber-banding the page. macOS only.
+    public func onPageOverscrollLeading(_ action: @escaping (PageLeadingPull) -> Void) -> some View {
+        self.environment(\.pageLeadingOverscrollAction, action)
+    }
+}
+
+/// A pull past the first page: points the fingers have travelled, then the release with its
+/// velocity in points a second (positive is still pulling).
+public enum PageLeadingPull {
+    case changed(distance: CGFloat)
+    case ended(distance: CGFloat, velocity: CGFloat)
 }
 
 /// Where a swipe sits: `progress` of the way from the page `from` to the page `to`.
@@ -82,6 +100,24 @@ extension EnvironmentValues {
     var pageSwipeAction: ((PageSwipePosition?) -> Void)? {
         get { self[PageSwipeActionKey.self] }
         set { self[PageSwipeActionKey.self] = newValue }
+    }
+
+    struct PageSwipeEnabledKey: EnvironmentKey {
+        static var defaultValue = true
+    }
+
+    var pageSwipeEnabled: Bool {
+        get { self[PageSwipeEnabledKey.self] }
+        set { self[PageSwipeEnabledKey.self] = newValue }
+    }
+
+    struct PageLeadingOverscrollKey: EnvironmentKey {
+        static var defaultValue: ((PageLeadingPull) -> Void)? = nil
+    }
+
+    var pageLeadingOverscrollAction: ((PageLeadingPull) -> Void)? {
+        get { self[PageLeadingOverscrollKey.self] }
+        set { self[PageLeadingOverscrollKey.self] = newValue }
     }
 
     struct NavigateActionKey: EnvironmentKey {

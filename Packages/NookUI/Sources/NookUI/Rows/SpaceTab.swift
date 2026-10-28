@@ -25,6 +25,7 @@ public struct SpaceTab: View {
     @FocusState private var isTextFieldFocused: Bool
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.tabActions) private var actions
+    @Environment(\.nookSettings) private var nookSettings
     private let renameState = SidebarRenameState.shared
 
     @Environment(TabsController.self) private var tabs
@@ -117,7 +118,7 @@ public struct SpaceTab: View {
                         .hidden()
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .overlay(alignment: .leading) {
-                            Text(title)
+                            label(title)
                                 .font(NookDesign.Font.body)
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
@@ -182,6 +183,13 @@ public struct SpaceTab: View {
             }
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
             .nookRowSelection(isCurrentTab)
+            // Developer Mode on this tab's site, marked as Arc marks it.
+            .overlay {
+                if nookSettings.isDeveloperSite(tabs.currentURL(for: item)?.host) {
+                    NookDesign.Radius.shape(NookDesign.Radius.md)
+                        .strokeBorder(Color.yellow, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                }
+            }
             .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
         }
         .buttonStyle(PlainButtonStyle())
@@ -214,6 +222,12 @@ public struct SpaceTab: View {
     }
 
     private var accentColor: Color { actions?.accentColor ?? .accentColor }
+
+    /// A search results tab reads as Arc's does: the query, then the site in a softer tone.
+    private func label(_ title: String) -> Text {
+        guard let search = tabs.searchTitle(for: item) else { return Text(title) }
+        return Text(search.query) + Text("  " + search.site).foregroundColor(.secondary)
+    }
 
     private var isCurrentTab: Bool {
         tabs.selectedItemID(in: windowState) == item.id

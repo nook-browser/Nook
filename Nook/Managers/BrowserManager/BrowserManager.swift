@@ -820,6 +820,20 @@ class BrowserManager: ObservableObject {
         openSettings(tab: .spaces)
     }
 
+    /// Opens the Boost panel over the selected page. Nothing is saved until the person saves.
+    func openBoostPanel(in windowState: BrowserWindowState) {
+        guard let url = tabs.selectedSession(in: windowState)?.url,
+              url.scheme == "http" || url.scheme == "https",
+              !Boost.normalizeHost(url.host ?? "").isEmpty
+        else { return }
+        windowState.isBoostPanelVisible = true
+    }
+
+    func boostCurrentSite() {
+        guard let windowState = windowRegistry?.activeWindow else { return }
+        openBoostPanel(in: windowState)
+    }
+
     func openSettings(tab: SettingsTabs) {
         SettingsNavigation.shared.currentSettingsTab = tab
         openSettingsAction?.callAsFunction()
@@ -1170,28 +1184,15 @@ class BrowserManager: ObservableObject {
     /// Show the downloads panel in the sidebar
     func showDownloads() {
         guard let windowState = windowRegistry?.activeWindow else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            windowState.sidebarMenuSelectedTab = .downloads
-            windowState.isSidebarMenuVisible = true
-            windowState.isSidebarAIChatVisible = false
-            windowState.savedSidebarWidth = windowState.sidebarWidth
-            let newWidth: CGFloat = 400
-            windowState.sidebarWidth = newWidth
-            windowState.sidebarContentWidth = max(newWidth - 16, 0)
-        }
+        windowState.sidebarMenuSelectedTab = .downloads
+        LibraryMotion.present(windowState)
     }
 
-    /// Show the history panel in the sidebar
+    /// Shows History as a page over the web content, as Arc does; again hides it.
     func showHistory() {
         guard let windowState = windowRegistry?.activeWindow else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            windowState.sidebarMenuSelectedTab = .history
-            windowState.isSidebarMenuVisible = true
-            windowState.isSidebarAIChatVisible = false
-            windowState.savedSidebarWidth = windowState.sidebarWidth
-            let newWidth: CGFloat = 400
-            windowState.sidebarWidth = newWidth
-            windowState.sidebarContentWidth = max(newWidth - 16, 0)
+        withAnimation(NookDesign.Motion.standard) {
+            windowState.isHistoryPageVisible.toggle()
         }
     }
 

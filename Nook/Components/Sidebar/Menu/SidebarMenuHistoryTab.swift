@@ -327,15 +327,10 @@ struct HistoryRowView: View {
     let onDelete: () -> Void
 
     @State private var isHovered: Bool = false
-    @State private var favicon: SwiftUI.Image?
 
     var body: some View {
         HStack(spacing: NookDesign.Spacing.md) {
-            (favicon ?? SwiftUI.Image(systemName: "globe"))
-                .resizable()
-                .scaledToFit()
-                .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
-                .foregroundStyle(.secondary)
+            HistoryFavicon(url: entry.url)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(entry.displayTitle)
@@ -382,19 +377,6 @@ struct HistoryRowView: View {
         .onTapGesture {
             onTap()
         }
-        // Cancelled when the row scrolls away; the old onAppear Task kept fetching for rows long gone.
-        .task(id: entry.url.host) {
-            guard entry.url.scheme == "http" || entry.url.scheme == "https",
-                  let host = entry.url.host else { return }
-            if let cached = await FaviconCache.shared.cachedImage(for: host) {
-                favicon = SwiftUI.Image(nsImage: cached)
-                return
-            }
-            guard let image = try? await FaviconFinder(url: entry.url).fetchFaviconURLs().download().largest().image?.image,
-                  !Task.isCancelled else { return }
-            FaviconCache.shared.store(image, for: host)
-            favicon = SwiftUI.Image(nsImage: image)
-        }
         .contextMenu {
             Button("Open") { onTap() }
             Button("Open in New Tab") {
@@ -403,6 +385,32 @@ struct HistoryRowView: View {
             Divider()
             Button("Remove from History") { onDelete() }
         }
+    }
+}
+
+/// A history page's favicon: the cache first, the network only for a row on screen.
+struct HistoryFavicon: View {
+    let url: URL
+    @State private var favicon: SwiftUI.Image?
+
+    var body: some View {
+        (favicon ?? SwiftUI.Image(systemName: "globe"))
+            .resizable()
+            .scaledToFit()
+            .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
+            .foregroundStyle(.secondary)
+            // Cancelled when the row scrolls away; the old onAppear Task kept fetching for rows long gone.
+            .task(id: url.host) {
+                guard url.scheme == "http" || url.scheme == "https", let host = url.host else { return }
+                if let cached = await FaviconCache.shared.cachedImage(for: host) {
+                    favicon = SwiftUI.Image(platformImage: cached)
+                    return
+                }
+                guard let image = try? await FaviconFinder(url: url).fetchFaviconURLs().download().largest().image?.image,
+                      !Task.isCancelled else { return }
+                FaviconCache.shared.store(image, for: host)
+                favicon = SwiftUI.Image(platformImage: FaviconCache.shared.image(for: host) ?? image)
+            }
     }
 }
 

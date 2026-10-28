@@ -49,6 +49,7 @@ extension PageSession: WKNavigationDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
+        linkPreview = nil
         pdfLoadStateChanged(webView)
         if let capture = devCapture {
             capture.reset()
@@ -353,6 +354,7 @@ extension PageSession: WKNavigationDelegate {
                 SocialImageTweaks.apply(for: url, in: webView, settings: settings)
                 FacebookTweaks.apply(for: url, in: webView, settings: settings)
                 RedditTweaks.apply(in: webView, settings: settings)
+                BoostTweaks.apply(for: url, in: webView, settings: settings)
             }
         }
 

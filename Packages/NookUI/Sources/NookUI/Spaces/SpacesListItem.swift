@@ -23,6 +23,7 @@ struct SpacesListItem: View {
     let onHoverChange: ((Bool) -> Void)?
 
     @State private var isHovering: Bool = false
+    @State private var showThemePicker = false
     @Environment(\.tabActions) private var actions
 
     private let dotSize: CGFloat = NookDesign.Spacing.sm
@@ -61,9 +62,14 @@ struct SpacesListItem: View {
             isHovering = hovering
             onHoverChange?(hovering)
         }
+        .popover(isPresented: $showThemePicker, arrowEdge: .top) {
+            SpaceThemeEditor(space: space)
+                .environment(tabs)
+        }
         .contextMenu {
             SpaceContextMenu(
                 space: space,
+                onEditThemeColor: { showThemePicker = true },
                 canDelete: tabs.switchableSpaces(for: windowState).count > 1,
                 onOpenSettings: { actions?.openSpaceSettings() },
                 onDeleteSpace: { tabs.deleteSpace(space.id) }

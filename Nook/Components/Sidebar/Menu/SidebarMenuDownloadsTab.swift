@@ -8,21 +8,21 @@
 
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import NookDesign
 import NookUI
 
 struct SidebarMenuDownloadsTab: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var text: String = ""
+    @State private var kind: DownloadKind?
 
     private var filteredDownloads: [Download] {
-        if text.isEmpty {
-            return browserManager.downloadManager.allDownloads
-        } else {
-            return browserManager.downloadManager.allDownloads.filter { download in
-                download.suggestedFilename.localizedCaseInsensitiveContains(text) ||
-                    download.originalURL.absoluteString.localizedCaseInsensitiveContains(text)
-            }
+        browserManager.downloadManager.allDownloads.filter { download in
+            (kind == nil || DownloadKind(download.displayName) == kind)
+                && (text.isEmpty
+                    || download.displayName.localizedCaseInsensitiveContains(text)
+                    || download.originalURL.absoluteString.localizedCaseInsensitiveContains(text))
         }
     }
 
@@ -30,23 +30,30 @@ struct SidebarMenuDownloadsTab: View {
         // Once per render: every access sorts the whole list.
         let downloads = filteredDownloads
         ScrollView {
-            LazyVStack(spacing: NookDesign.Spacing.rowGap) {
-                if downloads.isEmpty && !text.isEmpty {
+            LazyVStack(alignment: .leading, spacing: NookDesign.Spacing.rowGap) {
+                if downloads.isEmpty {
                     VStack(spacing: NookDesign.Spacing.md) {
-                        Image(systemName: "magnifyingglass")
+                        Image(systemName: text.isEmpty && kind == nil ? "arrow.down.circle" : "magnifyingglass")
                             .font(NookDesign.Font.titleLarge)
                             .foregroundStyle(.tertiary)
-                        Text("No downloads found")
+                        Text(text.isEmpty && kind == nil ? "No downloads yet" : "No downloads found")
                             .font(NookDesign.Font.body)
                             .foregroundStyle(.secondary)
-                        Text("Try searching with a different term")
-                            .font(NookDesign.Font.secondary)
-                            .foregroundStyle(.tertiary)
                     }
+                    .frame(maxWidth: .infinity)
                     .padding(.vertical, NookDesign.Spacing.xxxl)
                 } else {
-                    ForEach(downloads) { download in
-                        DownloadItem(download: download)
+                    ForEach(Self.days(downloads), id: \.title) { day in
+                        Text(day.title)
+                            .font(NookDesign.Font.label)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, NookDesign.Spacing.rowPadding)
+                            .padding(.top, NookDesign.Spacing.lg)
+                            .padding(.bottom, NookDesign.Spacing.xs)
+                        ForEach(day.downloads) { download in
+                            DownloadItem(download: download)
+                                .transition(.opacity.combined(with: .move(edge: .leading)))
+                        }
                     }
                 }
             }
@@ -55,17 +62,135 @@ struct SidebarMenuDownloadsTab: View {
         }
         // Rows scroll under the floating search field, as in the history tab.
         .nookScrollHeader {
-            SidebarMenuSearchField(prompt: "Search downloads...", text: $text)
-                .padding(NookDesign.Spacing.md)
+            HStack(spacing: NookDesign.Spacing.sm) {
+                SidebarMenuSearchField(prompt: "Search downloads...", text: $text)
+                filterMenu
+            }
+            .padding(NookDesign.Spacing.md)
+        }
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Picker("Show", selection: $kind) {
+                Text("All Downloads").tag(DownloadKind?.none)
+                Divider()
+                ForEach(DownloadKind.allCases, id: \.self) { kind in
+                    Label(kind.plural, systemImage: kind.symbol).tag(DownloadKind?.some(kind))
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label(kind?.plural ?? "Filter", systemImage: "line.3.horizontal.decrease.circle")
+        }
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .buttonStyle(RectNavButtonStyle())
+        .fixedSize()
+    }
+
+    private struct Day {
+        let title: String
+        let downloads: [Download]
+    }
+
+    /// Today, Yesterday, then days ago for a week, then the date, as Arc groups them.
+    private static func days(_ downloads: [Download]) -> [Day] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var order: [Date] = []
+        var byDay: [Date: [Download]] = [:]
+        for download in downloads {
+            let day = calendar.startOfDay(for: download.startDate)
+            if byDay[day] == nil { order.append(day) }
+            byDay[day, default: []].append(download)
+        }
+        return order.map { day in
+            let ago = calendar.dateComponents([.day], from: day, to: today).day ?? 0
+            let title: String
+            switch ago {
+            case 0: title = "Today"
+            case 1: title = "Yesterday"
+            case 2..<7: title = "\(ago) days ago"
+            default: title = day.formatted(.dateTime.day().month(.wide).year())
+            }
+            return Day(title: title, downloads: byDay[day] ?? [])
+        }
+    }
+}
+
+/// What a downloaded file is, for the row's subtitle and the filter.
+enum DownloadKind: CaseIterable, Hashable {
+    case image, video, audio, pdf, document, diskImage, archive, other
+
+    init(_ filename: String) {
+        let type = UTType(filenameExtension: (filename as NSString).pathExtension) ?? .data
+        switch true {
+        case type.conforms(to: .image): self = .image
+        case type.conforms(to: .movie): self = .video
+        case type.conforms(to: .audio): self = .audio
+        case type.conforms(to: .pdf): self = .pdf
+        case type.conforms(to: .diskImage): self = .diskImage
+        case type.conforms(to: .archive): self = .archive
+        case type.conforms(to: .text), type.conforms(to: .presentation), type.conforms(to: .spreadsheet),
+             type.conforms(to: .rtf), type.conforms(to: .compositeContent): self = .document
+        default: self = .other
+        }
+    }
+
+    var name: String {
+        switch self {
+        case .image: "Image"
+        case .video: "Video"
+        case .audio: "Audio"
+        case .pdf: "PDF"
+        case .document: "Document"
+        case .diskImage: "Disk Image"
+        case .archive: "Archive"
+        case .other: "Download"
+        }
+    }
+
+    var plural: String {
+        switch self {
+        case .image: "Images"
+        case .video: "Videos"
+        case .audio: "Audio"
+        case .pdf: "PDFs"
+        case .document: "Documents"
+        case .diskImage: "Disk Images"
+        case .archive: "Archives"
+        case .other: "Other"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .image: "photo"
+        case .video: "film"
+        case .audio: "waveform"
+        case .pdf: "doc.richtext"
+        case .document: "doc.text"
+        case .diskImage: "externaldrive"
+        case .archive: "archivebox"
+        case .other: "arrow.down.circle"
         }
     }
 }
 
 struct DownloadItem: View {
+    @EnvironmentObject var browserManager: BrowserManager
     @State private var isHovering: Bool = false
     var download: Download
 
-    private let iconSize: CGFloat = 24
+    private let iconSize: CGFloat = 36
+
+    /// "Disk Image from github.com", as Arc writes it.
+    private var subtitle: String {
+        let kind = DownloadKind(download.displayName).name
+        guard let host = download.originalURL.host, !host.isEmpty else { return kind }
+        return "\(kind) from \(host)"
+    }
 
     var body: some View {
         HStack(spacing: NookDesign.Spacing.md) {
@@ -75,14 +200,27 @@ struct DownloadItem: View {
                 .frame(width: iconSize, height: iconSize)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(download.suggestedFilename)
-                    .font(NookDesign.Font.body)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                HStack(spacing: NookDesign.Spacing.xs) {
+                    Text(download.displayName)
+                        .font(NookDesign.Font.title)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .id(download.displayName)
+                        .transition(.blurReplace)
+                    if download.renamedFrom != nil {
+                        Image(systemName: "sparkles")
+                            .font(NookDesign.Font.caption)
+                            .foregroundStyle(.secondary)
+                            .symbolEffect(.bounce, value: download.displayName)
+                            .transition(.scale(scale: 0.5).combined(with: .opacity))
+                            .help("Renamed by Tidy Downloads")
+                    }
+                }
 
-                Text(download.originalURL.absoluteString)
-                    .font(NookDesign.Font.secondary)
+                Text(subtitle)
+                    .font(NookDesign.Font.body)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -102,6 +240,13 @@ struct DownloadItem: View {
                         Label("Show in Finder", systemImage: "folder")
                     }
                     Divider()
+                    if download.renamedFrom != nil {
+                        Button {
+                            browserManager.downloadManager.undoTidy(download)
+                        } label: {
+                            Label("Restore Original Name", systemImage: "arrow.uturn.backward")
+                        }
+                    }
                     Button(action: moveToTrash) {
                         Label("Move to Trash", systemImage: "trash")
                     }
@@ -124,10 +269,14 @@ struct DownloadItem: View {
             }
         }
         .onTapGesture {
-            openFile()
+            if download.completedFile != nil { browserManager.downloadManager.previewing = download }
         }
         .onDrag {
             download.dragItemProvider()
+        }
+        // Rows restored from an earlier launch load their thumbnail when they first show.
+        .task(id: download.destinationURL) {
+            if download.downloadThumbnail == nil, download.state == .completed { await download.loadThumbnail() }
         }
     }
 
@@ -150,9 +299,8 @@ struct DownloadItem: View {
         NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
     }
 
-    /// This item used to call Show in Finder. The row stays, as it does in Safari.
+    /// The file goes to the Trash and its row leaves the list.
     private func moveToTrash() {
-        guard let file = download.completedFile else { return }
-        NSWorkspace.shared.recycle([file])
+        browserManager.downloadManager.moveToTrash(download)
     }
 }

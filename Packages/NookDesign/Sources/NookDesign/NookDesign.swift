@@ -26,6 +26,8 @@ public enum NookDesign {
         public static let lg: CGFloat = 12     // essentials tile, card, settings group
         public static let xl: CGFloat = 16     // dialog, toast
         public static let xxl: CGFloat = 24    // command palette
+        /// The website frame. Concentric with the macOS window corner (about 22) across the 8pt inset.
+        public static let page: CGFloat = 14
 
         public static func shape(_ radius: CGFloat) -> RoundedRectangle {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -127,6 +129,7 @@ public enum NookDesign {
         public static let caption = SwiftUI.Font.system(size: 11, weight: .medium)       // counts, shortcuts, subtitles
         public static let captionStrong = SwiftUI.Font.system(size: 11, weight: .semibold) // section headers
         public static let micro = SwiftUI.Font.system(size: 9, weight: .semibold)        // badges only
+        public static let mono = SwiftUI.Font.system(size: 12, weight: .regular, design: .monospaced) // developer bar address
     }
 
     // MARK: - Motion
@@ -178,14 +181,32 @@ public enum NookDesign {
                 Color(hex: "#13261E"), Color(hex: "#0F1F19"), Color(hex: "#0A1612"),
             ])
         public static let grainOpacity: Double = 0.08         // film grain over a fixed backdrop
+        public static let themeGrainOpacity: Double = 0.7     // a space theme's grain at the dial's maximum
+        /// A space theme's color over the blurred desktop: mostly see-through at the slider's
+        /// left end, nearly solid at its right.
+        public static func themeTintOpacity(intensity: Double) -> Double { 0.3 + 0.62 * intensity }
         public static let agentFrameWidth: CGFloat = 3        // frame around the Agent space's page
 
         #if os(macOS)
         public static let windowBackground = Color(nsColor: .windowBackgroundColor)
-        public static let raised = Color(nsColor: .controlBackgroundColor) // active row, active tile
+        public static let raised = Color(nsColor: .controlBackgroundColor) // floating cards, active tile
+        /// Link preview cards: near black in dark appearance and white in light, as Arc's are, so
+        /// the photo and text pop instead of sitting on a gray card.
+        public static let previewCard = Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(white: 0.06, alpha: 1) : .white
+        })
+        /// The chosen row, as Arc draws it: white laid over the space's color, soft in dark
+        /// appearance and near solid in light, so the tint still shows through.
+        public static let selection = Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor.white.withAlphaComponent(0.14)
+                : NSColor.white.withAlphaComponent(0.72)
+        })
         #else
         public static let windowBackground = Color(uiColor: .systemBackground)
-        public static let raised = Color(uiColor: .secondarySystemBackground) // active row, active tile
+        public static let raised = Color(uiColor: .secondarySystemBackground) // floating cards, active tile
+        public static let selection = Color.primary.opacity(0.1)
+        public static let previewCard = Color(uiColor: .systemBackground)
         #endif
 
         /// Sidebar/window chrome fill: the space accent fading to the system window background.

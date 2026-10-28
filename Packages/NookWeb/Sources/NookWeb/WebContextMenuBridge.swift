@@ -195,6 +195,14 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             }
             return
         }
+        if dictionary.keys.contains("linkPreview") {
+            guard message.frameInfo.isMainFrame else { return }
+            session?.linkPreview = (dictionary["linkPreview"] as? String).flatMap(URL.init(string:)).map { url in
+                let number = { (key: String) in (dictionary[key] as? NSNumber)?.doubleValue ?? 0 }
+                return LinkPreviewTarget(url: url, rect: CGRect(x: number("x"), y: number("y"), width: number("width"), height: number("height")))
+            }
+            return
+        }
         let payload = WebContextMenuPayload(dictionary: dictionary)
         session?.deliverContextMenuPayload(payload)
     }
@@ -331,6 +339,42 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             }
         }, false);
 
+        // Link previews: Shift held over a link reports it with its box in the viewport, and
+        // leaving it, scrolling or switching away takes the preview down. Main frame only, so
+        // the box is in the web view's own coordinates. Nothing is cancelled for the page.
+        if (window.top === window) {
+            var previewLink = null;
+            var pointerTarget = null;
+            function previewHandler() {
+                return window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload;
+            }
+            function webLink(target) {
+                var link = target && target.closest ? target.closest('a[href]') : null;
+                return link && /^https?:/i.test(link.href) ? link : null;
+            }
+            function reportPreview(link) {
+                if (link === previewLink) { return; }
+                previewLink = link;
+                var handler = previewHandler();
+                if (!handler) { return; }
+                if (!link) { handler.postMessage({ linkPreview: null }); return; }
+                var box = link.getBoundingClientRect();
+                handler.postMessage({ linkPreview: link.href, x: box.left, y: box.top, width: box.width, height: box.height });
+            }
+            document.addEventListener('mouseover', function(event) {
+                pointerTarget = event.target;
+                var link = webLink(event.target);
+                if (event.shiftKey && link) { reportPreview(link); }
+                else if (previewLink && link !== previewLink) { reportPreview(null); }
+            }, true);
+            window.addEventListener('keydown', function(event) {
+                if (event.key === 'Shift' && !event.repeat) { reportPreview(webLink(pointerTarget)); }
+            }, true);
+            window.addEventListener('scroll', function() { reportPreview(null); }, true);
+            window.addEventListener('blur', function() { reportPreview(null); });
+            document.addEventListener('mouseleave', function() { pointerTarget = null; reportPreview(null); });
+        }
+
         console.log('[Nook Context Menu] Event listener registered');
     })();
     """
@@ -342,4 +386,10 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler {
             in: world
         )
     }
+}
+
+/// A link the person is holding Shift over, with its box in the page's viewport (CSS pixels).
+public struct LinkPreviewTarget: Equatable, Sendable {
+    public let url: URL
+    public let rect: CGRect
 }
