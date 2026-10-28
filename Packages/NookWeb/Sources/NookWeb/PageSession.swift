@@ -481,7 +481,6 @@ public final class PageSession: NSObject, Identifiable {
         unload()
         savedHistory = nil
         isAudioMuted = false
-        controller?.sessionDelegate?.cleanupZoom(for: itemID)
         if webStoreHandler != nil {
             if let controller = primaryWebView?.configuration.userContentController {
                 self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)

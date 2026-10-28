@@ -50,7 +50,6 @@ public protocol PageSessionDelegate: AnyObject {
     // MARK: Per-page chrome
 
     func loadZoom(for itemID: UUID)
-    func cleanupZoom(for itemID: UUID)
     func setMuteState(_ muted: Bool, for itemID: UUID)
     func requestPictureInPicture(for session: PageSession, webView: WKWebView?)
 
