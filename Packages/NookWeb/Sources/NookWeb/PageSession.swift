@@ -207,6 +207,8 @@ public final class PageSession: NSObject, Identifiable {
     @ObservationIgnored var jsDialogsSuppressed = false
     /// An open-in-another-app sheet is up, so a redirect loop cannot stack more.
     @ObservationIgnored var externalAppConfirmPending = false
+    /// URL rewrites since the last commit; capped so a server redirecting back cannot loop us.
+    @ObservationIgnored var navigationRewrites = 0
     /// Downloads since the last commit, the person's answer about more of them, and the answers
     /// waiting on that question. Requests made inside a click are remembered until their response.
     @ObservationIgnored var downloadsThisPage = 0

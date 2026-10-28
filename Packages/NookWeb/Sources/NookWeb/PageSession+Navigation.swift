@@ -49,6 +49,7 @@ extension PageSession: WKNavigationDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
+        navigationRewrites = 0
         linkPreview = nil
         pdfLoadStateChanged(webView)
         if let capture = devCapture {
@@ -329,8 +330,10 @@ extension PageSession: WKNavigationDelegate {
         {
             devCapture?.markNavigationStart()
             // urlskip= goes past a known redirector; $removeparam restarts without tracking
-            // parameters. Either way the replacement comes back through here.
-            if navigationAction.navigationType != .backForward,
+            // parameters. Either way the replacement comes back through here. Past three
+            // rewrites the server is redirecting back to the original (Reddit's /hot/), so let it load.
+            let mayRewrite = navigationRewrites < 3
+            if mayRewrite, navigationAction.navigationType != .backForward,
                (navigationAction.request.httpMethod ?? "GET") == "GET",
                let replacement = controller?.blocker.urlSkipTarget(for: url, from: self.url, tab: self)
                    ?? controller?.blocker.strippedTrackingParams(for: url, tab: self)
@@ -340,12 +343,14 @@ extension PageSession: WKNavigationDelegate {
                     capture.recordBlock(DevBlockEntry(action: skipped ? .skippedRedirect : .strippedParams,
                                                       url: url.absoluteString, target: replacement.absoluteString))
                 }
+                navigationRewrites += 1
                 decisionHandler(.cancel)
                 webView.load(URLRequest(url: replacement))
                 return
             }
 
-            if let settings = controller?.settings, let hot = RedditTweaks.hotURL(for: url, settings: settings) {
+            if mayRewrite, let settings = controller?.settings, let hot = RedditTweaks.hotURL(for: url, settings: settings) {
+                navigationRewrites += 1
                 decisionHandler(.cancel)
                 webView.load(URLRequest(url: hot))
                 return
