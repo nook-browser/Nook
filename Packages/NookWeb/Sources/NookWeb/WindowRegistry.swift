@@ -45,8 +45,12 @@ public class WindowRegistry {
     @ObservationIgnored
     public var onActiveWindowChange: ((BrowserWindowState) -> Void)?
 
-    /// Register a new window
+    /// Register once: programmatic windows register before their SwiftUI view appears.
     public func register(_ window: BrowserWindowState) {
+        guard windows[window.id] == nil else {
+            return
+        }
+
         windows[window.id] = window
         onWindowRegister?(window)
     }
