@@ -5,7 +5,8 @@
 //
 //  DevMCP may only write under its root. Compiles the shipped source directly:
 //
-//    swiftc Nook/Managers/DevMCPServer/DevMCPFiles.swift scripts/tests/DevMCPFilesCheck.swift \
+//    swiftc Nook/Managers/DevMCPServer/DevMCPFiles.swift Packages/NookWeb/Sources/NookWeb/Quarantine.swift \
+//           scripts/tests/DevMCPFilesCheck.swift \
 //           -o /tmp/devmcp-files-check && /tmp/devmcp-files-check
 //
 
@@ -30,6 +31,9 @@ struct DevMCPFilesCheck {
         precondition(DevMCPFiles.resolve("/etc/hosts", root: root) == nil)
         precondition(DevMCPFiles.resolve("~/.zshrc", root: root) == nil)
         precondition(DevMCPFiles.resolve("out/x", root: root) == nil, "a symlink must not lead out")
+        try fm.createSymbolicLink(atPath: root.appendingPathComponent("dangling").path,
+                                  withDestinationPath: tmp.appendingPathComponent("planted.txt").path)
+        precondition(DevMCPFiles.resolve("dangling", root: root) == nil, "a dangling symlink must not lead out")
 
         let u = URL(string: "https://cdn.example.com/files/a%20b/photo.JPG?v=1")!
         let name = DevMCPFiles.fileName(for: u, contentType: "image/jpeg")

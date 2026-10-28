@@ -523,6 +523,7 @@ final class DevMCPServer {
                 } else {
                     try data.write(to: saveURL)
                 }
+                DownloadManager.setQuarantineAttribute(on: saveURL)
                 return text("Saved \(data.count) bytes to \(saveURL.path)")
 
             case "download":
