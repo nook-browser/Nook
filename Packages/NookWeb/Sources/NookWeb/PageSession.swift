@@ -332,9 +332,9 @@ public final class PageSession: NSObject, Identifiable {
             return
         }
 
-        // Private and Agent pages never get the extension controller: extensions could open
-        // windows and activate the app from an Agent page.
-        if isPrivate || isAgentPage {
+        // Agent pages never get the extension controller: extensions could open windows and
+        // activate the app from an Agent page.
+        if isAgentPage {
             configuration.webExtensionController = nil
         } else if configuration.webExtensionController == nil,
                   let extensionController = controller?.tabEvents?.nativeController {
@@ -423,7 +423,7 @@ public final class PageSession: NSObject, Identifiable {
         configure(webView)
         setupThemeColorObserver(for: webView)
         setupNavigationStateObservers(for: webView)
-        if !didNotifyOpenToExtensions, !isPrivate {
+        if !didNotifyOpenToExtensions {
             controller?.tabEvents?.tabOpened(self)
             didNotifyOpenToExtensions = true
         }
@@ -543,7 +543,7 @@ public final class PageSession: NSObject, Identifiable {
         loadingState = .didStartProvisionalNavigation
 
         // Grant extension access before loading so content scripts inject at document_start.
-        controller?.tabEvents?.grantAccess(to: newURL)
+        controller?.tabEvents?.grantAccess(to: newURL, private: isPrivate)
 
         // Reset audio tracking for the new page; the mute preference is preserved.
         hasAudioContent = false

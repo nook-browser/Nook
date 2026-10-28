@@ -131,7 +131,7 @@ extension TabsController {
         session.onClose = nil
         register(session, in: window)
         // Extensions could not see the page while it had no item.
-        if !session.isPrivate { tabEvents?.tabOpened(session) }
+        tabEvents?.tabOpened(session)
         select(session.itemID, in: window)
         return session.itemID
     }
@@ -141,7 +141,7 @@ extension TabsController {
         guard session.isDetached else { return }
         session.onClose = nil
         session.tearDown()
-        if !session.isPrivate { tabEvents?.tabClosed(itemID: session.itemID) }
+        tabEvents?.tabClosed(itemID: session.itemID)
     }
 
     /// A WebKit-created popup from `opener`: a new selected tab in the opener's window whose
@@ -220,7 +220,7 @@ extension TabsController {
             }
             session.loadWebViewIfNeeded()
             session.checkMediaState()
-            if session !== previous, !session.isPrivate {
+            if session !== previous {
                 tabEvents?.tabActivated(new: session, previous: previous)
             }
         }

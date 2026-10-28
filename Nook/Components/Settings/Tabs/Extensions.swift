@@ -219,6 +219,16 @@ private struct ExtensionRowView: View {
                             .lineLimit(1)
                     }
                 }
+
+                Toggle(
+                    "Allow in Private Browsing",
+                    isOn: Binding(
+                        get: { `extension`.allowsPrivateBrowsing },
+                        set: { browserManager.extensionManager?.setAllowsPrivateBrowsing(`extension`.id, allowed: $0) }
+                    )
+                )
+                .toggleStyle(.checkbox)
+                .font(NookDesign.Font.caption)
             }
 
             Spacer()
