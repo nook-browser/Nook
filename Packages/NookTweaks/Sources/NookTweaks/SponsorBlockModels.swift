@@ -3,7 +3,7 @@
 //  SponsorBlockModels.swift
 //  Nook
 //
-//  Created by Claude on 26/03/2026.
+//  Created by Bain Gurley on 26/03/2026.
 //
 //  Runtime SponsorBlock types: segments and the hash-prefix API response.
 //  SponsorBlockCategory and SponsorBlockSkipOption are persisted settings and

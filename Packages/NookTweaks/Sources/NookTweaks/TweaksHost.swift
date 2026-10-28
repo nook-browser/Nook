@@ -3,7 +3,7 @@
 //  TweaksHost.swift
 //  NookTweaks
 //
-//  Created by Claude on 17/09/2026.
+//  Created by Bain Gurley on 17/09/2026.
 //
 //  The two seams the tweaks need from the app. Everything else in this package
 //  is Foundation and WebKit, so it builds on iOS unchanged.

@@ -19,7 +19,7 @@ const out = path.join(listDir, 'redirects.json');
 
 // Ad-Shield compares the script it receives against an X-Length response header,
 // so a body with no headers reads as malformed and it replaces the document with
-// an error modal. Blocking it outright is the milder failure. See CLAUDE.md.
+// an error modal. Blocking it outright is the milder failure.
 const NEVER_ANSWER = /html-load\.|ad-shield|adshield/i;
 
 const MIME = {

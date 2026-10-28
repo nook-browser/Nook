@@ -231,8 +231,7 @@
   }
 
   // --- Stories: advance past an ad as soon as it becomes the active story.
-  // Unverified — no Facebook story ad was seen live during probing (see
-  // docs/superpowers/specs or CLAUDE.md's site-tweak probe method). Reuses the feed's
+  // Unverified: no Facebook story ad was seen live during probing. Reuses the feed's
   // SPONSORED_LABELS text match; gated to the story-viewer dialog so it can't fire on an
   // ordinary inline feed video, which also gets aria-label="Video player".
   var advancedStories = new WeakSet();
