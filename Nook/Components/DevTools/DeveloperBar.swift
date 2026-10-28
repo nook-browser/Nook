@@ -71,12 +71,16 @@ struct DeveloperBar: View {
                 }
                 tool("camera", "Copy Screenshot", action: copyScreenshot)
                 separator
-                tool("terminal", "Console", isOn: devTabShowing(.console)) { browserManager.toggleDevPanel(.console) }
-                tool("network", "Network", isOn: devTabShowing(.network)) { browserManager.toggleDevPanel(.network) }
-                tool("scope", "Pick Element") { browserManager.startElementPicker() }
+                Group {
+                    tool("terminal", "Console", isOn: devTabShowing(.console)) { browserManager.toggleDevPanel(.console) }
+                    tool("network", "Network", isOn: devTabShowing(.network)) { browserManager.toggleDevPanel(.network) }
+                    tool("scope", "Pick Element") { browserManager.startElementPicker() }
+                }
+                .disabled(!captureOn)
                 separator
                 tool("hammer", "Web Inspector") { browserManager.openWebInspector() }
                 tool("gauge.with.needle", "Performance", isOn: devTabShowing(.perf)) { browserManager.toggleDevPanel(.perf) }
+                    .disabled(!captureOn)
             }
         }
         .padding(.horizontal, NookDesign.Spacing.lg)
@@ -92,6 +96,9 @@ struct DeveloperBar: View {
             .frame(width: 1, height: NookDesign.Spacing.xl)
             .padding(.horizontal, NookDesign.Spacing.xs)
     }
+
+    /// The capture scripts behind these tools run only with Settings > Developer > Developer Mode on.
+    private var captureOn: Bool { browserManager.nookSettings?.developerModeEnabled == true }
 
     private func devTabShowing(_ tab: DevPanelTab) -> Bool {
         windowState.isSidebarAIChatVisible && windowState.devPanelTab == tab

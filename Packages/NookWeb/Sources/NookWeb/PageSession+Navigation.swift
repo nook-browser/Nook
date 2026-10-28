@@ -111,6 +111,7 @@ extension PageSession: WKNavigationDelegate {
             // The final URL after redirects.
             controller?.pageCommitted(itemID: itemID, url: newURL)
             controller?.sessionDelegate?.navigateAcrossWindows(itemID, to: newURL)
+            if let settings = controller?.settings { BoostTweaks.runScripts(for: newURL, in: webView, settings: settings) }
 
             // Load saved zoom level for the new domain
             controller?.sessionDelegate?.loadZoom(for: self.itemID)
@@ -354,7 +355,7 @@ extension PageSession: WKNavigationDelegate {
                 SocialImageTweaks.apply(for: url, in: webView, settings: settings)
                 FacebookTweaks.apply(for: url, in: webView, settings: settings)
                 RedditTweaks.apply(in: webView, settings: settings)
-                BoostTweaks.apply(for: url, in: webView, settings: settings)
+                if let blocker = controller?.blocker { BoostTweaks.apply(for: url, in: webView, settings: settings, blocker: blocker) }
             }
         }
 

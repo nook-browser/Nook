@@ -67,10 +67,13 @@ public final class AdvancedRulesEngine {
     /// Main-frame fast path: embed the configuration so the runtime applies it synchronously
     /// at document start instead of round-tripping through the message handler.
     /// Always returns a script: `null` when nothing applies, so the runtime skips its async lookup.
-    func configUserScript(for pageUrl: URL) -> WKUserScript {
+    /// `boostCSS` is the page's Boost stylesheet, carried here so it applies before first paint.
+    func configUserScript(for pageUrl: URL, boostCSS: String = "") -> WKUserScript {
         var json = "null"
         var scriptlets: String?
-        if var conf = configuration(for: pageUrl, topUrl: nil) {
+        var configuration = configuration(for: pageUrl, topUrl: nil)
+        if !boostCSS.isEmpty { configuration = (configuration ?? [:]).merging(["boostCSS": boostCSS]) { $1 } }
+        if var conf = configuration {
             // Carried in the script body, not the config object: it is code, not data.
             scriptlets = conf.removeValue(forKey: "scriptlets") as? String
             if let data = try? JSONSerialization.data(withJSONObject: conf),

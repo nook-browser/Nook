@@ -44,6 +44,10 @@ public final class ContentBlockerManager: NSObject {
     private var hasActivated = false
 
     private var compiledRuleLists: [WKContentRuleList] = []
+    /// The person's own cosmetic filters, compiled apart from the big lists.
+    private var userRuleList: WKContentRuleList?
+    private var userRuleGeneration = 0
+    private var activeRuleLists: [WKContentRuleList] { compiledRuleLists + (userRuleList.map { [$0] } ?? []) }
     private var updateTimer: Timer?
     /// How often to look for due lists; each list's own `! Expires:` decides whether it is fetched.
     private static let updateCheckInterval: TimeInterval = 60 * 60
@@ -258,6 +262,24 @@ public final class ContentBlockerManager: NSObject {
         updateTimer?.tolerance = 15 * 60
     }
 
+    /// Replaces the person's own cosmetic filters (`host##selector` lines). Only this small list
+    /// is compiled; the filter lists stay as they are.
+    /// Returns false when the compile failed, so the caller can retry. A call overtaken by a
+    /// newer one changes nothing.
+    @discardableResult
+    public func setUserCosmeticRules(_ lines: [String]) async -> Bool {
+        userRuleGeneration += 1
+        let generation = userRuleGeneration
+        let result = await ContentRuleListCompiler.compileUser(rules: lines)
+        guard generation == userRuleGeneration else { return true }
+        userRuleList = result.list
+        if isEnabled, host != nil {
+            applyToSharedConfiguration()
+            applyToExistingWebViews()
+        }
+        return result.ok
+    }
+
     // MARK: - Tracking parameter removal ($removeparam)
 
     /// The URL with tracking parameters removed, or nil when nothing should change.
@@ -292,7 +314,9 @@ public final class ContentBlockerManager: NSObject {
 
     private func setupContentBlockerScripts(for url: URL, in webView: WKWebView, exempt: Bool) {
         reconcile(webView, exempt: exempt)
-        let config = exempt ? nil : advancedRulesEngine.configUserScript(for: url)
+        // Empty until the Boosts have loaded; the style script's own lookup covers that page.
+        let boostCSS = settings.boostsLoaded ? Boost.css(for: url, in: settings.boosts) : ""
+        let config = exempt ? nil : advancedRulesEngine.configUserScript(for: url, boostCSS: boostCSS)
         replaceConfigScript(in: webView.configuration.userContentController, with: config)
         cbLog.info("main frame \(url.host ?? "-", privacy: .private(mask: .hash)): exempt=\(exempt) config=\(config?.source.count ?? 0, privacy: .public)B ruleLists=\(self.compiledRuleLists.count)")
     }
@@ -325,7 +349,7 @@ public final class ContentBlockerManager: NSObject {
     private func configureNewController(_ controller: WKUserContentController) {
         controller.addScriptMessageHandler(self, contentWorld: .page, name: AdvancedRulesEngine.messageHandlerName)
         guard isEnabled else { return }
-        for list in compiledRuleLists { controller.add(list) }
+        for list in activeRuleLists { controller.add(list) }
         // Static scripts arrive by copy from the shared configuration.
     }
 
@@ -334,7 +358,7 @@ public final class ContentBlockerManager: NSObject {
     private func applyToSharedConfiguration() {
         guard let ucc = self.host?.sharedUserContentController else { return }
         ucc.removeAllContentRuleLists()
-        for list in compiledRuleLists { ucc.add(list) }
+        for list in activeRuleLists { ucc.add(list) }
         ensureStaticScripts(in: ucc)
     }
 
@@ -358,7 +382,7 @@ public final class ContentBlockerManager: NSObject {
     private func applyBlocking(to webView: WKWebView) {
         let ucc = webView.configuration.userContentController
         ucc.removeAllContentRuleLists()
-        for list in compiledRuleLists { ucc.add(list) }
+        for list in activeRuleLists { ucc.add(list) }
         ensureStaticScripts(in: ucc)
         exemptedWebViews.remove(webView)
     }

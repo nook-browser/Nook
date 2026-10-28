@@ -10,6 +10,7 @@
 
 import AppKit
 import SwiftUI
+import NookBlocker
 import NookDesign
 import NookWeb
 import NookUI
@@ -19,17 +20,21 @@ import NookUI
 struct LinkPreviewHost: View {
     let session: PageSession
     let zoom: CGFloat
+    let blocker: ContentBlockerManager
 
     @State private var shown: LinkPreviewTarget?
     @State private var isOnCard = false
     @State private var hideTask: Task<Void, Never>?
+    @State private var showTask: Task<Void, Never>?
 
     private let linger: Duration = .milliseconds(300)
+    /// The pointer has to rest on a link this long before anything is fetched.
+    private let rest: Duration = .milliseconds(500)
 
     var body: some View {
         ZStack {
             if let shown {
-                LinkPreviewOverlay(target: shown, zoom: zoom) { hovering in
+                LinkPreviewOverlay(target: shown, zoom: zoom, session: session, blocker: blocker) { hovering in
                     isOnCard = hovering
                     if !hovering { scheduleHide() }
                 }
@@ -37,9 +42,18 @@ struct LinkPreviewHost: View {
             }
         }
         .onChange(of: session.linkPreview, initial: true) { _, target in
+            showTask?.cancel()
             if let target {
                 hideTask?.cancel()
-                withAnimation(NookDesign.Motion.quick) { shown = target }
+                if shown?.url == target.url {
+                    shown = target
+                    return
+                }
+                showTask = Task {
+                    try? await Task.sleep(for: rest)
+                    guard !Task.isCancelled, session.linkPreview == target else { return }
+                    withAnimation(NookDesign.Motion.quick) { shown = target }
+                }
             } else {
                 scheduleHide()
             }
@@ -60,6 +74,8 @@ private struct LinkPreviewOverlay: View {
     let target: LinkPreviewTarget
     /// Page zoom: the link's box arrives in CSS pixels.
     let zoom: CGFloat
+    let session: PageSession
+    let blocker: ContentBlockerManager
     let onHover: (Bool) -> Void
 
     private let width: CGFloat = 340
@@ -81,7 +97,7 @@ private struct LinkPreviewOverlay: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: below ? .top : .bottom)))
         }
-        .task(id: target.url) { LinkPreviewService.shared.load(target.url) }
+        .task(id: target.url) { LinkPreviewService.shared.load(target.url, from: session, blocker: blocker) }
     }
 }
 

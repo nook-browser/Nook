@@ -28,12 +28,14 @@ public struct Boost: Codable, Identifiable, Equatable, Sendable {
     /// `#RRGGBB`, or empty for no tint. Blended over the page with `tintStrength`.
     public var tint: String
     public var tintStrength: Double
-    /// Dark page: the page inverted to dark, its photos and videos inverted back so they look right.
+    /// Dark page: the page inverted to dark by a layer over it, its photos and videos inverted back.
     public var darkPage: Bool
     public var fontFamily: String
     public var fontScale: Double
     public var textCase: TextCase
     public var css: String
+    /// Selectors hidden by Zap. Also compiled as `host##selector` into the user cosmetic rule list.
+    public var zaps: [String]
     public var script: String
     /// Off by default and forced off on import: a script is code the user must choose to run.
     public var scriptEnabled: Bool
@@ -48,7 +50,7 @@ public struct Boost: Codable, Identifiable, Equatable, Sendable {
         id: UUID = UUID(), name: String = "", host: String, includeSubdomains: Bool = true, isEnabled: Bool = true,
         brightness: Double = 1, contrast: Double = 1, tint: String = "", tintStrength: Double = 0.35,
         darkPage: Bool = false, fontFamily: String = "", fontScale: Double = 1,
-        textCase: TextCase = .none, css: String = "", script: String = "", scriptEnabled: Bool = false,
+        textCase: TextCase = .none, css: String = "", zaps: [String] = [], script: String = "", scriptEnabled: Bool = false,
         updated: Date = Date()
     ) {
         self.id = id
@@ -65,6 +67,7 @@ public struct Boost: Codable, Identifiable, Equatable, Sendable {
         self.fontScale = fontScale
         self.textCase = textCase
         self.css = css
+        self.zaps = zaps
         self.script = script
         self.scriptEnabled = scriptEnabled
         self.updated = updated
@@ -88,6 +91,7 @@ public struct Boost: Codable, Identifiable, Equatable, Sendable {
             fontScale: try c.decodeIfPresent(Double.self, forKey: .fontScale) ?? 1,
             textCase: (try? c.decodeIfPresent(TextCase.self, forKey: .textCase)) ?? .none,
             css: try c.decodeIfPresent(String.self, forKey: .css) ?? "",
+            zaps: try c.decodeIfPresent([String].self, forKey: .zaps) ?? [],
             script: try c.decodeIfPresent(String.self, forKey: .script) ?? "",
             scriptEnabled: try c.decodeIfPresent(Bool.self, forKey: .scriptEnabled) ?? false,
             updated: try c.decodeIfPresent(Date.self, forKey: .updated) ?? Date()
@@ -115,6 +119,11 @@ public struct Boost: Codable, Identifiable, Equatable, Sendable {
         return pageHost == host || (includeSubdomains && pageHost.hasSuffix("." + host))
     }
 
+    /// The stylesheet for a page: every matching Boost's CSS, joined.
+    public static func css(for url: URL, in boosts: [Boost]) -> String {
+        matching(url, in: boosts).map(\.compiledCSS).filter { !$0.isEmpty }.joined(separator: "\n")
+    }
+
     /// Every match, in list order, so overlapping Boosts stack the same way every time.
     public static func matching(_ url: URL, in boosts: [Boost]) -> [Boost] {
         boosts.filter { $0.matches(url) }
@@ -125,20 +134,25 @@ public struct Boost: Codable, Identifiable, Equatable, Sendable {
     /// Visual controls first, the user's own CSS last so it can override them.
     public var compiledCSS: String {
         var rules: [String] = []
-        // One filter on the root: a second `filter` rule would replace the first, not add to it.
+        // No filter goes on the root element (it would make every fixed element position against
+        // the page). A fixed layer over the page filters what is painted under it instead.
         var filters: [String] = []
         if darkPage { filters.append("invert(1) hue-rotate(180deg)") }
         if brightness != 1 { filters.append("brightness(\(Self.num(brightness)))") }
         if contrast != 1 { filters.append("contrast(\(Self.num(contrast)))") }
         if !filters.isEmpty {
-            rules.append("html { filter: \(filters.joined(separator: " ")) !important; }")
+            let f = filters.joined(separator: " ")
+            // The backdrop layer costs a compositing pass while the boosted page scrolls; it is opt-in per site.
+            // !important keeps a site's own html::before rule from breaking it.
+            rules.append("html::before { content: \"\" !important; display: block !important; position: fixed !important; inset: 0 !important; pointer-events: none !important; z-index: 2147483646 !important; -webkit-backdrop-filter: \(f); backdrop-filter: \(f); }")
         }
         if darkPage {
-            // A page with no background of its own shows the white canvas, which no filter reaches;
-            // zero specificity, so any background the site sets still wins.
+            // A page with no background of its own shows the canvas; give the layer a color to turn dark.
+            // Zero specificity, so any background the site sets still wins.
             rules.append(":where(html) { background-color: #fff; }")
-            // Pictures turned back the right way round.
-            rules.append("img, video, picture, canvas, iframe, embed, object, svg image { filter: invert(1) hue-rotate(180deg) !important; }")
+            // Pictures turned back the right way round, except where they sit above the layer
+            // (full screen, modal dialogs, popovers) and were never inverted.
+            rules.append(":is(img, video, picture, canvas, iframe, embed, object, svg image):not(:fullscreen, :fullscreen *, dialog[open] *, :popover-open *) { filter: invert(1) hue-rotate(180deg) !important; }")
         }
         if Self.isHexColor(tint) {
             // A fixed layer that colours what is under it and takes no clicks.
@@ -156,8 +170,40 @@ public struct Boost: Codable, Identifiable, Equatable, Sendable {
         if textCase != .none {
             rules.append("\(text) { text-transform: \(textCase.rawValue) !important; }")
         }
-        if !css.isEmpty { rules.append(css) }
+        for selector in zaps where Self.isAllowedZap(selector) {
+            rules.append("\(selector) { display: none !important; }")
+        }
+        let own = Self.removingBaitRules(css)
+        if !own.isEmpty { rules.append(own) }
         return rules.joined(separator: "\n")
+    }
+
+    /// A zap selector goes into a stylesheet and a filter list: one plain selector, no braces,
+    /// no filter syntax. YouTube's ad-block bait (`#player-ads`) is never hidden: hiding it
+    /// brings up "Ad blockers are not allowed".
+    public static func isAllowedZap(_ selector: String) -> Bool {
+        let s = selector.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty, s.utf8.count <= 500, !s.replacingOccurrences(of: "\\", with: "").lowercased().contains("player-ads") else { return false }
+        return !s.contains { "{};\n\r\\".contains($0) } && !s.contains("##") && !s.contains("#@#") && !s.contains("#?#")
+    }
+
+    /// CSS without the rules that mention YouTube's `player-ads` bait, in any spelling (id, class, attribute value).
+    /// ponytail: splits on `}`, so a rule nested in `@media` loses its block but leaves the wrapper unbalanced.
+    public static func removingBaitRules(_ css: String) -> String {
+        guard css.replacingOccurrences(of: "\\", with: "").lowercased().contains("player-ads") else { return css }
+        let parts = css.components(separatedBy: "}")
+        let kept = parts.enumerated().compactMap { i, part -> String? in
+            if part.replacingOccurrences(of: "\\", with: "").lowercased().contains("player-ads") { return nil }
+            return i < parts.count - 1 ? part + "}" : part
+        }
+        return kept.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The user cosmetic filter lines for these Boosts, one per allowed zap of each enabled Boost.
+    public static func zapFilterLines(_ boosts: [Boost]) -> [String] {
+        boosts.filter { $0.isEnabled && !$0.host.isEmpty }.flatMap { b in
+            b.zaps.filter(isAllowedZap).map { "\(b.host)##\($0)" }
+        }
     }
 
     public static func isHexColor(_ s: String) -> Bool {
@@ -211,6 +257,16 @@ public enum BoostBundle {
         return try? encoder.encode(File(schema: Boost.schemaVersion, boosts: boosts))
     }
 
+    /// Imported CSS may not reach the network: no `@import`, no `url(`. Backslashes go too, since
+    /// CSS escapes can spell either one.
+    public static func stripRemoteCSS(_ css: String) -> String {
+        var out = css.replacingOccurrences(of: "\\", with: "")
+        for pattern in ["@import[^;{]*;?", "url\\s*\\([^)]*\\)?"] {
+            out = out.replacingOccurrences(of: pattern, with: "", options: [.regularExpression, .caseInsensitive])
+        }
+        return out
+    }
+
     /// Validated, ready to preview. Scripts arrive disabled, ids are new, bad hosts are refused.
     public static func parse(_ data: Data) throws -> [Boost] {
         guard data.count <= maxBytes else { throw Failure(message: "The file is larger than 2 MB.") }
@@ -230,6 +286,8 @@ public enum BoostBundle {
             }
             b.id = UUID()
             b.scriptEnabled = false
+            b.css = Boost.removingBaitRules(stripRemoteCSS(b.css))
+            b.zaps = b.zaps.filter(Boost.isAllowedZap)
             return b
         }
     }
