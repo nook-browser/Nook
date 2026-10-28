@@ -205,6 +205,8 @@ public final class PageSession: NSObject, Identifiable {
     /// JavaScript dialogs since the last commit, and whether the user silenced the page.
     @ObservationIgnored var jsDialogCount = 0
     @ObservationIgnored var jsDialogsSuppressed = false
+    /// An open-in-another-app sheet is up, so a redirect loop cannot stack more.
+    @ObservationIgnored var externalAppConfirmPending = false
     @ObservationIgnored var hasFavicon: Bool = false
     @ObservationIgnored var faviconFetchInFlight: Bool = false
     @ObservationIgnored var faviconFetchAttempts: Int = 0

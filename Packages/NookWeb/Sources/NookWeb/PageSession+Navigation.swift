@@ -293,23 +293,32 @@ extension PageSession: WKNavigationDelegate {
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        // mailto:, tel: and app schemes go to the system. A subframe needs a click, so an ad
-        // iframe cannot launch an app on its own; a page that was not clicked has to ask.
+        // mailto:, tel: and app schemes go to the system. Only a real click on a link opens one
+        // straight away; a scripted `a.click()` is also `.linkActivated`, so the gesture decides.
+        // A subframe needs that click too, and everything else asks, one sheet at a time.
         if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
            !WKWebView.handlesURLScheme(scheme), scheme != "webkit-extension", scheme != "safari-web-extension"
         {
             decisionHandler(.cancel)
             // An agent page never opens another app or asks the person to.
             if isAgentPage { return }
-            let clicked = navigationAction.navigationType == .linkActivated
+            let gesture = navigationAction.nookIsUserInitiated
+            let clicked = gesture && navigationAction.navigationType == .linkActivated
             guard navigationAction.targetFrame?.isMainFrame != false || clicked, canOpenWithSystem(url) else { return }
-            if clicked || scheme == "mailto" || scheme == "tel" {
+            if clicked || (gesture && (scheme == "mailto" || scheme == "tel")) {
                 openWithSystem(url)
-            } else if let alerts = controller?.alerts {
+            } else if !externalAppConfirmPending, !jsDialogsSuppressed, let alerts = controller?.alerts {
+                externalAppConfirmPending = true
                 let message = systemAppName(for: url).map { "Open this link in \($0)?" } ?? "Open this link in another app?"
+                // The target frame, not `sourceFrame`, which is nil for loads the app started.
+                let host = navigationAction.targetFrame?.securityOrigin.host ?? ""
                 alerts.presentConfirm(
-                    message: message, host: webView.url?.host ?? "", over: webView, onSuppress: nil
-                ) { if $0 { openWithSystem(url) } }
+                    message: message, host: host.isEmpty ? (webView.url?.host ?? "") : host, over: webView,
+                    onSuppress: nextDialogSuppressor()
+                ) { [weak self] in
+                    self?.externalAppConfirmPending = false
+                    if $0 { openWithSystem(url) }
+                }
             }
             return
         }
@@ -802,5 +811,15 @@ extension PageSession {
             """
 
         webView.evaluateJavaScript(script) { _, _ in }
+    }
+}
+
+private extension WKNavigationAction {
+    /// `_isUserInitiated`: true only inside a real user gesture. Without it, nothing counts as one.
+    var nookIsUserInitiated: Bool {
+        let selector = NSSelectorFromString("_isUserInitiated")
+        guard responds(to: selector) else { return false }
+        typealias Getter = @convention(c) (AnyObject, Selector) -> Bool
+        return unsafeBitCast(method(for: selector), to: Getter.self)(self, selector)
     }
 }
