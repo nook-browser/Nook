@@ -108,11 +108,14 @@ struct BrowserWindowOpeningCheck {
 
         // The button's named Space stays the destination after the source window switches Spaces.
         let source = manager.createNewWindow()!
-        let originalSpace = source.spaceID!
+        let firstSpace = manager.tabs.orderedSpaces.first!.id
+        let originalSpace = manager.tabs.createSpace(name: "Work", icon: "briefcase", accentHex: "#777777", after: firstSpace)!
         let originalSpaceName = manager.tabs.space(originalSpace)!.name
-        let otherSpace = manager.tabs.createSpace(name: "Other", icon: "briefcase", accentHex: "#777777", after: originalSpace)!
+        let otherSpace = manager.tabs.createSpace(name: "Personal", icon: "house", accentHex: "#777777", after: originalSpace)!
         let stickyURL = URL(string: "about:blank#sticky-space")!
 
+        precondition(originalSpace != manager.tabs.orderedSpaces.first!.id,
+                     "The captured Space must differ from the first Space to detect an incorrect fallback")
         manager.tabs.setSpace(originalSpace, in: source)
         manager.externalMiniWindowManager.present(url: stickyURL)
 
