@@ -197,6 +197,23 @@ struct NookCommands: Commands {
                     || !(browserManager.tabs.activeWindowSession.map { $0.hasVideoContent || $0.hasPiPActive } ?? false)
             )
 
+            Divider()
+
+            Button("Collapse All Folders") {
+                if let spaceID = windowRegistry.activeWindow?.spaceID {
+                    browserManager.tabs.setAllFolders(open: false, space: spaceID)
+                }
+            }
+            .disabled(windowRegistry.activeWindow?.spaceID == nil)
+
+            Button("Expand All Folders") {
+                if let spaceID = windowRegistry.activeWindow?.spaceID {
+                    browserManager.tabs.setAllFolders(open: true, space: spaceID)
+                }
+            }
+            .modifier(dynamicShortcut(.expandAllFolders))
+            .disabled(windowRegistry.activeWindow?.spaceID == nil)
+
             if tabOrganizerManager.isAvailable {
                 Divider()
 
