@@ -80,11 +80,37 @@ struct PeekOverlayView: View {
                 actionButtons
                     .alignmentGuide(.leading) { $0[.trailing] + NookDesign.Spacing.lg }
             }
+            // The site sits in the margin above, where the page cannot draw over it.
+            .overlay(alignment: .topLeading) {
+                siteLabel(page: page)
+                    .frame(maxWidth: frame.width, alignment: .leading)
+                    .alignmentGuide(.top) { $0[.bottom] + NookDesign.Spacing.sm }
+            }
             .position(
                 x: frame.minX + (frame.width / 2),
                 y: geometry.size.height / 2
             )
         }
+    }
+
+    /// The card's site, drawn as the address bar draws it: the URL bar still names the tab under Peek.
+    private func siteLabel(page: PageSession) -> some View {
+        HStack(spacing: NookDesign.Spacing.xs) {
+            if page.url.scheme == "http" {
+                Image(systemName: "lock.open.fill")
+                    .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            // Head truncation keeps the registrable domain: `accounts.google.com.x.evil.tld`.
+            Text(page.url.nookDisplayHost ?? page.url.absoluteString)
+                .font(NookDesign.Font.secondary)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.head)
+        }
+        .padding(.horizontal, NookDesign.Spacing.sm)
+        .padding(.vertical, NookDesign.Spacing.xs)
+        .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
     }
 
     /// Close, split and new tab: standalone icon buttons on one floating card, readable over any page.
