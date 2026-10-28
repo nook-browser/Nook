@@ -96,11 +96,9 @@ extension ExtensionManager {
             return (newPermissions.sorted(), Set(newPatterns.map(\.string)).sorted())
         }
         let oldPatterns = requiredPatterns(previous)
-        let oldStrings = Set(oldPatterns.map(\.string))
-        // ponytail: host coverage is exact string match or an old all-hosts pattern; a new narrower
-        // pattern under an old broad wildcard (e.g. *.google.com) still prompts. Fine for rare updates.
-        let oldCoversAllHosts = oldPatterns.contains { $0.matchesAllURLs || $0.matchesAllHosts }
-        let addedHosts = oldCoversAllHosts ? [] : Set(newPatterns.map(\.string)).subtracting(oldStrings).sorted()
+        // WebKit's own containment: `<all_urls>` and `*://*/*` cover neither `file:` nor a wider scheme.
+        let addedHosts = Set(newPatterns.filter { pattern in !oldPatterns.contains { $0.matches(pattern) } }
+            .map(\.string)).sorted()
         let addedPermissions = newPermissions.subtracting(previous.requestedPermissions.map(\.rawValue)).sorted()
         return (addedPermissions, addedHosts)
     }
@@ -328,7 +326,8 @@ extension ExtensionManager {
             )
             context.insert(entity)
         }
-        if let store { entity.sourceStore = store.rawValue }
+        // Cleared when a sideload replaces a store build: the store vouched for that package only.
+        entity.sourceStore = store?.rawValue
         try context.save()
 
         // STEP 6: Load from the final location so resource URLs resolve to real files.
