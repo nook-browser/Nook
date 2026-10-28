@@ -149,7 +149,7 @@ public enum NookDesign {
         public static let verticalInset: CGFloat = 2
         public static let stride: CGFloat = height + verticalInset * 2
         public static let radius: CGFloat = 12
-        public static let font = SwiftUI.Font.system(size: 14, weight: .regular)
+        public static let font = NookDesign.Font.body   // tab title, as before the Arc work
         public static let pressScale: CGFloat = 0.985
         public static let dragScale: CGFloat = 1.025
         public static let dragOpacity: Double = 0.96

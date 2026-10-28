@@ -176,7 +176,7 @@ struct URLBarView: View {
                                 Text(displayPath(for: session)).foregroundStyle(.tertiary)
                                     .truncationMode(.tail)
                             }
-                            .font(.system(size: 14, weight: .regular))
+                            .font(NookDesign.Font.secondary)
                             .lineLimit(1)
                             if let errors = devErrorCount(for: session) {
                                 Button {
@@ -198,7 +198,7 @@ struct URLBarView: View {
                                 .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                                 .foregroundStyle(textColor)
                             Text("Search or Enter URL...")
-                                .font(.system(size: 14, weight: .regular))
+                                .font(NookDesign.Font.secondary)
                                 .foregroundStyle(textColor)
                         }
                     }
@@ -291,7 +291,7 @@ struct URLBarView: View {
         } else {
             TextField("Search or Enter URL...", text: $addressText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14, weight: .regular))
+                .font(NookDesign.Font.secondary)
                 .focused($addressFocused)
                 .onSubmit { submitAddress() }
                 .onExitCommand { cancelEditing() }
@@ -373,13 +373,13 @@ struct URLBarView: View {
                             .frame(width: 20, height: 20)
                         HStack(spacing: 6) {
                             Text(suggestionTitle(suggestion))
-                                .font(.system(size: 14, weight: .regular))
+                                .font(NookDesign.Font.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                                 .layoutPriority(1)
                             if let host = suggestionURL(suggestion)?.host {
                                 Text("— " + host)
-                                    .font(.system(size: 12))
+                                    .font(NookDesign.Font.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                     .truncationMode(.head)
