@@ -94,8 +94,19 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             ENABLE_CODE_COVERAGE=NO \
-            CLANG_COVERAGE_MAPPING=NO
+            CLANG_COVERAGE_MAPPING=NO \
+            DEPLOYMENT_POSTPROCESSING=YES \
+            STRIP_INSTALLED_PRODUCT=YES \
+            DEBUG_INFORMATION_FORMAT=dwarf-with-dsym
           cp -R "build/Build/Products/Release/Nook.app" ./Nook.app
+
+      # The app ships stripped; its symbols stay here so crash reports can be read.
+      - name: Keep debug symbols
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Nook-${{ github.ref_name }}-dSYM
+          path: build/Build/Products/Release/Nook.app.dSYM
+          retention-days: 90
 
       - name: Read minimum macOS version
         run: |
