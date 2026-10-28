@@ -1041,23 +1041,25 @@ class BrowserManager: ObservableObject {
         webViewCoordinator?.setMuteState(muted, for: tabId, excludingWindow: originatingWindowId)
     }
 
-    /// Returns a ready browser window and brings it forward. Reuses the active window
-    /// (including a private window), then any registered window, before creating one.
+    /// Returns the last-used regular window, creating one when none is open.
     /// Creation and registration complete synchronously, so callers never queue their own work.
     func openBrowserWindow() -> BrowserWindowState? {
         guard let windowRegistry,
-              let window = windowRegistry.activeWindow
-                ?? windowRegistry.allWindows.first
-                ?? createNewWindow() else {
+              let window = windowRegistry.mostRecentRegularWindow ?? createNewWindow() else {
             return nil
         }
 
-        windowRegistry.setActive(window)
+        activateBrowserWindow(window)
+
+        return window
+    }
+
+    /// Presents an explicitly chosen window without changing its browsing context.
+    func activateBrowserWindow(_ window: BrowserWindowState) {
+        windowRegistry?.setActive(window)
         NSApp.activate(ignoringOtherApps: true)
         window.window?.deminiaturize(nil)
         window.window?.makeKeyAndOrderFront(nil)
-
-        return window
     }
 
     /// Creates and registers a regular window before constructing its view. The returned
@@ -1124,6 +1126,7 @@ class BrowserManager: ObservableObject {
         // ARC owns this window. AppKit's default release on close over-releases it and crashes
         // in the next autorelease pool drain.
         window.isReleasedWhenClosed = false
+        window.tabbingMode = .disallowed
         window.title = title
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -1147,13 +1150,14 @@ class BrowserManager: ObservableObject {
     // MARK: - Incognito Window
 
     /// Create a new incognito/private browsing window
-    func createIncognitoWindow() {
+    @discardableResult
+    func createIncognitoWindow() -> BrowserWindowState? {
         guard let windowRegistry = windowRegistry,
               let webViewCoordinator = webViewCoordinator else {
             #if DEBUG
             print("⚠️ [BrowserManager] Cannot create incognito window - missing WindowRegistry or WebViewCoordinator")
             #endif
-            return
+            return nil
         }
 
         let windowState = BrowserWindowState()
@@ -1175,6 +1179,8 @@ class BrowserManager: ObservableObject {
         windowRegistry.setActive(windowState)
 
         newWindow.makeKeyAndOrderFront(nil)
+
+        return windowState
     }
 
     /// Destroys a closed incognito window's ephemeral data store. Its pages were already ended by

@@ -18,9 +18,11 @@ struct ContentView: View {
     @State private var commandPalette = CommandPalette()
     
     private let providedWindowState: BrowserWindowState?
+    private let onWindowRegistered: (() -> Void)?
     
-    init(windowState: BrowserWindowState? = nil) {
+    init(windowState: BrowserWindowState? = nil, onWindowRegistered: (() -> Void)? = nil) {
         self.providedWindowState = windowState
+        self.onWindowRegistered = onWindowRegistered
     }
     
     private var windowState: BrowserWindowState {
@@ -39,6 +41,7 @@ struct ContentView: View {
                 windowState.commandPalette = commandPalette
                 // Register this window state with the registry
                 windowRegistry.register(windowState)
+                onWindowRegistered?()
             }
             .onDisappear {
                 // Unregister this window state when the window closes

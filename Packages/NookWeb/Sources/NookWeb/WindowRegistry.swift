@@ -16,6 +16,8 @@ public class WindowRegistry {
     /// All registered window states (ignored from observation to avoid actor isolation issues)
     @ObservationIgnored
     private var _windows: [UUID: BrowserWindowState] = [:]
+    @ObservationIgnored
+    private var activationOrder: [UUID] = []
 
     public var windows: [UUID: BrowserWindowState] {
         get { _windows }
@@ -31,6 +33,11 @@ public class WindowRegistry {
     public var activeWindow: BrowserWindowState? {
         guard let id = activeWindowId else { return nil }
         return _windows[id]
+    }
+
+    /// The last-used regular window. Private-window activation never replaces this choice.
+    public var mostRecentRegularWindow: BrowserWindowState? {
+        activationOrder.reversed().compactMap { windows[$0] }.first { !$0.isIncognito }
     }
 
     /// Callback for window cleanup (set by whoever needs to clean up resources)
@@ -52,6 +59,11 @@ public class WindowRegistry {
         }
 
         windows[window.id] = window
+
+        if !activationOrder.contains(window.id) {
+            activationOrder.insert(window.id, at: 0)
+        }
+
         onWindowRegister?(window)
     }
 
@@ -63,16 +75,19 @@ public class WindowRegistry {
         onWindowClose?(id)
 
         windows.removeValue(forKey: id)
+        activationOrder.removeAll { $0 == id }
 
         // If this was the active window, switch to another
         if activeWindowId == id {
-            activeWindowId = windows.keys.first
+            activeWindowId = activationOrder.last
         }
 
     }
 
     /// Set the active (focused) window
     public func setActive(_ window: BrowserWindowState) {
+        activationOrder.removeAll { $0 == window.id }
+        activationOrder.append(window.id)
         activeWindowId = window.id
         onActiveWindowChange?(window)
     }

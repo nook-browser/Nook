@@ -58,11 +58,26 @@ final class ExternalMiniWindowManager {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// Moves the live page into a browser window, switching to the chosen space first.
+    /// Returns the page to its originating window, unless the person chooses another space.
     private func adopt(_ page: PageSession, in spaceID: UUID? = nil) {
         guard let browserManager,
-              controllers[page.itemID] != nil,
-              let window = browserManager.openBrowserWindow() else {
+              controllers[page.itemID] != nil else {
+            return
+        }
+
+        let source = page.detachedWindow.flatMap { browserManager.windowRegistry?.windows[$0.id] }
+        let destination: BrowserWindowState?
+
+        if spaceID == nil, let source {
+            destination = source
+        } else if spaceID == nil, page.isPrivate {
+            // Its original private session has ended. Reopen privately, never in a regular tab.
+            destination = browserManager.createIncognitoWindow()
+        } else {
+            destination = browserManager.openBrowserWindow()
+        }
+
+        guard let window = destination else {
             return
         }
 
@@ -71,6 +86,7 @@ final class ExternalMiniWindowManager {
         }
 
         browserManager.tabs.adopt(page, in: window)
+        browserManager.activateBrowserWindow(window)
         controllers[page.itemID]?.close()
     }
 }
@@ -140,6 +156,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.titlebarAppearsTransparent = true
+        window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
         window.contentMinSize = Self.minimumSize
         // Without this the hosting controller shrinks the window to the view's minimum size.

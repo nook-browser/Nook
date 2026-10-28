@@ -57,7 +57,7 @@ public struct LinksSettingsView: View {
                     Button {
                         showingAddSheet = true
                     } label: {
-                        Label("Add rule", systemImage: "plus")
+                        Label("Add Rule", systemImage: "plus")
                     }
                     .buttonStyle(.borderless)
 

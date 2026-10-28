@@ -26,6 +26,11 @@ struct BrowserWindowOpeningCheck {
         let organizer = TabOrganizerManager()
         var registrations: [UUID: Int] = [:]
 
+        precondition(settings.externalLinksInMiniWindow, "New and upgrading users default to mini windows")
+        settings.externalLinksInMiniWindow = false
+        precondition(!NookSettingsService().externalLinksInMiniWindow, "The external-link preference must persist")
+        settings.externalLinksInMiniWindow = true
+
         app.setActivationPolicy(.prohibited)
         manager.webViewCoordinator = coordinator
         manager.aiConfigService = aiConfig
@@ -65,6 +70,8 @@ struct BrowserWindowOpeningCheck {
 
         precondition(second !== first && registry.windows.count == 2, "An explicit new-window request must stay distinct")
         precondition(second.window != nil && second.spaceID != nil)
+        precondition(first.window?.tabbingMode == .disallowed && second.window?.tabbingMode == .disallowed,
+                     "Browser windows must not participate in macOS native window tabs")
         precondition(manager.openBrowserWindow() === second)
 
         // Allow SwiftUI onAppear and focus notifications to run, then check registration again.
@@ -111,18 +118,75 @@ struct BrowserWindowOpeningCheck {
         precondition(manager.tabs.tree.items.values.filter { $0.url == routedURL }.count == 1)
         closeBrowserWindows()
 
+        let olderRegular = manager.createNewWindow()!
+        let newerRegular = manager.createNewWindow()!
+
+        registry.setActive(olderRegular)
         manager.createIncognitoWindow()
 
         let privateWindow = registry.activeWindow!
+        let externalURL = URL(string: "about:blank#outside-private")!
 
         precondition(privateWindow.isIncognito)
-        precondition(manager.openBrowserWindow() === privateWindow, "Keep the active private window's context")
+        precondition(manager.openBrowserWindow() === olderRegular, "General window opening always selects a regular window")
+        registry.setActive(privateWindow)
         settings.externalLinksInMiniWindow = false
-        manager.presentExternalURL(a)
-        precondition(registry.windows.count == 1)
-        precondition(privateWindow.privateTree?.items.values.contains { $0.url == a } == true)
+        manager.presentExternalURL(externalURL)
+        precondition(registry.windows.count == 3)
+        precondition(registry.activeWindow === olderRegular, "Use activation order, not window creation order")
+        precondition(privateWindow.privateTree?.items.values.contains { $0.url == externalURL } != true)
+
         try await Task.sleep(for: .milliseconds(200))
+        olderRegular.window?.close()
+        registry.unregister(olderRegular.id)
+        registry.setActive(privateWindow)
+        manager.presentExternalURL(URL(string: "about:blank#after-close")!)
+        precondition(registry.activeWindow === newerRegular, "Closing the last-used regular window reveals the previous one")
+        newerRegular.window?.close()
+        registry.unregister(newerRegular.id)
+        registry.setActive(privateWindow)
+        manager.presentExternalURL(URL(string: "about:blank#only-private")!)
+        precondition(registry.windows.count == 2 && registry.activeWindow?.isIncognito == false,
+                     "Only-private sessions need one new regular window")
+        try await Task.sleep(for: .milliseconds(200))
+        closeBrowserWindows()
+
+        // A matching routing rule also leaves the private window untouched.
+        manager.createIncognitoWindow()
+        settings.externalLinksInMiniWindow = true
+        manager.presentExternalURL(routedURL)
+        try await Task.sleep(for: .milliseconds(200))
+        precondition(registry.windows.count == 2 && registry.activeWindow?.isIncognito == false)
+        precondition(registry.activeWindow?.spaceID == target)
         precondition(registrations.values.allSatisfy { $0 == 1 })
+        closeBrowserWindows()
+
+        // Promotion follows the popup's source, even after another window takes focus.
+        let privateSource = manager.createIncognitoWindow()!
+        let privateURL = URL(string: "about:blank#private-popup")!
+
+        manager.externalMiniWindowManager.present(url: privateURL)
+
+        let privateMini = app.windows.compactMap { $0 as? MiniBrowserWindow }.first { $0.isVisible }!
+        let regularDestination = manager.createNewWindow()!
+
+        privateMini.openInSpaceAction!()
+        precondition(registry.activeWindow === privateSource)
+        precondition(privateSource.privateTree?.items.values.contains { $0.url == privateURL } == true)
+        precondition(!manager.tabs.tree.items.values.contains { $0.url == privateURL })
+
+        manager.externalMiniWindowManager.present(url: URL(string: "about:blank#closed-private-source")!)
+
+        let orphanMini = app.windows.compactMap { $0 as? MiniBrowserWindow }.first { $0.isVisible }!
+
+        try await Task.sleep(for: .milliseconds(200))
+        privateSource.window?.close()
+        registry.unregister(privateSource.id)
+        registry.setActive(regularDestination)
+        orphanMini.openInSpaceAction!()
+        precondition(registry.activeWindow?.isIncognito == true)
+        precondition(!manager.tabs.tree.items.values.contains { $0.url?.fragment == "closed-private-source" })
+        try await Task.sleep(for: .milliseconds(200))
         closeBrowserWindows()
 
         // Save two distinct windows, then load the same state through a fresh manager.
@@ -167,7 +231,7 @@ struct BrowserWindowOpeningCheck {
         }
 
         UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
-        print("Browser window opening checks passed: readiness, reuse, distinct windows, registration, external bursts, mini promotion, routing, private context, and saved-window restoration")
+        print("Browser window opening checks passed: readiness, reuse, distinct windows, registration, external bursts, mini promotion, routing, private exclusion, regular-window recency, and saved-window restoration")
         exit(0)
     }
 }
