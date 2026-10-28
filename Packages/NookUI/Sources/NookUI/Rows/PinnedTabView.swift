@@ -121,9 +121,14 @@ public struct PinnedTabView<Icon: View>: View {
     private var wantsGlow: Bool { colors != nil && !reduceTransparency }
 
     private func glowImage(_ image: CGImage) -> some View {
-        Image(decorative: image, scale: NookDesign.Size.favoriteGlowScale)
-            .resizable()
-            .scaledToFill()
+        // Fills the tile's own frame; on its own, scaledToFill grows the tile with the sidebar's width.
+        Color.clear
+            .overlay {
+                Image(decorative: image, scale: NookDesign.Size.favoriteGlowScale)
+                    .resizable()
+                    .scaledToFill()
+            }
+            .clipped()
     }
 
     //MARK: - Colors

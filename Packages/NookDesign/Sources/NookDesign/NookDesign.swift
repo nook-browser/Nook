@@ -79,7 +79,7 @@ public enum NookDesign {
         public static let row: CGFloat = 32
         #endif
         public static let iconButton: CGFloat = 28
-        public static let favoriteTile: CGFloat = 47   // a favorite tile, as in Arc: four fit the 228 pt sidebar
+        public static let favoriteTile: CGFloat = 53   // a favorite tile's height; four are square at the default sidebar width
         public static let favoriteBorder: CGFloat = 2  // the selected favorite's edge
         public static let favoriteGlowScale: CGFloat = 2   // pixels per point of the blurred favicon behind a tile
         public static let favoriteGlowBlur: CGFloat = 0.25 // its blur radius as a fraction of the tile
