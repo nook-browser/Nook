@@ -14,6 +14,33 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 import NookDesign
+import NookWeb
+
+// MARK: - Download Origin
+
+/// Which page started a download, captured when it starts.
+struct DownloadOrigin {
+    /// A private window or the Agent space (or no page known): kept off disk and away from Tidy.
+    var isPrivate: Bool
+    /// The data store id of the page's profile, for the downloads list filter.
+    var profileID: UUID?
+    var pageTitle: String?
+
+    static let unknown = DownloadOrigin(isPrivate: true, profileID: nil, pageTitle: nil)
+
+}
+
+extension DownloadOrigin {
+    @MainActor
+    init(session: PageSession?) {
+        guard let session else { self = .unknown; return }
+        let profile = session.profile
+        self.init(
+            isPrivate: session.isPrivate || session.isAgentPage || profile?.isEphemeral == true,
+            profileID: profile?.id,
+            pageTitle: session.title)
+    }
+}
 
 // MARK: - Download Model
 
@@ -31,8 +58,8 @@ public class Download: Identifiable {
     var destinationURL: URL?
     /// The name Tidy Downloads replaced, while it can still be undone.
     var renamedFrom: String?
-    /// The page the download started from, for Tidy Downloads to name it by.
-    @ObservationIgnored var pageTitle: String?
+    /// Which page started it: private or not, which profile, and the title Tidy Downloads names it by.
+    let origin: DownloadOrigin
     var progress: Double
     var state: DownloadState {
         didSet {
@@ -106,6 +133,7 @@ public class Download: Identifiable {
         destinationPreference: DestinationPreference = .automaticDownloadsFolder,
         allowedContentTypes: [UTType]? = nil,
         mediaOnly: Bool = false,
+        origin: DownloadOrigin,
         state: DownloadState = .pending
     ) {
         id = UUID()
@@ -115,6 +143,7 @@ public class Download: Identifiable {
         self.destinationPreference = destinationPreference
         self.allowedContentTypes = allowedContentTypes
         self.mediaOnly = mediaOnly
+        self.origin = origin
         progress = state == .completed ? 1 : 0
         self.state = state
         downloadedBytes = 0
@@ -296,32 +325,44 @@ public class DownloadManager: NSObject {
 
     // MARK: - Kept across launches
 
-    @ObservationIgnored private var restored = false
+    @ObservationIgnored private var restoreStarted = false
+    @ObservationIgnored private var restoreFinished = false
+    @ObservationIgnored private var persistAfterRestore = false
 
-    /// Earlier launches' finished downloads, read the first time the list is wanted rather
-    /// than at launch. Their thumbnails load as their rows appear.
+    /// Earlier launches' finished downloads, read the first time the list is wanted rather than
+    /// at launch. The file checks run off the main thread; rows appear when they are done.
     private func restoreIfNeeded() {
-        guard !restored else { return }
-        restored = true
-        for record in DownloadHistoryStore.load() {
-            let url = URL(fileURLWithPath: record.path)
-            let item = Download(download: nil, originalURL: record.originalURL,
-                                suggestedFilename: url.lastPathComponent, state: .completed)
-            item.destinationURL = url
-            item.startDate = record.date
-            item.fileSize = record.size
-            item.downloadedBytes = record.size ?? 0
-            item.renamedFrom = record.renamedFrom
-            downloads[item.id] = item
+        guard !restoreStarted else { return }
+        restoreStarted = true
+        DownloadHistoryStore.load { [weak self] records in
+            guard let self else { return }
+            for record in records {
+                let url = URL(fileURLWithPath: record.path)
+                let item = Download(download: nil, originalURL: record.originalURL,
+                                    suggestedFilename: url.lastPathComponent,
+                                    origin: DownloadOrigin(isPrivate: false, profileID: record.profileID, pageTitle: nil),
+                                    state: .completed)
+                item.destinationURL = url
+                item.startDate = record.date
+                item.fileSize = record.size
+                item.downloadedBytes = record.size ?? 0
+                item.renamedFrom = record.renamedFrom
+                self.downloads[item.id] = item
+            }
+            self.restoreFinished = true
+            if self.persistAfterRestore { self.persist() }
         }
     }
 
     private func persist() {
         restoreIfNeeded()
+        // Saving before the old history is in would overwrite it with this launch's downloads alone.
+        guard restoreFinished else { persistAfterRestore = true; return }
         DownloadHistoryStore.save(downloads.values.compactMap { item in
             guard item.state == .completed, let url = item.destinationURL else { return nil }
-            return DownloadRecord(originalURL: item.originalURL, path: url.path, date: item.startDate,
-                                  size: item.fileSize ?? item.downloadedBytes, renamedFrom: item.renamedFrom)
+            return DownloadSnapshot(originalURL: item.originalURL, path: url.path, date: item.startDate,
+                                    size: item.fileSize ?? item.downloadedBytes, renamedFrom: item.renamedFrom,
+                                    profileID: item.origin.profileID, isCompleted: true, isPrivate: item.origin.isPrivate)
         })
     }
 
@@ -346,7 +387,8 @@ public class DownloadManager: NSObject {
         suggestedFilename: String,
         destinationPreference: Download.DestinationPreference = .automaticDownloadsFolder,
         allowedContentTypes: [UTType]? = nil,
-        mediaOnly: Bool = false
+        mediaOnly: Bool = false,
+        origin: DownloadOrigin
     ) -> Download {
         let downloadModel = Download(
             download: download,
@@ -354,7 +396,8 @@ public class DownloadManager: NSObject {
             suggestedFilename: suggestedFilename,
             destinationPreference: destinationPreference,
             allowedContentTypes: allowedContentTypes,
-            mediaOnly: mediaOnly
+            mediaOnly: mediaOnly,
+            origin: origin
         )
         let delegate = DownloadDelegate(downloadManager: self, download: downloadModel, wkDownload: download)
 
@@ -386,7 +429,7 @@ public class DownloadManager: NSObject {
         }
         NSWorkspace.shared.recycle([file]) { [weak self] _, error in
             guard error == nil else { return }
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 withAnimation(NookDesign.Motion.standard) { self?.removeDownload(download.id) }
             }
         }
@@ -456,7 +499,7 @@ public class DownloadManager: NSObject {
             completedCount += 1
             Self.announceFinished(download.destinationURL)
             persist()
-            tidy(download)
+            announceTidy(download)
         }
         if state == .completed || state == .failed || state == .cancelled {
             downloadDelegates[id]?.stopProgressObservation()
@@ -485,7 +528,8 @@ public class DownloadManager: NSObject {
         _ data: Data,
         suggestedFilename: String,
         originalURL: URL,
-        from window: NSWindow?
+        from window: NSWindow?,
+        origin: DownloadOrigin
     ) -> Download? {
         let name = Self.sanitizedFilename(suggestedFilename)
         guard let downloadsDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return nil }
@@ -497,7 +541,7 @@ public class DownloadManager: NSObject {
         }
         Self.setQuarantineAttribute(on: destination)
 
-        let saved = Download(download: nil, originalURL: originalURL, suggestedFilename: destination.lastPathComponent)
+        let saved = Download(download: nil, originalURL: originalURL, suggestedFilename: destination.lastPathComponent, origin: origin)
         saved.destinationURL = destination
         saved.fileSize = Int64(data.count)
         saved.downloadedBytes = Int64(data.count)
@@ -510,40 +554,21 @@ public class DownloadManager: NSObject {
         completedCount += 1
         Self.announceFinished(destination)
         persist()
-        tidy(saved)
         return saved
     }
 
     // MARK: - Tidy Downloads
 
-    private func tidy(_ download: Download) {
-        guard tidyDownloadsEnabled(), let url = download.destinationURL else { return }
-        let pageTitle = download.pageTitle ?? download.download?.webView?.title
-        Task { [weak self] in
-            guard let name = await DownloadTidier.proposedName(for: url.lastPathComponent, pageTitle: pageTitle, sourceURL: download.originalURL),
-                  let self, download.destinationURL == url else { return }
-            let target = Self.uniqueDestination(for: Self.sanitizedFilename(name), in: url.deletingLastPathComponent())
-            do {
-                try FileManager.default.moveItem(at: url, to: target)
-            } catch {
-                return
-            }
-            // One animation for the row, the hover card and the toast: the old name blurs out as
-            // the new one comes in.
-            withAnimation(.smooth(duration: 0.45)) {
-                download.renamedFrom = url.lastPathComponent
-                download.destinationURL = target
-                self.lastTidied = download
-            }
-            Self.announceFinished(target)
-            self.persist()
-        }
+    /// The file was named before it was written; once it is complete, offer the undo.
+    private func announceTidy(_ download: Download) {
+        guard download.renamedFrom != nil else { return }
+        withAnimation(.smooth(duration: 0.45)) { lastTidied = download }
     }
 
     /// Puts the file back under the name it downloaded with.
     func undoTidy(_ download: Download) {
         defer { dismissTidyToast() }
-        guard let original = download.renamedFrom, let current = download.destinationURL else { return }
+        guard download.state == .completed, let original = download.renamedFrom, let current = download.destinationURL else { return }
         let target = Self.uniqueDestination(for: original, in: current.deletingLastPathComponent())
         guard (try? FileManager.default.moveItem(at: current, to: target)) != nil else { return }
         withAnimation(.smooth(duration: 0.45)) {
@@ -699,10 +724,24 @@ private class DownloadDelegate: NSObject, WKDownloadDelegate {
             return
         }
 
-        let destination = DownloadManager.uniqueDestination(for: cleanName, in: downloadsDirectory)
-
-        configureDownload(for: destination, response: response)
-        completion(.proceed(destination))
+        // Named before the first byte is written, so the file never exists under the old name.
+        // Holds self: WebKit's completion must be called even if the row is removed meanwhile.
+        Task { @MainActor in
+            var name = cleanName
+            if DownloadTidier.shouldTidy(isAutomaticFolder: true, isPrivate: self.download.origin.isPrivate, origin: .network),
+               DownloadTidier.isMessy(cleanName),
+               self.downloadManager?.tidyDownloadsEnabled() == true,
+               let proposed = await DownloadTidier.proposedName(
+                   for: cleanName, pageTitle: self.download.origin.pageTitle, domain: self.download.originalURL.host) {
+                name = DownloadManager.sanitizedFilename(proposed)
+            }
+            // Cancelled while the model was thinking.
+            guard self.download.state == .pending else { completion(.cancel); return }
+            if name != cleanName { self.download.renamedFrom = cleanName }
+            let destination = DownloadManager.uniqueDestination(for: name, in: downloadsDirectory)
+            self.configureDownload(for: destination, response: response)
+            completion(.proceed(destination))
+        }
     }
 
     private func presentSavePanel(response: URLResponse, cleanName: String, completion: @escaping (DestinationDecision) -> Void) {

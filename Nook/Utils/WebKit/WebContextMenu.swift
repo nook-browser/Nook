@@ -308,7 +308,8 @@ extension FocusableWKWebView {
                 download,
                 originalURL: url,
                 suggestedFilename: url.lastPathComponent,
-                destinationPreference: .askUser
+                destinationPreference: .askUser,
+                origin: DownloadOrigin(session: self.owningSession)
             )
         }
     }

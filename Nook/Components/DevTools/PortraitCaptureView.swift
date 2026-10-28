@@ -205,7 +205,8 @@ struct PortraitCaptureView: View {
         let title = session.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let name = title.isEmpty ? (session.url.host ?? "Capture") : title
         let saved = browserManager.downloadManager.saveCompletedFile(
-            png, suggestedFilename: name + ".png", originalURL: session.url, from: NSApp.keyWindow)
+            png, suggestedFilename: name + ".png", originalURL: session.url, from: NSApp.keyWindow,
+            origin: DownloadOrigin(session: session))
         browserManager.showWindowToast(saved == nil ? "Couldn't save the capture" : "Saved to Downloads", in: windowState)
         if saved != nil { close() }
     }
