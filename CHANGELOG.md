@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+
+- Space themes with colors, texture and light or dark
+- Space icons and emoji
+- Library: swipe past the first space
+- Control-Tab switches between recent tabs
+- Download history and previews
+- Tidy Downloads
+- Link previews on Shift-hover
+- Boosts
+- Portrait capture
+- Developer Mode per site
+
+### Changed
+
+- Sidebar snaps to its default width, drag to hide
+- Address bar edits in place
+- Split view panes resize
+- Tidier tab titles
+- Pages scroll at 120 Hz
+
+### Fixed
+
+- Bugs
+
+### Thanks
+
+- @Fenrur, @AbdulRehman-18
+
 ## 1.3.0
 
 ### Added
