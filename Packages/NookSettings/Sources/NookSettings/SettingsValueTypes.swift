@@ -122,3 +122,22 @@ public enum YouTubeHomeSection: String, CaseIterable, Identifiable {
         }
     }
 }
+
+// MARK: - Protection Level
+
+/// Safari's Advanced Tracking and Fingerprinting Protection, and where it applies.
+public enum ProtectionLevel: String, CaseIterable, Identifiable {
+    case standard
+    case strictInPrivate
+    case strict
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .standard: return "Standard"
+        case .strictInPrivate: return "Strict in private windows"
+        case .strict: return "Strict everywhere"
+        }
+    }
+}

@@ -291,6 +291,18 @@ extension PageSession: WKNavigationDelegate {
     public func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
+        preferences: WKWebpagePreferences,
+        decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
+    ) {
+        if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url {
+            applyProtection(to: preferences, for: url)
+        }
+        self.webView(webView, decidePolicyFor: navigationAction) { decisionHandler($0, preferences) }
+    }
+
+    public func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
         // mailto:, tel: and app schemes go to the system. A subframe needs a click, so an ad

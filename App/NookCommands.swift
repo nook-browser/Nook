@@ -230,6 +230,11 @@ struct NookCommands: Commands {
             .modifier(dynamicShortcut(.refresh))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
+            Button("Reload with Standard Protection") {
+                browserManager.tabs.activeWindowSession?.reloadWithStandardProtection()
+            }
+            .disabled(browserManager.tabs.activeWindowSession?.usesStrictProtection != true)
+
             Button(browserManager.tabs.activeWindowSession?.isTranslated == true ? "Show Original" : "Translate Page") {
                 browserManager.tabs.activeWindowSession?.toggleTranslation()
             }

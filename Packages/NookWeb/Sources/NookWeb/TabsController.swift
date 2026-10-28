@@ -354,6 +354,13 @@ public final class TabsController {
         Array(liveSessions.values) + privateWindows.flatMap { $0.privateSessions.values }
     }
 
+    /// Fraud warnings and tracking prevention for every loaded page.
+    public func applyPrivacySettings() {
+        for session in sessions {
+            if let webView = session.webView { session.applyPrivacySettings(to: webView) }
+        }
+    }
+
     public func session(for webView: WKWebView) -> PageSession? {
         let coordinator = webViews
         return sessions.first { session in

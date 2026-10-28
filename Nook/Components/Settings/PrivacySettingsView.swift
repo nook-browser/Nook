@@ -9,6 +9,7 @@
 import SwiftUI
 import WebKit
 
+import NookDesign
 import NookSettings
 import NookWeb
 
@@ -23,99 +24,71 @@ struct PrivacySettingsView: View {
         @Bindable var settings = nookSettings
 
         Form {
-            Section("Cookie Management") {
-                cookieStatsView
-
-                NavigationLink("Manage Cookies", value: SettingsSubPane.cookies)
-
-                HStack {
-                    Menu("Clear Data") {
-                        Button("Clear Expired Cookies") {
-                            clearExpiredCookies()
-                        }
-                        Button("Clear Third-Party Cookies") {
-                            clearThirdPartyCookies()
-                        }
-                        Button("Clear High-Risk Cookies") {
-                            clearHighRiskCookies()
-                        }
-                        Divider()
-                        Button("Clear All Cookies") {
-                            clearAllCookies()
-                        }
-                        Button("Privacy Cleanup") {
-                            performCookiePrivacyCleanup()
-                        }
-                        Divider()
-                        Button("Clear All Website Data", role: .destructive) {
-                            clearAllWebsiteData()
+            Section("Protection") {
+                VStack(alignment: .leading, spacing: NookDesign.Spacing.md) {
+                    Picker("Protection", selection: $settings.protectionLevel) {
+                        ForEach(ProtectionLevel.allCases) { level in
+                            Text(level.displayName).tag(level)
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(isClearing)
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text("Strict blocks fingerprinting companies, removes tracking parameters from links, and hides details that identify your device. If a site breaks, use View > Reload with Standard Protection.")
+                        .font(NookDesign.Font.caption)
+                        .foregroundStyle(.secondary)
+                }
+                settingToggle(
+                    "Prevent cross-site tracking",
+                    detail: "Stops trackers following you between sites. Turn off only if a site's sign-in or embeds break.",
+                    isOn: $settings.preventCrossSiteTracking
+                )
+                .onChange(of: nookSettings.preventCrossSiteTracking) {
+                    browserManager.tabs.applyPrivacySettings()
+                }
+            }
 
+            Section("Security") {
+                settingToggle(
+                    "Warn before opening a site over HTTP",
+                    detail: "You can continue to a site from the warning.",
+                    isOn: $settings.warnBeforeHTTP
+                )
+                settingToggle(
+                    "Warn about fraudulent websites",
+                    detail: "Checks sites against Google Safe Browsing.",
+                    isOn: $settings.fraudulentWebsiteWarning
+                )
+                .onChange(of: nookSettings.fraudulentWebsiteWarning) {
+                    browserManager.tabs.applyPrivacySettings()
+                }
+            }
+
+            Section("History") {
+                settingToggle(
+                    "Search page text in history",
+                    detail: "Turning this off erases saved page text.",
+                    isOn: $settings.searchPageTextInHistory
+                )
+                .onChange(of: nookSettings.searchPageTextInHistory) { _, enabled in
+                    if !enabled { browserManager.historyManager.erasePageText() }
+                }
+            }
+
+            Section {
+                cookiesRow
+                cacheRow
+                LabeledContent("Browsing history") {
+                    Button("Clear History") {
+                        clearBrowsingHistory()
+                    }
+                }
+            } header: {
+                HStack(spacing: NookDesign.Spacing.md) {
+                    Text("Website Data")
                     if isClearing {
                         ProgressView()
-                            .controlSize(.small)
+                            .controlSize(.mini)
                     }
-                }
-            }
-
-            Section("Cache Management") {
-                cacheStatsView
-
-                NavigationLink("Manage Cache", value: SettingsSubPane.cache)
-
-                HStack {
-                    Menu("Clear Cache") {
-                        Button("Clear Stale Cache") {
-                            clearStaleCache()
-                        }
-                        Button("Clear Personal Data Cache") {
-                            clearPersonalDataCache()
-                        }
-                        Button("Clear Disk Cache") {
-                            clearDiskCache()
-                        }
-                        Button("Clear Memory Cache") {
-                            clearMemoryCache()
-                        }
-                        Divider()
-                        Button("Privacy Cleanup") {
-                            performCachePrivacyCleanup()
-                        }
-                        Divider()
-                        Button("Clear All Cache", role: .destructive) {
-                            clearAllCache()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isClearing)
-
-                    if isClearing {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-            }
-
-            Section("Privacy Controls") {
-                Toggle("Block Cross-Site Tracking", isOn: $settings.blockCrossSiteTracking)
-                    .onChange(of: nookSettings.blockCrossSiteTracking) { _, enabled in
-                        browserManager.contentBlockerManager.setEnabled(enabled)
-                    }
-                Toggle("Search Page Text in History", isOn: $settings.searchPageTextInHistory)
-                    .onChange(of: nookSettings.searchPageTextInHistory) { _, enabled in
-                        if !enabled { browserManager.historyManager.erasePageText() }
-                    }
-            }
-
-            Section("Website Data") {
-                Button("Clear Browsing History") {
-                    clearBrowsingHistory()
-                }
-                Button("Clear Cache") {
-                    clearCache()
                 }
             }
         }
@@ -127,56 +100,141 @@ struct PrivacySettingsView: View {
             }
         }
     }
-    
-    // MARK: - Cache Stats View
-    
-    @ViewBuilder
-    private var cacheStatsView: some View {
-        let stats = cacheManager.getCacheStats()
 
-        LabeledContent {
-            Text("\(stats.total)")
-                .foregroundStyle(.secondary)
-        } label: {
-            Label("Stored Cache", systemImage: "internaldrive")
-        }
-
-        if stats.total > 0 {
-            LabeledContent("Disk") { Text(formatSize(stats.diskSize)) }
-            LabeledContent("Memory") { Text(formatSize(stats.memorySize)) }
-            if stats.staleCount > 0 {
-                LabeledContent("Stale") {
-                    Text("\(stats.staleCount)")
-                        .foregroundStyle(.orange)
-                }
+    private func settingToggle(_ title: String, detail: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                Text(title)
+                Text(detail)
+                    .font(NookDesign.Font.caption)
+                    .foregroundStyle(.secondary)
             }
-            LabeledContent("Total size") { Text(formatSize(stats.totalSize)) }
         }
     }
 
-    // MARK: - Cookie Stats View
-    
-    @ViewBuilder
-    private var cookieStatsView: some View {
+    // MARK: - Website Data Rows
+
+    private struct DataStat: Identifiable {
+        let value: String
+        let label: String
+        var isWarning = false
+        var id: String { label }
+    }
+
+    private var cookiesRow: some View {
         let stats = cookieManager.getCookieStats()
-
-        LabeledContent {
-            Text("\(stats.total)")
-                .foregroundStyle(.secondary)
-        } label: {
-            Label("Stored Cookies", systemImage: "doc.on.doc")
+        return websiteDataRow(
+            "Cookies",
+            systemImage: "doc.on.doc",
+            count: stats.total.formatted(),
+            stats: stats.total == 0 ? [] : [
+                DataStat(value: stats.persistent.formatted(), label: "Persistent"),
+                DataStat(value: stats.session.formatted(), label: "Session"),
+                DataStat(value: stats.expired.formatted(), label: "Expired", isWarning: stats.expired > 0),
+                DataStat(value: formatSize(stats.totalSize), label: "Total size"),
+            ],
+            manage: .cookies
+        ) {
+            Button("Clear Expired Cookies") {
+                clearExpiredCookies()
+            }
+            Button("Clear Third-Party Cookies") {
+                clearThirdPartyCookies()
+            }
+            Button("Clear High-Risk Cookies") {
+                clearHighRiskCookies()
+            }
+            Divider()
+            Button("Clear All Cookies") {
+                clearAllCookies()
+            }
+            Button("Privacy Cleanup") {
+                performCookiePrivacyCleanup()
+            }
+            Divider()
+            Button("Clear All Website Data", role: .destructive) {
+                clearAllWebsiteData()
+            }
         }
+    }
 
-        if stats.total > 0 {
-            LabeledContent("Session") { Text("\(stats.session)") }
-            LabeledContent("Persistent") { Text("\(stats.persistent)") }
-            if stats.expired > 0 {
-                LabeledContent("Expired") {
-                    Text("\(stats.expired)")
-                        .foregroundStyle(.orange)
+    private var cacheRow: some View {
+        let stats = cacheManager.getCacheStats()
+        return websiteDataRow(
+            "Cache",
+            systemImage: "internaldrive",
+            count: stats.total == 1 ? "1 site" : "\(stats.total.formatted()) sites",
+            stats: stats.total == 0 ? [] : [
+                DataStat(value: formatSize(stats.diskSize), label: "Disk"),
+                DataStat(value: formatSize(stats.memorySize), label: "Memory"),
+                DataStat(value: stats.staleCount.formatted(), label: "Stale", isWarning: stats.staleCount > 0),
+                DataStat(value: formatSize(stats.totalSize), label: "Total size"),
+            ],
+            manage: .cache
+        ) {
+            Button("Clear Stale Cache") {
+                clearStaleCache()
+            }
+            Button("Clear Personal Data Cache") {
+                clearPersonalDataCache()
+            }
+            Button("Clear Disk Cache") {
+                clearDiskCache()
+            }
+            Button("Clear Memory Cache") {
+                clearMemoryCache()
+            }
+            Divider()
+            Button("Privacy Cleanup") {
+                performCachePrivacyCleanup()
+            }
+            Divider()
+            Button("Clear All Cache", role: .destructive) {
+                clearAllCache()
+            }
+        }
+    }
+
+    private func websiteDataRow<ClearItems: View>(
+        _ title: String,
+        systemImage: String,
+        count: String,
+        stats: [DataStat],
+        manage: SettingsSubPane,
+        @ViewBuilder clearItems: () -> ClearItems
+    ) -> some View {
+        HStack(alignment: .top, spacing: NookDesign.Spacing.lg) {
+            VStack(alignment: .leading, spacing: NookDesign.Spacing.sm) {
+                HStack(spacing: NookDesign.Spacing.xs) {
+                    Label(title, systemImage: systemImage)
+                    Text("· \(count)")
+                        .foregroundStyle(.secondary)
+                }
+                if !stats.isEmpty {
+                    HStack(alignment: .top, spacing: NookDesign.Spacing.lg) {
+                        ForEach(stats) { stat in
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(stat.value)
+                                    .foregroundStyle(stat.isWarning ? .orange : .primary)
+                                Text(stat.label)
+                                    .font(NookDesign.Font.caption)
+                                    .foregroundStyle(stat.isWarning ? .orange : .secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                 }
             }
-            LabeledContent("Total size") { Text(formatSize(stats.totalSize)) }
+            Menu("Clear", content: clearItems)
+                .fixedSize()
+                .disabled(isClearing)
+            NavigationLink(value: manage) {
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help("Manage \(title)")
+            .accessibilityLabel("Manage \(title)")
         }
     }
 
@@ -214,12 +272,6 @@ struct PrivacySettingsView: View {
     
     private func clearBrowsingHistory() {
         browserManager.historyManager.clearHistory()
-    }
-    
-    private func clearCache() {
-        Task {
-            await removeWebsiteData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
-        }
     }
 
     /// Tabs use one store per space; Peek and the base config have used the default.
@@ -271,6 +323,7 @@ struct PrivacySettingsView: View {
     private func clearAllCache() {
         isClearing = true
         Task {
+            await removeWebsiteData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
             await cacheManager.clearAllCache()
             await MainActor.run {
                 isClearing = false

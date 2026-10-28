@@ -73,7 +73,7 @@ final class BrowserModel: ObservableObject {
         if persisted?["settings.adBlockerEnabled"] == nil {
             settings.adBlockerEnabled = true
         }
-        blocker.setEnabled(settings.blockCrossSiteTracking || settings.adBlockerEnabled)
+        blocker.setEnabled(settings.adBlockerEnabled)
         log.notice("Model ready: \(self.tabs.orderedSpaces.count) spaces, selected \(String(describing: self.window.selectedItemID), privacy: .public)")
     }
 
