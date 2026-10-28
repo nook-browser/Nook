@@ -139,7 +139,7 @@ public enum NookDesign {
         public static let icon: CGFloat = 15
         public static let button: CGFloat = 30
         public static let gap: CGFloat = 2
-        public static let trafficLightsInset: CGFloat = 76
+        public static let trafficLightsInset: CGFloat = Spacing.trafficLights
         public static let footerSideReserve: CGFloat = 66
     }
 
