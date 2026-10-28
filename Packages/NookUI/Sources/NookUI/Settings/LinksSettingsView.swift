@@ -27,38 +27,46 @@ public struct LinksSettingsView: View {
         Form {
             #if os(macOS)
             Section {
-                Toggle("Open links from other apps in a mini window", isOn: $settings.externalLinksInMiniWindow)
+                LabeledContent("Open in") {
+                    Picker("Open in", selection: $settings.externalLinksInMiniWindow) {
+                        Text("Mini window").tag(true)
+                        Text("New tab in current Space").tag(false)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
             } header: {
-                Text("Default behavior")
+                Text("Links from other apps")
             } footer: {
-                Text("When off, external links open as tabs in the current Space. Routing rules take priority.")
+                Text("Air Traffic Control rules below take priority.")
             }
             #endif
 
             Section {
                 if nookSettings.siteRoutingRules.isEmpty {
-                    Text("No routing rules configured.")
+                    Text("No rules yet")
                         .foregroundStyle(.tertiary)
                 } else {
                     ForEach(nookSettings.siteRoutingRules) { rule in
                         ruleRow(rule)
                     }
                 }
-            } header: {
-                Text("Air Traffic Control")
-            } footer: {
-                Text("Automatically route websites to specific spaces. When you navigate to a matching domain, a new tab opens in the designated space.")
-            }
 
-            Section {
                 HStack {
                     Button {
                         showingAddSheet = true
                     } label: {
-                        Label("Add Rule", systemImage: "plus")
+                        Label("Add rule", systemImage: "plus")
                     }
+                    .buttonStyle(.borderless)
+
                     Spacer()
                 }
+            } header: {
+                Text("Air Traffic Control")
+            } footer: {
+                Text("Open matching sites in a chosen Space, whether the link comes from another app or a page in Nook.")
             }
         }
         .formStyle(.grouped)
