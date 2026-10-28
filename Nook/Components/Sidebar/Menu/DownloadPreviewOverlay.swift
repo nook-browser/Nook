@@ -8,7 +8,6 @@
 //
 
 import AppKit
-import PDFKit
 import Quartz
 import UniformTypeIdentifiers
 import SwiftUI
@@ -43,13 +42,8 @@ struct DownloadPreviewOverlay: View {
                     header
                         .background(Color(white: 0.55).opacity(0.92))
                         .environment(\.colorScheme, .dark)
-                    Group {
-                        if isPDF, let file = download.completedFile {
-                            PDFDocumentView(url: file)
-                        } else {
-                            QuickLookView(url: download.completedFile)
-                        }
-                    }
+                    // Quick Look parses the file out of process; PDFKit would do it in Nook.
+                    QuickLookView(url: download.completedFile)
                     .padding(.vertical, NookDesign.Spacing.lg)
                 }
                 .background(RadialGradient(colors: [Color(white: 0.97), Color(white: 0.84)],
@@ -139,10 +133,6 @@ struct DownloadPreviewOverlay: View {
         .animation(NookDesign.Motion.quick, value: download.id)
     }
 
-    private var isPDF: Bool {
-        download.completedFile.flatMap { UTType(filenameExtension: $0.pathExtension) }?.conforms(to: .pdf) ?? false
-    }
-
     private static let previewApp = URL(fileURLWithPath: "/System/Applications/Preview.app")
 
     /// Preview for what it shows (PDFs and images), as on a Mac; else the file's own app.
@@ -189,27 +179,7 @@ private struct TitleThenIcon: LabelStyle {
     }
 }
 
-/// PDFKit's viewer: scrolls, zooms, selects text and follows links, which Quick Look's does not.
-private struct PDFDocumentView: NSViewRepresentable {
-    let url: URL
-
-    func makeNSView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = .singlePageContinuous
-        view.displaysPageBreaks = true
-        view.pageShadowsEnabled = true
-        // The lightbox's own gray shows around the page.
-        view.backgroundColor = .clear
-        return view
-    }
-
-    func updateNSView(_ view: PDFView, context: Context) {
-        if view.document?.documentURL != url { view.document = PDFDocument(url: url) }
-    }
-}
-
-/// macOS's Quick Look view: previews any other file it has a previewer for.
+/// macOS's Quick Look view: previews any file it has a previewer for, PDFs included.
 private struct QuickLookView: NSViewRepresentable {
     let url: URL?
 

@@ -413,7 +413,8 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
             suggestedFilename: proposedName,
             destinationPreference: destinationPreference,
             allowedContentTypes: Self.imageContentTypes,
-            mediaOnly: true
+            mediaOnly: true,
+            origin: DownloadOrigin(session: owningSession)
         )
     }
 

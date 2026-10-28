@@ -532,7 +532,7 @@ public final class NookSettingsService {
             appearanceModeKey: AppearanceMode.system.rawValue,
             tabOrganizerEnabledKey: false,
             autoRenamePinnedTabsKey: true,
-            tidyDownloadsKey: true,
+            tidyDownloadsKey: false,
             linkPreviewsKey: true,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,

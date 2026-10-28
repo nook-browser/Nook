@@ -15,11 +15,11 @@ import NookUI
 struct SidebarMenuDownloadsTab: View {
     @EnvironmentObject var browserManager: BrowserManager
     @State private var text: String = ""
-    @State private var kind: DownloadKind?
+    @State private var profileID: UUID?
 
     private var filteredDownloads: [Download] {
         browserManager.downloadManager.allDownloads.filter { download in
-            (kind == nil || DownloadKind(download.displayName) == kind)
+            (profileID == nil || download.origin.profileID == profileID)
                 && (text.isEmpty
                     || download.displayName.localizedCaseInsensitiveContains(text)
                     || download.originalURL.absoluteString.localizedCaseInsensitiveContains(text))
@@ -33,10 +33,10 @@ struct SidebarMenuDownloadsTab: View {
             LazyVStack(alignment: .leading, spacing: NookDesign.Spacing.rowGap) {
                 if downloads.isEmpty {
                     VStack(spacing: NookDesign.Spacing.md) {
-                        Image(systemName: text.isEmpty && kind == nil ? "arrow.down.circle" : "magnifyingglass")
+                        Image(systemName: text.isEmpty && profileID == nil ? "arrow.down.circle" : "magnifyingglass")
                             .font(NookDesign.Font.titleLarge)
                             .foregroundStyle(.tertiary)
-                        Text(text.isEmpty && kind == nil ? "No downloads yet" : "No downloads found")
+                        Text(text.isEmpty && profileID == nil ? "No downloads yet" : "No downloads found")
                             .font(NookDesign.Font.body)
                             .foregroundStyle(.secondary)
                     }
@@ -70,23 +70,29 @@ struct SidebarMenuDownloadsTab: View {
         }
     }
 
+    /// Hidden while there is only one profile to filter by.
+    @ViewBuilder
     private var filterMenu: some View {
-        Menu {
-            Picker("Show", selection: $kind) {
-                Text("All Downloads").tag(DownloadKind?.none)
-                Divider()
-                ForEach(DownloadKind.allCases, id: \.self) { kind in
-                    Label(kind.plural, systemImage: kind.symbol).tag(DownloadKind?.some(kind))
+        let profiles = browserManager.tabs.profiles
+        if profiles.count > 1 {
+            Menu {
+                Picker("Show", selection: $profileID) {
+                    Text("All Downloads").tag(UUID?.none)
+                    Divider()
+                    ForEach(profiles) { profile in
+                        Text(profile.name).tag(UUID?.some(profile.id))
+                    }
                 }
+                .pickerStyle(.inline)
+            } label: {
+                Label(profiles.first { $0.id == profileID }?.name ?? "Filter",
+                      systemImage: "line.3.horizontal.decrease.circle")
             }
-            .pickerStyle(.inline)
-        } label: {
-            Label(kind?.plural ?? "Filter", systemImage: "line.3.horizontal.decrease.circle")
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(RectNavButtonStyle())
+            .fixedSize()
         }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(RectNavButtonStyle())
-        .fixedSize()
     }
 
     private struct Day {
@@ -119,8 +125,8 @@ struct SidebarMenuDownloadsTab: View {
     }
 }
 
-/// What a downloaded file is, for the row's subtitle and the filter.
-enum DownloadKind: CaseIterable, Hashable {
+/// What a downloaded file is, for the row's subtitle.
+enum DownloadKind: Hashable {
     case image, video, audio, pdf, document, diskImage, archive, other
 
     init(_ filename: String) {
@@ -148,32 +154,6 @@ enum DownloadKind: CaseIterable, Hashable {
         case .diskImage: "Disk Image"
         case .archive: "Archive"
         case .other: "Download"
-        }
-    }
-
-    var plural: String {
-        switch self {
-        case .image: "Images"
-        case .video: "Videos"
-        case .audio: "Audio"
-        case .pdf: "PDFs"
-        case .document: "Documents"
-        case .diskImage: "Disk Images"
-        case .archive: "Archives"
-        case .other: "Other"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .image: "photo"
-        case .video: "film"
-        case .audio: "waveform"
-        case .pdf: "doc.richtext"
-        case .document: "doc.text"
-        case .diskImage: "externaldrive"
-        case .archive: "archivebox"
-        case .other: "arrow.down.circle"
         }
     }
 }
