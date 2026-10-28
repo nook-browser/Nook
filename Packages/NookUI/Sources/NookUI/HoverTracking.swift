@@ -59,8 +59,14 @@ final class HoverTrackingNSView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        NotificationCenter.default.removeObserver(self, name: HoverResync.notification, object: nil)
+        if window != nil {
+            NotificationCenter.default.addObserver(self, selector: #selector(resyncRequested), name: HoverResync.notification, object: nil)
+        }
         resyncHover()
     }
+
+    @objc private func resyncRequested() { resyncHover() }
 
     /// Derives hover from where the pointer actually is, for the cases no enter/exit arrives.
     private func resyncHover() {
@@ -96,6 +102,21 @@ final class HoverTrackingNSView: NSView {
     }
 }
 
+/// Rows that slide under a resting pointer get no enter event (`.inVisibleRect` areas move
+/// without `updateTrackingAreas`), so a close asks every hover view to check the pointer again.
+public enum HoverResync {
+    static let notification = Notification.Name("NookHoverResync")
+
+    @MainActor public static func request(after delay: TimeInterval) {
+        // Once when the slide should be done, once more for a frame that landed late.
+        for extra in [0, 0.1] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + extra) {
+                NotificationCenter.default.post(name: notification, object: nil)
+            }
+        }
+    }
+}
+
 // MARK: - View Modifier
 
 struct HoverTrackingModifier: ViewModifier {
@@ -110,6 +131,11 @@ struct HoverTrackingModifier: ViewModifier {
 }
 
 #else
+
+public enum HoverResync {
+    @MainActor public static func request(after delay: TimeInterval) {}
+}
+
 
 /// Hover is a pointer notion; on iOS SwiftUI's own `.onHover` is cheap and only fires
 /// with a connected pointer.

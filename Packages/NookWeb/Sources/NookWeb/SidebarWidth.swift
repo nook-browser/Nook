@@ -13,7 +13,7 @@ public enum SidebarWidth {
     public static let hide: CGFloat = 82
     public static let min: CGFloat = 164
     public static let max: CGFloat = 500
-    public static let standard: CGFloat = 252   // four square favorite tiles: 8 + 8 + 4 * 53 + 3 * 8
+    public static let standard: CGFloat = 260   // four 55 pt wide favorite tiles: 8 + 8 + 4 * 55 + 3 * 8
     public static let snap: CGFloat = 14
 
     /// The width a drag to `proposed` ends up at: 0 (hidden) below `hide`, clamped to `min...max`,

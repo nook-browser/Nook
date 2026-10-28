@@ -158,6 +158,8 @@ public struct SpaceTab: View {
                         let useUnload = tabs.isSynced(item.id) && !isUnloaded
                         Button(action: {
                             if useUnload { tabs.unload(item.id) } else { tabs.remove(item.id) }
+                            // The next row slides under the pointer; let it show its close button.
+                            HoverResync.request(after: NookDesign.Motion.tabCloseDuration)
                         }) {
                             Image(systemName: useUnload ? "minus" : "xmark")
                                 .font(NookDesign.Font.secondary)

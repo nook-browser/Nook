@@ -79,7 +79,7 @@ public enum NookDesign {
         public static let row: CGFloat = 32
         #endif
         public static let iconButton: CGFloat = 28
-        public static let favoriteTile: CGFloat = 53   // a favorite tile's height; four are square at the default sidebar width
+        public static let favoriteTile: CGFloat = 48   // a favorite tile's height; at the default sidebar width tiles are 55 pt wide
         public static let favoriteBorder: CGFloat = 2  // the selected favorite's edge
         public static let favoriteGlowScale: CGFloat = 2   // pixels per point of the blurred favicon behind a tile
         public static let favoriteGlowBlur: CGFloat = 0.25 // its blur radius as a fraction of the tile
@@ -183,7 +183,8 @@ public enum NookDesign {
 
     public enum Motion {
         public static let tabReorder = Animation.easeOut(duration: 0.10)
-        public static let tabClose = Animation.easeOut(duration: 0.20)
+        public static let tabCloseDuration: TimeInterval = 0.20
+        public static let tabClose = Animation.easeOut(duration: tabCloseDuration)
         public static let tabLandingDuration: TimeInterval = 0.10
         public static let quick = Animation.easeOut(duration: 0.12)      // hover, press
         public static let standardDuration: TimeInterval = 0.22          // `standard`, for AppKit animations
