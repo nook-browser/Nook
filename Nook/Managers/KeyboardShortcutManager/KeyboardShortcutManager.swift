@@ -212,7 +212,11 @@ class KeyboardShortcutManager {
         // pass through so standard macOS shortcuts (Cmd+W to close, etc.) work normally
         if let keyWindow = NSApp.keyWindow,
            !(windowRegistry?.windows.values.contains(where: { $0.window === keyWindow }) ?? false) {
-            return false
+            guard let miniWindow = keyWindow as? MiniBrowserWindow,
+                  let keyCombination = KeyCombination(from: event),
+                  let shortcut = shortcutMap[keyCombination.lookupKey],
+                  shortcut.isEnabled else { return false }
+            return executeInMiniWindow(shortcut.action, miniWindow)
         }
 
         let keyCode = event.keyCode
@@ -459,6 +463,44 @@ class KeyboardShortcutManager {
     private static func isControlTab(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown, event.keyCode == 48 else { return false } // Tab
         return event.modifierFlags.contains(.control) && !event.modifierFlags.contains(.command)
+    }
+
+    /// A mini window's page takes the page shortcuts. The rest are swallowed, since the menu bar
+    /// would otherwise run them on the browser window behind it; New Window and Quit pass through.
+    private func executeInMiniWindow(_ action: ShortcutAction, _ window: MiniBrowserWindow) -> Bool {
+        guard let page = window.page, let webView = page.webView else { return false }
+        switch action {
+        case .newWindow, .closeBrowser:
+            return false
+        case .goBack:
+            if webView.canGoBack { webView.goBack() }
+        case .goForward:
+            if webView.canGoForward { webView.goForward() }
+        case .refresh:
+            page.refresh()
+        case .hardReload:
+            webView.reloadFromOrigin()
+        case .copyCurrentURL:
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(page.url.absoluteString, forType: .string)
+        case .printPage:
+            webView.nookPrint()
+        case .muteUnmuteAudio:
+            page.toggleMute()
+        case .togglePictureInPicture:
+            page.requestPictureInPicture()
+        case .zoomIn:
+            browserManager?.zoomManager.zoomIn(for: webView)
+        case .zoomOut:
+            browserManager?.zoomManager.zoomOut(for: webView)
+        case .actualSize:
+            browserManager?.zoomManager.resetZoom(for: webView)
+        case .closeTab, .closeWindow:
+            window.performClose(nil)
+        default:
+            break
+        }
+        return true
     }
 
     private func executeAction(_ action: ShortcutAction) {

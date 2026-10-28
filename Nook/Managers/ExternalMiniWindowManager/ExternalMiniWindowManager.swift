@@ -94,6 +94,8 @@ private extension NSToolbarItem.Identifier {
 /// and the window is not part of the app's menu-bar command tree.
 final class MiniBrowserWindow: NSWindow {
     var openInSpaceAction: (() -> Void)?
+    /// The page shortcuts act on while this window is key (`KeyboardShortcutManager`).
+    weak var page: PageSession?
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -160,6 +162,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
 
         window.delegate = self
         window.openInSpaceAction = { adoptAction(nil) }
+        window.page = page
         window.subtitle = page.profile?.name ?? "Default"
         installToolbar(on: window)
         observeNavigationState(for: window)

@@ -34,6 +34,8 @@ final class WindowFrameInteractionView: NSView {
             owner = acquired
         } else { owner = nil }
         defer { if let owner { endDrag?(owner) } }
+        // A drag of a full-screen window moves it off its space and blanks the display it left.
+        guard !window.styleMask.contains(.fullScreen) else { return }
         window.performDrag(with: press)
     }
 
