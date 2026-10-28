@@ -133,7 +133,7 @@ public struct DevNetworkEntry: DevLogEntry, Identifiable {
     public var curl: String {
         func quote(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
         var parts = ["curl", quote(url)]
-        if method != "GET" { parts += ["-X", method] }
+        if method != "GET" { parts += ["-X", quote(method)] }
         for (name, value) in requestHeaders.sorted(by: { $0.key < $1.key }) {
             parts += ["-H", quote("\(name): \(value)")]
         }

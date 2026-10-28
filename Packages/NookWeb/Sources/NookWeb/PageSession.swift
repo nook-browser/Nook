@@ -205,6 +205,16 @@ public final class PageSession: NSObject, Identifiable {
     /// JavaScript dialogs since the last commit, and whether the user silenced the page.
     @ObservationIgnored var jsDialogCount = 0
     @ObservationIgnored var jsDialogsSuppressed = false
+    /// An open-in-another-app sheet is up, so a redirect loop cannot stack more.
+    @ObservationIgnored var externalAppConfirmPending = false
+    /// Downloads since the last commit, the person's answer about more of them, and the answers
+    /// waiting on that question. Requests made inside a click are remembered until their response.
+    @ObservationIgnored var downloadsThisPage = 0
+    @ObservationIgnored var moreDownloadsAllowed: Bool?
+    @ObservationIgnored var downloadDecisionsWaiting: [(Bool) -> Void] = []
+    @ObservationIgnored var clickedRequestURLs: [URL] = []
+    /// The page's main response said `Cache-Control: no-store`, so its text stays out of history.
+    @ObservationIgnored var pageAskedNotToStore = false
     @ObservationIgnored var hasFavicon: Bool = false
     @ObservationIgnored var faviconFetchInFlight: Bool = false
     @ObservationIgnored var faviconFetchAttempts: Int = 0
@@ -398,6 +408,10 @@ public final class PageSession: NSObject, Identifiable {
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
         controller.add(self, contentWorld: Self.pipStateWorld, name: "pipStateChange")
+        for name in Self.linkHoverHandlerNames {
+            controller.removeScriptMessageHandler(forName: name, contentWorld: Self.linkHoverWorld)
+            controller.add(self, contentWorld: Self.linkHoverWorld, name: name)
+        }
         controller.removeScriptMessageHandler(forName: Self.translateHandlerName, contentWorld: Self.translateWorld)
         controller.add(self, contentWorld: Self.translateWorld, name: Self.translateHandlerName)
         webView.customUserAgent = PlatformUserAgent.custom
@@ -501,6 +515,9 @@ public final class PageSession: NSObject, Identifiable {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
+        for name in Self.linkHoverHandlerNames {
+            controller.removeScriptMessageHandler(forName: name, contentWorld: Self.linkHoverWorld)
+        }
         controller.removeScriptMessageHandler(forName: Self.translateHandlerName, contentWorld: Self.translateWorld)
         self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
         detachDevCaptureHandler(from: webView)

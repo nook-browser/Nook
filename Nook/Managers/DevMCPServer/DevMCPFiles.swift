@@ -5,21 +5,34 @@
 //
 //  Where DevMCP's evaluate saveTo and download tools may write (only under ~/Downloads/Nook MCP),
 //  file names for downloaded URLs, and which of the page's cookies a download sends.
-//  Foundation only, so scripts/tests/DevMCPFilesCheck.swift can compile it directly.
+//  Foundation only, so scripts/tests/DevMCPFilesCheck.swift can compile it directly
+//  (with NookWeb's Quarantine.swift beside it).
 //
 
 import Foundation
+#if canImport(NookWeb)
+import NookWeb
+#endif
 
 enum DevMCPFiles {
     static let root = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Nook MCP", isDirectory: true)
 
-    /// `relative` under `root`, or nil when it is empty, absolute, or climbs out through `..` or a symlink.
+    /// `relative` under `root`, or nil when it is empty, absolute, climbs out through `..`, or
+    /// passes through any symlink under the root, a dangling one included.
     static func resolve(_ relative: String, root: URL = root) -> URL? {
         guard !relative.isEmpty, !relative.hasPrefix("/"), !relative.hasPrefix("~") else { return nil }
         let base = realPath(root.standardizedFileURL)
-        let url = realPath(base.appendingPathComponent(relative).standardizedFileURL)
-        return url.path.hasPrefix(base.path + "/") ? url : nil
+        let url = base.appendingPathComponent(relative).standardizedFileURL
+        guard url.path.hasPrefix(base.path + "/") else { return nil }
+        var walk = base
+        for part in url.pathComponents.dropFirst(base.pathComponents.count) {
+            walk.appendPathComponent(part)
+            // attributesOfItem is lstat: it sees the link itself, where fileExists follows it.
+            let type = (try? FileManager.default.attributesOfItem(atPath: walk.path))?[.type] as? FileAttributeType
+            if type == .typeSymbolicLink { return nil }
+        }
+        return url
     }
 
     /// `resolvingSymlinksInPath` leaves a path alone when its last part doesn't exist yet,
@@ -143,6 +156,7 @@ final class DevMCPDownload: @unchecked Sendable {
                     row["status"] = "exists"
                 } else {
                     try data.write(to: file)
+                    setQuarantineAttribute(on: file)
                     row["status"] = "ok"
                     row["bytes"] = data.count
                 }

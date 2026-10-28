@@ -194,7 +194,6 @@ class WebViewCoordinator {
         webView.stopLoading()
         let controller = webView.configuration.userContentController
         let handlerNames = [
-            "linkHover", "commandHover",
             "mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
             "historyStateDidChange", "nookShortcutDetect",
         ]
@@ -202,6 +201,9 @@ class WebViewCoordinator {
             controller.removeScriptMessageHandler(forName: name)
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: PageSession.pipStateWorld)
+        for name in PageSession.linkHoverHandlerNames {
+            controller.removeScriptMessageHandler(forName: name, contentWorld: PageSession.linkHoverWorld)
+        }
         if let focusable = webView as? FocusableWKWebView {
             focusable.contextMenuBridge?.detach()
             focusable.contextMenuBridge = nil

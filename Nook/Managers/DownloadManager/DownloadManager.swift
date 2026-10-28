@@ -593,9 +593,12 @@ public class DownloadManager: NSObject {
     /// A name safe to create in a folder: one path component, no leading dots or NULs, at most 255
     /// characters. Idempotent, so a caller can adjust the name and run it again.
     static func sanitizedFilename(_ suggested: String) -> String {
-        var name = (suggested.isEmpty ? "download" : suggested)
+        // Bidi overrides and controls go too: "invoice\u{202E}fdp.app" displays as a PDF.
+        let hidden = CharacterSet.controlCharacters
+            .union(CharacterSet(charactersIn: "\u{200E}\u{200F}\u{202A}\u{202B}\u{202C}\u{202D}\u{202E}\u{2066}\u{2067}\u{2068}\u{2069}"))
+        var name = String(String.UnicodeScalarView((suggested.isEmpty ? "download" : suggested)
+            .unicodeScalars.filter { !hidden.contains($0) }))
             .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "\0", with: "")
         while name.hasPrefix(".") {
             name = String(name.dropFirst())
         }
@@ -630,25 +633,8 @@ public class DownloadManager: NSObject {
     }
 
     /// Sets the `com.apple.quarantine` extended attribute on a downloaded file.
-    ///
-    /// This ensures macOS Gatekeeper will prompt the user before opening
-    /// executables, disk images, or other potentially dangerous files
-    /// downloaded from the web.
     nonisolated static func setQuarantineAttribute(on fileURL: URL) {
-        // com.apple.quarantine format: flags;timestamp_hex;agent_name;uuid
-        // 0083 = "downloaded from the web, not yet opened by the user"
-        let quarantineValue = "0083;\(String(format: "%08x", Int(Date().timeIntervalSince1970)));Nook;\(UUID().uuidString)"
-        guard let data = quarantineValue.data(using: .utf8) else { return }
-
-        fileURL.withUnsafeFileSystemRepresentation { path in
-            guard let path = path else { return }
-            let result = setxattr(path, "com.apple.quarantine", (data as NSData).bytes, data.count, 0, 0)
-            if result != 0 {
-                #if DEBUG
-                print("Failed to set quarantine attribute on \(fileURL.lastPathComponent): errno \(errno)")
-                #endif
-            }
-        }
+        NookWeb.setQuarantineAttribute(on: fileURL)
     }
 }
 

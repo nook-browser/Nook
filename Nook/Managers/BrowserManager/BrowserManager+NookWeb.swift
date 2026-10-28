@@ -295,6 +295,19 @@ extension BrowserManager: AlertPresenter {
         }
     }
 
+    func presentQuestion(
+        _ question: String, detail: String, allowTitle: String, denyTitle: String, over webView: WKWebView,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let alert = NSAlert()
+        alert.messageText = question
+        alert.informativeText = detail
+        alert.addButton(withTitle: allowTitle)
+        alert.addButton(withTitle: denyTitle)
+        guard let window = webView.window else { return completion(false) }
+        alert.beginSheetModal(for: window) { completion($0 == .alertFirstButtonReturn) }
+    }
+
     func presentPrompt(
         prompt: String, defaultText: String?, host: String, over webView: WKWebView,
         onSuppress: (() -> Void)?, completion: @escaping (String?) -> Void

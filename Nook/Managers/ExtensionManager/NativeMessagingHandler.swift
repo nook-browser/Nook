@@ -47,20 +47,20 @@ final class NativeMessagingHandler: NSObject {
     /// Called on the main thread once a port conversation ends.
     var onClose: (() -> Void)?
 
-    init(applicationId: String, extensionContext: WKWebExtensionContext) {
+    init(applicationId: String, extensionContext: WKWebExtensionContext, chromeIDVerified: Bool) {
         self.applicationId = applicationId
-        self.callerOrigins = Self.origins(for: extensionContext)
+        self.callerOrigins = Self.origins(for: extensionContext, chromeIDVerified: chromeIDVerified)
         super.init()
     }
 
     /// How the calling extension identifies itself to host manifests: Chrome `allowed_origins`
-    /// entries (`chrome-extension://<id>/`, or `nook-extension://<id>/` for Nook-specific hosts).
-    /// Firefox `allowed_extensions` is not honored: a gecko ID is only what the extension's own
-    /// manifest claims, and nothing here verifies it the way AMO signing does.
-    private static func origins(for context: WKWebExtensionContext) -> Set<String> {
+    /// entries (`chrome-extension://<id>/`, only for an ID a store install proved, or
+    /// `nook-extension://<id>/` for Nook-specific hosts). Firefox `allowed_extensions` is not
+    /// honored: a gecko ID is only what the extension's own manifest claims.
+    private static func origins(for context: WKWebExtensionContext, chromeIDVerified: Bool) -> Set<String> {
         let id = context.uniqueIdentifier
         var origins: Set<String> = ["nook-extension://\(id)/"]
-        if ExtensionStore.isValidExtensionID(id) {
+        if chromeIDVerified, ExtensionStore.isValidExtensionID(id) {
             origins.insert("chrome-extension://\(id)/")
         }
         return origins

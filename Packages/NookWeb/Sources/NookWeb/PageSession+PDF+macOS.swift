@@ -54,6 +54,7 @@ extension PageSession {
             do {
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 try data.write(to: file, options: .withoutOverwriting)
+                setQuarantineAttribute(on: file)
                 try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: file.path)
             } catch {
                 return

@@ -112,7 +112,8 @@ extension BrowserManager {
         let shown = [peek, tabs.selectedSession(in: state)]
             + [splitManager.leftTabId(for: state.id), splitManager.rightTabId(for: state.id)].map { $0.flatMap(tabs.session(for:)) }
         if let view = shown.compactMap({ $0?.webView }).first(where: { $0.fullscreenState != .notInFullscreen }) {
-            view.evaluateJavaScript("document.exitFullscreen()")
+            // In Nook's own world, where a page cannot replace exitFullscreen with a no-op.
+            view.evaluateJavaScript("document.exitFullscreen()", in: nil, in: .defaultClient) { _ in }
         } else if peek != nil {
             peekManager.dismissPeek()
         }

@@ -505,7 +505,9 @@ extension ExtensionManager {
         Self.logger.info("[NativeMessaging] sendMessage to '\(applicationId, privacy: .public)'")
 
         // Single-shot message handling
-        let handler = NativeMessagingHandler(applicationId: applicationId, extensionContext: extensionContext)
+        let handler = NativeMessagingHandler(
+            applicationId: applicationId, extensionContext: extensionContext,
+            chromeIDVerified: hasStoreVerifiedChromeID(extensionContext))
         handler.sendMessage(message) { [weak self] response, error in
             // Cache only a missing or disallowed host; timeouts and bad replies may be transient.
             if let error = error as NSError?,
@@ -543,7 +545,9 @@ extension ExtensionManager {
             return
         }
 
-        let handler = NativeMessagingHandler(applicationId: applicationId, extensionContext: extensionContext)
+        let handler = NativeMessagingHandler(
+            applicationId: applicationId, extensionContext: extensionContext,
+            chromeIDVerified: hasStoreVerifiedChromeID(extensionContext))
         // Keep the handler alive for the life of the conversation.
         nativeMessagingHandlers.append(handler)
         handler.onClose = { [weak self, weak handler] in

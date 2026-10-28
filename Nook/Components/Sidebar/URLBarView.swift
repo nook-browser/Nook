@@ -500,10 +500,7 @@ struct URLBarView: View {
     /// that was written out even when it is the scheme's default, so `https://x.com:443`
     /// still reads as `x.com`.
     private func displayHost(for session: PageSession?) -> String {
-        guard let url = session?.url, let host = url.host else { return displayURL(for: session) }
-        let defaultPort = url.scheme == "https" ? 443 : (url.scheme == "http" ? 80 : nil)
-        guard let port = url.port, port != defaultPort else { return host }
-        return "\(host):\(port)"
+        session?.url.nookDisplayHost ?? displayURL(for: session)
     }
     private func displayPath(for session: PageSession?) -> String {
         guard let url = session?.url, url.host != nil else { return "" }
@@ -790,5 +787,15 @@ private struct SplitAddressSearchField: NSViewRepresentable {
     func updateNSView(_ nsView: Field, context: Context) {
         context.coordinator.parent = self
         if nsView.stringValue != text { nsView.stringValue = text }
+    }
+}
+
+extension URL {
+    /// The host as the address bar shows it, with a non-default port; nil when there is no host.
+    var nookDisplayHost: String? {
+        guard let host else { return nil }
+        let defaultPort = scheme == "https" ? 443 : (scheme == "http" ? 80 : nil)
+        guard let port, port != defaultPort else { return host }
+        return "\(host):\(port)"
     }
 }

@@ -143,9 +143,20 @@ final class ExtensionManager: NSObject, ObservableObject,
         for applicationId: String, context: WKWebExtensionContext
     ) -> (any InternalNativePortHandler)? {
         guard let handler = internalPortHandlers[applicationId],
-              type(of: handler).extensionIdentifiers.contains(context.uniqueIdentifier)
+              type(of: handler).extensionIdentifiers.contains(context.uniqueIdentifier),
+              !ExtensionStore.isValidExtensionID(context.uniqueIdentifier) || hasStoreVerifiedChromeID(context)
         else { return nil }
         return handler
+    }
+
+    /// A Chrome-format ID is only a claim: a sideload gets one by copying a store build's public
+    /// manifest `key`. A Web Store or Edge install is what proves it.
+    func hasStoreVerifiedChromeID(_ context: WKWebExtensionContext) -> Bool {
+        let id = context.uniqueIdentifier
+        guard ExtensionStore.isValidExtensionID(id),
+              let store = fetchEntity(id: id)?.sourceStore.flatMap(ExtensionStore.init(rawValue:))
+        else { return false }
+        return store == .chrome || store == .edge
     }
 
     // MARK: - Extension Context Identity

@@ -176,7 +176,7 @@ extension PageSession: WKUIDelegate {
 
     /// Counts a dialog. From the second one since the last main-frame commit the presenter offers
     /// to stop them, so `while(1) alert()` cannot hold the window.
-    private func nextDialogSuppressor() -> (() -> Void)? {
+    func nextDialogSuppressor() -> (() -> Void)? {
         jsDialogCount += 1
         guard jsDialogCount > 1 else { return nil }
         return { [weak self] in self?.jsDialogsSuppressed = true }
