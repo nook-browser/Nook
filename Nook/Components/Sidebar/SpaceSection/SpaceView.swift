@@ -55,7 +55,11 @@ struct SpaceView: View {
 
     var body: some View {
         let rows = tabs.rows(space: spaceID)
-        let pinned = rows.filter { $0.section == .pinned }
+        // A folded pinned section still shows its selected tab, as Arc does.
+        let selected = windowState.spaceID == spaceID ? windowState.selectedItemID : nil
+        let pinned = rows.filter {
+            $0.section == .pinned && (!tabs.isPinnedCollapsed(space: spaceID) || $0.id == selected)
+        }
         let regular = rows.filter { $0.section == .tabs }
         let split = splitPair(in: rows)
 

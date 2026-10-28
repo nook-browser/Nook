@@ -43,6 +43,7 @@ public final class TabsController {
     private var pageOwners: [UUID: UUID] = [:]
     /// Open folders of private windows, kept apart so their ids never reach device.json.
     private var privateOpenFolders: Set<UUID> = []
+    private var privateCollapsedPinned: Set<UUID> = []
     /// Live folders whose last refresh failed, and why. No entry when it worked.
     public internal(set) var liveStatus: [UUID: LiveFolderStatus] = [:]
     @ObservationIgnored var liveRefreshed: [UUID: Date] = [:]
@@ -302,6 +303,11 @@ public final class TabsController {
 
     public func isOpen(folder: UUID) -> Bool {
         device.openFolders.contains(folder) || privateOpenFolders.contains(folder)
+    }
+
+    /// Whether the space's pinned section is folded into its title.
+    public func isPinnedCollapsed(space spaceID: UUID) -> Bool {
+        device.collapsedPinned?.contains(spaceID) == true || privateCollapsedPinned.contains(spaceID)
     }
 
     /// A synced tab whose open page's host and path differ from its home URL.
@@ -597,6 +603,20 @@ public final class TabsController {
             if open { refreshLiveFolder(folderID) }
         case .privateWindow:
             if open { privateOpenFolders.insert(folderID) } else { privateOpenFolders.remove(folderID) }
+        }
+    }
+
+    /// Main-tree spaces are remembered in device.json; private ones only in memory.
+    public func setPinnedCollapsed(_ collapsed: Bool, space spaceID: UUID) {
+        guard let owner = owner(ofSpace: spaceID) else { return }
+        switch owner {
+        case .main:
+            var all = device.collapsedPinned ?? []
+            if collapsed { all.insert(spaceID) } else { all.remove(spaceID) }
+            device.collapsedPinned = all.isEmpty ? nil : all
+            save()
+        case .privateWindow:
+            if collapsed { privateCollapsedPinned.insert(spaceID) } else { privateCollapsedPinned.remove(spaceID) }
         }
     }
 
