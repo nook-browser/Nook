@@ -400,6 +400,10 @@ public final class PageSession: NSObject, Identifiable {
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
         controller.add(self, contentWorld: Self.pipStateWorld, name: "pipStateChange")
+        for name in Self.linkHoverHandlerNames {
+            controller.removeScriptMessageHandler(forName: name, contentWorld: Self.linkHoverWorld)
+            controller.add(self, contentWorld: Self.linkHoverWorld, name: name)
+        }
         controller.removeScriptMessageHandler(forName: Self.translateHandlerName, contentWorld: Self.translateWorld)
         controller.add(self, contentWorld: Self.translateWorld, name: Self.translateHandlerName)
         webView.customUserAgent = PlatformUserAgent.custom
@@ -503,6 +507,9 @@ public final class PageSession: NSObject, Identifiable {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
+        for name in Self.linkHoverHandlerNames {
+            controller.removeScriptMessageHandler(forName: name, contentWorld: Self.linkHoverWorld)
+        }
         controller.removeScriptMessageHandler(forName: Self.translateHandlerName, contentWorld: Self.translateWorld)
         self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
         detachDevCaptureHandler(from: webView)

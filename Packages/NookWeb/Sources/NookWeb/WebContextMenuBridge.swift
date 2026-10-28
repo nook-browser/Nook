@@ -289,6 +289,8 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler, WKScr
         }
 
         function capturePayload(event) {
+            // A page can dispatch its own contextmenu to stage a link the next real menu offers.
+            if (!event.isTrusted) return;
             console.log('[Nook Context Menu] capturePayload called');
             try {
                 var invocations = 0;
