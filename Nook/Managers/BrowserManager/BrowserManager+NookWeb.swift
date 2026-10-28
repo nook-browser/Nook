@@ -83,8 +83,6 @@ extension BrowserManager: PageSessionDelegate {
 
     func loadZoom(for itemID: UUID) { loadZoomForTab(itemID) }
 
-    func cleanupZoom(for itemID: UUID) { cleanupZoomForTab(itemID) }
-
     func setMuteState(_ muted: Bool, for itemID: UUID) {
         setMuteState(muted, for: itemID, originatingWindowId: windowRegistry?.activeWindow?.id)
     }
@@ -133,7 +131,7 @@ extension BrowserManager: TabEventObserver {
     }
 
     func tabActivated(new session: PageSession, previous: PageSession?) {
-        zoomManager.showZoomLevel(for: session.itemID)
+        zoomManager.showZoomLevel(for: session.webView)
         ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
         // The loaded-page budget was only ever reached from startup warming and split view, so
         // opening tabs by hand never checked it and no cap could bind.

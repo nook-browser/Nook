@@ -222,7 +222,7 @@ extension BrowserManager {
             return
         }
 
-        zoomManager.zoomIn(for: webView, tabId: currentTab.itemID)
+        zoomManager.zoomIn(for: webView)
         shouldShowZoomPopup = true
     }
 
@@ -235,7 +235,7 @@ extension BrowserManager {
             return
         }
 
-        zoomManager.zoomOut(for: webView, tabId: currentTab.itemID)
+        zoomManager.zoomOut(for: webView)
         shouldShowZoomPopup = true
     }
 
@@ -248,23 +248,18 @@ extension BrowserManager {
             return
         }
 
-        zoomManager.resetZoom(for: webView, tabId: currentTab.itemID)
+        zoomManager.resetZoom(for: webView)
         shouldShowZoomPopup = true
     }
 
-    /// Reset zoom when a tab navigates, so a page never inherits the previous page's zoom.
+    /// Apply the new page's saved site zoom when a tab navigates.
     func loadZoomForTab(_ tabId: UUID) {
-        // Every window's view of the page, not just the active window's: magnification is per view.
+        // Every window's view of the page, not just the active window's: zoom is per view.
         for webView in webViewCoordinator?.getAllWebViews(for: tabId) ?? [] {
-            zoomManager.resetZoom(for: webView, tabId: tabId)
+            zoomManager.restoreZoom(for: webView)
         }
         // A background tab navigating must not move the readout off the tab being looked at.
-        zoomManager.showZoomLevel(for: windowRegistry?.activeWindow?.selectedItemID)
-    }
-
-    /// Clean up zoom data when a tab is closed
-    func cleanupZoomForTab(_ tabId: UUID) {
-        zoomManager.removeTabZoomLevel(for: tabId)
+        zoomManager.showZoomLevel(for: tabs.activeWindowSession?.webView)
     }
 
 }

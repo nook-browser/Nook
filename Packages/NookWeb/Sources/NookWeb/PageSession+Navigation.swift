@@ -72,6 +72,8 @@ extension PageSession: WKNavigationDelegate {
             self.url = newURL
             controller?.pageCommitted(itemID: itemID, url: newURL)
             controller?.sessionDelegate?.navigateAcrossWindows(itemID, to: newURL)
+            // At commit, before first paint, so a zoomed site never flashes at 100%.
+            controller?.sessionDelegate?.loadZoom(for: itemID)
             // Update website shortcut detector with new URL; it follows the window's tab, not Peek.
             if !isDetached { controller?.sessionDelegate?.shortcutDetectorDidNavigate(to: newURL) }
             // Grant extension access to the committed URL. This is critical for
@@ -114,9 +116,6 @@ extension PageSession: WKNavigationDelegate {
             controller?.pageCommitted(itemID: itemID, url: newURL)
             controller?.sessionDelegate?.navigateAcrossWindows(itemID, to: newURL)
             if let settings = controller?.settings { BoostTweaks.runScripts(for: newURL, in: webView, settings: settings) }
-
-            // Load saved zoom level for the new domain
-            controller?.sessionDelegate?.loadZoom(for: self.itemID)
 
             // CHROME WEB STORE INTEGRATION: Inject script after navigation
             injectWebStoreScriptIfNeeded(for: newURL, in: webView)

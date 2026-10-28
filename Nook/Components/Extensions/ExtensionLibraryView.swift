@@ -271,12 +271,12 @@ struct ExtensionLibraryView: View {
 
     private func zoomIn() {
         guard let tab = currentTab, let webView = tab.webView else { return }
-        browserManager.zoomManager.zoomIn(for: webView, tabId: tab.itemID)
+        browserManager.zoomManager.zoomIn(for: webView)
     }
 
     private func zoomOut() {
         guard let tab = currentTab, let webView = tab.webView else { return }
-        browserManager.zoomManager.zoomOut(for: webView, tabId: tab.itemID)
+        browserManager.zoomManager.zoomOut(for: webView)
     }
 }
 
