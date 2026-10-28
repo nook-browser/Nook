@@ -159,8 +159,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                         registry.activeWindow?.commandPalette?.open()
                     }
                 case 3:  // Back button
-                    if let eventWindowState, eventWindowState.isSidebarHovered, !Self.isOverWebContent(event) {
-                        manager.tabs.selectPreviousSpace(in: eventWindowState)
+                    if let eventWindowState, eventWindowState.isSidebarHovered, !Self.isOverWebContent(event),
+                       manager.tabs.selectPreviousSpace(in: eventWindowState) {
                         return
                     }
                     guard let windowState = registry.activeWindow,
@@ -170,8 +170,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                     }
                     session.goBack(in: manager.getWebView(for: session.itemID, in: windowState.id))
                 case 4:  // Forward button
-                    if let eventWindowState, eventWindowState.isSidebarHovered, !Self.isOverWebContent(event) {
-                        manager.tabs.selectNextSpace(in: eventWindowState)
+                    if let eventWindowState, eventWindowState.isSidebarHovered, !Self.isOverWebContent(event),
+                       manager.tabs.selectNextSpace(in: eventWindowState) {
                         return
                     }
                     guard
