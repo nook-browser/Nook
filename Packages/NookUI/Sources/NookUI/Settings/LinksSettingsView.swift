@@ -1,6 +1,6 @@
 // Licensed under GPL-3.0. See LICENSE.
 //
-//  AirTrafficControlSettingsView.swift
+//  LinksSettingsView.swift
 //  Nook
 //
 
@@ -11,7 +11,7 @@ import NookDesign
 import NookTweaks
 import NookWeb
 
-public struct AirTrafficControlSettingsView: View {
+public struct LinksSettingsView: View {
     @Environment(NookSettingsService.self) var nookSettings
     @Environment(TabsController.self) private var tabs
     @Environment(\.siteRouting) private var siteRouting
@@ -22,7 +22,19 @@ public struct AirTrafficControlSettingsView: View {
     public init() {}
 
     public var body: some View {
+        @Bindable var settings = nookSettings
+
         Form {
+            #if os(macOS)
+            Section {
+                Toggle("Open links from other apps in a mini window", isOn: $settings.externalLinksInMiniWindow)
+            } header: {
+                Text("Default behavior")
+            } footer: {
+                Text("When off, external links open as tabs in the current Space. Routing rules take priority.")
+            }
+            #endif
+
             Section {
                 if nookSettings.siteRoutingRules.isEmpty {
                     Text("No routing rules configured.")
@@ -33,7 +45,7 @@ public struct AirTrafficControlSettingsView: View {
                     }
                 }
             } header: {
-                Text("Rules")
+                Text("Air Traffic Control")
             } footer: {
                 Text("Automatically route websites to specific spaces. When you navigate to a matching domain, a new tab opens in the designated space.")
             }

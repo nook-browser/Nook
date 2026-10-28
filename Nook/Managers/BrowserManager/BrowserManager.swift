@@ -548,6 +548,7 @@ class BrowserManager: ObservableObject {
 
     private var startupWaitedForContentBlocker = false
     private var startupWarmTasks: [UUID: Task<Void, Never>] = [:]
+    private var pendingExternalURLs: [URL] = []
     /// Runs once the next regular window `createNewWindow(then:)` opened is set up.
     private var nextWindowSetup: ((BrowserWindowState) -> Void)?
 
@@ -966,9 +967,50 @@ class BrowserManager: ObservableObject {
         extensionManager?.uninstallExtension(extensionId)
     }
 
-    /// Presents an external URL in a mini window popup (for URL events)
+    /// Routing rules take precedence over the default presentation for links from other apps.
     func presentExternalURL(_ url: URL) {
-        externalMiniWindowManager.present(url: url)
+        if siteRoutingManager.applyRoute(url: url, from: nil) {
+            NSApp.activate(ignoringOtherApps: true)
+            windowRegistry?.activeWindow?.window?.makeKeyAndOrderFront(nil)
+
+            return
+        }
+
+        if nookSettings?.externalLinksInMiniWindow != false {
+            externalMiniWindowManager.present(url: url)
+
+            return
+        }
+
+        if let window = windowRegistry?.activeWindow {
+            tabs.open(url: url, in: window, placement: .newTab)
+            NSApp.activate(ignoringOtherApps: true)
+            window.window?.makeKeyAndOrderFront(nil)
+
+            return
+        }
+
+        // Window registration is asynchronous. Keep a burst of links together until it is ready.
+        pendingExternalURLs.append(url)
+
+        guard pendingExternalURLs.count == 1 else {
+            return
+        }
+
+        createNewWindow { [weak self] window in
+            guard let self else {
+                return
+            }
+
+            let urls = pendingExternalURLs
+
+            pendingExternalURLs.removeAll()
+            windowRegistry?.setActive(window)
+
+            for url in urls {
+                presentExternalURL(url)
+            }
+        }
     }
 
     // MARK: - Window State Management
