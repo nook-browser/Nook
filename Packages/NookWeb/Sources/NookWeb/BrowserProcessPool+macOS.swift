@@ -29,19 +29,20 @@ extension BrowserConfiguration {
         }
         guard let pool = poolClass.perform(make, with: configuration)?.takeUnretainedValue() as? NSObject else { return }
 
-        setPrimaryWebBrowserCacheModel(on: pool)
+        setPrimaryWebBrowserCacheModel(context: pool)
         let warm = NSSelectorFromString("_warmInitialProcess")
         if pool.responds(to: warm) { pool.perform(warm) }
         // Through KVC because `processPool` is deprecated; WebKit still runs pages in the pool it is given.
         config.setValue(pool, forKey: "processPool")
     }
 
-    private static func setPrimaryWebBrowserCacheModel(on pool: NSObject) {
+    /// The cache model is app-wide: WebKit applies it to every pool and network process. The C
+    /// function still takes a WKContextRef, which a WKProcessPool is.
+    private static func setPrimaryWebBrowserCacheModel(context: NSObject) {
         guard let symbol = dlsym(dlopen(nil, RTLD_LAZY), "WKContextSetCacheModel") else { return }
         typealias SetCacheModel = @convention(c) (UnsafeRawPointer, UInt32) -> Void
         let primaryWebBrowser: UInt32 = 2
-        // WKProcessPool is the Objective-C wrapper behind the C API's WKContextRef.
-        unsafeBitCast(symbol, to: SetCacheModel.self)(Unmanaged.passUnretained(pool).toOpaque(), primaryWebBrowser)
+        unsafeBitCast(symbol, to: SetCacheModel.self)(Unmanaged.passUnretained(context).toOpaque(), primaryWebBrowser)
     }
 }
 #endif
