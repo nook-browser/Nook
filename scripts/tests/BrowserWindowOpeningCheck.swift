@@ -191,31 +191,18 @@ struct BrowserWindowOpeningCheck {
         precondition(registrations.values.allSatisfy { $0 == 1 })
         closeBrowserWindows()
 
-        // Promotion follows the popup's source, even after another window takes focus.
+        // A link from another app skips a focused private window in mini-window mode too.
         let privateSource = manager.createIncognitoWindow()!
-        let privateURL = URL(string: "about:blank#private-popup")!
+        let privateURL = URL(string: "about:blank#mini-outside-private")!
 
-        manager.externalMiniWindowManager.present(url: privateURL)
+        manager.presentExternalURL(privateURL)
 
         let privateMini = app.windows.compactMap { $0 as? MiniBrowserWindow }.first { $0.isVisible }!
-        let regularDestination = manager.createNewWindow()!
 
         privateMini.openInSpaceAction!()
-        precondition(registry.activeWindow === privateSource)
-        precondition(privateSource.privateTree?.items.values.contains { $0.url == privateURL } == true)
-        precondition(!manager.tabs.tree.items.values.contains { $0.url == privateURL })
-
-        manager.externalMiniWindowManager.present(url: URL(string: "about:blank#closed-private-source")!)
-
-        let orphanMini = app.windows.compactMap { $0 as? MiniBrowserWindow }.first { $0.isVisible }!
-
-        try await Task.sleep(for: .milliseconds(200))
-        privateSource.window?.close()
-        registry.unregister(privateSource.id)
-        registry.setActive(regularDestination)
-        orphanMini.openInSpaceAction!()
-        precondition(registry.activeWindow?.isIncognito == true)
-        precondition(!manager.tabs.tree.items.values.contains { $0.url?.fragment == "closed-private-source" })
+        precondition(registry.activeWindow?.isIncognito == false)
+        precondition(privateSource.privateTree?.items.values.contains { $0.url == privateURL } != true)
+        precondition(manager.tabs.tree.items.values.contains { $0.url == privateURL })
         try await Task.sleep(for: .milliseconds(200))
         closeBrowserWindows()
 

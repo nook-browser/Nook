@@ -23,15 +23,13 @@ final class ExternalMiniWindowManager {
         self.browserManager = browserManager
     }
 
-    /// A link from another app, in the data store of the active window's space.
+    /// A link from another app, in the data store of the last regular window's space.
+    /// A private window never takes it.
     func present(url: URL) {
         guard let browserManager else { return }
-        let window = browserManager.windowRegistry?.activeWindow
-        let profile = window.flatMap { window in
-            window.isIncognito
-                ? window.ephemeralProfile
-                : window.spaceID.flatMap { browserManager.tabs.profile(forSpace: $0) }
-        } ?? browserManager.currentProfile
+        let window = browserManager.windowRegistry?.mostRecentRegularWindow
+        let profile = window?.spaceID.flatMap { browserManager.tabs.profile(forSpace: $0) }
+            ?? browserManager.currentProfile
         guard let profile else { return }
         present(browserManager.tabs.openDetached(url: url, profile: profile, in: window))
     }
