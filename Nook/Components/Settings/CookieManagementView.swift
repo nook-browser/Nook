@@ -10,7 +10,7 @@ import SwiftUI
 import NookDesign
 
 struct CookieManagementView: View {
-    @StateObject private var cookieManager = CookieManager()
+    @ObservedObject var cookieManager: CookieManager
     @State private var searchText: String = ""
     @State private var selectedFilter: CookieFilter = .all
     @State private var selectedSort: CookieSortOption = .domain
@@ -18,6 +18,10 @@ struct CookieManagementView: View {
     @State private var selectedCookie: CookieInfo?
     @State private var showingCookieDetails: Bool = false
     @State private var viewMode: ViewMode = .domain
+
+    init(cookieManager: CookieManager) {
+        self.cookieManager = cookieManager
+    }
 
     enum ViewMode: String, CaseIterable {
         case domain = "By Domain"
@@ -41,12 +45,8 @@ struct CookieManagementView: View {
 
             entryList
                 .frame(minHeight: entryListMinHeight)
-
-            Divider()
-
-            actionBar
         }
-        .navigationTitle("Cookie Management")
+        .navigationTitle("Cookies")
         .onAppear {
             Task {
                 await cookieManager.loadCookies()
@@ -61,6 +61,7 @@ struct CookieManagementView: View {
 
     // MARK: - Entry List
 
+    // A List, not Form rows: a grouped Form builds every row up front.
     @ViewBuilder
     private var entryList: some View {
         if cookieManager.isLoading {
@@ -71,6 +72,10 @@ struct CookieManagementView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if hasNoEntries {
+            Text("No cookies")
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             switch viewMode {
             case .domain:
@@ -126,11 +131,12 @@ struct CookieManagementView: View {
     private var summarySection: some View {
         let stats = cookieManager.getCookieStats()
 
-        return Section("Cookie Management") {
+        return Section("Summary") {
             LabeledContent("Cookies") { Text("\(stats.total)") }
             LabeledContent("Session") { Text("\(stats.session)") }
             LabeledContent("Persistent") { Text("\(stats.persistent)") }
             LabeledContent("Total size") { Text(formatSize(stats.totalSize)) }
+            actionBar
         }
     }
 
@@ -138,10 +144,7 @@ struct CookieManagementView: View {
 
     private var filterSection: some View {
         Section("Filter") {
-            LabeledContent("Search") {
-                TextField("Search cookies...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-            }
+            TextField("Search", text: $searchText, prompt: Text("Search cookies..."))
 
             Picker("View", selection: $viewMode) {
                 ForEach(ViewMode.allCases, id: \.self) { mode in
@@ -174,6 +177,8 @@ struct CookieManagementView: View {
 
     private var actionBar: some View {
         HStack(spacing: NookDesign.Spacing.lg) {
+            Spacer()
+
             Button("Refresh") {
                 Task {
                     await cookieManager.loadCookies()
@@ -198,13 +203,17 @@ struct CookieManagementView: View {
             }
             .buttonStyle(.bordered)
             .fixedSize()
-
-            Spacer()
         }
-        .padding(NookDesign.Spacing.xl)
     }
 
     // MARK: - Computed Properties
+
+    private var hasNoEntries: Bool {
+        switch viewMode {
+        case .domain: filteredDomainGroups.isEmpty
+        case .list: filteredAndSortedCookies.isEmpty
+        }
+    }
 
     private var filteredDomainGroups: [DomainCookieGroup] {
         let searchFiltered = searchText.isEmpty ? cookieManager.domainGroups : 

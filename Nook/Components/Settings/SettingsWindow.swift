@@ -95,8 +95,7 @@ private struct SettingsLocation: Hashable {
 }
 
 /// Both buttons always show, disabled when there is nowhere to go, as standalone icon buttons
-/// with the toolbar's glass backing hidden. Applied to the root pane and every pushed pane,
-/// since a push replaces the toolbar.
+/// with the toolbar's glass backing hidden.
 private struct HistoryToolbar: ViewModifier {
     let canGoBack: Bool
     let canGoForward: Bool
@@ -224,18 +223,22 @@ private struct SettingsSidebarRow: View {
 
 // MARK: - Sub-Panes
 
-/// Pushed destinations. Typed so back/forward can replay them.
+/// Pages shown in place of a tab's own page. Typed so back/forward can replay them.
 enum SettingsSubPane: Hashable {
     case cookies
     case cache
 
     @MainActor @ViewBuilder
-    var view: some View {
+    func view(_ browserManager: BrowserManager) -> some View {
         switch self {
-        case .cookies: CookieManagementView()
-        case .cache: CacheManagementView()
+        case .cookies: CookieManagementView(cookieManager: browserManager.cookieManager)
+        case .cache: CacheManagementView(cacheManager: browserManager.cacheManager)
         }
     }
+}
+
+extension EnvironmentValues {
+    @Entry var showSettingsSubPane: (SettingsSubPane) -> Void = { _ in }
 }
 
 // MARK: - Detail Pane
@@ -247,42 +250,50 @@ private struct SettingsDetailPane: View {
     @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             Group {
-                switch tab {
-                case .general:
-                    SettingsGeneralTab()
-                case .appearance:
-                    SettingsAppearanceTab()
-                case .ai:
-                    SettingsAITab()
-                case .privacy:
-                    PrivacySettingsView()
-                case .adBlocker:
-                    SettingsAdBlockerTab()
-                case .tweaks:
-                    SettingsTweaksTab()
-                case .airTrafficControl:
-                    AirTrafficControlSettingsView()
-                case .spaces:
-                    SpacesSettingsView()
-                case .shortcuts:
-                    ShortcutsSettingsView()
-                case .extensions:
-                    if let extensionManager = browserManager.extensionManager {
-                        ExtensionsSettingsView(extensionManager: extensionManager)
-                    }
-                case .developer:
-                    SettingsDeveloperTab()
+                if let pane = path.last {
+                    pane.view(browserManager)
+                } else {
+                    tabPage
+                        .navigationTitle(tab.name)
                 }
             }
-            .navigationTitle(tab.name)
+            .environment(\.showSettingsSubPane) { path.append($0) }
             .modifier(history)
-            .navigationDestination(for: SettingsSubPane.self) { pane in
-                pane.view
-                    .navigationBarBackButtonHidden(true)
-                    .modifier(history)
+        }
+    }
+
+    @ViewBuilder
+    private var tabPage: some View {
+        switch tab {
+        case .general:
+            SettingsGeneralTab()
+        case .appearance:
+            SettingsAppearanceTab()
+        case .ai:
+            SettingsAITab()
+        case .privacy:
+            PrivacySettingsView(
+                cookieManager: browserManager.cookieManager,
+                cacheManager: browserManager.cacheManager
+            )
+        case .adBlocker:
+            SettingsAdBlockerTab()
+        case .tweaks:
+            SettingsTweaksTab()
+        case .airTrafficControl:
+            AirTrafficControlSettingsView()
+        case .spaces:
+            SpacesSettingsView()
+        case .shortcuts:
+            ShortcutsSettingsView()
+        case .extensions:
+            if let extensionManager = browserManager.extensionManager {
+                ExtensionsSettingsView(extensionManager: extensionManager)
             }
+        case .developer:
+            SettingsDeveloperTab()
         }
     }
 }
