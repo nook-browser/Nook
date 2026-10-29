@@ -17,6 +17,9 @@ public class BrowserConfiguration {
     
     public lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
+        #if os(macOS)
+        BrowserConfiguration.applyProcessPool(to: config)
+        #endif
 
         // Use default website data store for normal browsing
         // Extensions use their own separate persistent storage managed by Apple

@@ -19,7 +19,9 @@ public final class NookSettingsService {
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let tabManagementModeKey = "settings.tabManagementMode"
     private let startupLoadModeKey = "settings.startupLoadMode"
-    private let blockXSTKey = "settings.blockCrossSiteTracking"
+    private let enhancedFingerprintingProtectionKey = "settings.enhancedFingerprintingProtection"
+    private let removeTrackingFromLinksKey = "settings.removeTrackingFromLinks"
+    private let warnBeforeHTTPKey = "settings.warnBeforeHTTP"
     private let adBlockerEnabledKey = "settings.adBlockerEnabled"
     private let adBlockerWhitelistKey = "settings.adBlockerWhitelist"
     private let adBlockerLastUpdateKey = "settings.adBlockerLastUpdate"
@@ -194,10 +196,22 @@ public final class NookSettingsService {
         tabManagementMode.unloadTimeout
     }
 
-    public var blockCrossSiteTracking: Bool {
+    public var enhancedFingerprintingProtection: ProtectionScope {
         didSet {
-            userDefaults.set(blockCrossSiteTracking, forKey: blockXSTKey)
-            NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
+            userDefaults.set(enhancedFingerprintingProtection.rawValue, forKey: enhancedFingerprintingProtectionKey)
+        }
+    }
+
+    /// Both the filter lists' `$removeparam` rules and WebKit's own link filtering.
+    public var removeTrackingFromLinks: ProtectionScope {
+        didSet {
+            userDefaults.set(removeTrackingFromLinks.rawValue, forKey: removeTrackingFromLinksKey)
+        }
+    }
+
+    public var warnBeforeHTTP: Bool {
+        didSet {
+            userDefaults.set(warnBeforeHTTP, forKey: warnBeforeHTTPKey)
         }
     }
 
@@ -544,7 +558,6 @@ public final class NookSettingsService {
         userDefaults.register(defaults: [
             searchEngineKey: SearchProvider.google.rawValue,
             tabManagementModeKey: TabManagementMode.standard.rawValue,
-            blockXSTKey: false,
             adBlockerEnabledKey: false,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
@@ -627,8 +640,23 @@ public final class NookSettingsService {
         self.startupLoadMode = StartupLoadMode(
             rawValue: userDefaults.string(forKey: startupLoadModeKey) ?? ""
         ) ?? .favoritesAndSpace
-        self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
+        let legacyBlockCrossSiteTrackingKey = "settings.blockCrossSiteTracking"
+        if userDefaults.bool(forKey: legacyBlockCrossSiteTrackingKey) {
+            userDefaults.set(true, forKey: adBlockerEnabledKey)
+        }
+        userDefaults.removeObject(forKey: legacyBlockCrossSiteTrackingKey)
         self.adBlockerEnabled = userDefaults.bool(forKey: adBlockerEnabledKey)
+        self.enhancedFingerprintingProtection = ProtectionScope(
+            rawValue: userDefaults.string(forKey: enhancedFingerprintingProtectionKey) ?? ""
+        ) ?? .privateWindows
+        if userDefaults.string(forKey: removeTrackingFromLinksKey) == nil {
+            let migrated: ProtectionScope = userDefaults.bool(forKey: adBlockerEnabledKey) ? .allWindows : .privateWindows
+            userDefaults.set(migrated.rawValue, forKey: removeTrackingFromLinksKey)
+        }
+        self.removeTrackingFromLinks = ProtectionScope(
+            rawValue: userDefaults.string(forKey: removeTrackingFromLinksKey) ?? ""
+        ) ?? .privateWindows
+        self.warnBeforeHTTP = userDefaults.bool(forKey: warnBeforeHTTPKey)
         if let wlData = userDefaults.data(forKey: adBlockerWhitelistKey),
            let decoded = try? JSONDecoder().decode([String].self, from: wlData) {
             self.adBlockerWhitelist = decoded
@@ -825,7 +853,6 @@ public enum OpenRouterModel: String, CaseIterable, Identifiable {
 // MARK: - Notification Names
 extension Notification.Name {
     public static let tabManagementModeChanged = Notification.Name("tabManagementModeChanged")
-    public static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
     public static let appearanceModeChanged = Notification.Name("appearanceModeChanged")
     public static let adBlockerEnabledChanged = Notification.Name("adBlockerEnabledChanged")
     public static let adBlockerStateChanged = Notification.Name("adBlockerStateChanged")

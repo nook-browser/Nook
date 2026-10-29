@@ -122,3 +122,30 @@ public enum YouTubeHomeSection: String, CaseIterable, Identifiable {
         }
     }
 }
+
+// MARK: - Protection Scope
+
+/// Where a privacy protection applies, as Safari offers its advanced protections.
+public enum ProtectionScope: String, CaseIterable, Identifiable {
+    case off
+    case privateWindows
+    case allWindows
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .off: return "Off"
+        case .privateWindows: return "Incognito windows"
+        case .allWindows: return "All windows"
+        }
+    }
+
+    public func applies(inPrivateWindow isPrivate: Bool) -> Bool {
+        switch self {
+        case .off: return false
+        case .privateWindows: return isPrivate
+        case .allWindows: return true
+        }
+    }
+}

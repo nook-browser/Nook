@@ -502,7 +502,8 @@ class BrowserManager: ObservableObject {
         self.contentBlockerManager.attach(host: self)
         // Launch waits on the blocker, so it starts here and not when the first window appears,
         // about 190 ms later. NookApp's own call then finds it already under way.
-        self.contentBlockerManager.setEnabled(settings.blockCrossSiteTracking || settings.adBlockerEnabled)
+        self.contentBlockerManager.setEnabled(settings.adBlockerEnabled)
+        self.contentBlockerManager.prepareLinkCleaning()
         self.siteRoutingManager.host = self
         SocialImageTweaks.downloader = self
         // Note: tracking protection will be configured after settingsManager injection
@@ -519,17 +520,6 @@ class BrowserManager: ObservableObject {
             name: .tabManagementModeChanged,
             object: nil
         )
-
-        NotificationCenter.default.addObserver(
-            forName: .blockCrossSiteTrackingChanged,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            guard let enabled = note.userInfo?["enabled"] as? Bool else { return }
-            Task { @MainActor [weak self] in
-                self?.contentBlockerManager.setEnabled(enabled)
-            }
-        }
 
         NotificationCenter.default.addObserver(
             forName: .adBlockerEnabledChanged,
