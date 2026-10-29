@@ -32,6 +32,9 @@ struct NookApp: App {
     @StateObject private var browserManager: BrowserManager
 
     init() {
+        // Nook owns tab presentation; AppKit must not merge browser windows into native tabs.
+        NSWindow.allowsAutomaticWindowTabbing = false
+
         let settings = NookSettingsService()
         _settingsManager = State(initialValue: settings)
         let registry = WindowRegistry()
@@ -55,6 +58,9 @@ struct NookApp: App {
                     .environment(browserManager.tabs)
             } viewB: {
                 ContentView()
+                    .onWindowRegistered {
+                        setupApplicationLifecycle()
+                    }
                     .ignoresSafeArea(.all)
                     .background(BackgroundWindowModifier())
                     .environmentObject(browserManager)
@@ -69,15 +75,15 @@ struct NookApp: App {
                     .environment(mcpManager)
                     .environment(aiService)
                     .environment(tabOrganizerManager)
-                    .onAppear {
-                        setupApplicationLifecycle()
-                        setupAIServices()
-                    }
                 
                 
             }
+            // AppDelegate routes URLs; reuse the open scene instead of creating another one.
+            .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
 
         }
+        // TabsController restores browser windows; SwiftUI must not restore a second set.
+        .restorationBehavior(.disabled)
         .windowStyle(.hiddenTitleBar)
         .commands {
             NookCommands(
@@ -141,11 +147,13 @@ struct NookApp: App {
     /// 2. Moving window management out of BrowserManager entirely
     /// 3. Using pure environment-based dependency injection
     private func setupApplicationLifecycle() {
+        guard appDelegate.browserManager == nil else {
+            return
+        }
+
         // Connect AppDelegate for termination and updates
-        appDelegate.browserManager = browserManager
         appDelegate.windowRegistry = windowRegistry
         appDelegate.mcpManager = mcpManager
-        appDelegate.drainPendingURLs()
         browserManager.appDelegate = appDelegate
 
         // TEMPORARY: Wire coordinators to BrowserManager
@@ -204,8 +212,7 @@ struct NookApp: App {
         windowRegistry.onWindowRegister = { [weak browserManager] windowState in
             browserManager?.setupWindowState(windowState)
         }
-        // Retroactively set up any windows that registered before this callback was set
-        // (child .onAppear fires before parent .onAppear in SwiftUI)
+        // The initial ContentView registers before calling this setup function.
         for (_, windowState) in windowRegistry.windows {
             browserManager.setupWindowState(windowState)
         }
@@ -240,6 +247,13 @@ struct NookApp: App {
             [weak browserManager] windowState in
             browserManager?.setActiveWindowState(windowState)
         }
+
+        setupAIServices()
+
+        // The initial window is registered and set up before external links can create windows.
+        // URLs received during cold launch stay in AppDelegate's queue until this point.
+        appDelegate.browserManager = browserManager
+        appDelegate.drainPendingURLs()
     }
 }
 
@@ -275,6 +289,7 @@ struct BackgroundWindowModifier: NSViewRepresentable {
                 if window.toolbar == nil { window.toolbar = NSToolbar() }
                 window.toolbarStyle = .unified
                 window.titlebarAppearsTransparent = true
+                window.tabbingMode = .disallowed
                 window.backgroundColor = .clear
                 window.titleVisibility = .hidden
                 window.isReleasedWhenClosed = false

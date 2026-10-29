@@ -21,16 +21,25 @@ private let tweaksLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook"
 extension BrowserManager: SiteRoutingHost {
     func route(url: URL, toSpace spaceID: UUID, from page: AnyObject?) -> Bool {
         let session = page as? PageSession
+
         // An agent page stays in the Agent space: routing would show the person a new tab.
-        guard session?.isPrivate != true, session?.isAgentPage != true else { return false }
-        guard let window = session.flatMap({ tabs.window(for: $0) }) ?? windowRegistry?.activeWindow,
-              !window.isIncognito
-        else { return false }
+        guard session?.isPrivate != true, session?.isAgentPage != true else {
+            return false
+        }
 
         guard tabs.space(spaceID) != nil else {
             tweaksLog.debug("Route skipped: target space \(spaceID) no longer exists")
+
             return false
         }
+
+        // Page navigation stays in its own window. External links can arrive with no window open.
+        guard let window = session.flatMap({ tabs.window(for: $0) })
+                ?? (page == nil ? openBrowserWindow() : nil),
+              !window.isIncognito else {
+            return false
+        }
+
         // A page already in the target space loads in place. A link from another app has no
         // page, and still opens as a tab there.
         guard session == nil || window.spaceID != spaceID else { return false }

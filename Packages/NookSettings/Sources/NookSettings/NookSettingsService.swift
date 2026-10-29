@@ -64,6 +64,7 @@ public final class NookSettingsService {
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
+    private let externalLinksInMiniWindowKey = "settings.externalLinksInMiniWindow"
     private let siteRoutingRulesKey = "settings.siteRoutingRules"
     private let boostsKey = "settings.boosts"
     private let sitePermissionsKey = "settings.sitePermissions"
@@ -146,6 +147,12 @@ public final class NookSettingsService {
             }
         }
         await boostsLoad?.value
+    }
+
+    public var externalLinksInMiniWindow: Bool {
+        didSet {
+            userDefaults.set(externalLinksInMiniWindow, forKey: externalLinksInMiniWindowKey)
+        }
     }
 
     public var siteRoutingRules: [SiteRoutingRule] = [] {
@@ -554,6 +561,7 @@ public final class NookSettingsService {
             adBlockerEnabledKey: false,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
+            externalLinksInMiniWindowKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
             topBarAddressViewKey: false,
 
@@ -674,6 +682,7 @@ public final class NookSettingsService {
         }
         self.debugToggleUpdateNotification = userDefaults.bool(forKey: debugToggleUpdateNotificationKey)
         self.lastSeenVersion = userDefaults.string(forKey: lastSeenVersionKey)
+        self.externalLinksInMiniWindow = userDefaults.bool(forKey: externalLinksInMiniWindowKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
         self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)

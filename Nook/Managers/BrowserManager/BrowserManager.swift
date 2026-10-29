@@ -538,8 +538,6 @@ class BrowserManager: ObservableObject {
 
     private var startupWaitedForContentBlocker = false
     private var startupWarmTasks: [UUID: Task<Void, Never>] = [:]
-    /// Runs once the next regular window `createNewWindow(then:)` opened is set up.
-    private var nextWindowSetup: ((BrowserWindowState) -> Void)?
 
     /// Loads a newly registered window's selected page. With "Last Tab, Favorites & Space" the
     /// space's other tabs-section pages then warm one at a time; pinned tabs and favorites load
@@ -956,9 +954,23 @@ class BrowserManager: ObservableObject {
         extensionManager?.uninstallExtension(extensionId)
     }
 
-    /// Presents an external URL in a mini window popup (for URL events)
+    /// Routing rules take precedence over the default presentation for links from other apps.
     func presentExternalURL(_ url: URL) {
-        externalMiniWindowManager.present(url: url)
+        if siteRoutingManager.applyRoute(url: url, from: nil) {
+            return
+        }
+
+        if nookSettings?.externalLinksInMiniWindow != false {
+            externalMiniWindowManager.present(url: url)
+
+            return
+        }
+
+        guard let window = openBrowserWindow() else {
+            return
+        }
+
+        tabs.open(url: url, in: window, placement: .newTab)
     }
 
     // MARK: - Window State Management
@@ -978,13 +990,10 @@ class BrowserManager: ObservableObject {
 
         tabs.attach(window: windowState)
         guard !windowState.isIncognito else { return }
-        let setup = nextWindowSetup
-        nextWindowSetup = nil
         windowSpaceChanged(windowState)
         applyStartupLoadMode(for: windowState)
         restoreSavedWindows()
         installPendingExtensionImports()
-        setup?(windowState)
     }
 
     /// Set the active window state (called when a window gains focus)
@@ -1022,27 +1031,59 @@ class BrowserManager: ObservableObject {
         webViewCoordinator?.setMuteState(muted, for: tabId, excludingWindow: originatingWindowId)
     }
 
-    /// Opens a regular window. `frame` places a window restored from DeviceState.windows;
-    /// `setup` runs once the window is registered and set up.
-    func createNewWindow(frame: NSRect? = nil, then setup: ((BrowserWindowState) -> Void)? = nil) {
-        guard let windowRegistry = windowRegistry,
-              let webViewCoordinator = webViewCoordinator else {
+    /// Returns the last-used regular window, creating one when none is open.
+    /// Creation and registration complete synchronously, so callers never queue their own work.
+    func openBrowserWindow() -> BrowserWindowState? {
+        guard let windowRegistry,
+              let window = windowRegistry.mostRecentRegularWindow ?? createNewWindow() else {
+            return nil
+        }
+
+        activateBrowserWindow(window)
+
+        return window
+    }
+
+    /// Presents an explicitly chosen window without changing its browsing context.
+    func activateBrowserWindow(_ window: BrowserWindowState) {
+        windowRegistry?.setActive(window)
+        NSApp.activate(ignoringOtherApps: true)
+        window.window?.deminiaturize(nil)
+        window.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Creates and registers a regular window before constructing its view. The returned
+    /// window already has its space and tab state, even before SwiftUI calls onAppear.
+    @discardableResult
+    func createNewWindow(frame: NSRect? = nil) -> BrowserWindowState? {
+        guard let windowRegistry,
+              let webViewCoordinator else {
             #if DEBUG
             print("⚠️ [BrowserManager] Cannot create window - missing WindowRegistry or WebViewCoordinator")
             #endif
-            return
+
+            return nil
         }
 
-        if let setup { nextWindowSetup = setup }
+        let windowState = BrowserWindowState()
         let newWindow = makeBrowserNSWindow(title: "Nook")
-        let contentView = windowContent(ContentView(), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
-        newWindow.contentView = NSHostingView(rootView: contentView)
+
         if let frame {
             newWindow.setFrame(frame, display: false)
         } else {
             newWindow.center()
         }
+
+        windowState.window = newWindow
+        windowRegistry.register(windowState)
+
+        let contentView = windowContent(ContentView(windowState: windowState), windowRegistry: windowRegistry, webViewCoordinator: webViewCoordinator)
+
+        newWindow.contentView = NSHostingView(rootView: contentView)
+        windowRegistry.setActive(windowState)
         newWindow.makeKeyAndOrderFront(nil)
+
+        return windowState
     }
 
     private func windowContent(_ content: ContentView, windowRegistry: WindowRegistry, webViewCoordinator: WebViewCoordinator) -> some View {
@@ -1075,6 +1116,7 @@ class BrowserManager: ObservableObject {
         // ARC owns this window. AppKit's default release on close over-releases it and crashes
         // in the next autorelease pool drain.
         window.isReleasedWhenClosed = false
+        window.tabbingMode = .disallowed
         window.title = title
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -1098,13 +1140,14 @@ class BrowserManager: ObservableObject {
     // MARK: - Incognito Window
 
     /// Create a new incognito/private browsing window
-    func createIncognitoWindow() {
+    @discardableResult
+    func createIncognitoWindow() -> BrowserWindowState? {
         guard let windowRegistry = windowRegistry,
               let webViewCoordinator = webViewCoordinator else {
             #if DEBUG
             print("⚠️ [BrowserManager] Cannot create incognito window - missing WindowRegistry or WebViewCoordinator")
             #endif
-            return
+            return nil
         }
 
         let windowState = BrowserWindowState()
@@ -1126,6 +1169,8 @@ class BrowserManager: ObservableObject {
         windowRegistry.setActive(windowState)
 
         newWindow.makeKeyAndOrderFront(nil)
+
+        return windowState
     }
 
     /// Destroys a closed incognito window's ephemeral data store. Its pages were already ended by

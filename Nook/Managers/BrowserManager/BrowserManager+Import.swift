@@ -133,8 +133,7 @@ extension BrowserManager {
     /// window. Onboarding imports run before any browser window registers; an unregistered window
     /// state still targets the main tree, and background opens never select in it.
     private var importWindow: BrowserWindowState? {
-        if let active = windowRegistry?.activeWindow, !active.isIncognito { return active }
-        return tabs.regularWindows.first ?? BrowserWindowState()
+        windowRegistry?.mostRecentRegularWindow ?? BrowserWindowState()
     }
 
     private func importSpaceID(_ window: BrowserWindowState) -> UUID? {

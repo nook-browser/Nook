@@ -1,6 +1,6 @@
 // Licensed under GPL-3.0. See LICENSE.
 //
-//  AirTrafficControlSettingsView.swift
+//  LinksSettingsView.swift
 //  Nook
 //
 
@@ -11,7 +11,7 @@ import NookDesign
 import NookTweaks
 import NookWeb
 
-public struct AirTrafficControlSettingsView: View {
+public struct LinksSettingsView: View {
     @Environment(NookSettingsService.self) var nookSettings
     @Environment(TabsController.self) private var tabs
     @Environment(\.siteRouting) private var siteRouting
@@ -22,31 +22,51 @@ public struct AirTrafficControlSettingsView: View {
     public init() {}
 
     public var body: some View {
+        @Bindable var settings = nookSettings
+
         Form {
+            #if os(macOS)
+            Section {
+                LabeledContent("Open in") {
+                    Picker("Open in", selection: $settings.externalLinksInMiniWindow) {
+                        Text("Mini window").tag(true)
+                        Text("New tab in current Space").tag(false)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                }
+            } header: {
+                Text("Links from other apps")
+            } footer: {
+                Text("Air Traffic Control rules below take priority.")
+            }
+            #endif
+
             Section {
                 if nookSettings.siteRoutingRules.isEmpty {
-                    Text("No routing rules configured.")
+                    Text("No rules yet")
                         .foregroundStyle(.tertiary)
                 } else {
                     ForEach(nookSettings.siteRoutingRules) { rule in
                         ruleRow(rule)
                     }
                 }
-            } header: {
-                Text("Rules")
-            } footer: {
-                Text("Automatically route websites to specific spaces. When you navigate to a matching domain, a new tab opens in the designated space.")
-            }
 
-            Section {
                 HStack {
                     Button {
                         showingAddSheet = true
                     } label: {
                         Label("Add Rule", systemImage: "plus")
                     }
+                    .buttonStyle(.borderless)
+
                     Spacer()
                 }
+            } header: {
+                Text("Air Traffic Control")
+            } footer: {
+                Text("Open matching sites in a chosen Space, whether the link comes from another app or a page in Nook.")
             }
         }
         .formStyle(.grouped)

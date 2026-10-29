@@ -50,7 +50,7 @@ extension BrowserManager {
     /// window that shows the Agent space takes it from there itself.
     func hostAgentPage(_ session: PageSession) {
         guard tabs.agentItem == session.itemID, let view = session.webView,
-              let window = ((windowRegistry?.activeWindow).flatMap { $0.isIncognito ? nil : $0 } ?? tabs.regularWindows.first)?.window,
+              let window = windowRegistry?.mostRecentRegularWindow?.window,
               let content = window.contentView else { return }
         // Already in a window that is still open; a closed one no longer renders it.
         if let current = view.window, current === window || current.isVisible || current.isMiniaturized { return }

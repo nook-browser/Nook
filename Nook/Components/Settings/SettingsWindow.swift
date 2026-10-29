@@ -282,8 +282,8 @@ private struct SettingsDetailPane: View {
             SettingsAdBlockerTab()
         case .tweaks:
             SettingsTweaksTab()
-        case .airTrafficControl:
-            AirTrafficControlSettingsView()
+        case .links:
+            LinksSettingsView()
         case .spaces:
             SpacesSettingsView()
         case .shortcuts:
