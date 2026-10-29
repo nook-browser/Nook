@@ -40,6 +40,15 @@
   </picture>
 </p>
 
+## Performance
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/benchmark-dark.svg">
+    <img src="assets/benchmark-light.svg" alt="Nook uses 2.0 GB and 34 mW with 16 tabs open, against 2.5 to 4.4 GB and 41 to 163 mW for Safari, Zen, Firefox, Chrome, Arc and Dia. Nook launches in 0.54 s; Chrome is fastest at 0.39 s.">
+  </picture>
+</p>
+
 
 ## Getting Started  
 
