@@ -284,11 +284,14 @@ extension FocusableWKWebView {
 
     /// Opens `url` in a new regular window on the page's space.
     func openLinkInNewWindow(_ url: URL) {
-        guard let browserManager, let spaceID = owningSession.flatMap({ browserManager.tabs.window(for: $0) })?.spaceID else { return }
-        browserManager.createNewWindow { window in
-            browserManager.tabs.setSpace(spaceID, in: window)
-            _ = browserManager.tabs.open(url: url, in: window, placement: .newTab)
+        guard let browserManager,
+              let spaceID = owningSession.flatMap({ browserManager.tabs.window(for: $0) })?.spaceID,
+              let window = browserManager.createNewWindow() else {
+            return
         }
+
+        browserManager.tabs.setSpace(spaceID, in: window)
+        browserManager.tabs.open(url: url, in: window, placement: .newTab)
     }
 
     /// Opens `url` as a trail child and pairs it with the window's selection.

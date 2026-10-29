@@ -26,7 +26,7 @@ struct SettingsSheet: View {
                 }
                 Section {
                     row(.adBlocker)
-                    row(.airTrafficControl)
+                    row(.links)
                 }
                 Section {
                     row(.tweaks)
@@ -58,7 +58,7 @@ struct SettingsSheet: View {
         case .appearance: SettingsAppearanceTab()
         case .spaces: SpacesSettingsView()
         case .adBlocker: SettingsAdBlockerTab()
-        case .airTrafficControl: AirTrafficControlSettingsView()
+        case .links: LinksSettingsView()
         case .tweaks: SettingsTweaksTab()
         }
     }

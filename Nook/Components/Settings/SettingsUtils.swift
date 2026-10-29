@@ -15,7 +15,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
     case privacy
     case adBlocker
     case tweaks
-    case airTrafficControl
+    case links
     case spaces
     case shortcuts
     case extensions
@@ -29,7 +29,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .privacy: return "Privacy"
         case .adBlocker: return "Ad Blocker"
         case .tweaks: return "Tweaks"
-        case .airTrafficControl: return "Air Traffic Control"
+        case .links: return "Links"
         case .spaces: return "Spaces"
         case .shortcuts: return "Shortcuts"
         case .extensions: return "Extensions"
@@ -45,7 +45,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .privacy: return "lock.shield"
         case .adBlocker: return "shield.lefthalf.filled"
         case .tweaks: return "wand.and.stars"
-        case .airTrafficControl: return "arrow.triangle.branch"
+        case .links: return "link"
         case .spaces: return "square.on.square"
         case .shortcuts: return "keyboard"
         case .extensions: return "puzzlepiece.extension"
@@ -62,7 +62,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .privacy: return ["cookies", "cache", "tracking", "website data"]
         case .adBlocker: return ["ads", "filters", "blocking", "allowlist", "whitelist"]
         case .tweaks: return ["youtube", "shorts", "thumbnails", "sponsorblock", "facebook", "instagram", "reels", "download", "social media"]
-        case .airTrafficControl: return ["routing", "rules", "domains"]
+        case .links: return ["air traffic control", "routing", "rules", "domains", "external", "mini window"]
         case .spaces: return ["accent", "colour", "color", "rename"]
         case .shortcuts: return ["keyboard", "keys", "hotkeys"]
         case .extensions: return ["web extensions", "chrome", "add-ons"]
@@ -85,7 +85,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         case .privacy: return .blue
         case .adBlocker: return .green
         case .tweaks: return .orange
-        case .airTrafficControl: return .mint
+        case .links: return .mint
         case .spaces: return .cyan
         case .shortcuts: return .indigo
         case .extensions: return .teal
@@ -98,7 +98,7 @@ enum SettingsTabs: String, Hashable, CaseIterable {
         [
             (nil, [.general, .appearance]),
             (nil, [.ai]),
-            (nil, [.privacy, .adBlocker, .airTrafficControl]),
+            (nil, [.privacy, .adBlocker, .links]),
             (nil, [.spaces, .shortcuts, .extensions, .developer]),
             (nil, [.tweaks]),
         ]

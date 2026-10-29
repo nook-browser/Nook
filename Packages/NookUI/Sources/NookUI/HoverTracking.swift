@@ -60,8 +60,14 @@ final class HoverTrackingNSView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         NotificationCenter.default.removeObserver(self, name: HoverResync.notification, object: nil)
-        if window != nil {
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: nil)
+        if let window {
             NotificationCenter.default.addObserver(self, selector: #selector(resyncRequested), name: HoverResync.notification, object: nil)
+            // No exit arrives while the window is not key, so the pointer may have left meanwhile.
+            if !always {
+                NotificationCenter.default.addObserver(
+                    self, selector: #selector(resyncRequested), name: NSWindow.didBecomeKeyNotification, object: window)
+            }
         }
         resyncHover()
     }

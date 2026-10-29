@@ -17,7 +17,7 @@ enum SettingsRoute: String, Hashable, Identifiable {
     case appearance
     case spaces
     case adBlocker
-    case airTrafficControl
+    case links
     case tweaks
 
     var id: String { rawValue }
@@ -28,7 +28,7 @@ enum SettingsRoute: String, Hashable, Identifiable {
         case .appearance: "Appearance"
         case .spaces: "Spaces"
         case .adBlocker: "Ad Blocker"
-        case .airTrafficControl: "Air Traffic Control"
+        case .links: "Links"
         case .tweaks: "Tweaks"
         }
     }
