@@ -159,7 +159,7 @@ struct NookCommands: Commands {
                 windowRegistry.activeWindow?.commandPalette?.open(prefill: currentURL, navigateCurrentTab: true)
             }
             .modifier(dynamicShortcut(.focusAddressBar))
-            .disabled(browserManager.tabs.activeWindowSession == nil)
+            .disabled(browserManager.tabs.activeWindowSession == nil || browserManager.tabs.keyDetachedSession != nil)
 
             Button("Copy Current URL") {
                 browserManager.copyCurrentURL()
@@ -222,7 +222,7 @@ struct NookCommands: Commands {
                 browserManager.showFindBar()
             }
             .modifier(dynamicShortcut(.findInPage))
-            .disabled(browserManager.tabs.activeWindowSession == nil)
+            .disabled(browserManager.tabs.activeWindowSession == nil || browserManager.tabs.keyDetachedSession != nil)
 
             Button("Reload Page") {
                 browserManager.tabs.activeWindowSession?.refresh()
@@ -448,7 +448,7 @@ struct NookCommands: Commands {
                 Button("Boost This Site...") {
                     browserManager.boostCurrentSite()
                 }
-                .disabled(browserManager.tabs.activeWindowSession == nil)
+                .disabled(browserManager.tabs.activeWindowSession == nil || browserManager.tabs.keyDetachedSession != nil)
             }
         }
     }

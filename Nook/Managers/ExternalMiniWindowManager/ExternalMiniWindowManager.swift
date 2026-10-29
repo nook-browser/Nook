@@ -174,6 +174,16 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
         window?.makeKeyAndOrderFront(sender)
     }
 
+    func windowDidBecomeKey(_ notification: Notification) {
+        page.controller?.keyDetachedSession = page
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        if page.controller?.keyDetachedSession === page {
+            page.controller?.keyDetachedSession = nil
+        }
+    }
+
     func windowWillClose(_ notification: Notification) {
         onClose()
     }

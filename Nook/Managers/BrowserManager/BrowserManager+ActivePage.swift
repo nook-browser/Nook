@@ -49,18 +49,19 @@ extension BrowserManager {
     func hardReloadCurrentPage() {
         guard let currentTab = tabs.activeWindowSession,
             let host = currentTab.url.host,
-            let activeWindowId = windowRegistry?.activeWindow?.id
+            let webView = activePageWebView ?? currentTab.webView
         else { return }
         Task { @MainActor in
             await cacheManager.clearCacheForDomainExcludingCookies(host)
-            // Use the WebView that's actually visible in the current window
-            if let webView = getWebView(for: currentTab.itemID, in: activeWindowId) {
-                webView.reloadFromOrigin()
-            } else {
-                // Fallback to the tab's default webView
-                currentTab.webView?.reloadFromOrigin()
-            }
+            webView.reloadFromOrigin()
         }
+    }
+
+    private var activePageWebView: WKWebView? {
+        guard let session = tabs.activeWindowSession else { return nil }
+        if session === tabs.keyDetachedSession { return session.webView }
+        guard let windowId = windowRegistry?.activeWindow?.id else { return nil }
+        return getWebView(for: session.itemID, in: windowId)
     }
 
     func clearStaleCache() {
@@ -154,7 +155,7 @@ extension BrowserManager {
             #endif
 
             // Show toast on active window
-            if let windowState = windowRegistry?.activeWindow {
+            if tabs.keyDetachedSession == nil, let windowState = windowRegistry?.activeWindow {
                 windowState.isShowingCopyURLToast = true
 
                 Task { [weak windowState] in
@@ -203,52 +204,30 @@ extension BrowserManager {
 
     /// The print panel for the active window's page, a PDF included.
     func printCurrentPage() {
-        guard let windowState = windowRegistry?.activeWindow,
-              let session = tabs.controllableSession(in: windowState),
-              let webView = getWebView(for: session.itemID, in: windowState.id)
-        else { return }
-        webView.nookPrint()
+        activePageWebView?.nookPrint()
     }
 
     // MARK: - Zoom Management
 
     /// Zoom in for the current tab
     func zoomInCurrentTab() {
-        guard let windowState = windowRegistry?.activeWindow,
-            let currentTab = tabs.activeWindowSession,
-            let webView = getWebView(for: currentTab.itemID, in: windowState.id)
-        else {
-            return
-        }
-
-        zoomManager.zoomIn(for: webView, tabId: currentTab.itemID)
-        shouldShowZoomPopup = true
+        zoomActivePage(zoomManager.zoomIn(for:tabId:))
     }
 
     /// Zoom out for the current tab
     func zoomOutCurrentTab() {
-        guard let windowState = windowRegistry?.activeWindow,
-            let currentTab = tabs.activeWindowSession,
-            let webView = getWebView(for: currentTab.itemID, in: windowState.id)
-        else {
-            return
-        }
-
-        zoomManager.zoomOut(for: webView, tabId: currentTab.itemID)
-        shouldShowZoomPopup = true
+        zoomActivePage(zoomManager.zoomOut(for:tabId:))
     }
 
     /// Reset zoom to 100% for the current tab
     func resetZoomCurrentTab() {
-        guard let windowState = windowRegistry?.activeWindow,
-            let currentTab = tabs.activeWindowSession,
-            let webView = getWebView(for: currentTab.itemID, in: windowState.id)
-        else {
-            return
-        }
+        zoomActivePage(zoomManager.resetZoom(for:tabId:))
+    }
 
-        zoomManager.resetZoom(for: webView, tabId: currentTab.itemID)
-        shouldShowZoomPopup = true
+    private func zoomActivePage(_ zoom: (WKWebView, UUID) -> Void) {
+        guard let currentTab = tabs.activeWindowSession, let webView = activePageWebView else { return }
+        zoom(webView, currentTab.itemID)
+        shouldShowZoomPopup = currentTab !== tabs.keyDetachedSession
     }
 
     /// Reset zoom when a tab navigates, so a page never inherits the previous page's zoom.
