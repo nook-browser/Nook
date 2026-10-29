@@ -148,7 +148,6 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.titlebarAppearsTransparent = true
-        window.isReleasedWhenClosed = false
         window.contentMinSize = Self.minimumSize
         // Without this the hosting controller shrinks the window to the view's minimum size.
         hostingController.sizingOptions = []
@@ -158,6 +157,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
 
         super.init(window: window)
 
+        window.setUpAsPageWindow()
         window.delegate = self
         window.openInSpaceAction = { adoptAction(nil) }
         window.subtitle = page.profile?.name ?? "Default"
@@ -172,6 +172,16 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
         window?.makeKeyAndOrderFront(sender)
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        page.controller?.keyDetachedSession = page
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        if page.controller?.keyDetachedSession === page {
+            page.controller?.keyDetachedSession = nil
+        }
     }
 
     func windowWillClose(_ notification: Notification) {

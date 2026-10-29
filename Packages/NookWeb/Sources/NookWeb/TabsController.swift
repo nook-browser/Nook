@@ -370,10 +370,13 @@ public final class TabsController {
         window.selectedItemID.flatMap { session(for: $0) }
     }
 
-    /// The active window's selected page, when that window holds the live page. Commands never
-    /// reach a page another window holds; the user moves it first.
+    public var keyDetachedSession: PageSession?
+
+    /// The page commands act on: a mini window's while it is key, otherwise the active window's
+    /// selected page when that window holds the live page. Commands never reach a page another
+    /// window holds; the user moves it first.
     public var activeWindowSession: PageSession? {
-        windowRegistry.activeWindow.flatMap { controllableSession(in: $0) }
+        keyDetachedSession ?? windowRegistry.activeWindow.flatMap { controllableSession(in: $0) }
     }
 
     /// The window's selected page for actions (navigation, reload, find, zoom): nil while another
