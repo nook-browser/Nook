@@ -28,13 +28,24 @@ struct CacheManagementView: View {
         case list = "All Cache"
     }
 
+    /// Minimum height for the entry list; the pane grows from it.
+    private let entryListMinHeight: CGFloat = 260
+
     var body: some View {
-        Form {
-            summarySection
-            filterSection
-            entrySection
+        VStack(spacing: 0) {
+            Form {
+                summarySection
+                filterSection
+            }
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            entryList
+                .frame(minHeight: entryListMinHeight)
         }
-        .formStyle(.grouped)
         .navigationTitle("Cache")
         .onAppear {
             Task {
@@ -50,52 +61,69 @@ struct CacheManagementView: View {
 
     // MARK: - Entry List
 
-    private var entrySection: some View {
-        Section {
-            if cacheManager.isLoading {
-                HStack(spacing: NookDesign.Spacing.md) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading cache data...")
-                        .foregroundStyle(.secondary)
-                }
-            } else if hasNoEntries {
-                Text("No cached data")
+    // A List, not Form rows: a grouped Form builds every row up front.
+    @ViewBuilder
+    private var entryList: some View {
+        if cacheManager.isLoading {
+            VStack(spacing: NookDesign.Spacing.md) {
+                ProgressView()
+                Text("Loading cache data...")
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(.secondary)
-            } else if viewMode == .domain {
-                ForEach(filteredDomainGroups) { group in
-                    DisclosureGroup {
-                        ForEach(filteredCacheForGroup(group)) { cache in
-                            CacheRowView(cache: cache) {
-                                selectedCache = cache
-                                showingCacheDetails = true
-                            } onDelete: {
-                                Task {
-                                    await cacheManager.clearSpecificCache(cache)
-                                }
-                            }
-                        }
-                    } label: {
-                        DomainCacheRowView(group: group) {
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if hasNoEntries {
+            Text("No cached data")
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            switch viewMode {
+            case .domain:
+                domainList
+            case .list:
+                flatList
+            }
+        }
+    }
+
+    private var domainList: some View {
+        List {
+            ForEach(filteredDomainGroups) { group in
+                DisclosureGroup {
+                    ForEach(filteredCacheForGroup(group)) { cache in
+                        CacheRowView(cache: cache) {
+                            selectedCache = cache
+                            showingCacheDetails = true
+                        } onDelete: {
                             Task {
-                                await cacheManager.clearCacheForDomain(group.domain)
+                                await cacheManager.clearSpecificCache(cache)
                             }
                         }
                     }
-                }
-            } else {
-                ForEach(filteredAndSortedCache) { cache in
-                    CacheRowView(cache: cache, showsDomain: true) {
-                        selectedCache = cache
-                        showingCacheDetails = true
-                    } onDelete: {
+                } label: {
+                    DomainCacheRowView(group: group) {
                         Task {
-                            await cacheManager.clearSpecificCache(cache)
+                            await cacheManager.clearCacheForDomain(group.domain)
                         }
                     }
                 }
             }
         }
+        .listStyle(.sidebar)
+    }
+
+    private var flatList: some View {
+        List(filteredAndSortedCache) { cache in
+            CacheRowView(cache: cache, showsDomain: true) {
+                selectedCache = cache
+                showingCacheDetails = true
+            } onDelete: {
+                Task {
+                    await cacheManager.clearSpecificCache(cache)
+                }
+            }
+        }
+        .listStyle(.inset(alternatesRowBackgrounds: true))
     }
 
     // MARK: - Summary

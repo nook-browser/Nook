@@ -256,10 +256,10 @@ private struct SettingsDetailPane: View {
                     pane.view(browserManager)
                 } else {
                     tabPage
+                        .navigationTitle(tab.name)
                 }
             }
             .environment(\.showSettingsSubPane) { path.append($0) }
-            .navigationTitle(tab.name)
             .modifier(history)
         }
     }

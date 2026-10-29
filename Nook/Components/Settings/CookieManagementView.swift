@@ -28,13 +28,24 @@ struct CookieManagementView: View {
         case list = "All Cookies"
     }
 
+    /// Minimum height for the entry list; the pane grows from it.
+    private let entryListMinHeight: CGFloat = 260
+
     var body: some View {
-        Form {
-            summarySection
-            filterSection
-            entrySection
+        VStack(spacing: 0) {
+            Form {
+                summarySection
+                filterSection
+            }
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            entryList
+                .frame(minHeight: entryListMinHeight)
         }
-        .formStyle(.grouped)
         .navigationTitle("Cookies")
         .onAppear {
             Task {
@@ -50,52 +61,69 @@ struct CookieManagementView: View {
 
     // MARK: - Entry List
 
-    private var entrySection: some View {
-        Section {
-            if cookieManager.isLoading {
-                HStack(spacing: NookDesign.Spacing.md) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading cookies...")
-                        .foregroundStyle(.secondary)
-                }
-            } else if hasNoEntries {
-                Text("No cookies")
+    // A List, not Form rows: a grouped Form builds every row up front.
+    @ViewBuilder
+    private var entryList: some View {
+        if cookieManager.isLoading {
+            VStack(spacing: NookDesign.Spacing.md) {
+                ProgressView()
+                Text("Loading cookies...")
+                    .font(NookDesign.Font.caption)
                     .foregroundStyle(.secondary)
-            } else if viewMode == .domain {
-                ForEach(filteredDomainGroups) { group in
-                    DisclosureGroup {
-                        ForEach(filteredCookiesForGroup(group)) { cookie in
-                            CookieRowView(cookie: cookie) {
-                                selectedCookie = cookie
-                                showingCookieDetails = true
-                            } onDelete: {
-                                Task {
-                                    await cookieManager.deleteCookie(cookie)
-                                }
-                            }
-                        }
-                    } label: {
-                        DomainRowView(group: group) {
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if hasNoEntries {
+            Text("No cookies")
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            switch viewMode {
+            case .domain:
+                domainList
+            case .list:
+                flatList
+            }
+        }
+    }
+
+    private var domainList: some View {
+        List {
+            ForEach(filteredDomainGroups) { group in
+                DisclosureGroup {
+                    ForEach(filteredCookiesForGroup(group)) { cookie in
+                        CookieRowView(cookie: cookie) {
+                            selectedCookie = cookie
+                            showingCookieDetails = true
+                        } onDelete: {
                             Task {
-                                await cookieManager.deleteCookiesForDomain(group.domain)
+                                await cookieManager.deleteCookie(cookie)
                             }
                         }
                     }
-                }
-            } else {
-                ForEach(filteredAndSortedCookies) { cookie in
-                    CookieRowView(cookie: cookie, showsDomain: true) {
-                        selectedCookie = cookie
-                        showingCookieDetails = true
-                    } onDelete: {
+                } label: {
+                    DomainRowView(group: group) {
                         Task {
-                            await cookieManager.deleteCookie(cookie)
+                            await cookieManager.deleteCookiesForDomain(group.domain)
                         }
                     }
                 }
             }
         }
+        .listStyle(.sidebar)
+    }
+
+    private var flatList: some View {
+        List(filteredAndSortedCookies) { cookie in
+            CookieRowView(cookie: cookie, showsDomain: true) {
+                selectedCookie = cookie
+                showingCookieDetails = true
+            } onDelete: {
+                Task {
+                    await cookieManager.deleteCookie(cookie)
+                }
+            }
+        }
+        .listStyle(.inset(alternatesRowBackgrounds: true))
     }
 
     // MARK: - Summary
