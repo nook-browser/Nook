@@ -34,7 +34,7 @@ struct PrivacySettingsView: View {
                 scopePicker(
                     "Enhanced fingerprinting protection",
                     detail: "Makes it harder for websites to recognize your Mac and follow you around the web. If a site breaks, turn it off for that site in Site Controls.",
-                    selection: $settings.fingerprintingProtection
+                    selection: $settings.enhancedFingerprintingProtection
                 )
                 scopePicker(
                     "Remove tracking from links",

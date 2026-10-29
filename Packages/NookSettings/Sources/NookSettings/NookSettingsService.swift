@@ -19,7 +19,7 @@ public final class NookSettingsService {
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let tabManagementModeKey = "settings.tabManagementMode"
     private let startupLoadModeKey = "settings.startupLoadMode"
-    private let fingerprintingProtectionKey = "settings.fingerprintingProtection"
+    private let enhancedFingerprintingProtectionKey = "settings.enhancedFingerprintingProtection"
     private let removeTrackingFromLinksKey = "settings.removeTrackingFromLinks"
     private let warnBeforeHTTPKey = "settings.warnBeforeHTTP"
     private let adBlockerEnabledKey = "settings.adBlockerEnabled"
@@ -189,9 +189,9 @@ public final class NookSettingsService {
         tabManagementMode.unloadTimeout
     }
 
-    public var fingerprintingProtection: ProtectionScope {
+    public var enhancedFingerprintingProtection: ProtectionScope {
         didSet {
-            userDefaults.set(fingerprintingProtection.rawValue, forKey: fingerprintingProtectionKey)
+            userDefaults.set(enhancedFingerprintingProtection.rawValue, forKey: enhancedFingerprintingProtectionKey)
         }
     }
 
@@ -638,8 +638,8 @@ public final class NookSettingsService {
         }
         userDefaults.removeObject(forKey: legacyBlockCrossSiteTrackingKey)
         self.adBlockerEnabled = userDefaults.bool(forKey: adBlockerEnabledKey)
-        self.fingerprintingProtection = ProtectionScope(
-            rawValue: userDefaults.string(forKey: fingerprintingProtectionKey) ?? ""
+        self.enhancedFingerprintingProtection = ProtectionScope(
+            rawValue: userDefaults.string(forKey: enhancedFingerprintingProtectionKey) ?? ""
         ) ?? .privateWindows
         if userDefaults.string(forKey: removeTrackingFromLinksKey) == nil {
             let migrated: ProtectionScope = userDefaults.bool(forKey: adBlockerEnabledKey) ? .allWindows : .privateWindows

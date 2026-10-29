@@ -7,34 +7,34 @@
 import WebKit
 
 extension PageSession {
-    /// Fingerprinting protection unless it was turned off for the current site.
-    public var usesFingerprintingProtection: Bool {
-        fingerprintingProtectionOffHost == nil && fingerprintingProtectionApplies
+    /// Enhanced fingerprinting protection unless it was turned off for the current site.
+    public var usesEnhancedFingerprintingProtection: Bool {
+        enhancedFingerprintingProtectionOffHost == nil && enhancedFingerprintingProtectionApplies
     }
 
-    public var fingerprintingProtectionApplies: Bool {
-        controller?.settings.fingerprintingProtection.applies(inPrivateWindow: isPrivate) == true
+    public var enhancedFingerprintingProtectionApplies: Bool {
+        controller?.settings.enhancedFingerprintingProtection.applies(inPrivateWindow: isPrivate) == true
     }
 
     public var removesTrackingFromLinks: Bool {
         controller?.settings.removeTrackingFromLinks.applies(inPrivateWindow: isPrivate) == true
     }
 
-    public func reloadWithoutFingerprintingProtection() {
-        fingerprintingProtectionOffHost = url.host
+    public func reloadWithoutEnhancedFingerprintingProtection() {
+        enhancedFingerprintingProtectionOffHost = url.host
         refresh()
     }
 
-    public func reloadWithFingerprintingProtection() {
-        fingerprintingProtectionOffHost = nil
+    public func reloadWithEnhancedFingerprintingProtection() {
+        enhancedFingerprintingProtectionOffHost = nil
         refresh()
     }
 
     func applyProtection(to preferences: WKWebpagePreferences, for url: URL) {
         guard let settings = controller?.settings else { return }
-        if let host = fingerprintingProtectionOffHost, host != url.host { fingerprintingProtectionOffHost = nil }
+        if let host = enhancedFingerprintingProtectionOffHost, host != url.host { enhancedFingerprintingProtectionOffHost = nil }
         preferences.setAdvancedPrivacyProtections(
-            fingerprinting: usesFingerprintingProtection,
+            enhancedFingerprinting: usesEnhancedFingerprintingProtection,
             linkFiltering: removesTrackingFromLinks
         )
         // WebKit loads a blank page instead of its warning for loopback and private addresses.
@@ -46,9 +46,9 @@ extension PageSession {
 
 extension WKWebpagePreferences {
     /// Safari's Advanced Tracking and Fingerprinting Protection, in two parts. WebKit names the
-    /// option bits after unrelated features: `EnhancedTelemetry` is fingerprinting protection,
+    /// option bits after unrelated features: `EnhancedTelemetry` is enhanced fingerprinting protection,
     /// `RequestValidation` enhanced network privacy and `SanitizeLookalikeCharacters` link filtering.
-    fileprivate func setAdvancedPrivacyProtections(fingerprinting: Bool, linkFiltering: Bool) {
+    fileprivate func setAdvancedPrivacyProtections(enhancedFingerprinting: Bool, linkFiltering: Bool) {
         let getter = NSSelectorFromString("_networkConnectionIntegrityPolicy")
         let setter = NSSelectorFromString("_setNetworkConnectionIntegrityPolicy:")
         guard responds(to: getter), responds(to: setter) else { return }
@@ -56,13 +56,13 @@ extension WKWebpagePreferences {
         let enhancedTelemetry: UInt = 1 << 6
         let requestValidation: UInt = 1 << 7
         let sanitizeLookalikeCharacters: UInt = 1 << 8
-        let fingerprintingBits = baseline | enhancedTelemetry | requestValidation
+        let enhancedFingerprintingBits = baseline | enhancedTelemetry | requestValidation
 
         typealias Getter = @convention(c) (AnyObject, Selector) -> UInt
         typealias Setter = @convention(c) (AnyObject, Selector, UInt) -> Void
         var policy = unsafeBitCast(method(for: getter), to: Getter.self)(self, getter)
-        policy &= ~(fingerprintingBits | sanitizeLookalikeCharacters)
-        if fingerprinting { policy |= fingerprintingBits }
+        policy &= ~(enhancedFingerprintingBits | sanitizeLookalikeCharacters)
+        if enhancedFingerprinting { policy |= enhancedFingerprintingBits }
         if linkFiltering { policy |= sanitizeLookalikeCharacters }
         unsafeBitCast(method(for: setter), to: Setter.self)(self, setter, policy)
     }

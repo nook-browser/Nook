@@ -28,7 +28,7 @@ public struct SettingsAdBlockerTab: View {
                         contentBlocker?.setEnabled(enabled)
                     }
             } footer: {
-                Text("Filter lists update automatically every 24 hours. Removing tracking codes from links is in Privacy settings.")
+                Text("Filter lists update automatically every 24 hours.")
             }
 
             if nookSettings.adBlockerEnabled {

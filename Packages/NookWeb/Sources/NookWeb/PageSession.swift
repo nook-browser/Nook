@@ -54,8 +54,8 @@ public final class PageSession: NSObject, Identifiable {
     public var favicon: SwiftUI.Image
     /// A page the ad blocker stopped from loading. The blocked-page card shows while it is set.
     public internal(set) var blockedURL: URL?
-    /// The site fingerprinting protection is off for until the tab leaves it.
-    var fingerprintingProtectionOffHost: String?
+    /// The site enhanced fingerprinting protection is off for until the tab leaves it.
+    var enhancedFingerprintingProtectionOffHost: String?
 
     public enum LoadingState: Equatable {
         case idle
