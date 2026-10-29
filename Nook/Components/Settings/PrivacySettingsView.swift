@@ -16,51 +16,42 @@ import NookWeb
 struct PrivacySettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(\.nookSettings) var nookSettings
-    @StateObject private var cookieManager = CookieManager()
-    @StateObject private var cacheManager = CacheManager()
+    @Environment(\.showSettingsSubPane) private var showSettingsSubPane
+    @ObservedObject var cookieManager: CookieManager
+    @ObservedObject var cacheManager: CacheManager
     @State private var isClearing = false
+
+    init(cookieManager: CookieManager, cacheManager: CacheManager) {
+        self.cookieManager = cookieManager
+        self.cacheManager = cacheManager
+    }
 
     var body: some View {
         @Bindable var settings = nookSettings
 
         Form {
-            Section("Protection") {
-                VStack(alignment: .leading, spacing: NookDesign.Spacing.md) {
-                    Picker("Protection", selection: $settings.protectionLevel) {
-                        ForEach(ProtectionLevel.allCases) { level in
-                            Text(level.displayName).tag(level)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    Text("Strict blocks fingerprinting companies, removes tracking parameters from links, and hides details that identify your device. If a site breaks, use View > Reload with Standard Protection.")
-                        .font(NookDesign.Font.caption)
-                        .foregroundStyle(.secondary)
-                }
-                settingToggle(
-                    "Prevent cross-site tracking",
-                    detail: "Stops trackers following you between sites. Turn off only if a site's sign-in or embeds break.",
-                    isOn: $settings.preventCrossSiteTracking
+            Section("Tracking") {
+                scopePicker(
+                    "Enhanced fingerprinting protection",
+                    detail: "Makes it harder for websites to recognize your Mac and follow you around the web. If a site breaks, turn it off for that site in Site Controls.",
+                    selection: $settings.fingerprintingProtection
                 )
-                .onChange(of: nookSettings.preventCrossSiteTracking) {
-                    browserManager.tabs.applyPrivacySettings()
+                scopePicker(
+                    "Remove tracking from links",
+                    detail: "Removes tracking added to links, so advertisers can't see which link brought you to a site.",
+                    selection: $settings.removeTrackingFromLinks
+                )
+                .onChange(of: nookSettings.removeTrackingFromLinks) {
+                    browserManager.contentBlockerManager.prepareLinkCleaning()
                 }
             }
 
             Section("Security") {
                 settingToggle(
                     "Warn before opening a site over HTTP",
-                    detail: "You can continue to a site from the warning.",
+                    detail: "Nook always tries HTTPS first. Ask before opening a site that only works over HTTP.",
                     isOn: $settings.warnBeforeHTTP
                 )
-                settingToggle(
-                    "Warn about fraudulent websites",
-                    detail: "Checks sites against Google Safe Browsing.",
-                    isOn: $settings.fraudulentWebsiteWarning
-                )
-                .onChange(of: nookSettings.fraudulentWebsiteWarning) {
-                    browserManager.tabs.applyPrivacySettings()
-                }
             }
 
             Section("History") {
@@ -103,12 +94,41 @@ struct PrivacySettingsView: View {
 
     private func settingToggle(_ title: String, detail: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
-            VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
-                Text(title)
-                Text(detail)
-                    .font(NookDesign.Font.caption)
-                    .foregroundStyle(.secondary)
+            settingLabel(title, detail: detail)
+        }
+    }
+
+    private func scopePicker(_ title: String, detail: String, selection: Binding<ProtectionScope>) -> some View {
+        LabeledContent {
+            // Hidden copies hold the widest option's width, so the text beside it doesn't reflow.
+            ZStack(alignment: .trailing) {
+                ForEach(ProtectionScope.allCases) { scope in
+                    scopeMenu(title, selection: .constant(scope))
+                        .hidden()
+                }
+                scopeMenu(title, selection: selection)
             }
+            .fixedSize()
+        } label: {
+            settingLabel(title, detail: detail)
+        }
+    }
+
+    private func scopeMenu(_ title: String, selection: Binding<ProtectionScope>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(ProtectionScope.allCases) { scope in
+                Text(scope.displayName).tag(scope)
+            }
+        }
+        .labelsHidden()
+    }
+
+    private func settingLabel(_ title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+            Text(title)
+            Text(detail)
+                .font(NookDesign.Font.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -125,7 +145,6 @@ struct PrivacySettingsView: View {
         let stats = cookieManager.getCookieStats()
         return websiteDataRow(
             "Cookies",
-            systemImage: "doc.on.doc",
             count: stats.total.formatted(),
             stats: stats.total == 0 ? [] : [
                 DataStat(value: stats.persistent.formatted(), label: "Persistent"),
@@ -162,7 +181,6 @@ struct PrivacySettingsView: View {
         let stats = cacheManager.getCacheStats()
         return websiteDataRow(
             "Cache",
-            systemImage: "internaldrive",
             count: stats.total == 1 ? "1 site" : "\(stats.total.formatted()) sites",
             stats: stats.total == 0 ? [] : [
                 DataStat(value: formatSize(stats.diskSize), label: "Disk"),
@@ -197,16 +215,15 @@ struct PrivacySettingsView: View {
 
     private func websiteDataRow<ClearItems: View>(
         _ title: String,
-        systemImage: String,
         count: String,
         stats: [DataStat],
         manage: SettingsSubPane,
         @ViewBuilder clearItems: () -> ClearItems
     ) -> some View {
-        HStack(alignment: .top, spacing: NookDesign.Spacing.lg) {
+        HStack(alignment: .firstTextBaseline, spacing: NookDesign.Spacing.md) {
             VStack(alignment: .leading, spacing: NookDesign.Spacing.sm) {
                 HStack(spacing: NookDesign.Spacing.xs) {
-                    Label(title, systemImage: systemImage)
+                    Text(title)
                     Text("· \(count)")
                         .foregroundStyle(.secondary)
                 }
@@ -225,16 +242,23 @@ struct PrivacySettingsView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Menu("Clear", content: clearItems)
                 .fixedSize()
                 .disabled(isClearing)
-            NavigationLink(value: manage) {
+            Button {
+                showSettingsSubPane(manage)
+            } label: {
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
             .help("Manage \(title)")
             .accessibilityLabel("Manage \(title)")
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showSettingsSubPane(manage)
         }
     }
 
@@ -402,6 +426,6 @@ struct PrivacySettingsView: View {
 }
 
 #Preview {
-    PrivacySettingsView()
+    PrivacySettingsView(cookieManager: CookieManager(), cacheManager: CacheManager())
         .environmentObject(BrowserManager(settings: NookSettingsService(), windowRegistry: WindowRegistry()))
 }

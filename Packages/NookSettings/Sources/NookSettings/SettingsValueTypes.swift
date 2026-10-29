@@ -123,21 +123,29 @@ public enum YouTubeHomeSection: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Protection Level
+// MARK: - Protection Scope
 
-/// Safari's Advanced Tracking and Fingerprinting Protection, and where it applies.
-public enum ProtectionLevel: String, CaseIterable, Identifiable {
-    case standard
-    case strictInPrivate
-    case strict
+/// Where a privacy protection applies, as Safari offers its advanced protections.
+public enum ProtectionScope: String, CaseIterable, Identifiable {
+    case off
+    case privateWindows
+    case allWindows
 
     public var id: String { rawValue }
 
     public var displayName: String {
         switch self {
-        case .standard: return "Standard"
-        case .strictInPrivate: return "Strict in private windows"
-        case .strict: return "Strict everywhere"
+        case .off: return "Off"
+        case .privateWindows: return "Incognito windows"
+        case .allWindows: return "All windows"
+        }
+    }
+
+    public func applies(inPrivateWindow isPrivate: Bool) -> Bool {
+        switch self {
+        case .off: return false
+        case .privateWindows: return isPrivate
+        case .allWindows: return true
         }
     }
 }

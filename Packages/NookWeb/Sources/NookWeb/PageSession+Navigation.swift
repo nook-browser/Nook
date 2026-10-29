@@ -335,7 +335,7 @@ extension PageSession: WKNavigationDelegate {
             if navigationAction.navigationType != .backForward,
                (navigationAction.request.httpMethod ?? "GET") == "GET",
                let replacement = controller?.blocker.urlSkipTarget(for: url, from: self.url, tab: self)
-                   ?? controller?.blocker.strippedTrackingParams(for: url, tab: self)
+                   ?? (removesTrackingFromLinks ? controller?.blocker.strippedTrackingParams(for: url, tab: self) : nil)
             {
                 if let capture = devCapture {
                     let skipped = replacement.host != url.host

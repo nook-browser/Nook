@@ -7,57 +7,63 @@
 import WebKit
 
 extension PageSession {
-    /// Strict unless Reload with Standard Protection lifted it for the current site.
-    public var usesStrictProtection: Bool {
-        reducedProtectionHost == nil && strictProtectionApplies
+    /// Fingerprinting protection unless it was turned off for the current site.
+    public var usesFingerprintingProtection: Bool {
+        fingerprintingProtectionOffHost == nil && fingerprintingProtectionApplies
     }
 
-    public func reloadWithStandardProtection() {
-        reducedProtectionHost = url.host
+    public var fingerprintingProtectionApplies: Bool {
+        controller?.settings.fingerprintingProtection.applies(inPrivateWindow: isPrivate) == true
+    }
+
+    public var removesTrackingFromLinks: Bool {
+        controller?.settings.removeTrackingFromLinks.applies(inPrivateWindow: isPrivate) == true
+    }
+
+    public func reloadWithoutFingerprintingProtection() {
+        fingerprintingProtectionOffHost = url.host
         refresh()
     }
 
-    private var strictProtectionApplies: Bool {
-        switch controller?.settings.protectionLevel {
-        case .strict: return true
-        case .strictInPrivate: return isPrivate
-        case .standard, nil: return false
-        }
+    public func reloadWithFingerprintingProtection() {
+        fingerprintingProtectionOffHost = nil
+        refresh()
     }
 
     func applyProtection(to preferences: WKWebpagePreferences, for url: URL) {
         guard let settings = controller?.settings else { return }
-        if let host = reducedProtectionHost, host != url.host { reducedProtectionHost = nil }
-        preferences.setAdvancedPrivacyProtections(usesStrictProtection)
+        if let host = fingerprintingProtectionOffHost, host != url.host { fingerprintingProtectionOffHost = nil }
+        preferences.setAdvancedPrivacyProtections(
+            fingerprinting: usesFingerprintingProtection,
+            linkFiltering: removesTrackingFromLinks
+        )
         // WebKit loads a blank page instead of its warning for loopback and private addresses.
         preferences.preferredHTTPSNavigationPolicy = settings.warnBeforeHTTP && !DevHosts.isDevHost(url)
             ? .userMediatedFallbackToHTTP
             : .automaticFallbackToHTTP
     }
-
-    func applyPrivacySettings(to webView: WKWebView) {
-        guard let settings = controller?.settings else { return }
-        webView.configuration.preferences.isFraudulentWebsiteWarningEnabled = settings.fraudulentWebsiteWarning
-        webView.configuration.websiteDataStore.setTrackingPreventionEnabled(settings.preventCrossSiteTracking)
-    }
 }
 
 extension WKWebpagePreferences {
-    /// Safari's Advanced Tracking and Fingerprinting Protection: known-tracker blocking, fingerprinting
-    /// defenses, link tracking-parameter removal and enhanced network privacy.
-    fileprivate func setAdvancedPrivacyProtections(_ enabled: Bool) {
-        let selector = NSSelectorFromString("_setNetworkConnectionIntegrityEnabled:")
-        guard responds(to: selector) else { return }
-        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
-        unsafeBitCast(method(for: selector), to: Setter.self)(self, selector, enabled)
-    }
-}
+    /// Safari's Advanced Tracking and Fingerprinting Protection, in two parts. WebKit names the
+    /// option bits after unrelated features: `EnhancedTelemetry` is fingerprinting protection,
+    /// `RequestValidation` enhanced network privacy and `SanitizeLookalikeCharacters` link filtering.
+    fileprivate func setAdvancedPrivacyProtections(fingerprinting: Bool, linkFiltering: Bool) {
+        let getter = NSSelectorFromString("_networkConnectionIntegrityPolicy")
+        let setter = NSSelectorFromString("_setNetworkConnectionIntegrityPolicy:")
+        guard responds(to: getter), responds(to: setter) else { return }
+        let baseline: UInt = 1 << 0
+        let enhancedTelemetry: UInt = 1 << 6
+        let requestValidation: UInt = 1 << 7
+        let sanitizeLookalikeCharacters: UInt = 1 << 8
+        let fingerprintingBits = baseline | enhancedTelemetry | requestValidation
 
-extension WKWebsiteDataStore {
-    fileprivate func setTrackingPreventionEnabled(_ enabled: Bool) {
-        let selector = NSSelectorFromString("_setResourceLoadStatisticsEnabled:")
-        guard responds(to: selector) else { return }
-        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
-        unsafeBitCast(method(for: selector), to: Setter.self)(self, selector, enabled)
+        typealias Getter = @convention(c) (AnyObject, Selector) -> UInt
+        typealias Setter = @convention(c) (AnyObject, Selector, UInt) -> Void
+        var policy = unsafeBitCast(method(for: getter), to: Getter.self)(self, getter)
+        policy &= ~(fingerprintingBits | sanitizeLookalikeCharacters)
+        if fingerprinting { policy |= fingerprintingBits }
+        if linkFiltering { policy |= sanitizeLookalikeCharacters }
+        unsafeBitCast(method(for: setter), to: Setter.self)(self, setter, policy)
     }
 }

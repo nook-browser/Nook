@@ -230,10 +230,10 @@ struct NookCommands: Commands {
             .modifier(dynamicShortcut(.refresh))
             .disabled(browserManager.tabs.activeWindowSession == nil)
 
-            Button("Reload with Standard Protection") {
-                browserManager.tabs.activeWindowSession?.reloadWithStandardProtection()
+            Button("Reload with Standard Fingerprinting Protection") {
+                browserManager.tabs.activeWindowSession?.reloadWithoutFingerprintingProtection()
             }
-            .disabled(browserManager.tabs.activeWindowSession?.usesStrictProtection != true)
+            .disabled(browserManager.tabs.activeWindowSession?.usesFingerprintingProtection != true)
 
             Button(browserManager.tabs.activeWindowSession?.isTranslated == true ? "Show Original" : "Translate Page") {
                 browserManager.tabs.activeWindowSession?.toggleTranslation()

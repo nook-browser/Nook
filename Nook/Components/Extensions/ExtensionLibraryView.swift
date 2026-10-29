@@ -155,6 +155,21 @@ struct ExtensionLibraryView: View {
                     if let newHost { contentBlockerEnabled = !browserManager.contentBlockerManager.isDomainAllowed(newHost) }
                 }
 
+                if let tab = currentTab, tab.fingerprintingProtectionApplies {
+                    SiteSettingRow(
+                        icon: "hand.raised.fill",
+                        title: "Fingerprinting Protection",
+                        subtitle: tab.usesFingerprintingProtection ? "Enhanced" : "Standard until you leave this site",
+                        isOn: tab.usesFingerprintingProtection
+                    ) {
+                        if tab.usesFingerprintingProtection {
+                            tab.reloadWithoutFingerprintingProtection()
+                        } else {
+                            tab.reloadWithFingerprintingProtection()
+                        }
+                    }
+                }
+
                 let developer = settings.isDeveloperSite(host)
                 SiteSettingRow(
                     icon: "hammer.fill",

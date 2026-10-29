@@ -54,8 +54,8 @@ public final class PageSession: NSObject, Identifiable {
     public var favicon: SwiftUI.Image
     /// A page the ad blocker stopped from loading. The blocked-page card shows while it is set.
     public internal(set) var blockedURL: URL?
-    /// The site Reload with Standard Protection lifted strict protection for.
-    var reducedProtectionHost: String?
+    /// The site fingerprinting protection is off for until the tab leaves it.
+    var fingerprintingProtectionOffHost: String?
 
     public enum LoadingState: Equatable {
         case idle
@@ -409,7 +409,7 @@ public final class PageSession: NSObject, Identifiable {
         if developerModeOn { attachDevCaptureHandler(to: webView) }
         webView.isInspectable = true
         webView.allowsLinkPreview = true
-        applyPrivacySettings(to: webView)
+        webView.configuration.preferences.isFraudulentWebsiteWarningEnabled = true
     }
 
     /// Installs a WebKit-created popup view as this session's primary view. WebKit drives the

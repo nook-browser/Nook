@@ -19,10 +19,9 @@ public final class NookSettingsService {
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let tabManagementModeKey = "settings.tabManagementMode"
     private let startupLoadModeKey = "settings.startupLoadMode"
-    private let protectionLevelKey = "settings.protectionLevel"
-    private let preventCrossSiteTrackingKey = "settings.preventCrossSiteTracking"
+    private let fingerprintingProtectionKey = "settings.fingerprintingProtection"
+    private let removeTrackingFromLinksKey = "settings.removeTrackingFromLinks"
     private let warnBeforeHTTPKey = "settings.warnBeforeHTTP"
-    private let fraudulentWebsiteWarningKey = "settings.fraudulentWebsiteWarning"
     private let adBlockerEnabledKey = "settings.adBlockerEnabled"
     private let adBlockerWhitelistKey = "settings.adBlockerWhitelist"
     private let adBlockerLastUpdateKey = "settings.adBlockerLastUpdate"
@@ -190,28 +189,22 @@ public final class NookSettingsService {
         tabManagementMode.unloadTimeout
     }
 
-    public var protectionLevel: ProtectionLevel {
+    public var fingerprintingProtection: ProtectionScope {
         didSet {
-            userDefaults.set(protectionLevel.rawValue, forKey: protectionLevelKey)
+            userDefaults.set(fingerprintingProtection.rawValue, forKey: fingerprintingProtectionKey)
         }
     }
 
-    /// WebKit's Intelligent Tracking Prevention, on every page's data store.
-    public var preventCrossSiteTracking: Bool {
+    /// Both the filter lists' `$removeparam` rules and WebKit's own link filtering.
+    public var removeTrackingFromLinks: ProtectionScope {
         didSet {
-            userDefaults.set(preventCrossSiteTracking, forKey: preventCrossSiteTrackingKey)
+            userDefaults.set(removeTrackingFromLinks.rawValue, forKey: removeTrackingFromLinksKey)
         }
     }
 
     public var warnBeforeHTTP: Bool {
         didSet {
             userDefaults.set(warnBeforeHTTP, forKey: warnBeforeHTTPKey)
-        }
-    }
-
-    public var fraudulentWebsiteWarning: Bool {
-        didSet {
-            userDefaults.set(fraudulentWebsiteWarning, forKey: fraudulentWebsiteWarningKey)
         }
     }
 
@@ -559,8 +552,6 @@ public final class NookSettingsService {
             searchEngineKey: SearchProvider.google.rawValue,
             tabManagementModeKey: TabManagementMode.standard.rawValue,
             adBlockerEnabledKey: false,
-            preventCrossSiteTrackingKey: true,
-            fraudulentWebsiteWarningKey: true,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
@@ -647,12 +638,17 @@ public final class NookSettingsService {
         }
         userDefaults.removeObject(forKey: legacyBlockCrossSiteTrackingKey)
         self.adBlockerEnabled = userDefaults.bool(forKey: adBlockerEnabledKey)
-        self.protectionLevel = ProtectionLevel(
-            rawValue: userDefaults.string(forKey: protectionLevelKey) ?? ""
-        ) ?? .strictInPrivate
-        self.preventCrossSiteTracking = userDefaults.bool(forKey: preventCrossSiteTrackingKey)
+        self.fingerprintingProtection = ProtectionScope(
+            rawValue: userDefaults.string(forKey: fingerprintingProtectionKey) ?? ""
+        ) ?? .privateWindows
+        if userDefaults.string(forKey: removeTrackingFromLinksKey) == nil {
+            let migrated: ProtectionScope = userDefaults.bool(forKey: adBlockerEnabledKey) ? .allWindows : .privateWindows
+            userDefaults.set(migrated.rawValue, forKey: removeTrackingFromLinksKey)
+        }
+        self.removeTrackingFromLinks = ProtectionScope(
+            rawValue: userDefaults.string(forKey: removeTrackingFromLinksKey) ?? ""
+        ) ?? .privateWindows
         self.warnBeforeHTTP = userDefaults.bool(forKey: warnBeforeHTTPKey)
-        self.fraudulentWebsiteWarning = userDefaults.bool(forKey: fraudulentWebsiteWarningKey)
         if let wlData = userDefaults.data(forKey: adBlockerWhitelistKey),
            let decoded = try? JSONDecoder().decode([String].self, from: wlData) {
             self.adBlockerWhitelist = decoded

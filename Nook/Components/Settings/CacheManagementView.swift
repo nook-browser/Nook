@@ -10,7 +10,7 @@ import SwiftUI
 import NookDesign
 
 struct CacheManagementView: View {
-    @StateObject private var cacheManager = CacheManager()
+    @ObservedObject var cacheManager: CacheManager
     @State private var searchText: String = ""
     @State private var selectedFilter: CacheFilter = .all
     @State private var selectedSort: CacheSortOption = .domain
@@ -19,34 +19,23 @@ struct CacheManagementView: View {
     @State private var showingCacheDetails: Bool = false
     @State private var viewMode: ViewMode = .domain
 
+    init(cacheManager: CacheManager) {
+        self.cacheManager = cacheManager
+    }
+
     enum ViewMode: String, CaseIterable {
         case domain = "By Domain"
         case list = "All Cache"
     }
 
-    /// Minimum height for the entry list; the pane grows from it.
-    private let entryListMinHeight: CGFloat = 260
-    
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                summarySection
-                filterSection
-            }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
-            .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-
-            entryList
-                .frame(minHeight: entryListMinHeight)
-
-            Divider()
-
-            actionBar
+        Form {
+            summarySection
+            filterSection
+            entrySection
         }
-        .navigationTitle("Cache Management")
+        .formStyle(.grouped)
+        .navigationTitle("Cache")
         .onAppear {
             Task {
                 await cacheManager.loadCacheData()
@@ -61,64 +50,52 @@ struct CacheManagementView: View {
 
     // MARK: - Entry List
 
-    @ViewBuilder
-    private var entryList: some View {
-        if cacheManager.isLoading {
-            VStack(spacing: NookDesign.Spacing.md) {
-                ProgressView()
-                Text("Loading cache data...")
-                    .font(NookDesign.Font.caption)
+    private var entrySection: some View {
+        Section {
+            if cacheManager.isLoading {
+                HStack(spacing: NookDesign.Spacing.md) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading cache data...")
+                        .foregroundStyle(.secondary)
+                }
+            } else if hasNoEntries {
+                Text("No cached data")
                     .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            switch viewMode {
-            case .domain:
-                domainList
-            case .list:
-                flatList
-            }
-        }
-    }
-
-    private var domainList: some View {
-        List {
-            ForEach(filteredDomainGroups) { group in
-                DisclosureGroup {
-                    ForEach(filteredCacheForGroup(group)) { cache in
-                        CacheRowView(cache: cache) {
-                            selectedCache = cache
-                            showingCacheDetails = true
-                        } onDelete: {
+            } else if viewMode == .domain {
+                ForEach(filteredDomainGroups) { group in
+                    DisclosureGroup {
+                        ForEach(filteredCacheForGroup(group)) { cache in
+                            CacheRowView(cache: cache) {
+                                selectedCache = cache
+                                showingCacheDetails = true
+                            } onDelete: {
+                                Task {
+                                    await cacheManager.clearSpecificCache(cache)
+                                }
+                            }
+                        }
+                    } label: {
+                        DomainCacheRowView(group: group) {
                             Task {
-                                await cacheManager.clearSpecificCache(cache)
+                                await cacheManager.clearCacheForDomain(group.domain)
                             }
                         }
                     }
-                } label: {
-                    DomainCacheRowView(group: group) {
+                }
+            } else {
+                ForEach(filteredAndSortedCache) { cache in
+                    CacheRowView(cache: cache, showsDomain: true) {
+                        selectedCache = cache
+                        showingCacheDetails = true
+                    } onDelete: {
                         Task {
-                            await cacheManager.clearCacheForDomain(group.domain)
+                            await cacheManager.clearSpecificCache(cache)
                         }
                     }
                 }
             }
         }
-        .listStyle(.sidebar)
-    }
-
-    private var flatList: some View {
-        List(filteredAndSortedCache) { cache in
-            CacheRowView(cache: cache, showsDomain: true) {
-                selectedCache = cache
-                showingCacheDetails = true
-            } onDelete: {
-                Task {
-                    await cacheManager.clearSpecificCache(cache)
-                }
-            }
-        }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
     }
 
     // MARK: - Summary
@@ -127,7 +104,7 @@ struct CacheManagementView: View {
         let stats = cacheManager.getCacheStats()
         let faviconStats = cacheManager.getFaviconCacheStats()
 
-        return Section("Cache Management") {
+        return Section("Summary") {
             LabeledContent("Cache entries") { Text("\(stats.total)") }
             LabeledContent("Total size") { Text(formatSize(stats.totalSize)) }
             LabeledContent("Stale entries") {
@@ -135,6 +112,7 @@ struct CacheManagementView: View {
                     .foregroundStyle(stats.staleCount > 0 ? .orange : .secondary)
             }
             LabeledContent("Favicons cached") { Text("\(faviconStats.count)") }
+            actionBar
         }
     }
 
@@ -142,10 +120,7 @@ struct CacheManagementView: View {
 
     private var filterSection: some View {
         Section("Filter") {
-            LabeledContent("Search") {
-                TextField("Search cache...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-            }
+            TextField("Search", text: $searchText, prompt: Text("Search cache..."))
 
             Picker("View", selection: $viewMode) {
                 ForEach(ViewMode.allCases, id: \.self) { mode in
@@ -178,6 +153,8 @@ struct CacheManagementView: View {
 
     private var actionBar: some View {
         HStack(spacing: NookDesign.Spacing.lg) {
+            Spacer()
+
             Button("Refresh") {
                 Task {
                     await cacheManager.loadCacheData()
@@ -220,14 +197,18 @@ struct CacheManagementView: View {
             }
             .buttonStyle(.bordered)
             .fixedSize()
-
-            Spacer()
         }
-        .padding(NookDesign.Spacing.xl)
     }
 
     // MARK: - Computed Properties
-    
+
+    private var hasNoEntries: Bool {
+        switch viewMode {
+        case .domain: filteredDomainGroups.isEmpty
+        case .list: filteredAndSortedCache.isEmpty
+        }
+    }
+
     private var filteredDomainGroups: [DomainCacheGroup] {
         let searchFiltered = searchText.isEmpty ? cacheManager.domainGroups :
             cacheManager.domainGroups.filter { group in

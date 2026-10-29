@@ -74,6 +74,7 @@ final class BrowserModel: ObservableObject {
             settings.adBlockerEnabled = true
         }
         blocker.setEnabled(settings.adBlockerEnabled)
+        blocker.prepareLinkCleaning()
         log.notice("Model ready: \(self.tabs.orderedSpaces.count) spaces, selected \(String(describing: self.window.selectedItemID), privacy: .public)")
     }
 

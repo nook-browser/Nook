@@ -10,7 +10,7 @@ import SwiftUI
 import NookDesign
 
 struct CookieManagementView: View {
-    @StateObject private var cookieManager = CookieManager()
+    @ObservedObject var cookieManager: CookieManager
     @State private var searchText: String = ""
     @State private var selectedFilter: CookieFilter = .all
     @State private var selectedSort: CookieSortOption = .domain
@@ -19,34 +19,23 @@ struct CookieManagementView: View {
     @State private var showingCookieDetails: Bool = false
     @State private var viewMode: ViewMode = .domain
 
+    init(cookieManager: CookieManager) {
+        self.cookieManager = cookieManager
+    }
+
     enum ViewMode: String, CaseIterable {
         case domain = "By Domain"
         case list = "All Cookies"
     }
 
-    /// Minimum height for the entry list; the pane grows from it.
-    private let entryListMinHeight: CGFloat = 260
-
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                summarySection
-                filterSection
-            }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
-            .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-
-            entryList
-                .frame(minHeight: entryListMinHeight)
-
-            Divider()
-
-            actionBar
+        Form {
+            summarySection
+            filterSection
+            entrySection
         }
-        .navigationTitle("Cookie Management")
+        .formStyle(.grouped)
+        .navigationTitle("Cookies")
         .onAppear {
             Task {
                 await cookieManager.loadCookies()
@@ -61,64 +50,52 @@ struct CookieManagementView: View {
 
     // MARK: - Entry List
 
-    @ViewBuilder
-    private var entryList: some View {
-        if cookieManager.isLoading {
-            VStack(spacing: NookDesign.Spacing.md) {
-                ProgressView()
-                Text("Loading cookies...")
-                    .font(NookDesign.Font.caption)
+    private var entrySection: some View {
+        Section {
+            if cookieManager.isLoading {
+                HStack(spacing: NookDesign.Spacing.md) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading cookies...")
+                        .foregroundStyle(.secondary)
+                }
+            } else if hasNoEntries {
+                Text("No cookies")
                     .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            switch viewMode {
-            case .domain:
-                domainList
-            case .list:
-                flatList
-            }
-        }
-    }
-
-    private var domainList: some View {
-        List {
-            ForEach(filteredDomainGroups) { group in
-                DisclosureGroup {
-                    ForEach(filteredCookiesForGroup(group)) { cookie in
-                        CookieRowView(cookie: cookie) {
-                            selectedCookie = cookie
-                            showingCookieDetails = true
-                        } onDelete: {
+            } else if viewMode == .domain {
+                ForEach(filteredDomainGroups) { group in
+                    DisclosureGroup {
+                        ForEach(filteredCookiesForGroup(group)) { cookie in
+                            CookieRowView(cookie: cookie) {
+                                selectedCookie = cookie
+                                showingCookieDetails = true
+                            } onDelete: {
+                                Task {
+                                    await cookieManager.deleteCookie(cookie)
+                                }
+                            }
+                        }
+                    } label: {
+                        DomainRowView(group: group) {
                             Task {
-                                await cookieManager.deleteCookie(cookie)
+                                await cookieManager.deleteCookiesForDomain(group.domain)
                             }
                         }
                     }
-                } label: {
-                    DomainRowView(group: group) {
+                }
+            } else {
+                ForEach(filteredAndSortedCookies) { cookie in
+                    CookieRowView(cookie: cookie, showsDomain: true) {
+                        selectedCookie = cookie
+                        showingCookieDetails = true
+                    } onDelete: {
                         Task {
-                            await cookieManager.deleteCookiesForDomain(group.domain)
+                            await cookieManager.deleteCookie(cookie)
                         }
                     }
                 }
             }
         }
-        .listStyle(.sidebar)
-    }
-
-    private var flatList: some View {
-        List(filteredAndSortedCookies) { cookie in
-            CookieRowView(cookie: cookie, showsDomain: true) {
-                selectedCookie = cookie
-                showingCookieDetails = true
-            } onDelete: {
-                Task {
-                    await cookieManager.deleteCookie(cookie)
-                }
-            }
-        }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
     }
 
     // MARK: - Summary
@@ -126,11 +103,12 @@ struct CookieManagementView: View {
     private var summarySection: some View {
         let stats = cookieManager.getCookieStats()
 
-        return Section("Cookie Management") {
+        return Section("Summary") {
             LabeledContent("Cookies") { Text("\(stats.total)") }
             LabeledContent("Session") { Text("\(stats.session)") }
             LabeledContent("Persistent") { Text("\(stats.persistent)") }
             LabeledContent("Total size") { Text(formatSize(stats.totalSize)) }
+            actionBar
         }
     }
 
@@ -138,10 +116,7 @@ struct CookieManagementView: View {
 
     private var filterSection: some View {
         Section("Filter") {
-            LabeledContent("Search") {
-                TextField("Search cookies...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-            }
+            TextField("Search", text: $searchText, prompt: Text("Search cookies..."))
 
             Picker("View", selection: $viewMode) {
                 ForEach(ViewMode.allCases, id: \.self) { mode in
@@ -174,6 +149,8 @@ struct CookieManagementView: View {
 
     private var actionBar: some View {
         HStack(spacing: NookDesign.Spacing.lg) {
+            Spacer()
+
             Button("Refresh") {
                 Task {
                     await cookieManager.loadCookies()
@@ -198,13 +175,17 @@ struct CookieManagementView: View {
             }
             .buttonStyle(.bordered)
             .fixedSize()
-
-            Spacer()
         }
-        .padding(NookDesign.Spacing.xl)
     }
 
     // MARK: - Computed Properties
+
+    private var hasNoEntries: Bool {
+        switch viewMode {
+        case .domain: filteredDomainGroups.isEmpty
+        case .list: filteredAndSortedCookies.isEmpty
+        }
+    }
 
     private var filteredDomainGroups: [DomainCookieGroup] {
         let searchFiltered = searchText.isEmpty ? cookieManager.domainGroups : 
