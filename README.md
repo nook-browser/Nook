@@ -34,7 +34,10 @@
 -  **Minimal, modern UI** – focused on content, not chrome.  
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26" alt="Nook screenshot">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshot-dark.png">
+    <img src="assets/screenshot-light.png" alt="Nook screenshot">
+  </picture>
 </p>
 
 
@@ -48,15 +51,15 @@
 #### Prerequisites  
 - macOS 15.6 (Sequoia) or later, Apple Silicon. Xcode 26 needs 15.6; the built app runs on 15.5 and later
 - On-device AI chat and Tab Organizer require macOS 26 or later with Apple Intelligence enabled
-- [Xcode](https://developer.apple.com/xcode/) 26 or later
+- [Xcode](https://developer.apple.com/xcode/) 26 or later, with the Metal Toolchain component (Xcode 26 no longer bundles it)
 ```bash
-
 git clone https://github.com/nook-browser/Nook.git
 cd Nook
+xcodebuild -downloadComponent MetalToolchain
 open Nook.xcodeproj
 ```
 
-Nook builds for Apple Silicon only: the on-device tab organizer depends on MLX, which has no x86_64 slice. Xcode resolves the Swift packages on open.
+Nook builds for Apple Silicon only: the bundled adblock-rust framework ships an arm64 slice and nothing else. Xcode resolves the Swift packages on open.
 
 You’ll need to set your personal Development Team in Signing to build locally.
 
@@ -79,7 +82,7 @@ Nook/
 │   │   ├── ExtensionManager/  # WKWebExtension support
 │   │   ├── AIManager/         # AI chat providers, MCP client, browser tools
 │   │   ├── DevMCPServer/      # Local MCP server for driving the app from a coding agent
-│   │   ├── TabOrganizerManager/ # On-device LLM tab grouping (MLX)
+│   │   ├── TabOrganizerManager/ # On-device tab grouping with Apple Intelligence
 │   │   ├── WebViewCoordinator/  # Web view pool for multi-window display
 │   │   ├── DownloadManager/   # File downloads
 │   │   ├── DialogManager/     # Modal dialogs
@@ -94,10 +97,10 @@ Nook/
 ├── CommandPalette/            # Command palette UI
 ├── Navigation/                # Sidebar structure: header, bottom bar, spaces list
 ├── Onboarding/                # First-run flow
-├── Settings/                  # SwiftUI environment glue for the settings service
+├── NookiOS/                   # iOS app target, not released yet
 ├── UI/                        # Shared buttons and controls
-├── docs/                      # Architecture notes, design specs, implementation plans
-├── scripts/                   # Filter list refresh, used in CI
+├── docs/                      # Ad blocker architecture notes
+├── scripts/                   # Filter list refresh, scriptlet and redirect generators, checks
 └── assets/                    # Static assets
 ```
 
