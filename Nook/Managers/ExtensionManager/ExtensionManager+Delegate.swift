@@ -791,7 +791,7 @@ extension ExtensionManager {
             backing: .buffered,
             defer: false
         )
-        window.isReleasedWhenClosed = false
+        window.setUpAsPageWindow()
         window.title = "\(displayName) – Options"
 
         let container = NSView(frame: window.contentView?.bounds ?? .zero)
