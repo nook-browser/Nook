@@ -39,7 +39,9 @@ public struct TabContextMenu: View {
     }
 
     public var body: some View {
-        if let item = tabs.item(itemID) {
+        if let windowState, context == .sidebar, case let group = tabs.selectedItems(in: windowState), group.contains(itemID) {
+            groupMenu(group, in: windowState)
+        } else if let item = tabs.item(itemID) {
             let section = tabs.section(of: itemID)
             Group {
                 if let windowState, let split = windowState.split,
@@ -59,6 +61,73 @@ public struct TabContextMenu: View {
                 Divider()
                 closeSection(item, section: section)
             }
+        }
+    }
+
+    // MARK: - Multi-selection
+
+    /// The menu for a row inside a selection of two or more; each action clears the selection.
+    @ViewBuilder
+    private func groupMenu(_ group: [UUID], in windowState: BrowserWindowState) -> some View {
+        let n = group.count
+        let spaceID = tabs.spaceID(of: itemID) ?? windowState.spaceID
+        let unpinned = group.filter { if case .pinned = tabs.section(of: $0) { false } else { true } }
+        let allPinned = group.allSatisfy { if case .pinned = tabs.section(of: $0) { true } else { false } }
+        if allPinned {
+            Button {
+                windowState.multiSelection.clear()
+                tabs.unpin(group)
+            } label: {
+                Label("Unpin \(n) Tabs", systemImage: "pin.slash")
+            }
+        } else if let spaceID {
+            Button {
+                windowState.multiSelection.clear()
+                tabs.pin(unpinned, to: .pinned(spaceID: spaceID))
+            } label: {
+                Label("Pin \(unpinned.count) Tabs", systemImage: "pin")
+            }
+        }
+
+        let spaces = tabs.spaces(visibleIn: windowState).filter { $0.id != tabs.agentSpaceID }
+        if spaces.count > 1 {
+            Menu {
+                ForEach(spaces) { space in
+                    Button(space.name) {
+                        windowState.multiSelection.clear()
+                        tabs.move(group, to: .tabs(spaceID: space.id), after: nil)
+                    }
+                    .disabled(group.allSatisfy { tabs.spaceID(of: $0) == space.id })
+                }
+            } label: {
+                Label("Move \(n) Tabs to Space", systemImage: "arrow.right.square")
+            }
+        }
+
+        Button {
+            if let folder = tabs.createFolder(title: "New Folder", holding: group) {
+                windowState.multiSelection.clear()
+                SidebarRenameState.shared.itemID = folder
+            }
+        } label: {
+            Label("New Folder with \(n) Tabs", systemImage: "folder.badge.plus")
+        }
+
+        Button {
+            windowState.multiSelection.clear()
+            let links = group.compactMap { tabs.item($0).flatMap(tabs.currentURL(for:))?.absoluteString }
+            actions?.copyToPasteboard(links.joined(separator: "\n"))
+        } label: {
+            Label("Copy \(n) Links", systemImage: "link")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            windowState.multiSelection.clear()
+            tabs.close(group)
+        } label: {
+            Label("Close \(n) Tabs", systemImage: "xmark")
         }
     }
 

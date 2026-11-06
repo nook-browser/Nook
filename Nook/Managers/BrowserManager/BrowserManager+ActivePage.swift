@@ -116,6 +116,8 @@ extension BrowserManager {
             view.evaluateJavaScript("document.exitFullscreen()", in: nil, in: .defaultClient) { _ in }
         } else if peek != nil {
             peekManager.dismissPeek()
+        } else {
+            state.multiSelection.clear()
         }
     }
 

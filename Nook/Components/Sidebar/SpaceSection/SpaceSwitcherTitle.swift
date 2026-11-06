@@ -33,7 +33,13 @@ struct SpaceSwitcherTitle: View {
             let pinned = Parent.pinned(spaceID: space.id)
             let isDropTarget = dragSession.isDragging && dragSession.activeZone == .target(pinned)
             NookDropZoneHostView(zoneID: .target(pinned), manager: dragSession, onDrop: { itemID in
-                tabs.pin(itemID, to: pinned)
+                let group = tabs.selectedItems(in: windowState)
+                if group.contains(itemID) {
+                    tabs.pin(group, to: pinned)
+                    windowState.multiSelection.clear()
+                } else {
+                    tabs.pin(itemID, to: pinned)
+                }
             }) {
                 HStack(spacing: 0) {
                     // As in Arc: the row folds the pinned section, the ellipsis holds the space menu.
