@@ -268,7 +268,9 @@ class KeyboardShortcutManager {
 
         // MARK: - Website Shortcut Conflict Resolution
         // Check if this shortcut conflicts with a website shortcut
-        if let windowId = windowRegistry?.activeWindow?.id {
+        // Peek covers the tab the detector would look at, so its keys never yield to the site below.
+        if let windowId = windowRegistry?.activeWindow?.id,
+           browserManager?.peekManager.windowId != windowId || browserManager?.peekManager.page == nil {
             let shouldPass = websiteShortcutDetector.shouldPassToWebsite(
                 keyCombination,
                 windowId: windowId,
@@ -481,8 +483,7 @@ class KeyboardShortcutManager {
         case .hardReload:
             webView.reloadFromOrigin()
         case .copyCurrentURL:
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(page.url.absoluteString, forType: .string)
+            browserManager?.copyCurrentURL()
         case .printPage:
             webView.nookPrint()
         case .muteUnmuteAudio:

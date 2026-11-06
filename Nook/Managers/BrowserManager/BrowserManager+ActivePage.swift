@@ -140,33 +140,26 @@ extension BrowserManager {
     }
 
     // MARK: - URL Utilities
+    /// Copies the URL of the page in front: a key mini window's page, Peek while it shows, else the
+    /// active window's selected page (which follows the last split pane clicked).
     func copyCurrentURL() {
-        if let url = tabs.activeWindowSession?.url.absoluteString {
-            #if DEBUG
-            print("Attempting to copy URL: \(url)")
-            #endif
+        let state = windowRegistry?.activeWindow
+        let mini = (NSApp.keyWindow as? MiniBrowserWindow)?.page
+        let peek = state.flatMap { peekManager.windowId == $0.id ? peekManager.page : nil }
+        guard let page = mini ?? peek ?? tabs.activeWindowSession else { return }
 
-            NSPasteboard.general.clearContents()
-            let success = NSPasteboard.general.setString(url, forType: .string)
-            let e = NSHapticFeedbackManager.defaultPerformer
-            e.perform(.generic, performanceTime: .drawCompleted)
-            #if DEBUG
-            print("Clipboard operation success: \(success)")
-            #endif
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(page.url.absoluteString, forType: .string)
+        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .drawCompleted)
 
-            // Show toast on active window
-            if let windowState = windowRegistry?.activeWindow {
-                windowState.isShowingCopyURLToast = true
-
-                Task { [weak windowState] in
-                    try? await Task.sleep(for: .seconds(2))
-                    windowState?.isShowingCopyURLToast = false
-                }
+        if mini != nil {
+            NotificationCenter.default.post(name: .miniWindowCopiedURL, object: page)
+        } else if let state {
+            state.isShowingCopyURLToast = true
+            Task { [weak state] in
+                try? await Task.sleep(for: .seconds(2))
+                state?.isShowingCopyURLToast = false
             }
-        } else {
-            #if DEBUG
-            print("No URL found to copy")
-            #endif
         }
     }
 
