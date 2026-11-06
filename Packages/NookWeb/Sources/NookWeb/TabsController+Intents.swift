@@ -36,7 +36,18 @@ extension TabsController {
         guard created != nil else { return nil }
         if opener != nil { revealTrail(position.0) }
         if placement != .background { select(id, in: window) }
+        else if let opener { noteBackgroundOpen(id, opener: opener, in: window) }
         return id
+    }
+
+    /// Feeds the "Opened in background" toast when the sidebar is hidden; gone after 2 s.
+    private func noteBackgroundOpen(_ id: UUID, opener: UUID, in window: BrowserWindowState) {
+        guard !window.isSidebarVisible, !isInAgentSpace(opener), !isInAgentSpace(id) else { return }
+        window.backgroundOpened.append(id)
+        Task { @MainActor [weak window] in
+            try? await Task.sleep(for: .seconds(2))
+            if window?.backgroundOpened.last == id { window?.backgroundOpened = [] }
+        }
     }
 
     /// Where a new tab goes: right below `anchor` when it is a tab in the window's tabs section,

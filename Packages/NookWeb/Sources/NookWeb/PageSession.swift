@@ -860,10 +860,10 @@ public final class PageSession: NSObject, Identifiable {
     /// than at each caller: a page must not be able to talk Nook into opening a tab on
     /// `javascript:`, `data:` or `file:`.
     /// ponytail: http(s) only. Widen if someone reports a legitimate scheme.
-    public func openInNewTab(_ url: URL, foreground: Bool = false) {
+    public func openInNewTab(_ url: URL, title: String? = nil, foreground: Bool = false) {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
         guard let tabs = controller, let window = tabs.window(for: self) else { return }
-        tabs.open(url: url, in: window, placement: foreground ? .newTab : .background, from: itemID)
+        tabs.open(url: url, in: window, placement: foreground ? .newTab : .background, from: itemID, title: title)
     }
 
     // MARK: - Equality
