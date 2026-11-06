@@ -94,7 +94,7 @@ final class LinkPreviewService {
                     if let image = await Self.image(at: imageURL) { images[url] = image }
                 }
             }
-            if let landed = page.landedURL, let host = landed.host {
+            if let landed = page.landedURL, let host = FaviconCache.key(for: landed) {
                 let iconURL = page.iconURL ?? URL(string: "/favicon.ico", relativeTo: landed)?.absoluteURL
                 Task {
                     if let icon = await Self.icon(at: iconURL, host: host) { icons[url] = icon }

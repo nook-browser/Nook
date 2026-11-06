@@ -230,7 +230,7 @@ public class SearchManager {
             let haystack = title.lowercased() + " " + url.absoluteString.lowercased()
             guard words.allSatisfy(haystack.contains) else { return nil }
             let favicon = session?.favicon
-                ?? url.host.flatMap { FaviconCache.shared.swiftUIImage(for: $0) }
+                ?? FaviconCache.key(for: url).flatMap { FaviconCache.shared.swiftUIImage(for: $0) }
                 ?? SwiftUI.Image(systemName: "globe")
             return TabMatch(itemID: item.id, title: title, url: url, favicon: favicon)
         }

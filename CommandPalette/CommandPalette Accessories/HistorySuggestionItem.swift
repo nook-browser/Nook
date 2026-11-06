@@ -73,7 +73,7 @@ struct HistorySuggestionItem: View {
     }
 
     private func fetchFavicon(for url: URL) async -> NSImage? {
-        guard url.scheme == "http" || url.scheme == "https", let cacheKey = url.host else { return nil }
+        guard url.scheme == "http" || url.scheme == "https", let cacheKey = FaviconCache.key(for: url) else { return nil }
         // Cache only: a row shown for one keystroke must not start a network fetch.
         return await FaviconCache.shared.cachedImage(for: cacheKey)
     }

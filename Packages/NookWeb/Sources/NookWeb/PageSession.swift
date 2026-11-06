@@ -753,7 +753,7 @@ public final class PageSession: NSObject, Identifiable {
 
     /// Memory then disk cache, synchronously. Gives restored rows their favicon at once.
     func restoreFaviconFromCache() {
-        guard url.scheme == "http" || url.scheme == "https", let host = url.host else { return }
+        guard url.scheme == "http" || url.scheme == "https", let host = FaviconCache.key(for: url) else { return }
         if let cached = FaviconCache.shared.image(for: host) ?? FaviconCache.shared.imageFromDiskSync(for: host) {
             favicon = SwiftUI.Image(platformImage: cached)
             hasFavicon = true
@@ -766,7 +766,7 @@ public final class PageSession: NSObject, Identifiable {
             favicon = defaultFavicon
             return
         }
-        let cacheKey = url.host ?? url.absoluteString
+        let cacheKey = FaviconCache.key(for: url) ?? url.absoluteString
 
         // Show the cached icon at once, and refetch it once a day so a site's new icon replaces the old one.
         let cached = await FaviconCache.shared.cachedImage(for: cacheKey)
