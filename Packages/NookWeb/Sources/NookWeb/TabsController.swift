@@ -284,6 +284,12 @@ public final class TabsController {
         return tree(owner).visibleRows(space: spaceID, openFolders: openFolders(owner))
     }
 
+    /// Loose tabs Clear closes in a space, keeping the trails of `keeping`.
+    public func tabsToClear(in spaceID: UUID, keeping: [UUID]) -> [UUID] {
+        guard let owner = owner(ofSpace: spaceID) else { return [] }
+        return tree(owner).tabsToClear(in: spaceID, keeping: keeping)
+    }
+
     public func section(of itemID: UUID) -> Parent? {
         owner(ofItem: itemID).flatMap { tree($0).section(of: itemID) }
     }

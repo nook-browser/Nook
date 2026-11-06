@@ -187,3 +187,24 @@ struct TrailTests {
         #expect(device.openFolders == [parent])
     }
 }
+
+struct ClearKeepingTests {
+    @Test func clearKeepsCurrentTrailAndSplit() {
+        var f = Fixture()
+        let tabs = Parent.tabs(spaceID: f.spaceA)
+        let a = f.tab("a", in: tabs)
+        let child = f.tab("child", in: .folder(itemID: a))
+        let grand = f.tab("grand", in: .folder(itemID: child))
+        let b = f.tab("b", in: tabs)
+        let c = f.tab("c", in: tabs)
+        let folder = f.folder("folder", in: tabs)
+        let pinned = f.tab("pinned", in: .pinned(spaceID: f.spaceA))
+        let other = f.tab("other", in: .tabs(spaceID: f.spaceB))
+        #expect(Set(f.tree.tabsToClear(in: f.spaceA, keeping: [])) == [a, b, c])
+        #expect(Set(f.tree.tabsToClear(in: f.spaceA, keeping: [grand])) == [b, c])
+        #expect(Set(f.tree.tabsToClear(in: f.spaceA, keeping: [b, c])) == [a])
+        #expect(Set(f.tree.tabsToClear(in: f.spaceA, keeping: [pinned, other])) == [a, b, c])
+        #expect(f.tree.tabsToClear(in: f.spaceA, keeping: [a, b, c]).isEmpty)
+        _ = folder
+    }
+}
