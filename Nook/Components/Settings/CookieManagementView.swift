@@ -28,23 +28,25 @@ struct CookieManagementView: View {
         case list = "All Cookies"
     }
 
-    /// Minimum height for the entry list; the pane grows from it.
-    private let entryListMinHeight: CGFloat = 260
+    /// Fixed entry list height; the page scrolls around it and the List stays lazy.
+    private let entryListHeight: CGFloat = 360
 
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                summarySection
-                filterSection
+        ScrollView {
+            VStack(spacing: 0) {
+                Form {
+                    summarySection
+                    filterSection
+                }
+                .formStyle(.grouped)
+                .scrollDisabled(true)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                entryList
+                    .frame(height: entryListHeight)
             }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
-            .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-
-            entryList
-                .frame(minHeight: entryListMinHeight)
         }
         .navigationTitle("Cookies")
         .onAppear {
