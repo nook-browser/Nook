@@ -14,7 +14,7 @@ extension TabsController {
     // MARK: - Open
 
     /// Creates a tab for `url`: at the top of `parent` when one is given; as the last child of
-    /// `opener`, the tab whose page opened the link (`childTabPosition`); else right below the
+    /// `opener`, the tab whose page opened the link (`childTabPosition`, when nesting is on); else right below the
     /// window's selected tab (`newTabPosition`). `.newTab` selects it, `.background` leaves
     /// selection alone and loads nothing, `.replaceCurrent` loads `url` in the selected page.
     /// `title` stands in for the page title until the page loads.
@@ -53,13 +53,14 @@ extension TabsController {
         return (.tabs(spaceID: spaceID), nil)
     }
 
-    /// Where a tab opened from `opener`'s page goes: its last child, so a run of links keeps its
+    /// Where a tab opened from `opener`'s page goes: with nesting off, like a new tab; else its last child, so a run of links keeps its
     /// order under it (a trail). A tab at the depth limit gets it as its next sibling; a pinned
     /// tab or favorite takes no children, so the tab goes to the top of the tabs section.
     func childTabPosition(in window: BrowserWindowState, opener: UUID) -> (Parent, UUID?)? {
         let source = tree(owner(of: window))
         // An agent page's tabs stay in the Agent space whatever the window shows.
         let spaceID = isInAgentSpace(opener) ? agentSpaceID : window.spaceID
+        guard settings.nestTabsFromLinks else { return newTabPosition(in: window, space: spaceID, after: opener) }
         guard source.spaceID(of: opener) == spaceID, source.canTakeChild(opener) else {
             if let item = source.item(opener), source.scope(of: opener) == .device,
                source.spaceID(of: opener) == spaceID {
