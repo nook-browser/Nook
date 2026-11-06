@@ -11,7 +11,7 @@ import NookDesign
 import NookWeb
 
 public struct CopyURLToast: View {
-    @Environment(BrowserWindowState.self) private var windowState
+    @Environment(BrowserWindowState.self) private var windowState: BrowserWindowState?
 
     private let title: String
 
@@ -43,11 +43,11 @@ public struct CopyURLToast: View {
         .onAppear {
             // Auto-dismiss after 2 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                windowState.isShowingCopyURLToast = false
+                windowState?.isShowingCopyURLToast = false
             }
         }
         .onTapGesture {
-            windowState.isShowingCopyURLToast = false
+            windowState?.isShowingCopyURLToast = false
         }
     }
 }
