@@ -19,6 +19,15 @@ extension TabsController {
         saveArchive()
     }
 
+    /// Merges imported entries into the Archive and saves once. Returns how many are still in the Archive after trimming.
+    public func importArchive(_ entries: [ArchiveEntry]) -> Int {
+        guard !isReadOnly, !entries.isEmpty else { return 0 }
+        let ids = Set(entries.map(\.id))
+        archive.merge(entries, now: Date())
+        saveArchive()
+        return archive.entries.filter { ids.contains($0.id) }.count
+    }
+
     /// Removes entries holding any of `ids` (items that are back in the tree).
     func dropArchived(containing ids: Set<UUID>) {
         if archive.remove(containing: ids) { saveArchive() }

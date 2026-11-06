@@ -31,7 +31,7 @@ struct BrowserImportDialog: DialogPresentable {
 
     @ViewBuilder
     func dialogContent() -> some View {
-        Text("Brings over spaces, tabs, folders, favorites, extensions and Air Traffic Control rules. Passwords and history stay in Arc.")
+        Text("Brings over spaces, tabs, folders, favorites, extensions, Air Traffic Control rules and the last 30 days of archived tabs. Passwords and history stay in Arc.")
             .font(NookDesign.Font.body)
             .foregroundStyle(.secondary)
     }

@@ -31,6 +31,19 @@ public struct ArchiveEntry: Codable, Hashable, Sendable, Identifiable {
         archivedAt = now
         self.reason = reason
     }
+
+    /// A single tab from outside the tree (an import), restorable like any other entry.
+    public init(spaceID: UUID, title: String, url: URL, archivedAt: Date, reason: ArchiveReason) {
+        let root = Item(parent: .tabs(spaceID: spaceID), order: OrderKey("a"), kind: .tab(url: url, pageTitle: title), modifiedAt: archivedAt)
+        id = root.id
+        items = [root]
+        self.spaceID = spaceID
+        self.title = title
+        self.url = url
+        host = url.host
+        self.archivedAt = archivedAt
+        self.reason = reason
+    }
 }
 
 /// Everything in `archive.json`, newest last.
@@ -46,6 +59,12 @@ public struct Archive: Codable, Equatable, Sendable {
         entries.removeAll { $0.id == entry.id }
         entries.append(entry)
         trim(now: entry.archivedAt)
+    }
+
+    /// Adds entries from elsewhere, keeping the list oldest first, then trims.
+    public mutating func merge(_ added: [ArchiveEntry], now: Date) {
+        entries = (entries + added).sorted { $0.archivedAt < $1.archivedAt }
+        trim(now: now)
     }
 
     /// Drops entries past the retention window, then the oldest beyond the cap.
