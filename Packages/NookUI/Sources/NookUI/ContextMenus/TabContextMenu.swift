@@ -384,6 +384,14 @@ public struct TabContextMenu: View {
                 }
             }
 
+            if let position = siblings.firstIndex(where: { $0.id == itemID }), position > 0 {
+                Button {
+                    siblings[..<position].map(\.id).forEach(tabs.remove)
+                } label: {
+                    Label("Close All Above", systemImage: "arrow.up.to.line")
+                }
+            }
+
             if let position = siblings.firstIndex(where: { $0.id == itemID }), position + 1 < siblings.count {
                 Button {
                     siblings[(position + 1)...].map(\.id).forEach(tabs.remove)

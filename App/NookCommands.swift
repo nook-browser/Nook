@@ -143,6 +143,12 @@ struct NookCommands: Commands {
                 windowRegistry.activeWindow?.commandPalette?.open()
             }
             .modifier(dynamicShortcut(.newTab))
+            Button(browserManager.pinToggleIsPin == false ? "Unpin Tab" : "Pin Tab") {
+                browserManager.togglePinCurrentTab()
+            }
+            .modifier(dynamicShortcut(.togglePinTab))
+            .disabled(browserManager.pinToggleIsPin == nil)
+
             Button("New Window") {
                 browserManager.createNewWindow()
             }
@@ -246,6 +252,12 @@ struct NookCommands: Commands {
             }
             .modifier(dynamicShortcut(.refresh))
             .disabled(browserManager.tabs.activeWindowSession == nil)
+
+            Button("Stop Loading") {
+                browserManager.stopLoadingCurrentPage()
+            }
+            .modifier(dynamicShortcut(.stopLoading))
+            .disabled(browserManager.tabs.activeWindowSession?.isLoading != true)
 
             Button("Reload with Standard Fingerprinting Protection") {
                 browserManager.tabs.activeWindowSession?.reloadWithoutEnhancedFingerprintingProtection()

@@ -206,6 +206,40 @@ extension BrowserManager {
         webView.nookPrint()
     }
 
+    /// Pins the window's selected tab to its space, or unpins it. Favorites are left alone.
+    func togglePinCurrentTab() {
+        guard let window = windowRegistry?.activeWindow, window.window?.attachedSheet == nil,
+              NSApp.keyWindow === window.window, let id = window.selectedItemID else { return }
+        switch tabs.section(of: id) {
+        case .tabs:
+            if let spaceID = tabs.spaceID(of: id) ?? window.spaceID { tabs.pin(id, to: .pinned(spaceID: spaceID)) }
+        case .pinned:
+            tabs.unpin(id)
+        default:
+            break
+        }
+    }
+
+    /// true to pin, false to unpin, nil for a favorite or no tab.
+    var pinToggleIsPin: Bool? {
+        guard let id = windowRegistry?.activeWindow?.selectedItemID else { return nil }
+        switch tabs.section(of: id) {
+        case .tabs: return true
+        case .pinned: return false
+        default: return nil
+        }
+    }
+
+    /// Stops the selected page loading. Cmd-. also cancels sheets, so with one up (or another window key) the key goes on as cancel.
+    func stopLoadingCurrentPage() {
+        guard let window = windowRegistry?.activeWindow, window.window?.attachedSheet == nil,
+              NSApp.keyWindow === window.window else {
+            NSApp.sendAction(#selector(NSResponder.cancelOperation(_:)), to: nil, from: nil)
+            return
+        }
+        tabs.controllableSession(in: window)?.stop()
+    }
+
     // MARK: - Zoom Management
 
     /// Zoom in for the current tab

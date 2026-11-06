@@ -18,7 +18,7 @@ class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
-    private let currentVersion = 10 // Increment when adding new shortcuts; 10 added Go to Space 1-9 (Ctrl+1-9) and moved Next/Previous Space to Cmd+Opt+arrows
+    private let currentVersion = 11 // Increment when adding new shortcuts; 11 added Pin/Unpin Tab (Cmd+D) and Stop Loading (Cmd+.); 10 added Go to Space 1-9 (Ctrl+1-9) and moved Next/Previous Space to Cmd+Opt+arrows
 
     /// Defaults that changed key: a user still on the old key gets the new one.
     private let movedDefaults: [(action: ShortcutAction, from: KeyCombination, version: Int)] = [
@@ -472,8 +472,10 @@ class KeyboardShortcutManager {
     private func executeInMiniWindow(_ action: ShortcutAction, _ window: MiniBrowserWindow) -> Bool {
         guard let page = window.page, let webView = page.webView else { return false }
         switch action {
-        case .newWindow, .closeBrowser:
+        case .newWindow, .closeBrowser, .togglePinTab:
             return false
+        case .stopLoading:
+            webView.stopLoading()
         case .goBack:
             if webView.canGoBack { webView.goBack() }
         case .goForward:
@@ -638,6 +640,10 @@ class KeyboardShortcutManager {
                 browserManager.showSpaceSettings()
             case .organizeTabs:
                 NotificationCenter.default.post(name: .organizeTabsRequested, object: nil)
+            case .togglePinTab:
+                browserManager.togglePinCurrentTab()
+            case .stopLoading:
+                browserManager.stopLoadingCurrentPage()
             }
 
         }
