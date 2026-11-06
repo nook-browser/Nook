@@ -86,6 +86,18 @@ public struct SettingsGeneralTab: View {
             }
 
             Section {
+                Picker("Archive tabs after", selection: $settings.archiveAfter) {
+                    Text("12 hours").tag(12)
+                    Text("24 hours").tag(24)
+                    Text("7 days").tag(168)
+                    Text("30 days").tag(720)
+                    Text("Never").tag(0)
+                }
+            } footer: {
+                Text("Tabs you haven't opened in that long move to the Archive. Pinned tabs and favorites stay put.")
+            }
+
+            Section {
                 #if os(macOS)
                 LabeledContent("Default search engine") {
                     HStack(spacing: NookDesign.Spacing.md) {

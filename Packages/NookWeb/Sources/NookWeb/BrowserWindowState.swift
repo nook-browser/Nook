@@ -203,6 +203,7 @@ public enum SidebarMenuTab: Hashable, Sendable {
     case history
     case downloads
     case spaces
+    case archive
 }
 
 /// Toast information specific to a window

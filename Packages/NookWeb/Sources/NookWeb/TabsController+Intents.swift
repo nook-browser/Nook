@@ -206,6 +206,11 @@ extension TabsController {
         if movedSpace { sessionDelegate?.windowSpaceChanged(window) }
         window.selectedItemBySpace[spaceID] = itemID
         window.emptiedSpaces.remove(spaceID)
+        if case .main = owner {
+            let now = Date()
+            device.stampActive(itemID, at: now)
+            if let previous, tree.item(previous.itemID) != nil { device.stampActive(previous.itemID, at: now) }
+        }
         // The latest window to select a page takes its live view; others show a placeholder.
         takeControl(itemID, in: window)
         var recent = window.recentItemsBySpace[spaceID, default: []]
@@ -328,7 +333,7 @@ extension TabsController {
 
     /// A pinned or favorite tab ends its page and keeps the item. Anything in the tabs section,
     /// and any folder, is removed into the reopen history.
-    public func close(_ itemID: UUID) {
+    public func close(_ itemID: UUID, archive: Bool = true) {
         guard let owner = owner(ofItem: itemID) else { return }
         let source = tree(owner)
         guard let item = source.item(itemID) else { return }
@@ -352,7 +357,7 @@ extension TabsController {
             return
         }
         // A tab with a trail closes alone; its children move up into its place.
-        remove(itemID, promotingChildren: !item.isFolder)
+        remove(itemID, promotingChildren: !item.isFolder, archiving: archive ? .closed : nil)
     }
 
     /// Deletes an item and its subtree from the sidebar, pinned tabs and favorites included.
@@ -361,7 +366,7 @@ extension TabsController {
         remove(itemID, promotingChildren: false)
     }
 
-    private func remove(_ itemID: UUID, promotingChildren: Bool) {
+    func remove(_ itemID: UUID, promotingChildren: Bool, archiving reason: ArchiveReason? = .closed) {
         guard let owner = owner(ofItem: itemID) else { return }
         let ids = promotingChildren ? [itemID] : tree(owner).subtree(of: itemID)
         if let item = tree(owner).item(itemID) { dismissFromLiveFolder(item) }
@@ -376,15 +381,16 @@ extension TabsController {
         for id in ids { endSession(id) }
         switch owner {
         case .main:
-            recordClosed(closedEntry)
+            if reason != .auto { recordClosed(closedEntry) }
+            if let reason { archiveClosed(closedEntry, reason: reason) }
         case .privateWindow(let window):
             window.privateClosed.append(closedEntry)
             if window.privateClosed.count > DeviceState.closedLimit { window.privateClosed.removeFirst() }
         }
     }
 
-    public func close(_ itemIDs: [UUID]) {
-        for id in itemIDs { close(id) }
+    public func close(_ itemIDs: [UUID], archive: Bool = true) {
+        for id in itemIDs { close(id, archive: archive) }
     }
 
     public func closeSelected(in window: BrowserWindowState) {
@@ -432,7 +438,7 @@ extension TabsController {
         }
         let restored = entry.items.map(\.id)
         // Older entries for the same items (a page close, then a delete) must not restore them twice.
-        if !isPrivate { dropClosed(containing: Set(restored)) }
+        if !isPrivate { dropClosed(containing: Set(restored)); dropArchived(containing: Set(restored)) }
         for host in entry.items where host.isFolder || entry.items.contains(where: { $0.parent == .folder(itemID: host.id) }) {
             openFolder(host.id)
         }
@@ -768,6 +774,7 @@ extension TabsController {
         // Items the change brought back must not also reopen from the history.
         let restored = Set(change.items.keys.filter { !before.contains($0) && tree.item($0) != nil })
         dropClosed(containing: restored)
+        dropArchived(containing: restored)
         for window in regularWindows { window.refreshCompositor() }
         save()
     }

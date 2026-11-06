@@ -43,17 +43,27 @@ public final class TabStore: @unchecked Sendable {
         var state: DeviceState
     }
 
+    /// `archive.json`: tabs closed or idle out of the tabs sections.
+    public static let archiveFormatVersion = 1
+
+    struct ArchiveFile: Codable {
+        var formatVersion = TabStore.archiveFormatVersion
+        var entries: [ArchiveEntry]
+    }
+
     /// Just enough of either file to tell which format it is.
     private struct VersionProbe: Codable { var formatVersion: Int }
 
     public let directory: URL
     private var structureURL: URL { directory.appendingPathComponent("structure.json") }
     private var deviceURL: URL { directory.appendingPathComponent("device.json") }
+    private var archiveURL: URL { directory.appendingPathComponent("archive.json") }
     private var backupsURL: URL { directory.appendingPathComponent("Backups", isDirectory: true) }
 
     private let queue = DispatchQueue(label: "com.gstudios.nook.tabstore", qos: .utility)
     private let lock = NSLock()
     private var pending: (TabTree, DeviceState)?
+    private var pendingArchive: Archive?
     private var scheduled = false
     private var readOnly = false
     /// Synced item ids last written to structure.json. A synced item that moves to the device
@@ -156,9 +166,38 @@ public final class TabStore: @unchecked Sendable {
         defer { lock.unlock() }
         guard !readOnly else { return }
         pending = (tree, device)
+        schedule()
+    }
+
+    public func save(_ archive: Archive) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !readOnly else { return }
+        pendingArchive = archive
+        schedule()
+    }
+
+    /// Caller holds `lock`.
+    private func schedule() {
         guard !scheduled else { return }
         scheduled = true
         queue.asyncAfter(deadline: .now() + Self.coalesceInterval) { [weak self] in self?.writePending() }
+    }
+
+    /// The saved archive trimmed to its retention; empty when the file is missing or unreadable.
+    public func loadArchive(now: Date = Date()) -> Archive {
+        guard let data = try? Data(contentsOf: archiveURL) else { return Archive() }
+        guard let file = try? JSONDecoder().decode(ArchiveFile.self, from: data),
+              file.formatVersion <= Self.archiveFormatVersion else {
+            // Keep a file we cannot read; the next save would overwrite it.
+            let aside = archiveURL.appendingPathExtension("bad")
+            try? FileManager.default.removeItem(at: aside)
+            try? FileManager.default.copyItem(at: archiveURL, to: aside)
+            return Archive()
+        }
+        var archive = Archive(entries: file.entries)
+        archive.trim(now: now)
+        return archive
     }
 
     /// Writes any queued state now and waits for it.
@@ -169,10 +208,20 @@ public final class TabStore: @unchecked Sendable {
     private func writePending() {
         lock.lock()
         let next = pending
+        let nextArchive = pendingArchive
         pending = nil
+        pendingArchive = nil
         scheduled = false
         let previousSynced = writtenSyncedIDs
         lock.unlock()
+        if let nextArchive {
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try JSONEncoder().encode(ArchiveFile(entries: nextArchive.entries)).write(to: archiveURL, options: .atomic)
+            } catch {
+                lock.withLock { lastError = error }
+            }
+        }
         guard let (tree, device) = next else { return }
         do {
             let syncedIDs = try write(tree: tree, device: device, previousSynced: previousSynced)

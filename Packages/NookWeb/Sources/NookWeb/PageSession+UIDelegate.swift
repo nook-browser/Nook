@@ -169,7 +169,7 @@ extension PageSession: WKUIDelegate {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self else { return }
-                self.controller?.close(self.itemID)
+                self.controller?.close(self.itemID, archive: false)
             }
         }
     }

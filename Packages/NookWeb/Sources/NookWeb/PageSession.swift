@@ -646,7 +646,7 @@ public final class PageSession: NSObject, Identifiable {
         } else if isDetached {
             onClose?()
         } else {
-            controller?.close(itemID)
+            controller?.close(itemID, archive: false)
         }
     }
 
