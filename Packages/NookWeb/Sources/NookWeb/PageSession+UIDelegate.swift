@@ -78,6 +78,7 @@ extension PageSession: WKUIDelegate {
     ) -> WKWebView? {
         guard let delegate = controller?.sessionDelegate else { return nil }
         let url = navigationAction.request.url
+        if url?.scheme?.lowercased() == "nook" { return nil }
         // Extensions manage their own auth flows, and never get Peek.
         let sourceScheme = navigationAction.sourceFrame.request.url?.scheme?.lowercased() ?? ""
         let isFromExtension = sourceScheme == "webkit-extension" || sourceScheme == "safari-web-extension"

@@ -28,6 +28,7 @@ public final class NookSettingsService {
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let lastSeenVersionKey = "settings.lastSeenVersion"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
+    private let allowNookURLsKey = "settings.allowNookURLs"
     private let sidebarPositionKey = "settings.sidebarPosition"
     private let topBarAddressViewKey = "settings.topBarAddressView"
 
@@ -275,6 +276,13 @@ public final class NookSettingsService {
         }
     }
     
+    /// Lets other apps drive Nook through nook:// links. Off until the person turns it on.
+    public var allowNookURLs: Bool {
+        didSet {
+            userDefaults.set(allowNookURLs, forKey: allowNookURLsKey)
+        }
+    }
+
     public var askBeforeQuit: Bool {
         didSet {
             userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
@@ -561,6 +569,7 @@ public final class NookSettingsService {
             adBlockerEnabledKey: false,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
+            allowNookURLsKey: false,
             externalLinksInMiniWindowKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
             topBarAddressViewKey: false,
@@ -684,6 +693,7 @@ public final class NookSettingsService {
         self.lastSeenVersion = userDefaults.string(forKey: lastSeenVersionKey)
         self.externalLinksInMiniWindow = userDefaults.bool(forKey: externalLinksInMiniWindowKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
+        self.allowNookURLs = userDefaults.bool(forKey: allowNookURLsKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
         self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
         self.geminiApiKey = ""  // In-memory only; persistent storage via AIKeychainStorage

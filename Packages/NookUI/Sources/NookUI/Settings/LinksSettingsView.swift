@@ -41,6 +41,12 @@ public struct LinksSettingsView: View {
             } footer: {
                 Text("Air Traffic Control rules below take priority.")
             }
+
+            Section {
+                Toggle("Allow nook:// links", isOn: $settings.allowNookURLs)
+            } footer: {
+                Text("Lets launchers like Raycast and Alfred open pages, search and switch spaces.")
+            }
             #endif
 
             Section {
