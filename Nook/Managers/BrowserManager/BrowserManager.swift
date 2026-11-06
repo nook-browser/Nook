@@ -1113,10 +1113,8 @@ class BrowserManager: ObservableObject {
             backing: .buffered,
             defer: false
         )
-        // ARC owns this window. AppKit's default release on close over-releases it and crashes
-        // in the next autorelease pool drain.
-        window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
+        window.setUpAsPageWindow()
         window.title = title
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true

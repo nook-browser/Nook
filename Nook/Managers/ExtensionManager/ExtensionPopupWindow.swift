@@ -53,7 +53,7 @@ final class ExtensionPopupWindow: NSObject, WKWebExtensionWindow, NSWindowDelega
         PopupClipboardHandler.install(on: webView, retainedBy: .shared)
 
         window.title = title
-        window.isReleasedWhenClosed = false
+        window.setUpAsPageWindow()
         window.contentView = webView
         window.delegate = self
         window.setFrame(rect, display: false)
