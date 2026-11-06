@@ -119,6 +119,18 @@ struct WindowView: View {
                         .environment(windowState)
                 }
                 
+                let opened = windowState.backgroundOpened.filter { browserManager.tabs.item($0) != nil }
+                if let id = opened.last, !hoverSidebarManager.isOverlayVisible,
+                   let item = browserManager.tabs.item(id) {
+                    BackgroundTabToast(
+                        item: item, title: browserManager.tabs.title(for: item),
+                        count: opened.count
+                    ) {
+                        browserManager.tabs.select(id, in: windowState)
+                        windowState.backgroundOpened = []
+                    }
+                }
+
                 // Shortcut conflict toast
                 if windowState.isShowingShortcutConflictToast,
                    let conflictInfo = windowState.shortcutConflictInfo
@@ -137,6 +149,7 @@ struct WindowView: View {
             .animation(.smooth(duration: 0.25), value: windowState.isShowingCopyURLToast)
             .animation(.smooth(duration: 0.25), value: browserManager.downloadManager.lastTidied?.id)
             .animation(.smooth(duration: 0.25), value: windowState.isShowingShortcutConflictToast)
+            .animation(.smooth(duration: 0.25), value: windowState.backgroundOpened.isEmpty)
         }
         // Zoom control popup - separate from system toasts
         .overlay(alignment: .topTrailing) {

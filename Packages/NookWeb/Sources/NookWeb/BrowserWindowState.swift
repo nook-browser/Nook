@@ -107,6 +107,9 @@ public class BrowserWindowState {
     /// Replaces the copy toast's text for one showing; nil is the URL wording.
     public var copyToastText: String?
 
+    /// Tabs opened in the background while the sidebar was hidden; non-empty shows the toast.
+    public var backgroundOpened: [UUID] = []
+
     /// Presentation flag for the shortcut conflict toast
     public var isShowingShortcutConflictToast: Bool = false
 
