@@ -266,18 +266,21 @@ struct SpaceView: View {
 
     private func separatorAndNewTab(regular: [Row]) -> some View {
         let looseTabs = regular.filter { $0.depth == 0 && !$0.item.isFolder }.map(\.item.id)
+        let kept = [windowState.selectedItemID, windowState.split?.leftItemID, windowState.split?.rightItemID].compactMap { $0 }
+        let clearable = tabs.tabsToClear(in: spaceID, keeping: kept)
         return VStack(spacing: NookDesign.Spacing.xs) {
             SpaceSeparator(
                 isHovering: $isSidebarHovered,
-                // Clear empties the section: a tab goes with its whole trail.
-                onClear: { looseTabs.forEach(tabs.remove) },
+                // Clear keeps the window's current tabs; a tab goes with its whole trail.
+                onClear: { clearable.forEach(tabs.remove) },
                 onOrganize: nookSettings.tabOrganizerEnabled && tabOrganizerManager.isAvailable ? {
                     Task {
                         await tabOrganizerManager.organizeTabs(in: spaceID, using: tabs)
                     }
                 } : nil,
                 isOrganizing: tabOrganizerManager.isOrganizing,
-                tabCount: looseTabs.count
+                tabCount: looseTabs.count,
+                clearCount: clearable.count
             )
             .padding(.horizontal, NookDesign.Spacing.md)
 
