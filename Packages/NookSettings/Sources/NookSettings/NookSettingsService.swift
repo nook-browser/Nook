@@ -62,6 +62,7 @@ public final class NookSettingsService {
     private let tidyDownloadsKey = "settings.tidyDownloads"
     private let linkPreviewsKey = "settings.linkPreviews"
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
+    private let nestTabsFromLinksKey = "settings.nestTabsFromLinks"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
     private let externalLinksInMiniWindowKey = "settings.externalLinksInMiniWindow"
@@ -493,6 +494,13 @@ public final class NookSettingsService {
         }
     }
 
+    /// A tab opened from a link sits under the page that opened it.
+    public var nestTabsFromLinks: Bool {
+        didSet {
+            userDefaults.set(nestTabsFromLinks, forKey: nestTabsFromLinksKey)
+        }
+    }
+
     public var sponsorBlockEnabled: Bool {
         didSet {
             userDefaults.set(sponsorBlockEnabled, forKey: sponsorBlockEnabledKey)
@@ -590,6 +598,7 @@ public final class NookSettingsService {
             linkPreviewsKey: false,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
+            nestTabsFromLinksKey: true,
         ])
 
         // Initialize properties from UserDefaults
@@ -717,6 +726,7 @@ public final class NookSettingsService {
         self.tidyDownloads = userDefaults.bool(forKey: tidyDownloadsKey)
         self.linkPreviews = userDefaults.bool(forKey: linkPreviewsKey)
         self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
+        self.nestTabsFromLinks = userDefaults.bool(forKey: nestTabsFromLinksKey)
         self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)
         if let sbData = userDefaults.data(forKey: sponsorBlockCategoryOptionsKey),
            let sbDecoded = try? JSONDecoder().decode([String: String].self, from: sbData) {

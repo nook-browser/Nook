@@ -52,6 +52,12 @@ public struct SettingsGeneralTab: View {
             #endif
 
             Section {
+                Toggle("Nest tabs opened from links", isOn: $settings.nestTabsFromLinks)
+            } footer: {
+                Text("A tab opened from a link sits under the page that opened it, and Back returns to that page.")
+            }
+
+            Section {
                 Picker("Tab Management", selection: Binding(
                     get: { nookSettings.tabManagementMode },
                     set: { nookSettings.tabManagementMode = $0 }
