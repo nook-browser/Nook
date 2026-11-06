@@ -11,20 +11,23 @@ import NookBlocker
 import NookSettings
 import WebKit
 
-/// Opens Reddit feeds sorted by Hot instead of Best. Full loads are redirected in
-/// `decidePolicyFor`; Reddit's in-page navigations never reach it, so a click listener
-/// rewrites feed links before Reddit's router reads them.
+/// Opens Reddit feeds sorted by Hot instead of Best. Subreddit and custom feed loads are
+/// redirected in `decidePolicyFor`, and a click listener rewrites their links for Reddit's
+/// in-page navigations. The home feed has no Hot sort any more (its `/hot/` redirects to Best),
+/// so the script swaps its posts for the old listing's `/hot.json`, each drawn by Reddit's own
+/// `partial-feed-post` card.
 @MainActor
 public enum RedditTweaks {
     private static let marker = "// Nook Reddit Tweaks"
-    private static let world = WKContentWorld.world(name: "NookRedditTweaks")
+    // Page world: the Hot item calls the sort dropdown's own methods.
+    private static let world = WKContentWorld.page
 
     // Mirrors hotURL(for:settings:).
     private static let script = #"""
     // Nook Reddit Tweaks
     (() => {
       if (!/^(www\.)?reddit\.com$/.test(location.hostname)) return;
-      const feed = /^\/(r\/[^/]+\/|user\/[^/]+\/m\/[^/]+\/)?$/;
+      const feed = /^\/(r\/[^/]+\/|user\/[^/]+\/m\/[^/]+\/)$/;
       document.addEventListener('click', (e) => {
         const a = e.composedPath().find((n) => n instanceof HTMLAnchorElement && n.href);
         if (!a) return;
@@ -34,18 +37,126 @@ public enum RedditTweaks {
         u.pathname = path + 'hot/';
         a.href = u.href;
       }, true);
+
+      // Home's Following feed (For You is not subscriptions). Reddit dropped its Hot sort, so
+      // the dropdown gets a Hot item back; the choice is kept per browser.
+      const HOME = 'shreddit-feed[reload-url*="home-feed"][reload-url*="feed=following"]';
+      const KEY = 'nook.redditHomeSort';
+      const wantsHot = () => { try { return localStorage.getItem(KEY) !== 'reddit'; } catch { return true; } };
+      const remember = (mode) => { try { localStorage.setItem(KEY, mode); } catch {} };
+
+      // Hide Reddit's own posts until the Hot ones replace them.
+      const style = document.createElement('style');
+      style.textContent = `${HOME}:not([data-nook-hot]) > :is(article, hr, shreddit-ad-post) { visibility: hidden }`;
+      style.disabled = !wantsHot();
+      (document.head || document.documentElement).append(style);
+
+      const card = (id) => fetch(`/svc/shreddit/partial-feed-post/${id}?render-mode=partial&postViewContext=AggregateFeed&feedViewType=cardView`)
+        .then((r) => (r.ok ? r.text() : '')).catch(() => '');
+
+      const page = async (state) => {
+        // Picking another sort refills the feed and drops the sentinel.
+        if (!state.sentinel.isConnected) state.done = true;
+        if (state.loading || state.done) return;
+        state.loading = true;
+        try {
+          const r = await fetch(`/hot.json?limit=10&raw_json=1${state.after ? `&after=${state.after}` : ''}`);
+          if (!r.ok) throw new Error(r.status);
+          const data = (await r.json()).data;
+          const ids = data.children.map((c) => c.data.name).filter((id) => !state.seen.has(id));
+          const htmls = await Promise.all(ids.map(card));
+          if (!state.after) {
+            for (const el of [...state.feed.children]) {
+              if (/^(ARTICLE|HR|SHREDDIT-AD-POST|FACEPLATE-LOADER)$/.test(el.tagName) || el.slot === 'load-after') el.remove();
+            }
+          }
+          // Each partial is a loader, the post's <article> and its <hr>, as in Reddit's own feed.
+          ids.forEach((id) => state.seen.add(id));
+          const range = document.createRange();
+          range.selectNodeContents(state.feed);
+          state.feed.insertBefore(range.createContextualFragment(htmls.join('')), state.sentinel);
+          state.after = data.after;
+          state.done = !data.after;
+        } catch {
+          state.done = true;
+        } finally {
+          state.loading = false;
+          state.feed.dataset.nookHot = '';
+        }
+        // The observer only reports changes, so keep going while the end is still near.
+        if (!state.done && state.sentinel.getBoundingClientRect().top < innerHeight + 1500) setTimeout(() => page(state));
+      };
+
+      const take = (feed) => {
+        delete feed.dataset.nookHot;
+        const sentinel = document.createElement('div');
+        feed.append(sentinel);
+        const state = { feed, sentinel, after: null, seen: new Set(), loading: false, done: false };
+        new IntersectionObserver((entries) => {
+          if (entries.some((e) => e.isIntersecting)) page(state);
+        }, { rootMargin: '1500px' }).observe(sentinel);
+        page(state);
+      };
+
+      // Clone Reddit's Best item into a Hot item, and mark Hot chosen while it shows.
+      const dropdown = () => document.querySelector('shreddit-sort-dropdown[sort-event="feed-sort-change"]');
+      const addHotItem = (d) => {
+        const best = d.querySelector('data[value="BEST"]');
+        if (!best || d.querySelector('data[value="HOT"]')) return;
+        const hot = best.cloneNode(true);
+        hot.setAttribute('value', 'HOT');
+        hot.querySelector('.text-body-2').textContent = 'Hot';
+        best.after(hot);
+      };
+      const selectHot = (d) => {
+        d.silentlySelectItemByValue?.('HOT');
+        for (const item of d.querySelectorAll('data')) {
+          const on = item.getAttribute('value') === 'HOT';
+          item.querySelector('li')?.toggleAttribute('rpl-selected', on);
+          const row = item.querySelector('[aria-selected]');
+          row?.setAttribute('aria-selected', String(on));
+          row?.classList.toggle('bg-neutral-background-selected', on);
+        }
+      };
+
+      document.addEventListener('click', (e) => {
+        const item = e.target.closest?.('shreddit-sort-dropdown[sort-event="feed-sort-change"] data');
+        const feed = document.querySelector(HOME);
+        if (!item || !feed) return;
+        if (item.getAttribute('value') !== 'HOT') { remember('reddit'); style.disabled = true; return; }
+        // Reddit's handler would ask its own feed for HOT, which it ignores.
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        remember('hot');
+        style.disabled = false;
+        document.body.click();
+        selectHot(item.closest('shreddit-sort-dropdown'));
+        take(feed);
+      }, true);
+
+      const find = () => {
+        const d = dropdown();
+        if (d) addHotItem(d);
+        const feed = document.querySelector(`${HOME}:not([data-nook-hot-taken])`);
+        if (!feed) return;
+        feed.dataset.nookHotTaken = '';
+        if (!wantsHot()) return;
+        take(feed);
+        if (d) selectHot(d);
+      };
+      new MutationObserver(find).observe(document.documentElement, { childList: true, subtree: true });
+      find();
     })();
     """#
 
-    /// The Hot version of a sortless Reddit feed URL: home, a subreddit, or a custom feed.
+    /// The Hot version of a sortless subreddit or custom feed URL.
     public static func hotURL(for url: URL, settings: NookSettingsService) -> URL? {
         guard settings.redditSortHot,
               let host = url.host?.lowercased(), host == "reddit.com" || host == "www.reddit.com",
               var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         else { return nil }
         let parts = components.path.split(separator: "/")
-        let isFeed = parts.isEmpty
-            || (parts.count == 2 && parts[0] == "r")
+        let isFeed = (parts.count == 2 && parts[0] == "r")
             || (parts.count == 4 && parts[0] == "user" && parts[2] == "m")
         guard isFeed else { return nil }
         components.path = "/" + parts.map { "\($0)/" }.joined() + "hot/"
