@@ -159,7 +159,6 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
         )
         window.titlebarAppearsTransparent = true
         window.tabbingMode = .disallowed
-        window.isReleasedWhenClosed = false
         window.contentMinSize = Self.minimumSize
         // Without this the hosting controller shrinks the window to the view's minimum size.
         hostingController.sizingOptions = []
@@ -169,6 +168,7 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
 
         super.init(window: window)
 
+        window.setUpAsPageWindow()
         window.delegate = self
         window.openInSpaceAction = { adoptAction(nil) }
         window.page = page
