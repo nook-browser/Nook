@@ -61,6 +61,7 @@ public final class NookSettingsService {
     private let tabOrganizerEnabledKey = "settings.tabOrganizerEnabled"
     private let autoRenamePinnedTabsKey = "settings.autoRenamePinnedTabs"
     private let tidyDownloadsKey = "settings.tidyDownloads"
+    private let didImportFromArcKey = "settings.didImportFromArc"
     private let linkPreviewsKey = "settings.linkPreviews"
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
     private let nestTabsFromLinksKey = "settings.nestTabsFromLinks"
@@ -468,6 +469,12 @@ public final class NookSettingsService {
         }
     }
 
+    public var didImportFromArc: Bool {
+        didSet {
+            userDefaults.set(didImportFromArc, forKey: didImportFromArcKey)
+        }
+    }
+
     /// Renames downloads with meaningless names (ids, hashes) on the on-device model.
     public var tidyDownloads: Bool {
         didSet {
@@ -604,6 +611,7 @@ public final class NookSettingsService {
             tabOrganizerEnabledKey: false,
             autoRenamePinnedTabsKey: true,
             tidyDownloadsKey: false,
+            didImportFromArcKey: false,
             linkPreviewsKey: false,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
@@ -734,6 +742,7 @@ public final class NookSettingsService {
         self.tabOrganizerEnabled = userDefaults.bool(forKey: tabOrganizerEnabledKey)
         self.autoRenamePinnedTabs = userDefaults.bool(forKey: autoRenamePinnedTabsKey)
         self.tidyDownloads = userDefaults.bool(forKey: tidyDownloadsKey)
+        self.didImportFromArc = userDefaults.bool(forKey: didImportFromArcKey)
         self.linkPreviews = userDefaults.bool(forKey: linkPreviewsKey)
         self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
         self.nestTabsFromLinks = userDefaults.bool(forKey: nestTabsFromLinksKey)
