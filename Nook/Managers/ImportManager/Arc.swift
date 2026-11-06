@@ -10,6 +10,9 @@ import Foundation
 #if canImport(NookSettings)
 import NookSettings
 #endif
+#if canImport(NookTabsCore)
+import NookTabsCore
+#endif
 
 // MARK: - Arc Models
 struct ArcImportResult {
@@ -19,6 +22,7 @@ struct ArcImportResult {
     /// Profile names the person gave in Arc, by the same keys.
     var profileNames: [String: String] = [:]
     var routing = ArcRouting()
+    var archive: [ArcArchivedItem] = []
 }
 
 /// A rule from `StorableLinkRouting.json` that Nook could express: a URL fragment sent to an Arc space.
@@ -197,9 +201,53 @@ func arcSiteRules(_ routing: ArcRouting, spaceIDs: [String: UUID], existing: [Si
     return (added, skipped)
 }
 
-/// "4 spaces, 87 tabs, 12 folders and 3 Air Traffic Control rules.", leaving out zero counts.
-func arcImportSummary(spaces: Int, tabs: Int, folders: Int, rules: Int) -> String {
-    let parts = [(spaces, "space"), (tabs, "tab"), (folders, "folder"), (rules, "Air Traffic Control rule")]
+// MARK: - Archive
+
+/// A tab from `StorableArchiveItems.json` that Arc closed out of a space.
+struct ArcArchivedItem: Equatable {
+    let spaceID: String
+    let url: String
+    let title: String
+    let archivedAt: Date
+    let auto: Bool
+}
+
+/// Archived tabs from `StorableArchiveItems.json`. Only items from a space are kept; Little Arc,
+/// standalone sidebar and unknown sources are dropped.
+func parseArcArchive(_ data: Data) -> [ArcArchivedItem] {
+    let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    return list(root?["items"]).compactMap { value in
+        guard let item = value as? [String: Any],
+              let spaceID = (((item["source"] as? [String: Any])?["space"] as? [String: Any])?["_0"]) as? String,
+              let seconds = item["archivedAt"] as? Double,
+              let sidebar = item["sidebarItem"] as? [String: Any],
+              let tab = (sidebar["data"] as? [String: Any])?["tab"] as? [String: Any],
+              let url = [tab["savedURL"], tab["currentURL"]].lazy.compactMap({ $0 as? String }).first(where: { !$0.isEmpty })
+        else { return nil }
+        let saved = tab["savedTitle"] as? String
+        let name = (sidebar["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        return ArcArchivedItem(spaceID: spaceID, url: url, title: name ?? saved ?? "",
+                               archivedAt: Date(timeIntervalSinceReferenceDate: seconds),
+                               auto: item["reason"].flatMap(key) == "auto")
+    }
+}
+
+/// Archive entries for items from imported spaces, within the Archive's retention, with an http(s)
+/// URL and not already in `existing` (same URL and time).
+func arcArchiveEntries(_ items: [ArcArchivedItem], spaceIDs: [String: UUID], existing: [ArchiveEntry], now: Date = Date()) -> [ArchiveEntry] {
+    let cutoff = now.addingTimeInterval(-Double(Archive.retentionDays) * 86_400)
+    return items.compactMap { item in
+        guard item.archivedAt >= cutoff, let space = spaceIDs[item.spaceID],
+              let url = URL(string: item.url), ["http", "https"].contains(url.scheme?.lowercased()),
+              !existing.contains(where: { $0.url == url && $0.archivedAt == item.archivedAt })
+        else { return nil }
+        return ArchiveEntry(spaceID: space, title: item.title, url: url, archivedAt: item.archivedAt, reason: item.auto ? .auto : .closed)
+    }
+}
+
+/// "4 spaces, 87 tabs, 12 folders, 3 Air Traffic Control rules and 14 archived tabs.", leaving out zero counts.
+func arcImportSummary(spaces: Int, tabs: Int, folders: Int, rules: Int, archived: Int) -> String {
+    let parts = [(spaces, "space"), (tabs, "tab"), (folders, "folder"), (rules, "Air Traffic Control rule"), (archived, "archived tab")]
         .filter { $0.0 > 0 }.map { "\($0.0) \($0.1)\($0.0 == 1 ? "" : "s")" }
     guard let last = parts.last else { return "" }
     return (parts.count > 1 ? parts.dropLast().joined(separator: ", ") + " and " : "") + last + "."

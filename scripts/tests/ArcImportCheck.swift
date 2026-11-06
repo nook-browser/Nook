@@ -5,7 +5,8 @@
 //
 //  Arc's sidebar parses in order with nesting intact. Compiles the shipped source directly:
 //
-//    swiftc Nook/Managers/ImportManager/Arc.swift Packages/NookSettings/Sources/NookSettings/SiteRoutingRule.swift scripts/tests/ArcImportCheck.swift \
+//    swiftc Nook/Managers/ImportManager/Arc.swift Packages/NookSettings/Sources/NookSettings/SiteRoutingRule.swift \
+//           Packages/NookTabsCore/Sources/NookTabsCore/*.swift scripts/tests/ArcImportCheck.swift \
 //           -o /tmp/arc-import-check && /tmp/arc-import-check [StorableSidebar.json]
 //
 //  With a path it also prints a summary of that file.
@@ -82,9 +83,41 @@ struct ArcImportCheck {
         precondition(again.rules.count == 1 && again.rules[0].domain == "github.com" && again.rules[0].pathPrefix == "/MyOrg",
                      "same domain and path to another space is dropped; path keeps its case")
 
-        precondition(arcImportSummary(spaces: 4, tabs: 87, folders: 12, rules: 3) == "4 spaces, 87 tabs, 12 folders and 3 Air Traffic Control rules.")
-        precondition(arcImportSummary(spaces: 1, tabs: 0, folders: 1, rules: 1) == "1 space, 1 folder and 1 Air Traffic Control rule.")
-        precondition(arcImportSummary(spaces: 0, tabs: 0, folders: 0, rules: 2) == "2 Air Traffic Control rules.")
+        precondition(arcImportSummary(spaces: 4, tabs: 87, folders: 12, rules: 3, archived: 14) == "4 spaces, 87 tabs, 12 folders, 3 Air Traffic Control rules and 14 archived tabs.")
+        precondition(arcImportSummary(spaces: 1, tabs: 0, folders: 1, rules: 1, archived: 1) == "1 space, 1 folder, 1 Air Traffic Control rule and 1 archived tab.")
+        precondition(arcImportSummary(spaces: 0, tabs: 0, folders: 0, rules: 2, archived: 0) == "2 Air Traffic Control rules.")
+        precondition(arcImportSummary(spaces: 0, tabs: 0, folders: 0, rules: 0, archived: 3) == "3 archived tabs.")
+
+        // Archive: Arc's flat [id, item, id, item] list, seconds since 2001.
+        let now = Date(timeIntervalSinceReferenceDate: 900_000_000)
+        func archived(_ source: String, _ url: String, daysAgo: Double, _ reason: String = "manual") -> String {
+            let at = now.timeIntervalSinceReferenceDate - daysAgo * 86_400
+            return #"""
+            "I", {"source": \#(source), "reason": "\#(reason)", "archivedAt": \#(at), "sidebarItem": {"title": null, "id": "I", "childrenIds": [],
+              "data": {"tab": {"savedURL": "\#(url)", "savedTitle": "T \#(url)"}}}}
+            """#
+        }
+        let s1 = #"{"space": {"_0": "S1"}}"#
+        let items = parseArcArchive(Data("""
+        {"version": 1, "items": [\([archived(s1, "https://new.example", daysAgo: 2, "auto"), archived(s1, "https://old.example", daysAgo: 31),
+            archived(s1, "ftp://x.example", daysAgo: 1), archived(#"{"space": {"_0": "GONE"}}"#, "https://gone.example", daysAgo: 1),
+            archived(#"{"littleArc": {}}"#, "https://little.example", daysAgo: 1), archived(#""unknown""#, "https://unknown.example", daysAgo: 1),
+            archived(s1, "https://clear.example", daysAgo: 3, "clearButton")].joined(separator: ","))]}
+        """.utf8))
+        precondition(items.count == 5, "Little Arc and unknown sources are dropped by the parser")
+        let space = UUID()
+        let entries = arcArchiveEntries(items, spaceIDs: ["S1": space], existing: [], now: now)
+        precondition(entries.map { $0.url?.host } == ["new.example", "clear.example"], "age, scheme and unimported space are skipped")
+        precondition(entries.map(\.reason) == [.auto, .closed], "auto stays auto, the rest are closed")
+        precondition(entries.allSatisfy { $0.spaceID == space && $0.items.first?.parent == .tabs(spaceID: space) })
+        precondition(entries[0].title == "T https://new.example" && entries[0].host == "new.example")
+        precondition(entries[0].archivedAt == Date(timeIntervalSinceReferenceDate: 900_000_000 - 2 * 86_400), "Arc's time is kept")
+        precondition(arcArchiveEntries(items, spaceIDs: ["S1": space], existing: entries, now: now).isEmpty, "a re-import adds nothing")
+
+        var archive = Archive(entries: [ArchiveEntry(spaceID: space, title: "mid", url: URL(string: "https://mid.example")!,
+                                                     archivedAt: now.addingTimeInterval(-86_400), reason: .closed)])
+        archive.merge(entries, now: now)
+        precondition(archive.entries.map { $0.url?.host } == ["clear.example", "new.example", "mid.example"], "merged oldest first")
 
         let empty = try parseArcSidebarData(Data("{}".utf8))
         precondition(empty.spaces.isEmpty)

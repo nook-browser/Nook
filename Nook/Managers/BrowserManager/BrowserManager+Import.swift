@@ -13,7 +13,7 @@ import SwiftUI
 extension BrowserManager {
     /// Arc's spaces in order, each with its pinned and Today sections, its profile's favorites,
     /// nested folders, custom tab names and theme color. Each Arc profile becomes a Nook profile
-    /// with Arc's name. Arc's member card is kept beside the tabs. Air Traffic Control rules come over too.
+    /// with Arc's name. Arc's member card is kept beside the tabs. Air Traffic Control rules and the last 30 days of archived tabs come over too.
     /// Returns what came in as a sentence, or nil when no space did.
     @discardableResult
     func importArcData() async -> String? {
@@ -63,9 +63,10 @@ extension BrowserManager {
 
         let routes = arcSiteRules(result.routing, spaceIDs: arcSpaceIDs, existing: nookSettings?.siteRoutingRules ?? [])
         nookSettings?.siteRoutingRules += routes.rules
+        let archived = tabs.importArchive(arcArchiveEntries(result.archive, spaceIDs: arcSpaceIDs, existing: tabs.archive.entries))
         nookSettings?.didImportFromArc = true
-        Self.importLog.notice("Arc import: \(routes.rules.count) routing rules added, \(routes.skipped) skipped")
-        return arcImportSummary(spaces: arcSpaceIDs.count, tabs: tabCount, folders: folderCount, rules: routes.rules.count)
+        Self.importLog.notice("Arc import: \(routes.rules.count) routing rules added, \(routes.skipped) skipped, \(archived) archived tabs")
+        return arcImportSummary(spaces: arcSpaceIDs.count, tabs: tabCount, folders: folderCount, rules: routes.rules.count, archived: archived)
     }
 
     func importDiaData() async {
