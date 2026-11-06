@@ -74,15 +74,24 @@ class CacheManager: ObservableObject {
         }
     }
 
-    /// Removes everything a store holds for the site `host` belongs to (WebKit records are per registrable domain).
-    static func clearSiteData(host: String, in store: WKWebsiteDataStore) async {
+    /// Records a store holds for the site `host` belongs to (WebKit records are per registrable domain).
+    private static func siteRecords(host: String, in store: WKWebsiteDataStore) async -> [WKWebsiteDataRecord] {
         let h = host.lowercased()
-        let types = WKWebsiteDataStore.allWebsiteDataTypes()
-        let records = await store.dataRecords(ofTypes: types).filter {
+        return await store.dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()).filter {
             let name = $0.displayName.lowercased()
             return h == name || h.hasSuffix("." + name)
         }
-        if !records.isEmpty { await store.removeData(ofTypes: types, for: records) }
+    }
+
+    /// The domain `clearSiteData` clears for `host`, nil when the store holds nothing for it.
+    static func siteDataDomain(host: String, in store: WKWebsiteDataStore) async -> String? {
+        await siteRecords(host: host, in: store).map(\.displayName).max { $0.count < $1.count }
+    }
+
+    /// Removes everything a store holds for the site `host` belongs to.
+    static func clearSiteData(host: String, in store: WKWebsiteDataStore) async {
+        let records = await siteRecords(host: host, in: store)
+        if !records.isEmpty { await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: records) }
     }
 
     /// Clears site data for a specific domain, excluding cookies

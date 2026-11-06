@@ -20,6 +20,8 @@ struct SiteSettingsButton: View {
     /// Owned by the URL bar so the button stays in the hierarchy while the alert is up.
     @Binding var confirmClear: Bool
     @EnvironmentObject private var browserManager: BrowserManager
+    /// The registrable domain the clear removes, resolved when the popover opens.
+    @State private var dataDomain: String?
 
     private var host: String? {
         guard ["http", "https"].contains(session.url.scheme?.lowercased()) else { return nil }
@@ -41,7 +43,12 @@ struct SiteSettingsButton: View {
                     .id(host)
                     .environmentObject(browserManager)
                 }
-                .alert("Clear data for \(host)?", isPresented: $confirmClear) {
+                .onChange(of: isPresented) { _, open in
+                    guard open, let store = session.webView?.configuration.websiteDataStore else { return }
+                    dataDomain = nil
+                    Task { dataDomain = await CacheManager.siteDataDomain(host: host, in: store) }
+                }
+                .alert("Clear data for \(dataDomain ?? host)?", isPresented: $confirmClear) {
                     Button("Clear", role: .destructive) {
                         guard let store = session.webView?.configuration.websiteDataStore else { return }
                         Task {
@@ -51,7 +58,7 @@ struct SiteSettingsButton: View {
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("You'll be signed out of this site.")
+                    Text("You'll be signed out of \(dataDomain ?? host) and its subdomains.")
                 }
         }
     }

@@ -216,8 +216,12 @@ struct URLBarView: View {
                     beginEditing(session?.url.absoluteString ?? "")
                 })
 
-                if !isEditing, isHovering || showSiteSettings || confirmClearSiteData, let session {
+                if !isEditing, !windowState.isIncognito, isHovering || showSiteSettings || confirmClearSiteData, let session {
                     SiteSettingsButton(session: session, isPresented: $showSiteSettings, confirmClear: $confirmClearSiteData)
+                        .onChange(of: showSiteSettings || confirmClearSiteData) { _, open in
+                            hoverManager.setSiteSettingsOpen(open, in: windowState.id)
+                        }
+                        .onDisappear { hoverManager.setSiteSettingsOpen(false, in: windowState.id) }
                 }
 
                 // Copy link button (show on hover when tab is selected)

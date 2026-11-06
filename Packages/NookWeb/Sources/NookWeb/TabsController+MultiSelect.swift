@@ -29,7 +29,8 @@ extension TabsController {
     }
 
     public func unpin(_ itemIDs: [UUID]) {
-        grouped { for id in itemIDs { unpin(id) } }
+        guard let spaceID = itemIDs.first.flatMap(unpinSpaceID) else { return }
+        move(itemIDs, to: .tabs(spaceID: spaceID), after: nil)
     }
 
     /// Moves the items in order, the first after `after`.

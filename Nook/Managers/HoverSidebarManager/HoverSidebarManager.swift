@@ -47,6 +47,17 @@ final class HoverSidebarManager: ObservableObject {
         }
     }
 
+    private var siteSettingsWindows = Set<UUID>()
+
+    /// Keeps the overlay (and the URL bar's Site Settings popover and alert) up while open.
+    func setSiteSettingsOpen(_ open: Bool, in windowID: UUID) {
+        if open { siteSettingsWindows.insert(windowID) }
+        else {
+            siteSettingsWindows.remove(windowID)
+            if isActive { scheduleHandleMouseMovement() }
+        }
+    }
+
     // MARK: - Lifecycle
     func attach(browserManager: BrowserManager) {
         self.browserManager = browserManager
@@ -108,7 +119,7 @@ final class HoverSidebarManager: ObservableObject {
 
         // The expanded address panel extends beyond the sidebar. Keep its host alive
         // until the editor dismisses through Escape, navigation, or an outside click.
-        if isOverlayVisible, addressEditingWindows.contains(activeState.id) { return }
+        if isOverlayVisible, addressEditingWindows.contains(activeState.id) || siteSettingsWindows.contains(activeState.id) { return }
 
         // Mouse and window frames are in screen coordinates
         let mouse = NSEvent.mouseLocation

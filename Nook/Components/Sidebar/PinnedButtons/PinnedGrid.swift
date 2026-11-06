@@ -30,6 +30,18 @@ struct PinnedGrid: View {
 
     private var tabs: TabsController { browserManager.tabs }
 
+    /// Drops a multi-selection as a group when the dragged tab is part of it.
+    private func dropOnFavorites(_ id: UUID, spaceID: UUID, index: Int) {
+        let group = tabs.selectedItems(in: windowState)
+        let land = { tabs.dropOnFavorites(id, spaceID: spaceID, index: index) }
+        if group.contains(id) {
+            tabs.dropGroup(group, dragged: id, drop: land)
+            windowState.multiSelection.clear()
+        } else {
+            land()
+        }
+    }
+
     @ViewBuilder
     var body: some View {
         let effectiveSpaceID = spaceID ?? windowState.spaceID
@@ -47,7 +59,7 @@ struct PinnedGrid: View {
                     zoneID: zone,
                     layout: .grid(count: 0, columns: colsCount),
                     manager: dragSession,
-                    onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
+                    onDrop: { id, position in dropOnFavorites(id, spaceID: spaceID, index: position.index) }
                 ) {
                     VStack(spacing: NookDesign.Spacing.md) {
                         Image(systemName: "star.circle.fill")
@@ -84,7 +96,7 @@ struct PinnedGrid: View {
                     zoneID: zone,
                     layout: .grid(count: items.count, columns: colsCount),
                     manager: dragSession,
-                    onDrop: { id, position in tabs.dropOnFavorites(id, spaceID: spaceID, index: position.index) }
+                    onDrop: { id, position in dropOnFavorites(id, spaceID: spaceID, index: position.index) }
                 ) {
                     let preview = favoritePreview(in: zone, items: items)
                     let displayedIDs = preview?.itemIDs ?? items.map(\.id)

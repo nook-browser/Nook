@@ -562,10 +562,12 @@ extension TabsController {
 
     /// Moves a pinned tab or favorite to the top of its space's tabs section.
     public func unpin(_ itemID: UUID) {
-        let spaceID = self.spaceID(of: itemID)
-            ?? allWindows.first(where: { $0.selectedItemID == itemID })?.spaceID
-        guard let spaceID else { return }
+        guard let spaceID = unpinSpaceID(itemID) else { return }
         move(itemID, to: .tabs(spaceID: spaceID), after: nil)
+    }
+
+    func unpinSpaceID(_ itemID: UUID) -> UUID? {
+        spaceID(of: itemID) ?? allWindows.first(where: { $0.selectedItemID == itemID })?.spaceID
     }
 
     public func rename(_ itemID: UUID, _ customTitle: String?) {
@@ -744,6 +746,10 @@ extension TabsController {
         for id in ids { endSession(id) }
         if case .main = owner, !isAgent {
             for entry in closed { recordClosed(entry) }
+        }
+        if case .main = owner, archive.entries.contains(where: { $0.spaceID == spaceID }) {
+            archive.entries.removeAll { $0.spaceID == spaceID }
+            saveArchive()
         }
         let spaces = tree(owner).orderedSpaces
         let remaining = spaces.filter { !$0.isAgent } + spaces.filter(\.isAgent)

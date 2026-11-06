@@ -78,6 +78,7 @@ struct SidebarMenu: View {
                         windowState.sidebarMenuSelectedTab = .history
                     }
                 )
+                if !windowState.isIncognito {
                 SidebarMenuTab(
                     image: "archivebox",
                     activeImage: "archivebox.fill",
@@ -87,6 +88,7 @@ struct SidebarMenu: View {
                         windowState.sidebarMenuSelectedTab = .archive
                     }
                 )
+                }
                 SidebarMenuTab(
                     image: "square.on.square",
                     activeImage: "square.fill.on.square.fill",

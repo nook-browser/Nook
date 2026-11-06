@@ -31,7 +31,7 @@ extension TabsController {
     /// Puts an entry back at the top of its space's tabs section (this window's space when that
     /// one is gone) and selects it.
     public func restoreArchived(_ id: UUID, in window: BrowserWindowState) {
-        guard let entry = archive.entries.first(where: { $0.id == id }),
+        guard window.privateTree == nil, let entry = archive.entries.first(where: { $0.id == id }),
               let spaceID = tree.space(entry.spaceID)?.id ?? fallbackSpaceID(for: window),
               perform(.main, "restoreArchived", { try $0.restore(entry.items, toTopOf: spaceID) }) != nil else { return }
         dropArchived(containing: Set(entry.items.map(\.id)))
@@ -43,8 +43,8 @@ extension TabsController {
     }
 
     private func fallbackSpaceID(for window: BrowserWindowState) -> UUID? {
-        if let id = window.spaceID, id != agentSpaceID { return id }
-        return tree.orderedSpaces.first { $0.id != agentSpaceID }?.id
+        if let id = window.spaceID, let space = tree.space(id), !space.isAgent { return id }
+        return tree.orderedSpaces.first { !$0.isAgent }?.id
     }
 
     /// Moves top-level tabs idle past Settings > General > Archive tabs after into the Archive.
