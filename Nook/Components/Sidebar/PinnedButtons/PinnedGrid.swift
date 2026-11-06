@@ -207,7 +207,7 @@ private struct PinnedTile: View {
                 hasLeftPinnedURL: tabs.hasLeftHome(item.id),
                 onResetToPinnedURL: { tabs.resetToHome(item.id) },
                 colors: tileColors,
-                glowHost: tileColors == nil ? nil : item.url?.host,
+                glowHost: tileColors == nil ? nil : item.url.flatMap(FaviconCache.key),
                 isDimmed: windowRegistry.activeWindowId != windowState.id,
                 action: {
                     FavoritePreview.shared.dismiss()

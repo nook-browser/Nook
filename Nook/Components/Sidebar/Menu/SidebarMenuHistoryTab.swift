@@ -400,8 +400,8 @@ struct HistoryFavicon: View {
             .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
             .foregroundStyle(.secondary)
             // Cancelled when the row scrolls away; the old onAppear Task kept fetching for rows long gone.
-            .task(id: url.host) {
-                guard url.scheme == "http" || url.scheme == "https", let host = url.host else { return }
+            .task(id: FaviconCache.key(for: url)) {
+                guard url.scheme == "http" || url.scheme == "https", let host = FaviconCache.key(for: url) else { return }
                 if let cached = await FaviconCache.shared.cachedImage(for: host) {
                     favicon = SwiftUI.Image(platformImage: cached)
                     return

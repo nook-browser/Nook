@@ -330,7 +330,7 @@ struct URLBarView: View {
                 let session = browserManager.tabs.session(for: item.id)
                 guard let url = session?.url ?? item.url, url.absoluteString != prefilledAddress else { return nil }
                 let title = item.customTitle ?? session?.title ?? item.displayTitle
-                let favicon = session?.favicon ?? url.host.flatMap { FaviconCache.shared.swiftUIImage(for: $0) } ?? Image(systemName: "globe")
+                let favicon = session?.favicon ?? FaviconCache.key(for: url).flatMap { FaviconCache.shared.swiftUIImage(for: $0) } ?? Image(systemName: "globe")
                 let match = SearchManager.TabMatch(itemID: item.id, title: title, url: url, favicon: favicon)
                 return SearchManager.SearchSuggestion(text: title, type: .tab(match))
             }
@@ -601,9 +601,9 @@ private struct AddressSuggestionFavicon: View {
                     .font(.system(size: 16)).foregroundStyle(.secondary)
             }
         }
-        .task(id: url?.host) {
+        .task(id: url.flatMap(FaviconCache.key)) {
             cached = nil
-            if let host = url?.host { cached = await FaviconCache.shared.cachedImage(for: host) }
+            if let host = url.flatMap(FaviconCache.key) { cached = await FaviconCache.shared.cachedImage(for: host) }
         }
     }
 }
