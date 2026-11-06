@@ -103,6 +103,8 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
     case installExtension = "install_extension"                // Cmd+Shift+E
     case customizeSpaceGradient = "customize_space_gradient"   // Cmd+Shift+G
     case organizeTabs = "organize_tabs"                        // Cmd+Shift+Option+O
+    case togglePinTab = "toggle_pin_tab"                       // Cmd+D
+    case stopLoading = "stop_loading"                          // Cmd+.
 
     var displayName: String {
         switch self {
@@ -163,6 +165,8 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
         case .installExtension: return "Install Extension"
         case .customizeSpaceGradient: return "Space Settings"
         case .organizeTabs: return "Organize Tabs"
+        case .togglePinTab: return "Pin/Unpin Tab"
+        case .stopLoading: return "Stop Loading"
         }
     }
 
@@ -173,9 +177,9 @@ enum ShortcutAction: String, CaseIterable, Hashable, Codable {
 
     var category: ShortcutCategory {
         switch self {
-        case .goBack, .goForward, .refresh, .clearCookiesAndRefresh:
+        case .goBack, .goForward, .refresh, .clearCookiesAndRefresh, .stopLoading:
             return .navigation
-        case .newTab, .closeTab, .undoCloseTab, .nextTab, .previousTab, .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8, .goToLastTab, .duplicateTab, .toggleTopBarAddressView:
+        case .newTab, .closeTab, .undoCloseTab, .nextTab, .previousTab, .goToTab1, .goToTab2, .goToTab3, .goToTab4, .goToTab5, .goToTab6, .goToTab7, .goToTab8, .goToLastTab, .duplicateTab, .togglePinTab, .toggleTopBarAddressView:
             return .tabs
         case .nextSpace, .previousSpace, .goToSpace1, .goToSpace2, .goToSpace3, .goToSpace4, .goToSpace5, .goToSpace6, .goToSpace7, .goToSpace8, .goToSpace9:
             return .spaces
@@ -411,7 +415,9 @@ extension KeyboardShortcut {
             KeyboardShortcut(action: .muteUnmuteAudio, keyCombination: KeyCombination(key: "m", modifiers: [.command])),
             KeyboardShortcut(action: .installExtension, keyCombination: KeyCombination(key: "e", modifiers: [.command, .shift])),
             KeyboardShortcut(action: .customizeSpaceGradient, keyCombination: KeyCombination(key: "g", modifiers: [.command, .shift])),
-            KeyboardShortcut(action: .organizeTabs, keyCombination: KeyCombination(key: "o", modifiers: [.command, .shift, .option]))
+            KeyboardShortcut(action: .organizeTabs, keyCombination: KeyCombination(key: "o", modifiers: [.command, .shift, .option])),
+            KeyboardShortcut(action: .togglePinTab, keyCombination: KeyCombination(key: "d", modifiers: [.command])),
+            KeyboardShortcut(action: .stopLoading, keyCombination: KeyCombination(key: ".", modifiers: [.command]))
         ]
     }
 }
