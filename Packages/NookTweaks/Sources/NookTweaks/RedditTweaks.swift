@@ -53,6 +53,13 @@ public enum RedditTweaks {
 
       const card = (id) => fetch(`/svc/shreddit/partial-feed-post/${id}?render-mode=partial&postViewContext=AggregateFeed&feedViewType=cardView`)
         .then((r) => (r.ok ? r.text() : '')).catch(() => '');
+      const hot = (after) => fetch(`/hot.json?limit=10&raw_json=1${after ? `&after=${after}` : ''}`)
+        .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((j) => j.data);
+
+      // Home's HTML streams for over a second, so ask for the first page before the feed exists.
+      let early = location.pathname === '/' && wantsHot() ? hot(null) : null;
+      early?.catch(() => {});
+      setTimeout(() => { early = null; }, 30000);
 
       const page = async (state) => {
         // Picking another sort refills the feed and drops the sentinel.
@@ -60,21 +67,30 @@ public enum RedditTweaks {
         if (state.loading || state.done) return;
         state.loading = true;
         try {
-          const r = await fetch(`/hot.json?limit=10&raw_json=1${state.after ? `&after=${state.after}` : ''}`);
-          if (!r.ok) throw new Error(r.status);
-          const data = (await r.json()).data;
+          const first = !state.after;
+          const data = await (first && early ? early : hot(state.after));
+          if (first) early = null;
           const ids = data.children.map((c) => c.data.name).filter((id) => !state.seen.has(id));
-          const htmls = await Promise.all(ids.map(card));
-          if (!state.after) {
-            for (const el of [...state.feed.children]) {
-              if (/^(ARTICLE|HR|SHREDDIT-AD-POST|FACEPLATE-LOADER)$/.test(el.tagName) || el.slot === 'load-after') el.remove();
-            }
-          }
-          // Each partial is a loader, the post's <article> and its <hr>, as in Reddit's own feed.
           ids.forEach((id) => state.seen.add(id));
+          const cards = ids.map(card);
           const range = document.createRange();
           range.selectNodeContents(state.feed);
-          state.feed.insertBefore(range.createContextualFragment(htmls.join('')), state.sentinel);
+          let cleared = !first;
+          // Each post goes in as soon as it and the ones above it arrive, so one slow card holds
+          // back only the posts under it. A partial is a loader, the <article> and its <hr>.
+          for (const c of cards) {
+            const html = await c;
+            if (!state.sentinel.isConnected) break;
+            if (!html) continue;
+            if (!cleared) {
+              for (const el of [...state.feed.children]) {
+                if (/^(ARTICLE|HR|SHREDDIT-AD-POST|FACEPLATE-LOADER)$/.test(el.tagName) || el.slot === 'load-after') el.remove();
+              }
+              cleared = true;
+            }
+            state.feed.insertBefore(range.createContextualFragment(html), state.sentinel);
+            state.feed.dataset.nookHot = '';
+          }
           state.after = data.after;
           state.done = !data.after;
         } catch {
@@ -144,7 +160,13 @@ public enum RedditTweaks {
         take(feed);
         if (d) selectHot(d);
       };
-      new MutationObserver(find).observe(document.documentElement, { childList: true, subtree: true });
+      // Reddit mutates constantly; look once per frame at most.
+      let queued = false;
+      new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; find(); });
+      }).observe(document.documentElement, { childList: true, subtree: true });
       find();
     })();
     """#
