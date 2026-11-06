@@ -5,7 +5,7 @@
 //
 //  Arc's sidebar parses in order with nesting intact. Compiles the shipped source directly:
 //
-//    swiftc Nook/Managers/ImportManager/Arc.swift scripts/tests/ArcImportCheck.swift \
+//    swiftc Nook/Managers/ImportManager/Arc.swift Packages/NookSettings/Sources/NookSettings/SiteRoutingRule.swift scripts/tests/ArcImportCheck.swift \
 //           -o /tmp/arc-import-check && /tmp/arc-import-check [StorableSidebar.json]
 //
 //  With a path it also prints a summary of that file.
@@ -54,6 +54,37 @@ struct ArcImportCheck {
         """.utf8), Data(#"{"extensions": {"settings": {"cjpalhdlnbpafiamejdnhcphjbkeiagm": {"from_webstore": true}}}}"#.utf8)])
         precondition(extensions == ["cjpalhdlnbpafiamejdnhcphjbkeiagm", "nngceckbapebfimnlniiiahkandclblb"],
                      "store installs only, enabled only, once each")
+
+        precondition(work.id == "S1" && home.id == "S2")
+
+        func route(_ pattern: String, _ style: String = "contains", _ space: String = "S1") -> String {
+            #"{"sourceComponents": [{"id": "x", "componentType": {"urlMatch": {"_0": {"\#(style)": {}}, "_1": "\#(pattern)"}}}], "destination": {"space": {"_0": {"space": {"_0": "\#(space)"}}}}, "id": "r"}"#
+        }
+        let little = #"{"sourceComponents": [{"componentType": {"urlMatch": {"_0": {"contains": {}}, "_1": "a.com"}}}], "destination": {"littleArc": {"_0": {"mostRecent": {}}}}}"#
+        let profile = #"{"sourceComponents": [{"componentType": {"urlMatch": {"_0": {"contains": {}}, "_1": "b.com"}}}], "destination": {"space": {"_0": {"profile": {"_0": "P"}}}}}"#
+        let routing = parseArcLinkRouting(Data("""
+        {"version": 1, "rules": [\([route("meet.google.com"), route("docs.google.com/spreadsheets"), route("x.com", "matches"),
+            little, profile, route("github"), route("https://www.Example.com/"), route("meet.google.com"),
+            route("lost.com", "contains", "GONE"), route("a.com/b c")].joined(separator: ","))]}
+        """.utf8))
+        precondition(routing.routes.count == 7 && routing.skipped == 3, "matches, Little Arc and profile rules are skipped")
+        let mapped = UUID(), kept = SiteRoutingRule(domain: "example.com", targetSpaceId: mapped)
+        let rules = arcSiteRules(routing, spaceIDs: ["S1": mapped], existing: [kept])
+        precondition(rules.rules.map(\.domain) == ["meet.google.com", "docs.google.com"], "host rules in order; duplicates dropped")
+        precondition(rules.rules[1].pathPrefix == "/spreadsheets" && rules.rules[0].pathPrefix == nil)
+        precondition(rules.rules.allSatisfy { $0.targetSpaceId == mapped })
+        precondition(rules.skipped == 3 + 3, "no dot, unknown space and bad path are skipped too")
+
+        let other = UUID()
+        let again = arcSiteRules(parseArcLinkRouting(Data("""
+        {"rules": [\([route("meet.google.com"), route("GitHub.com/MyOrg")].joined(separator: ","))]}
+        """.utf8)), spaceIDs: ["S1": other], existing: [SiteRoutingRule(domain: "meet.google.com", targetSpaceId: mapped)])
+        precondition(again.rules.count == 1 && again.rules[0].domain == "github.com" && again.rules[0].pathPrefix == "/MyOrg",
+                     "same domain and path to another space is dropped; path keeps its case")
+
+        precondition(arcImportSummary(spaces: 4, tabs: 87, folders: 12, rules: 3) == "4 spaces, 87 tabs, 12 folders and 3 Air Traffic Control rules.")
+        precondition(arcImportSummary(spaces: 1, tabs: 0, folders: 1, rules: 1) == "1 space, 1 folder and 1 Air Traffic Control rule.")
+        precondition(arcImportSummary(spaces: 0, tabs: 0, folders: 0, rules: 2) == "2 Air Traffic Control rules.")
 
         let empty = try parseArcSidebarData(Data("{}".utf8))
         precondition(empty.spaces.isEmpty)

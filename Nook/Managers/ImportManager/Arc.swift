@@ -7,6 +7,9 @@
 //
 
 import Foundation
+#if canImport(NookSettings)
+import NookSettings
+#endif
 
 // MARK: - Arc Models
 struct ArcImportResult {
@@ -15,9 +18,23 @@ struct ArcImportResult {
     var favorites: [String: [ArcNode]] = [:]
     /// Profile names the person gave in Arc, by the same keys.
     var profileNames: [String: String] = [:]
+    var routing = ArcRouting()
+}
+
+/// A rule from `StorableLinkRouting.json` that Nook could express: a URL fragment sent to an Arc space.
+struct ArcRoute: Equatable {
+    let pattern: String
+    let spaceID: String
+}
+
+struct ArcRouting {
+    var routes: [ArcRoute] = []
+    /// Rules of a shape Nook cannot hold: `matches`, profile or Little Arc targets, several conditions.
+    var skipped = 0
 }
 
 struct ArcSpace {
+    let id: String
     let title: String
     let emoji: String?
     let accentHex: String?
@@ -82,6 +99,7 @@ func parseArcSidebarData(_ data: Data) throws -> ArcImportResult {
         let custom = space["customInfo"] as? [String: Any]
         let midTone = ((custom?["windowTheme"] as? [String: Any])?["primaryColorPalette"] as? [String: Any])?["midTone"]
         result.spaces.append(ArcSpace(
+            id: space["id"] as? String ?? "",
             title: space["title"] as? String ?? "",
             emoji: (custom?["iconType"] as? [String: Any])?["emoji_v2"] as? String,
             accentHex: hex(midTone as? [String: Any]),
@@ -139,4 +157,50 @@ private func hex(_ color: [String: Any]?) -> String? {
           let b = color["blue"] as? Double else { return nil }
     let byte = { (v: Double) in Int((min(max(v, 0), 1) * 255).rounded()) }
     return String(format: "#%02X%02X%02X", byte(r), byte(g), byte(b))
+}
+
+// MARK: - Air Traffic Control
+
+func parseArcLinkRouting(_ data: Data) -> ArcRouting {
+    let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    var routing = ArcRouting()
+    for case let rule as [String: Any] in root?["rules"] as? [Any] ?? [] {
+        let parts = rule["sourceComponents"] as? [[String: Any]] ?? []
+        let match = (parts.first?["componentType"] as? [String: Any])?["urlMatch"] as? [String: Any]
+        let target = (((rule["destination"] as? [String: Any])?["space"] as? [String: Any])?["_0"] as? [String: Any])?["space"] as? [String: Any]
+        guard parts.count == 1, (match?["_0"] as? [String: Any])?.keys.first == "contains",
+              let pattern = match?["_1"] as? String, let spaceID = target?["_0"] as? String
+        else { routing.skipped += 1; continue }
+        routing.routes.append(ArcRoute(pattern: pattern, spaceID: spaceID))
+    }
+    return routing
+}
+
+/// Nook rules for the routes whose pattern is a host with an optional path and whose space came in.
+/// A rule with the same domain and path as one in `existing` or earlier in the list is dropped, whatever its space.
+func arcSiteRules(_ routing: ArcRouting, spaceIDs: [String: UUID], existing: [SiteRoutingRule])
+    -> (rules: [SiteRoutingRule], skipped: Int) {
+    var all = existing, added: [SiteRoutingRule] = [], skipped = routing.skipped
+    for route in routing.routes {
+        var text = route.pattern.trimmingCharacters(in: .whitespaces)
+        for scheme in ["https://", "http://"] where text.lowercased().hasPrefix(scheme) { text.removeFirst(scheme.count) }
+        let (rawHost, path) = text.firstIndex(of: "/").map { (String(text[..<$0]), String(text[$0...])) } ?? (text, "")
+        let host = rawHost.lowercased()
+        let hostOK = host.range(of: #"^([a-z0-9-]+\.)+[a-z0-9-]+$"#, options: .regularExpression) != nil
+        let pathOK = path.range(of: #"^(/[A-Za-z0-9._~%/-]*)?$"#, options: .regularExpression) != nil
+        guard hostOK, pathOK, let space = spaceIDs[route.spaceID] else { skipped += 1; continue }
+        let rule = SiteRoutingRule(domain: host, pathPrefix: path.count > 1 ? path : nil, targetSpaceId: space)
+        if all.contains(where: { $0.domain == rule.domain && $0.pathPrefix == rule.pathPrefix }) { continue }
+        all.append(rule)
+        added.append(rule)
+    }
+    return (added, skipped)
+}
+
+/// "4 spaces, 87 tabs, 12 folders and 3 Air Traffic Control rules.", leaving out zero counts.
+func arcImportSummary(spaces: Int, tabs: Int, folders: Int, rules: Int) -> String {
+    let parts = [(spaces, "space"), (tabs, "tab"), (folders, "folder"), (rules, "Air Traffic Control rule")]
+        .filter { $0.0 > 0 }.map { "\($0.0) \($0.1)\($0.0 == 1 ? "" : "s")" }
+    guard let last = parts.last else { return "" }
+    return (parts.count > 1 ? parts.dropLast().joined(separator: ", ") + " and " : "") + last + "."
 }
