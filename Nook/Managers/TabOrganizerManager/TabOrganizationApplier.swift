@@ -74,7 +74,7 @@ enum TabOrganizationApplier {
         // 3. Duplicates
         let duplicates = plan.duplicates.compactMap { tabMapping[$0] }
         if !duplicates.isEmpty {
-            tabs.close(duplicates)
+            tabs.close(duplicates, archive: false)
             log.debug("Closed \(duplicates.count) duplicate tabs")
         }
 

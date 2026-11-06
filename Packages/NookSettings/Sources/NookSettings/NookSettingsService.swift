@@ -48,6 +48,7 @@ public final class NookSettingsService {
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     private let favoritePreviewsKey = "settings.favoritePreviews"
+    private let archiveAfterKey = "settings.archiveAfter"
     private let themeTranslucencyKey = "settings.themeTranslucency"
     private let searchPageTextInHistoryKey = "settings.searchPageTextInHistory"
     private let hideWebContentBorderKey = "settings.hideWebContentBorder"
@@ -425,6 +426,13 @@ public final class NookSettingsService {
         }
     }
 
+    /// Hours a tab can sit unopened before it moves to the Archive; 0 is never.
+    public var archiveAfter: Int {
+        didSet {
+            userDefaults.set(archiveAfter, forKey: archiveAfterKey)
+        }
+    }
+
     /// Keep visited pages' text so the command palette can find them by their words.
     public var searchPageTextInHistory: Bool {
         didSet {
@@ -602,6 +610,7 @@ public final class NookSettingsService {
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
             favoritePreviewsKey: true,
+            archiveAfterKey: 12,
             themeTranslucencyKey: false,
             searchPageTextInHistoryKey: true,
             hideWebContentBorderKey: false,
@@ -733,6 +742,7 @@ public final class NookSettingsService {
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
         self.favoritePreviews = userDefaults.bool(forKey: favoritePreviewsKey)
+        self.archiveAfter = userDefaults.integer(forKey: archiveAfterKey)
         self.themeTranslucency = userDefaults.bool(forKey: themeTranslucencyKey)
         self.searchPageTextInHistory = userDefaults.bool(forKey: searchPageTextInHistoryKey)
         self.hideWebContentBorder = userDefaults.bool(forKey: hideWebContentBorderKey)

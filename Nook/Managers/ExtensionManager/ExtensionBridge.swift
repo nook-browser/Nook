@@ -275,7 +275,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func close(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
-        if let page = detached { page.onClose?() } else { tabs.close(itemID) }
+        if let page = detached { page.onClose?() } else { tabs.close(itemID, archive: false) }
         completionHandler(nil)
     }
 

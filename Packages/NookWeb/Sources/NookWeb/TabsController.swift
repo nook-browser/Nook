@@ -28,7 +28,11 @@ public final class TabsController {
     // MARK: - State
 
     public private(set) var tree: TabTree
-    public private(set) var device: DeviceState
+    public internal(set) var device: DeviceState
+    /// Tabs closed or idle out of the tabs sections (`archive.json`).
+    public internal(set) var archive = Archive()
+    /// Tabs shielded at the last auto-archive pass; one that dropped out gets a fresh stamp.
+    var archiveShielded = Set<UUID>()
     public let loadOutcome: LoadOutcome
     public let directory: URL
     var isReadOnly: Bool {
@@ -58,7 +62,7 @@ public final class TabsController {
     /// One `Profile` (website data store) per space, made on first use and kept for the session.
     @ObservationIgnored private var spaceProfiles: [UUID: Profile] = [:]
 
-    @ObservationIgnored private let store: TabStore
+    @ObservationIgnored let store: TabStore
     @ObservationIgnored private(set) var undoStack: [Change] = []
     @ObservationIgnored private var isTerminating = false
     @ObservationIgnored public let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Tabs")
@@ -123,6 +127,7 @@ public final class TabsController {
         let store = TabStore(directory: directory)
         self.store = store
         let loaded = store.load()
+        archive = store.loadArchive()
         loadOutcome = loaded.outcome
         switch loaded.outcome {
         case .firstLaunch, .readOnly:
@@ -150,7 +155,10 @@ public final class TabsController {
             log.info("Merged profiles into \(self.tree.orderedSpaces.count) spaces")
         }
         NotificationCenter.default.addObserver(forName: appDidBecomeActive, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshLiveFolders() }
+            MainActor.assumeIsolated {
+                self?.refreshLiveFolders()
+                self?.archiveIdleTabs()
+            }
         }
     }
 
@@ -183,6 +191,7 @@ public final class TabsController {
         isTerminating = true
         for window in regularWindows { mirror(window) }
         store.save(tree, device)
+        store.save(archive)
         store.flush()
     }
 
@@ -695,6 +704,7 @@ public final class TabsController {
             window.selectedItemBySpace[spaceID] = first
         }
         mirror(window)
+        archiveIdleTabs()
     }
 
     /// A window closed. Private windows end their pages; a regular window's record is dropped
