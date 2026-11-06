@@ -22,6 +22,22 @@ struct DevMCPFilesCheck {
         try fm.createSymbolicLink(at: root.appendingPathComponent("out"), withDestinationURL: tmp)
         defer { try? fm.removeItem(at: tmp) }
 
+        // Redirect to another host drops Cookie and Authorization; same host keeps them.
+        let job = DevMCPDownload(urls: [], dir: tmp, cookies: [], userAgent: nil, referer: nil)
+        var orig = URLRequest(url: URL(string: "https://a.example/x")!)
+        orig.setValue("s=1", forHTTPHeaderField: "Cookie")
+        let task = URLSession.shared.dataTask(with: orig)
+        let resp = HTTPURLResponse(url: orig.url!, statusCode: 302, httpVersion: nil, headerFields: nil)!
+        for (to, kept) in [("https://b.example/y", false), ("https://a.example/z", true), ("http://a.example/z", false), ("https://a.example:8443/z", false)] {
+            var next = URLRequest(url: URL(string: to)!)
+            next.setValue("s=1", forHTTPHeaderField: "Cookie")
+            next.setValue("Bearer t", forHTTPHeaderField: "Authorization")
+            job.urlSession(URLSession.shared, task: task, willPerformHTTPRedirection: resp, newRequest: next) {
+                precondition(($0?.value(forHTTPHeaderField: "Cookie") != nil) == kept)
+                precondition(($0?.value(forHTTPHeaderField: "Authorization") != nil) == kept)
+            }
+        }
+
         precondition(DevMCPFiles.resolve("a/b.json", root: root) != nil)
         precondition(DevMCPFiles.resolve("a/../b.json", root: root) != nil)
         precondition(DevMCPFiles.resolve("", root: root) == nil)
