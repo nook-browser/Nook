@@ -36,11 +36,14 @@ struct NookDragItem: Codable, Equatable {
     let tabId: UUID
     var title: String
     var urlString: String
+    /// Tabs dragged together when the row is part of a multi-selection; nil for one.
+    var count: Int?
 
-    init(tabId: UUID, title: String, urlString: String = "") {
+    init(tabId: UUID, title: String, urlString: String = "", count: Int? = nil) {
         self.tabId = tabId
         self.title = title
         self.urlString = urlString
+        self.count = count
     }
 }
 

@@ -193,6 +193,7 @@ extension TabsController {
             toggleFolder(itemID)
             return
         }
+        window.multiSelection.clear()
         // An agent tab never pulls a window into the Agent space; the person opens it to watch.
         if isInAgentSpace(itemID) {
             guard window.spaceID == agentSpaceID else { return selectForAgent(itemID) }
@@ -278,6 +279,7 @@ extension TabsController {
         guard source.space(spaceID) != nil else { return }
         let previous = selectedSession(in: window)
         let changed = window.spaceID != spaceID
+        if changed { window.multiSelection.clear() }
         window.spaceID = spaceID
         if changed { sessionDelegate?.windowSpaceChanged(window) }
         let order = displayOrder(in: window)
@@ -384,7 +386,11 @@ extension TabsController {
     }
 
     public func close(_ itemIDs: [UUID]) {
-        for id in itemIDs { close(id) }
+        grouped {
+            // Move every window off the group once, so no member is selected just to be closed.
+            moveSelectionOff(Set(itemIDs))
+            for id in itemIDs { close(id) }
+        }
     }
 
     public func closeSelected(in window: BrowserWindowState) {

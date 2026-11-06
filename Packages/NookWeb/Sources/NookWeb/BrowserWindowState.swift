@@ -176,6 +176,9 @@ public class BrowserWindowState {
         spaceID.flatMap { selectedItemBySpace[$0] }
     }
 
+    /// Tab rows picked with Cmd-click or Shift-click. Never saved.
+    public var multiSelection = TabSelection()
+
     /// The split pair shown in this window, if any.
     public var split: SplitRecord?
 

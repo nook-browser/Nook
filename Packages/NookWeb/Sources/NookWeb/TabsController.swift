@@ -60,6 +60,8 @@ public final class TabsController {
 
     @ObservationIgnored private let store: TabStore
     @ObservationIgnored private(set) var undoStack: [Change] = []
+    /// Collects the changes of one multi-item intent into a single undo step (`grouped`).
+    @ObservationIgnored private var undoGroup: Change?
     @ObservationIgnored private var isTerminating = false
     @ObservationIgnored public let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Tabs")
 
@@ -186,8 +188,19 @@ public final class TabsController {
         store.flush()
     }
 
+    /// Runs `body` so every tree edit in it is one undo step.
+    func grouped(_ body: () -> Void) {
+        guard undoGroup == nil else { return body() }
+        undoGroup = Change()
+        body()
+        let change = undoGroup ?? Change()
+        undoGroup = nil
+        pushUndo(change)
+    }
+
     func pushUndo(_ change: Change) {
         guard !change.isEmpty else { return }
+        if undoGroup != nil { undoGroup?.merge(change); return }
         undoStack.append(change)
         if undoStack.count > Self.undoLimit { undoStack.removeFirst(undoStack.count - Self.undoLimit) }
     }

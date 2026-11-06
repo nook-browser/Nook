@@ -125,7 +125,14 @@ struct SpaceView: View {
             layout: .rows(rows),
             manager: dragSession,
             onDrop: { itemID, position in
-                tabs.drop(itemID, at: position, section: section, rows: rows)
+                let group = tabs.selectedItems(in: windowState)
+                let land = { tabs.drop(itemID, at: position, section: section, rows: rows) }
+                if group.contains(itemID) {
+                    tabs.dropGroup(group, dragged: itemID, drop: land)
+                    windowState.multiSelection.clear()
+                } else {
+                    land()
+                }
             }
         ) {
             VStack(spacing: 0) {
@@ -225,8 +232,10 @@ struct SpaceView: View {
             SplitTabRow(left: split.left, right: split.right, zoneID: zone)
         } else {
             let session = tabs.session(for: row.item.id)
+            let group = windowState.multiSelection.contains(row.id) ? tabs.selectedItems(in: windowState) : []
             NookDragSourceView(
-                item: NookDragItem(tabId: row.item.id, title: tabs.title(for: row.item), urlString: tabs.currentURL(for: row.item)?.absoluteString ?? ""),
+                item: NookDragItem(tabId: row.item.id, title: tabs.title(for: row.item), urlString: tabs.currentURL(for: row.item)?.absoluteString ?? "",
+                                    count: group.contains(row.id) ? group.count : nil),
                 icon: row.item.isFolder ? Image(systemName: "folder.fill") : session?.favicon,
                 zoneID: zone,
                 manager: dragSession
