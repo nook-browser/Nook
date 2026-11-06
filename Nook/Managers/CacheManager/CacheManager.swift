@@ -74,6 +74,17 @@ class CacheManager: ObservableObject {
         }
     }
 
+    /// Removes everything a store holds for the site `host` belongs to (WebKit records are per registrable domain).
+    static func clearSiteData(host: String, in store: WKWebsiteDataStore) async {
+        let h = host.lowercased()
+        let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        let records = await store.dataRecords(ofTypes: types).filter {
+            let name = $0.displayName.lowercased()
+            return h == name || h.hasSuffix("." + name)
+        }
+        if !records.isEmpty { await store.removeData(ofTypes: types, for: records) }
+    }
+
     /// Clears site data for a specific domain, excluding cookies
     /// to support a "hard refresh" that does not sign the user out.
     func clearCacheForDomainExcludingCookies(_ domain: String) async {

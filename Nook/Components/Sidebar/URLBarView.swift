@@ -21,6 +21,8 @@ struct URLBarView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering: Bool = false
     @State private var showCheckmark: Bool = false
+    @State private var showSiteSettings = false
+    @State private var confirmClearSiteData = false
     @State private var isEditing = false
     @State private var addressText = ""
     @State private var selectedSuggestion: SearchManager.SearchSuggestion?
@@ -213,6 +215,10 @@ struct URLBarView: View {
                 .modifier(AddressActivationAccessibility(enabled: !isEditing) {
                     beginEditing(session?.url.absoluteString ?? "")
                 })
+
+                if !isEditing, isHovering || showSiteSettings || confirmClearSiteData, let session {
+                    SiteSettingsButton(session: session, isPresented: $showSiteSettings, confirmClear: $confirmClearSiteData)
+                }
 
                 // Copy link button (show on hover when tab is selected)
                 if !isEditing, isHovering, let session {
