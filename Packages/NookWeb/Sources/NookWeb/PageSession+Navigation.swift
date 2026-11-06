@@ -310,6 +310,11 @@ extension PageSession: WKNavigationDelegate {
         // mailto:, tel: and app schemes go to the system. Only a real click on a link opens one
         // straight away; a scripted `a.click()` is also `.linkActivated`, so the gesture decides.
         // A subframe needs that click too, and everything else asks, one sheet at a time.
+        // nook:// is for other apps. A page never triggers it, in any frame.
+        if navigationAction.request.url?.scheme?.lowercased() == "nook" {
+            decisionHandler(.cancel)
+            return
+        }
         if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
            !WKWebView.handlesURLScheme(scheme), scheme != "webkit-extension", scheme != "safari-web-extension"
         {
