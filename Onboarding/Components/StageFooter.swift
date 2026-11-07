@@ -50,9 +50,8 @@ struct StageFooter: View {
                         .foregroundStyle(.black)
                         .contentTransition(.numericText(value: Double(primaryText.count)))
                     if(isLoading) {
-                        RoundedSpinner()
+                        RoundedSpinner(color: .black)
                             .frame(width: 14, height: 14)
-                            .foregroundStyle(.black)
                     } else {
                         Image(systemName: "return")
                             .font(.system(size: 12, weight: .semibold))

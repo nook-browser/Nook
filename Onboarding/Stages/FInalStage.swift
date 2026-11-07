@@ -29,7 +29,7 @@ struct FinalStage: View {
                         if progress.isDone {
                             RoundedCheckmark()
                         } else {
-                            RoundedSpinner()
+                            RoundedSpinner(color: .white.opacity(0.6))
                         }
                     }
                     .frame(width: 16, height: 16)
