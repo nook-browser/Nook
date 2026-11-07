@@ -332,7 +332,7 @@ extension ExtensionManager {
             entity.extensionDescription = staged.displayDescription ?? ""
             entity.lastUpdateDate = Date()
             entity.packagePath = finalDir.path
-            entity.iconPath = findExtensionIcon(in: finalDir, manifest: manifest)
+            entity.iconPath = Self.findExtensionIcon(in: finalDir, manifest: manifest)
             if replacesStoreInstall {
                 // Optional grants were given to the store build, not to this package.
                 entity.grantedOptionalPermissions = nil
@@ -347,7 +347,7 @@ extension ExtensionManager {
                 extensionDescription: staged.displayDescription ?? "",
                 isEnabled: true,
                 packagePath: finalDir.path,
-                iconPath: findExtensionIcon(in: finalDir, manifest: manifest)
+                iconPath: Self.findExtensionIcon(in: finalDir, manifest: manifest)
             )
             context.insert(entity)
         }
@@ -515,7 +515,7 @@ extension ExtensionManager {
         return app.pathExtension.lowercased() == "app" ? app : nil
     }
 
-    private func findExtensionIcon(in directory: URL, manifest: [String: Any])
+    nonisolated static func findExtensionIcon(in directory: URL, manifest: [String: Any])
         -> String?
     {
         if let icons = manifest["icons"] as? [String: String] {
@@ -687,10 +687,18 @@ extension ExtensionManager {
 
     /// Safari extensions with nothing installed for them, under their own ID or as another version.
     var uninstalledSafariExtensions: [SafariExtensionInfo] {
-        (safariExtensions ?? []).filter { info in
-            !installedExtensions.contains {
-                $0.id == info.id || (!$0.source.isSafari && Self.isSameProduct($0.name, info.name))
-            }
+        (safariExtensions ?? []).filter { !hasInstalled(id: $0.id, name: $0.name, isSafari: true) }
+    }
+
+    /// Offers for extensions with nothing installed for them, under their own ID or as another version.
+    func notInstalled(_ offers: [ExtensionOffer]) -> [ExtensionOffer] {
+        offers.filter { !hasInstalled(id: $0.id, name: $0.name, isSafari: $0.isSafari) }
+    }
+
+    /// Installed under `id`, or as the same product from the other kind of source: Safari or a store.
+    private func hasInstalled(id: String, name: String, isSafari: Bool) -> Bool {
+        installedExtensions.contains {
+            $0.id == id || ($0.source.isSafari != isSafari && Self.isSameProduct($0.name, name))
         }
     }
 
@@ -844,12 +852,41 @@ extension ExtensionManager {
     }
 
     func showErrorAlert(_ error: ExtensionError) {
+        showErrorAlert(details: error.localizedDescription)
+    }
+
+    private func showErrorAlert(details: String) {
         let alert = NSAlert()
         alert.messageText = "Extension Installation Failed"
-        alert.informativeText = error.localizedDescription
+        alert.informativeText = details
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    /// Installs extensions the person chose from a list, one at a time without asking again, then
+    /// lists any that failed in one alert.
+    func install(_ offers: [ExtensionOffer]) async {
+        let chosen: InstallConsentPresenter = { _ in true }
+        var failures: [String] = []
+        for offer in offers {
+            let result: Result<InstalledExtension, ExtensionError> = await withCheckedContinuation { continuation in
+                let finish = { (result: Result<InstalledExtension, ExtensionError>) in continuation.resume(returning: result) }
+                switch offer.package {
+                case .store(let store):
+                    installFromWebStore(extensionId: offer.id, store: store, presenter: chosen, completionHandler: finish)
+                case .safari(let info):
+                    installSafariExtension(info, presenter: chosen, completionHandler: finish)
+                }
+            }
+            if case .failure(let error) = result {
+                Self.logger.error("Failed to install '\(offer.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                failures.append("\(offer.name): \(error.localizedDescription)")
+            }
+        }
+        if !failures.isEmpty {
+            showErrorAlert(details: failures.joined(separator: "\n"))
+        }
     }
 
     // MARK: - Persistence

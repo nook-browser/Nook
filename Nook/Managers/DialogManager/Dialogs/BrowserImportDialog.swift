@@ -76,7 +76,56 @@ struct BrowserImportDialog: DialogPresentable {
                 alert.informativeText = "Nook didn't find any Arc spaces on this Mac."
             }
             alert.runModal()
+            let offers = manager.arcExtensionOffers()
+            guard !offers.isEmpty else { return }
+            manager.dialogManager.showDialog(
+                ExtensionImportDialog(offers: offers) { chosen in
+                    manager.closeDialog()
+                    Task { await manager.extensionManager?.install(chosen) }
+                },
+                closesOnBackdropClick: false
+            )
         }
+    }
+}
+
+struct ExtensionImportDialog: DialogPresentable {
+    let offers: [ExtensionOffer]
+    let onDone: ([ExtensionOffer]) -> Void
+
+    @State private var selected: Set<String>
+
+    init(offers: [ExtensionOffer], onDone: @escaping ([ExtensionOffer]) -> Void) {
+        self.offers = offers
+        self.onDone = onDone
+        _selected = State(initialValue: Set(offers.map(\.id)))
+    }
+
+    func dialogHeader() -> DialogHeader {
+        DialogHeader(
+            icon: "puzzlepiece.extension",
+            title: "Bring your extensions",
+            subtitle: "Nook installs these from the Chrome Web Store."
+        )
+    }
+
+    func dialogContent() -> some View {
+        ExtensionOfferList(offers: offers, selected: $selected)
+    }
+
+    func dialogFooter() -> DialogFooter {
+        DialogFooter(
+            rightButtons: [
+                DialogButton(text: "Skip") { onDone([]) },
+                DialogButton(
+                    text: ExtensionOfferList.installTitle(count: selected.count),
+                    variant: .primary,
+                    keyboardShortcut: .return
+                ) {
+                    onDone(offers.filter { selected.contains($0.id) })
+                },
+            ]
+        )
     }
 }
 

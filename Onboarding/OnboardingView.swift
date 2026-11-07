@@ -17,6 +17,7 @@ struct OnboardingView: View {
     @State private var selectedBrowser: Browsers = .arc
     @State private var isLoading: Bool = false
     @State private var showSafariImportFlow: Bool = false
+    @State private var extensionOffers: [ExtensionOffer] = []
 
     var body: some View {
         ZStack {
@@ -37,7 +38,7 @@ struct OnboardingView: View {
                 stageView
                     .transition(.slideAndBlur)
                 Spacer()
-                if !showSafariImportFlow {
+                if !showsOwnButtons {
                     StageFooter(
                         currentStage: currentStage,
                         totalStages: 3,
@@ -55,7 +56,7 @@ struct OnboardingView: View {
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(.return) {
-            if !isLoading && !showSafariImportFlow {
+            if !isLoading && !showsOwnButtons {
                 advance()
                 return .handled
             }
@@ -63,9 +64,15 @@ struct OnboardingView: View {
         }
     }
 
+    private var showsOwnButtons: Bool {
+        showSafariImportFlow || !extensionOffers.isEmpty
+    }
+
     @ViewBuilder
     private var stageView: some View {
-        if showSafariImportFlow {
+        if !extensionOffers.isEmpty {
+            ExtensionsStage(offers: extensionOffers, onDone: finishExtensions)
+        } else if showSafariImportFlow {
             SafariImportFlow(
                 isLoading: $isLoading,
                 onBack: {
@@ -74,10 +81,9 @@ struct OnboardingView: View {
                     }
                 },
                 onComplete: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        showSafariImportFlow = false
-                        currentStage += 1
-                    }
+                    guard !isLoading else { return }
+                    isLoading = true
+                    Task { offerExtensions(await browserManager.safariExtensionOffers()) }
                 }
             )
         } else {
@@ -106,10 +112,7 @@ struct OnboardingView: View {
                 isLoading = true
             }
             performImport {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    currentStage += 1
-                    isLoading = false
-                }
+                offerExtensions(selectedBrowser == .arc ? browserManager.arcExtensionOffers() : [])
             }
         } else {
             withAnimation(.easeInOut(duration: 0.25)) {
@@ -131,6 +134,26 @@ struct OnboardingView: View {
             await MainActor.run {
                 completion()
             }
+        }
+    }
+
+    private func offerExtensions(_ offers: [ExtensionOffer]) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            showSafariImportFlow = false
+            isLoading = false
+            if offers.isEmpty {
+                currentStage += 1
+            } else {
+                extensionOffers = offers
+            }
+        }
+    }
+
+    private func finishExtensions(_ chosen: [ExtensionOffer]) {
+        Task { await browserManager.extensionManager?.install(chosen) }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            extensionOffers = []
+            currentStage += 1
         }
     }
 

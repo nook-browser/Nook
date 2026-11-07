@@ -32,16 +32,39 @@ class ImportManager: ObservableObject {
         return result
     }
 
-    /// Web Store ids of the extensions enabled in any Arc profile.
-    func arcExtensionIDs() -> [String] {
+    /// Web Store extensions enabled in any Arc profile, described from the copy Arc keeps of each.
+    func arcExtensions() -> [ExtensionOffer] {
         let userData = arcDirectory.appendingPathComponent("User Data")
-        let profiles = (try? FileManager.default.contentsOfDirectory(atPath: userData.path)) ?? []
-        let files = profiles.filter { $0 == "Default" || $0.hasPrefix("Profile ") }.sorted().flatMap { profile in
-            ["Secure Preferences", "Preferences"].compactMap {
-                try? Data(contentsOf: userData.appendingPathComponent(profile).appendingPathComponent($0))
-            }
+        let profiles = ((try? FileManager.default.contentsOfDirectory(atPath: userData.path)) ?? [])
+            .filter { $0 == "Default" || $0.hasPrefix("Profile ") }.sorted()
+            .map { userData.appendingPathComponent($0) }
+        let ids = parseChromiumExtensionIDs(profiles.flatMap { profile in
+            ["Secure Preferences", "Preferences"].compactMap { try? Data(contentsOf: profile.appendingPathComponent($0)) }
+        })
+        return ids.compactMap { id in profiles.lazy.compactMap { Self.chromiumExtension(id, in: $0) }.first }
+    }
+
+    /// The newest unpacked copy of a store extension in a Chromium profile, `Extensions/<id>/<version>_<n>`.
+    private static func chromiumExtension(_ id: String, in profile: URL) -> ExtensionOffer? {
+        let directory = profile.appendingPathComponent("Extensions").appendingPathComponent(id)
+        func version(_ folder: String) -> String { String(folder.prefix { $0 != "_" }) }
+        let folders = ((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+            .sorted { ExtensionVersion.isNewer(version($0), than: version($1)) }
+        for folder in folders {
+            let root = directory.appendingPathComponent(folder)
+            guard let data = try? Data(contentsOf: root.appendingPathComponent("manifest.json")),
+                  let manifest = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let name = manifest["name"] as? String
+            else { continue }
+            return ExtensionOffer(
+                id: id,
+                name: ExtensionManager.resolveLocaleString(name, in: root) ?? name,
+                version: manifest["version"] as? String ?? "",
+                icon: ExtensionManager.findExtensionIcon(in: root, manifest: manifest).flatMap(NSImage.init(contentsOfFile:)),
+                package: .store(.chrome)
+            )
         }
-        return parseChromiumExtensionIDs(files)
+        return nil
     }
 
     /// Arc's member card, with the person's Arc name added, as a JSON object.

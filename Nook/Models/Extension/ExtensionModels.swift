@@ -6,6 +6,7 @@
 //  Simplified extension models using native WKWebExtension support
 //
 
+import AppKit
 import Foundation
 import SwiftData
 
@@ -165,6 +166,33 @@ enum ExtensionVersion {
             if l != r { return l > r }
         }
         return false
+    }
+}
+
+/// An extension found in another browser or in an app on this Mac that Nook can install.
+struct ExtensionOffer: Identifiable {
+    enum Package {
+        case store(ExtensionStore)
+        case safari(ExtensionManager.SafariExtensionInfo)
+    }
+
+    let id: String
+    let name: String
+    let version: String
+    let icon: NSImage?
+    let package: Package
+
+    var isSafari: Bool {
+        if case .safari = package { true } else { false }
+    }
+}
+
+extension ExtensionOffer {
+    init(_ info: ExtensionManager.SafariExtensionInfo) {
+        self.init(
+            id: info.id, name: info.name, version: info.version,
+            icon: NSWorkspace.shared.icon(forFile: info.appPath.path), package: .safari(info)
+        )
     }
 }
 
