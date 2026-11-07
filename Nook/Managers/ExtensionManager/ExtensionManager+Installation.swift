@@ -690,9 +690,21 @@ extension ExtensionManager {
         (safariExtensions ?? []).filter { !hasInstalled(id: $0.id, name: $0.name, isSafari: true) }
     }
 
-    /// Offers for extensions with nothing installed for them, under their own ID or as another version.
-    func notInstalled(_ offers: [ExtensionOffer]) -> [ExtensionOffer] {
-        offers.filter { !hasInstalled(id: $0.id, name: $0.name, isSafari: $0.isSafari) }
+    /// One choice per extension with nothing installed for it, in its own ID or as another version.
+    /// A Web Store and a Safari version of the same extension share a choice, Web Store first.
+    func choices(from offers: [ExtensionOffer]) -> [ExtensionChoice] {
+        let available = offers.filter { !hasInstalled(id: $0.id, name: $0.name, isSafari: $0.isSafari) }
+        var safari = available.filter(\.isSafari)
+        var choices: [ExtensionChoice] = []
+        for offer in available where !offer.isSafari {
+            if let match = safari.firstIndex(where: { Self.isSameProduct($0.name, offer.name) }) {
+                choices.append(ExtensionChoice(versions: [offer, safari.remove(at: match)]))
+            } else {
+                choices.append(ExtensionChoice(versions: [offer]))
+            }
+        }
+        choices += safari.map { ExtensionChoice(versions: [$0]) }
+        return choices.sorted { $0.versions[0].name.localizedStandardCompare($1.versions[0].name) == .orderedAscending }
     }
 
     /// Installed under `id`, or as the same product from the other kind of source: Safari or a store.
@@ -869,6 +881,7 @@ extension ExtensionManager {
     func install(_ offers: [ExtensionOffer]) async {
         let chosen: InstallConsentPresenter = { _ in true }
         var failures: [String] = []
+        listInstallProgress = offers.isEmpty ? nil : (0, offers.count)
         for offer in offers {
             let result: Result<InstalledExtension, ExtensionError> = await withCheckedContinuation { continuation in
                 let finish = { (result: Result<InstalledExtension, ExtensionError>) in continuation.resume(returning: result) }
@@ -883,7 +896,9 @@ extension ExtensionManager {
                 Self.logger.error("Failed to install '\(offer.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
                 failures.append("\(offer.name): \(error.localizedDescription)")
             }
+            listInstallProgress?.finished += 1
         }
+        listInstallProgress = nil
         if !failures.isEmpty {
             showErrorAlert(details: failures.joined(separator: "\n"))
         }

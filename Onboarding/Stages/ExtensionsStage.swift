@@ -8,15 +8,15 @@ import NookDesign
 import SwiftUI
 
 struct ExtensionsStage: View {
-    let offers: [ExtensionOffer]
+    let choices: [ExtensionChoice]
     let onDone: ([ExtensionOffer]) -> Void
 
-    @State private var selected: Set<String>
+    @State private var selection: ExtensionSelection
 
-    init(offers: [ExtensionOffer], onDone: @escaping ([ExtensionOffer]) -> Void) {
-        self.offers = offers
+    init(choices: [ExtensionChoice], onDone: @escaping ([ExtensionOffer]) -> Void) {
+        self.choices = choices
         self.onDone = onDone
-        _selected = State(initialValue: Set(offers.map(\.id)))
+        _selection = State(initialValue: ExtensionSelection(choices))
     }
 
     var body: some View {
@@ -25,25 +25,23 @@ struct ExtensionsStage: View {
                 Text("Bring your extensions")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(.white)
-                Text(offers.contains(where: \.isSafari)
-                     ? "Nook installs these from apps on this Mac."
-                     : "Nook installs these from the Chrome Web Store.")
+                Text(ExtensionChoiceList.subtitle(for: choices))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.6))
             }
 
-            ExtensionOfferList(offers: offers, selected: $selected)
+            ExtensionChoiceList(choices: choices, selection: $selection)
                 .padding(20)
-                .frame(width: 360)
+                .frame(width: 400)
                 .background(.white.opacity(0.1))
                 .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
 
             HStack(spacing: 12) {
                 Button {
-                    onDone(offers.filter { selected.contains($0.id) })
+                    onDone(selection.chosen(from: choices))
                 } label: {
                     HStack(spacing: 8) {
-                        Text(ExtensionOfferList.installTitle(count: selected.count))
+                        Text(selection.installTitle)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.black)
                         Image(systemName: "return")

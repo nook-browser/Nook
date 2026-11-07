@@ -182,9 +182,22 @@ struct ExtensionOffer: Identifiable {
     let icon: NSImage?
     let package: Package
 
-    var isSafari: Bool {
-        if case .safari = package { true } else { false }
+    var source: ExtensionSource {
+        switch package {
+        case .store(let store): .store(store)
+        case .safari(let info): .safari(appPath: info.appPath.path)
+        }
     }
+
+    var isSafari: Bool { source.isSafari }
+}
+
+/// One extension an import offers: in one version, or as a Web Store and a Safari version of
+/// which only one can be installed. The first version is the one picked to start with.
+struct ExtensionChoice: Identifiable {
+    let versions: [ExtensionOffer]
+
+    var id: String { versions[0].id }
 }
 
 extension ExtensionOffer {

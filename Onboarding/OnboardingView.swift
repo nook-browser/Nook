@@ -17,7 +17,7 @@ struct OnboardingView: View {
     @State private var selectedBrowser: Browsers = .arc
     @State private var isLoading: Bool = false
     @State private var showSafariImportFlow: Bool = false
-    @State private var extensionOffers: [ExtensionOffer] = []
+    @State private var extensionChoices: [ExtensionChoice] = []
 
     var body: some View {
         ZStack {
@@ -33,7 +33,7 @@ struct OnboardingView: View {
                 .ignoresSafeArea()
 
             VStack {
-                StageIndicator(stages: 3, activeStage: currentStage)
+                StageIndicator(stages: 4, activeStage: currentStage)
                 Spacer()
                 stageView
                     .transition(.slideAndBlur)
@@ -41,7 +41,7 @@ struct OnboardingView: View {
                 if !showsOwnButtons {
                     StageFooter(
                         currentStage: currentStage,
-                        totalStages: 3,
+                        totalStages: 4,
                         isLoading: isLoading,
                         onContinue: advance,
                         onBack: goBack,
@@ -65,14 +65,12 @@ struct OnboardingView: View {
     }
 
     private var showsOwnButtons: Bool {
-        showSafariImportFlow || !extensionOffers.isEmpty
+        showSafariImportFlow || currentStage == 2
     }
 
     @ViewBuilder
     private var stageView: some View {
-        if !extensionOffers.isEmpty {
-            ExtensionsStage(offers: extensionOffers, onDone: finishExtensions)
-        } else if showSafariImportFlow {
+        if showSafariImportFlow {
             SafariImportFlow(
                 isLoading: $isLoading,
                 onBack: {
@@ -81,24 +79,23 @@ struct OnboardingView: View {
                     }
                 },
                 onComplete: {
-                    guard !isLoading else { return }
-                    isLoading = true
-                    Task { offerExtensions(await browserManager.safariExtensionOffers()) }
+                    showExtensions(includingArc: false)
                 }
             )
         } else {
             switch currentStage {
             case 0: HelloStage()
             case 1: ImportStage(selectedBrowser: $selectedBrowser)
-            case 2: FinalStage()
+            case 2: ExtensionsStage(choices: extensionChoices, onDone: finishExtensions)
+            case 3: FinalStage(extensionManager: browserManager.extensionManager ?? .shared)
             default: EmptyView()
             }
         }
     }
 
     private func advance() {
-        guard currentStage < 3 else { return }
-        if currentStage == 2 {
+        guard currentStage < 4 else { return }
+        if currentStage == 3 {
             nookSettings.didFinishOnboarding = true
             return
         }
@@ -112,7 +109,7 @@ struct OnboardingView: View {
                 isLoading = true
             }
             performImport {
-                offerExtensions(selectedBrowser == .arc ? browserManager.arcExtensionOffers() : [])
+                showExtensions(includingArc: selectedBrowser == .arc)
             }
         } else {
             withAnimation(.easeInOut(duration: 0.25)) {
@@ -137,36 +134,34 @@ struct OnboardingView: View {
         }
     }
 
-    private func offerExtensions(_ offers: [ExtensionOffer]) {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            showSafariImportFlow = false
-            isLoading = false
-            if offers.isEmpty {
-                currentStage += 1
-            } else {
-                extensionOffers = offers
+    private func showExtensions(includingArc: Bool) {
+        Task {
+            let choices = await browserManager.extensionChoices(includingArc: includingArc)
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showSafariImportFlow = false
+                isLoading = false
+                extensionChoices = choices
+                currentStage = choices.isEmpty ? 3 : 2
             }
         }
     }
 
     private func finishExtensions(_ chosen: [ExtensionOffer]) {
+        guard currentStage == 2 else { return }
         Task { await browserManager.extensionManager?.install(chosen) }
         withAnimation(.easeInOut(duration: 0.25)) {
-            extensionOffers = []
-            currentStage += 1
+            currentStage = 3
         }
     }
 
     private func skipImport() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            currentStage = 2
-        }
+        showExtensions(includingArc: false)
     }
 
     private func goBack() {
         guard currentStage > 0 else { return }
         withAnimation(.easeInOut(duration: 0.25)) {
-            currentStage -= 1
+            currentStage = currentStage == 3 ? 1 : currentStage - 1
         }
     }
 

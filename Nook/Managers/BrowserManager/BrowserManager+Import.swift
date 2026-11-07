@@ -115,17 +115,13 @@ extension BrowserManager {
         }
     }
 
-    /// Arc's Web Store extensions that Nook has in no version.
-    func arcExtensionOffers() -> [ExtensionOffer] {
-        guard let manager = extensionManager, manager.isExtensionSupportAvailable else { return [] }
-        return manager.notInstalled(importManager.arcExtensions())
-    }
-
-    /// Safari extensions from apps on this Mac that Nook has in no version.
-    func safariExtensionOffers() async -> [ExtensionOffer] {
+    /// The extensions to offer after an import: Arc's when it was the source, and the Safari
+    /// extensions from apps on this Mac.
+    func extensionChoices(includingArc: Bool) async -> [ExtensionChoice] {
         guard let manager = extensionManager, manager.isExtensionSupportAvailable else { return [] }
         await manager.refreshSafariExtensions()
-        return manager.uninstalledSafariExtensions.map(ExtensionOffer.init)
+        let arc = includingArc ? importManager.arcExtensions() : []
+        return manager.choices(from: arc + (manager.safariExtensions ?? []).map(ExtensionOffer.init))
     }
 
     private static let importLog = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Import")

@@ -29,6 +29,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     /// Safari extensions found in the Applications folders; nil until the first scan finishes.
     @Published var safariExtensions: [SafariExtensionInfo]?
     var isScanningSafari = false
+    /// Installs from an import list: how many are finished out of how many were chosen.
+    @Published var listInstallProgress: (finished: Int, total: Int)?
     // Scope: extensions are global. One controller, one install/enabled state, and one
     // storage namespace shared by every space. Private windows run only extensions the person
     // allowed there (`hasAccessToPrivateData`).
