@@ -156,15 +156,12 @@ extension ExtensionManager {
     ///   - store: set for Chrome Web Store / Edge Add-ons installs; enables automatic updates.
     ///   - extensionId: stable ID from the caller (store ID, Safari bundle ID). Falls back to the
     ///     ID derived from the manifest `key`, then a random UUID.
-    ///   - interactive: when false (background updates), an update that needs new permissions
-    ///     is skipped instead of prompting.
     ///   - replacing: an installed extension this one takes the place of, removed after it installs.
-    ///   - presenter: shows the permission dialog where the install started; the browser window when nil.
+    ///   - presenter: asks for consent where the install started; the browser window when nil.
     func installExtension(
         from url: URL,
         store: ExtensionStore? = nil,
         extensionId: String? = nil,
-        interactive: Bool = true,
         replacing replacedID: String? = nil,
         presenter: InstallConsentPresenter? = nil,
         completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
@@ -177,7 +174,7 @@ extension ExtensionManager {
         Task { @MainActor in
             do {
                 let installed = try await performInstallation(
-                    from: url, store: store, extensionId: extensionId, interactive: interactive,
+                    from: url, store: store, extensionId: extensionId,
                     replacing: replacedID, presenter: presenter
                 )
                 if let index = installedExtensions.firstIndex(where: { $0.id == installed.id }) {
@@ -198,7 +195,6 @@ extension ExtensionManager {
         from sourceURL: URL,
         store: ExtensionStore?,
         extensionId callerId: String?,
-        interactive: Bool,
         replacing replacedID: String?,
         presenter: InstallConsentPresenter?
     ) async throws -> InstalledExtension {
@@ -294,10 +290,6 @@ extension ExtensionManager {
         let needsConsent = existing == nil || replacesStoreInstall
             || !consent.permissions.isEmpty || !consent.hosts.isEmpty
         if needsConsent {
-            guard interactive else {
-                Self.logger.info("Skipping update of '\(name, privacy: .public)': new version requests additional permissions")
-                throw ExtensionError.cancelled
-            }
             let request = InstallConsent(
                 name: name, version: version, source: source, replacing: replaced,
                 permissions: consent.permissions, hosts: consent.hosts,
@@ -1013,7 +1005,7 @@ extension ExtensionManager {
     func installFromWebStore(
         extensionId: String,
         store: ExtensionStore = .chrome,
-        interactive: Bool = true,
+        presenter: InstallConsentPresenter? = nil,
         completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
     ) {
         WebStoreDownloader.downloadExtension(extensionId: extensionId, store: store) { [weak self] result in
@@ -1021,7 +1013,7 @@ extension ExtensionManager {
             switch result {
             case .success(let download):
                 self.installExtension(
-                    from: download.file, store: store, extensionId: download.id, interactive: interactive
+                    from: download.file, store: store, extensionId: download.id, presenter: presenter
                 ) { installResult in
                     try? FileManager.default.removeItem(at: download.file)
                     completionHandler(installResult)

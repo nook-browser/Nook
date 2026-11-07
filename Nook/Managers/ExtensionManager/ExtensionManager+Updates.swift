@@ -46,7 +46,11 @@ extension ExtensionManager {
                 await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                     guard let self else { return continuation.resume() }
                     self.installFromWebStore(
-                        extensionId: candidate.id, store: candidate.store, interactive: false
+                        extensionId: candidate.id, store: candidate.store,
+                        presenter: { _ in
+                            Self.logger.info("Skipping update of '\(candidate.name, privacy: .public)': new version requests additional permissions")
+                            return false
+                        }
                     ) { result in
                         if case .failure(let error) = result, !(error.isCancelled) {
                             Self.logger.error("Update failed for '\(candidate.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
