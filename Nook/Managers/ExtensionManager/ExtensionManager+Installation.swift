@@ -876,12 +876,20 @@ extension ExtensionManager {
         alert.runModal()
     }
 
+    struct ListInstallProgress {
+        let total: Int
+        var finished = 0
+        var failed = 0
+
+        var isDone: Bool { finished == total }
+    }
+
     /// Installs extensions the person chose from a list, one at a time without asking again, then
     /// lists any that failed in one alert.
     func install(_ offers: [ExtensionOffer]) async {
         let chosen: InstallConsentPresenter = { _ in true }
         var failures: [String] = []
-        listInstallProgress = offers.isEmpty ? nil : (0, offers.count)
+        listInstallProgress = offers.isEmpty ? nil : ListInstallProgress(total: offers.count)
         for offer in offers {
             let result: Result<InstalledExtension, ExtensionError> = await withCheckedContinuation { continuation in
                 let finish = { (result: Result<InstalledExtension, ExtensionError>) in continuation.resume(returning: result) }
@@ -895,10 +903,10 @@ extension ExtensionManager {
             if case .failure(let error) = result {
                 Self.logger.error("Failed to install '\(offer.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
                 failures.append("\(offer.name): \(error.localizedDescription)")
+                listInstallProgress?.failed += 1
             }
             listInstallProgress?.finished += 1
         }
-        listInstallProgress = nil
         if !failures.isEmpty {
             showErrorAlert(details: failures.joined(separator: "\n"))
         }
