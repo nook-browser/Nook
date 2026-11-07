@@ -71,28 +71,28 @@ public enum DevHandoff {
         failed: [DevNetworkEntry],
         imagePath: String?
     ) -> String {
-        var lines = ["## Element `\(e.selector)`", "", "- Page: \(e.url)", "- Selector: `\(e.selector)`"]
+        let selector = inline(e.selector)
+        var lines = ["## Element `\(selector)`", "", "- Page: \(inline(e.url))", "- Selector: `\(selector)`"]
         if let role = e.role {
             lines.append("- Role: \(role)" + (e.name.map { " \"\(oneLine($0, 120))\"" } ?? ""))
         } else if let name = e.name {
             lines.append("- Text: \"\(oneLine(name, 120))\"")
         }
         lines.append("- Box: \(Int(e.rect.width))×\(Int(e.rect.height)) at (\(Int(e.rect.minX)), \(Int(e.rect.minY))) in the viewport")
-        if let source = e.source { lines.append("- Source: `\(source)`") }
+        if let source = e.source { lines.append("- Source: `\(inline(source))`") }
         if !e.components.isEmpty { lines.append("- Components: " + e.components.joined(separator: " > ")) }
         if let imagePath { lines.append("- Screenshot: \(imagePath)") }
-        lines += ["", "### HTML", "", "```html", e.html, "```"]
+        lines += ["", "### HTML", ""] + fenced(e.html, "html")
         if !e.styles.isEmpty {
-            lines += ["", "### Styles that differ from the defaults", "", "```css"]
-            lines += e.styles.map { "\($0.0): \($0.1);" }
-            lines.append("```")
+            lines += ["", "### Styles that differ from the defaults", ""]
+            lines += fenced(e.styles.map { "\($0.0): \($0.1);" }.joined(separator: "\n"), "css")
         }
         lines += context(errors: errors, failed: failed)
         return lines.joined(separator: "\n")
     }
 
     public static func markdown(console e: DevConsoleEntry, pageURL: String?) -> String {
-        var lines = ["## Console \(e.level) on \(pageURL ?? "page")", "", "```", e.message, "```"]
+        var lines = ["## Console \(e.level) on \(pageURL ?? "page")", ""] + fenced(e.message)
         if let at = e.location { lines.append("- At: `\(at)`") }
         if let frame = e.frameURL { lines.append("- Frame: \(frame)") }
         if e.repeatCount > 1 { lines.append("- Repeated \(e.repeatCount) times") }
@@ -104,9 +104,9 @@ public enum DevHandoff {
         var lines = ["## Request on \(pageURL ?? "page")", "", "- \(e.method) \(e.url)", "- Result: \(status)", "- Kind: \(e.kind)"]
         if let ms = e.duration { lines.append("- Time: \(Int(ms.rounded())) ms") }
         if e.hasDetail {
-            lines += ["", "```sh", e.curl, "```"]
+            lines += [""] + fenced(e.curl, "sh")
             if let body = e.responseBody, !body.isEmpty {
-                lines += ["", "### Response", "", "```", String(body.prefix(4_000)), "```"]
+                lines += ["", "### Response", ""] + fenced(String(body.prefix(4_000)))
             }
         }
         return lines.joined(separator: "\n")
@@ -138,6 +138,25 @@ public enum DevHandoff {
         for case let .remove(_, line, _) in changes.removals { lines.append("-" + line) }
         for case let .insert(_, line, _) in changes.insertions { lines.append("+" + line) }
         return lines.joined(separator: "\n")
+    }
+
+    /// A fence one backtick longer than any run in `body`, so page text cannot close it early.
+    static func fenced(_ body: String, _ info: String = "") -> [String] {
+        var longest = 0, run = 0
+        for c in body { run = c == "`" ? run + 1 : 0; longest = max(longest, run) }
+        let fence = String(repeating: "`", count: max(3, longest + 1))
+        return [fence + info, body, fence]
+    }
+
+    /// Page text inside inline code: one line, and no backtick to end the span.
+    static func inline(_ s: String) -> String {
+        oneLine(s, 300).replacingOccurrences(of: "`", with: "'")
+    }
+
+    /// Wraps page-written tool output in a tag named with `nonce`, which the page cannot know,
+    /// so the agent can tell it from Nook's own words.
+    public static func pageContent(_ text: String, nonce: String) -> String {
+        "<page_content_\(nonce)>\n\(text)\n</page_content_\(nonce)>"
     }
 
     static func oneLine(_ s: String, _ limit: Int) -> String {

@@ -78,6 +78,7 @@ extension PageSession: WKUIDelegate {
     ) -> WKWebView? {
         guard let delegate = controller?.sessionDelegate else { return nil }
         let url = navigationAction.request.url
+        if url?.scheme?.lowercased() == "nook" { return nil }
         // Extensions manage their own auth flows, and never get Peek.
         let sourceScheme = navigationAction.sourceFrame.request.url?.scheme?.lowercased() ?? ""
         let isFromExtension = sourceScheme == "webkit-extension" || sourceScheme == "safari-web-extension"
@@ -169,14 +170,14 @@ extension PageSession: WKUIDelegate {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self else { return }
-                self.controller?.close(self.itemID)
+                self.controller?.close(self.itemID, archive: false)
             }
         }
     }
 
     /// Counts a dialog. From the second one since the last main-frame commit the presenter offers
     /// to stop them, so `while(1) alert()` cannot hold the window.
-    private func nextDialogSuppressor() -> (() -> Void)? {
+    func nextDialogSuppressor() -> (() -> Void)? {
         jsDialogCount += 1
         guard jsDialogCount > 1 else { return nil }
         return { [weak self] in self?.jsDialogsSuppressed = true }

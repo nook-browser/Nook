@@ -36,6 +36,7 @@ public final class ContentBlockerManager: NSObject {
     public let filterListManager = FilterListManager()
     public let advancedRulesEngine = AdvancedRulesEngine()
     public private(set) var trackingParamStripper = TrackingParamStripper()
+    private var linkCleaningTask: Task<Void, Never>?
     private var urlSkipper: URLSkipper?
     private var lastRulesHash: String?
 
@@ -106,13 +107,14 @@ public final class ContentBlockerManager: NSObject {
         return allowedDomains.contains { h == $0 || h.hasSuffix("." + $0) }
     }
 
-    private func isExempt(itemID: UUID, isOAuthFlow: Bool, host: String?) -> Bool {
-        !isEnabled || isTemporarilyDisabled(tabId: itemID) || isDomainAllowed(host) || isOAuthFlow
-            || (host != nil && continuedHosts[itemID] == host?.lowercased())
+    /// The site or tab is left alone by both the blocker and link cleaning.
+    private func isSiteExempt(_ session: any BlockablePage, host: String?) -> Bool {
+        isTemporarilyDisabled(tabId: session.itemID) || isDomainAllowed(host) || session.isOAuthFlow
+            || (host != nil && continuedHosts[session.itemID] == host?.lowercased())
     }
 
     private func isExempt(_ session: any BlockablePage, host: String?) -> Bool {
-        isExempt(itemID: session.itemID, isOAuthFlow: session.isOAuthFlow, host: host)
+        !isEnabled || isSiteExempt(session, host: host)
     }
 
     public func shouldApplyBlocking(to session: any BlockablePage) -> Bool {
@@ -295,9 +297,29 @@ public final class ContentBlockerManager: NSObject {
 
     // MARK: - Tracking parameter removal ($removeparam)
 
-    /// The URL with tracking parameters removed, or nil when nothing should change.
+    /// The URL with tracking parameters removed, or nil when nothing should change. Works with the
+    /// blocker off once `prepareLinkCleaning()` has loaded the rules.
     public func strippedTrackingParams(for url: URL, tab session: any BlockablePage) -> URL? {
-        strippedTrackingParams(for: url, exempt: isExempt(session, host: url.host))
+        guard !isSiteExempt(session, host: url.host), let stripped = trackingParamStripper.strip(url) else { return nil }
+        cbLog.info("removeparam \(url.host ?? "-", privacy: .private(mask: .hash)): \(url.query?.count ?? 0, privacy: .public) -> \(stripped.query?.count ?? 0, privacy: .public) query chars")
+        return stripped
+    }
+
+    /// Loads the `$removeparam` rules for link cleaning while the blocker, which otherwise loads
+    /// them with everything else, is off.
+    public func prepareLinkCleaning() {
+        guard settings.removeTrackingFromLinks != .off, !isEnabled, !isCompiling,
+              trackingParamStripper.ruleCount == 0, linkCleaningTask == nil else { return }
+        let enabledFilenames = filterListManager.enabledOptionalFilterListFilenames
+        linkCleaningTask = Task {
+            let stripper = await Task.detached(priority: .utility) { [filterListManager] in
+                let texts = filterListManager.loadFilterSources(enabledFilenames: enabledFilenames).map(\.rules)
+                return TrackingParamStripper(rules: FilterLineSearch.lines(containing: "removeparam", in: texts))
+            }.value
+            if trackingParamStripper.ruleCount == 0 { trackingParamStripper = stripper }
+            linkCleaningTask = nil
+            cbLog.info("Link cleaning loaded \(stripper.ruleCount, privacy: .public) removeparam rules")
+        }
     }
 
     /// Where a navigation to a known redirector really goes (`urlskip=`), or nil.
@@ -306,13 +328,6 @@ public final class ContentBlockerManager: NSObject {
               let target = urlSkipper?.target(for: url, from: source) else { return nil }
         cbLog.info("urlskip \(url.host ?? "-", privacy: .private(mask: .hash)) -> \(target.host ?? "-", privacy: .private(mask: .hash))")
         return target
-    }
-
-    private func strippedTrackingParams(for url: URL, exempt: Bool) -> URL? {
-        guard isEnabled, !exempt else { return nil }
-        guard let stripped = trackingParamStripper.strip(url) else { return nil }
-        cbLog.info("removeparam \(url.host ?? "-", privacy: .private(mask: .hash)): \(url.query?.count ?? 0, privacy: .public) -> \(stripped.query?.count ?? 0, privacy: .public) query chars")
-        return stripped
     }
 
     // MARK: - Per-Navigation (main frame, from PageSession.decidePolicyFor)

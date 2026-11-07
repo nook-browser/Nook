@@ -15,6 +15,10 @@ public struct DeviceState: Codable, Equatable, Sendable {
     /// Pages the person removed from a live folder, by folder id, so a refresh leaves them out.
     /// Optional because files written before live folders have no such key.
     public var liveDismissed: [UUID: Set<URL>]?
+    /// Spaces whose pinned section is folded into the space title. Optional for older files.
+    public var collapsedPinned: Set<UUID>?
+    /// When each tab was last selected or deselected, for auto-archive. Optional for older files.
+    public var lastActive: [UUID: Date]?
 
     public init() {}
 
@@ -28,6 +32,8 @@ public struct DeviceState: Codable, Equatable, Sendable {
         openFolders = openFolders.filter { tree.item($0)?.isFolder == true || tree.hasChildren($0) }
         openPages = openPages.filter { tree.item($0.key) != nil && tree.scope(of: $0.key) == .synced }
         liveDismissed = liveDismissed?.filter { tree.item($0.key)?.live != nil }
+        collapsedPinned = collapsedPinned?.filter { tree.space($0) != nil }
+        lastActive = lastActive?.filter { tree.item($0.key) != nil }
         for i in windows.indices {
             if let spaceID = windows[i].spaceID, tree.space(spaceID) == nil { windows[i].spaceID = nil }
             windows[i].selectedItemBySpace = windows[i].selectedItemBySpace.filter { tree.space($0.key) != nil && tree.item($0.value) != nil }

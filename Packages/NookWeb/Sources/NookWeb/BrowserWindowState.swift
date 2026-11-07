@@ -107,6 +107,9 @@ public class BrowserWindowState {
     /// Replaces the copy toast's text for one showing; nil is the URL wording.
     public var copyToastText: String?
 
+    /// Tabs opened in the background while the sidebar was hidden; non-empty shows the toast.
+    public var backgroundOpened: [UUID] = []
+
     /// Presentation flag for the shortcut conflict toast
     public var isShowingShortcutConflictToast: Bool = false
 
@@ -176,6 +179,9 @@ public class BrowserWindowState {
         spaceID.flatMap { selectedItemBySpace[$0] }
     }
 
+    /// Tab rows picked with Cmd-click or Shift-click. Never saved.
+    public var multiSelection = TabSelection()
+
     /// The split pair shown in this window, if any.
     public var split: SplitRecord?
 
@@ -203,6 +209,7 @@ public enum SidebarMenuTab: Hashable, Sendable {
     case history
     case downloads
     case spaces
+    case archive
 }
 
 /// Toast information specific to a window

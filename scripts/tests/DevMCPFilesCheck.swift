@@ -5,7 +5,8 @@
 //
 //  DevMCP may only write under its root. Compiles the shipped source directly:
 //
-//    swiftc Nook/Managers/DevMCPServer/DevMCPFiles.swift scripts/tests/DevMCPFilesCheck.swift \
+//    swiftc Nook/Managers/DevMCPServer/DevMCPFiles.swift Packages/NookWeb/Sources/NookWeb/Quarantine.swift \
+//           scripts/tests/DevMCPFilesCheck.swift \
 //           -o /tmp/devmcp-files-check && /tmp/devmcp-files-check
 //
 
@@ -21,6 +22,22 @@ struct DevMCPFilesCheck {
         try fm.createSymbolicLink(at: root.appendingPathComponent("out"), withDestinationURL: tmp)
         defer { try? fm.removeItem(at: tmp) }
 
+        // Redirect to another host drops Cookie and Authorization; same host keeps them.
+        let job = DevMCPDownload(urls: [], dir: tmp, cookies: [], userAgent: nil, referer: nil)
+        var orig = URLRequest(url: URL(string: "https://a.example/x")!)
+        orig.setValue("s=1", forHTTPHeaderField: "Cookie")
+        let task = URLSession.shared.dataTask(with: orig)
+        let resp = HTTPURLResponse(url: orig.url!, statusCode: 302, httpVersion: nil, headerFields: nil)!
+        for (to, kept) in [("https://b.example/y", false), ("https://a.example/z", true), ("http://a.example/z", false), ("https://a.example:8443/z", false)] {
+            var next = URLRequest(url: URL(string: to)!)
+            next.setValue("s=1", forHTTPHeaderField: "Cookie")
+            next.setValue("Bearer t", forHTTPHeaderField: "Authorization")
+            job.urlSession(URLSession.shared, task: task, willPerformHTTPRedirection: resp, newRequest: next) {
+                precondition(($0?.value(forHTTPHeaderField: "Cookie") != nil) == kept)
+                precondition(($0?.value(forHTTPHeaderField: "Authorization") != nil) == kept)
+            }
+        }
+
         precondition(DevMCPFiles.resolve("a/b.json", root: root) != nil)
         precondition(DevMCPFiles.resolve("a/../b.json", root: root) != nil)
         precondition(DevMCPFiles.resolve("", root: root) == nil)
@@ -30,6 +47,9 @@ struct DevMCPFilesCheck {
         precondition(DevMCPFiles.resolve("/etc/hosts", root: root) == nil)
         precondition(DevMCPFiles.resolve("~/.zshrc", root: root) == nil)
         precondition(DevMCPFiles.resolve("out/x", root: root) == nil, "a symlink must not lead out")
+        try fm.createSymbolicLink(atPath: root.appendingPathComponent("dangling").path,
+                                  withDestinationPath: tmp.appendingPathComponent("planted.txt").path)
+        precondition(DevMCPFiles.resolve("dangling", root: root) == nil, "a dangling symlink must not lead out")
 
         let u = URL(string: "https://cdn.example.com/files/a%20b/photo.JPG?v=1")!
         let name = DevMCPFiles.fileName(for: u, contentType: "image/jpeg")

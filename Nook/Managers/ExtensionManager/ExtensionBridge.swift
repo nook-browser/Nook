@@ -13,7 +13,7 @@ import WebKit
 import NookTabsCore
 import NookWeb
 
-/// One regular browser window. Private windows never get an adapter.
+/// One browser window, regular or private.
 final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     let windowID: UUID
     weak var state: BrowserWindowState?
@@ -21,6 +21,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
 
     init(window: BrowserWindowState, browserManager: BrowserManager) {
         self.windowID = window.id
+        self.isPrivate = window.isIncognito || window.privateTree != nil
         self.state = window
         self.browserManager = browserManager
         super.init()
@@ -71,10 +72,10 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
         completionHandler(nil)
     }
 
-    func isPrivate(for extensionContext: WKWebExtensionContext) -> Bool {
-        // Private windows have no extension controller and are never exposed through this adapter.
-        return false
-    }
+    /// Fixed at creation: WebKit caches it.
+    let isPrivate: Bool
+
+    func isPrivate(for extensionContext: WKWebExtensionContext) -> Bool { isPrivate }
 
     func windowType(for extensionContext: WKWebExtensionContext) -> WKWebExtension.WindowType {
         return .normal
@@ -178,9 +179,20 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
         return window.isKeyWindow || window.isMainWindow || window === page.detachedWindow?.window
     }
 
-    /// The window this tab belongs to: the focused window when it shows the tab, else any
-    /// regular window that shows it, else the focused regular window.
+    /// A page of a private window, Peek and sign-in popups included.
+    var isPrivate: Bool {
+        detached?.isPrivate ?? session?.isPrivate ?? (privateWindow != nil)
+    }
+
+    private var privateWindow: BrowserWindowState? {
+        if let page = detached { return page.isPrivate ? page.detachedWindow : nil }
+        return browserManager.windowRegistry?.allWindows.first { $0.privateTree?.item(itemID) != nil }
+    }
+
+    /// The window this tab belongs to: its private window, else the focused window when it shows
+    /// the tab, else any regular window that shows it, else the focused regular window.
     var hostWindow: BrowserWindowState? {
+        if isPrivate { return privateWindow.flatMap { $0.privateTree != nil ? $0 : nil } }
         let registry = browserManager.windowRegistry
         let regular = (registry?.allWindows ?? []).filter { $0.privateTree == nil }
         let active = registry?.activeWindow.flatMap { $0.privateTree == nil ? $0 : nil }
@@ -263,7 +275,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func close(for extensionContext: WKWebExtensionContext, completionHandler: @escaping (Error?) -> Void) {
-        if let page = detached { page.onClose?() } else { tabs.close(itemID) }
+        if let page = detached { page.onClose?() } else { tabs.close(itemID, archive: false) }
         completionHandler(nil)
     }
 

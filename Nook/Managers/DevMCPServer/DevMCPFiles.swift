@@ -5,21 +5,34 @@
 //
 //  Where DevMCP's evaluate saveTo and download tools may write (only under ~/Downloads/Nook MCP),
 //  file names for downloaded URLs, and which of the page's cookies a download sends.
-//  Foundation only, so scripts/tests/DevMCPFilesCheck.swift can compile it directly.
+//  Foundation only, so scripts/tests/DevMCPFilesCheck.swift can compile it directly
+//  (with NookWeb's Quarantine.swift beside it).
 //
 
 import Foundation
+#if canImport(NookWeb)
+import NookWeb
+#endif
 
 enum DevMCPFiles {
     static let root = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Nook MCP", isDirectory: true)
 
-    /// `relative` under `root`, or nil when it is empty, absolute, or climbs out through `..` or a symlink.
+    /// `relative` under `root`, or nil when it is empty, absolute, climbs out through `..`, or
+    /// passes through any symlink under the root, a dangling one included.
     static func resolve(_ relative: String, root: URL = root) -> URL? {
         guard !relative.isEmpty, !relative.hasPrefix("/"), !relative.hasPrefix("~") else { return nil }
         let base = realPath(root.standardizedFileURL)
-        let url = realPath(base.appendingPathComponent(relative).standardizedFileURL)
-        return url.path.hasPrefix(base.path + "/") ? url : nil
+        let url = base.appendingPathComponent(relative).standardizedFileURL
+        guard url.path.hasPrefix(base.path + "/") else { return nil }
+        var walk = base
+        for part in url.pathComponents.dropFirst(base.pathComponents.count) {
+            walk.appendPathComponent(part)
+            // attributesOfItem is lstat: it sees the link itself, where fileExists follows it.
+            let type = (try? FileManager.default.attributesOfItem(atPath: walk.path))?[.type] as? FileAttributeType
+            if type == .typeSymbolicLink { return nil }
+        }
+        return url
     }
 
     /// `resolvingSymlinksInPath` leaves a path alone when its last part doesn't exist yet,
@@ -74,7 +87,7 @@ enum DevMCPFiles {
 
 /// The download tool's job: fetches `urls` into `dir` six at a time with the page's cookies,
 /// user agent and Referer, appending one `manifest.jsonl` line per URL. Outlives the tool call.
-final class DevMCPDownload: @unchecked Sendable {
+final class DevMCPDownload: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     static let maxBytes = 100 * 1024 * 1024
 
     let urls: [URL]
@@ -82,7 +95,7 @@ final class DevMCPDownload: @unchecked Sendable {
     private let cookies: [HTTPCookie]
     private let userAgent: String?
     private let referer: String?
-    private let session: URLSession
+    private var session: URLSession!
     private let lock = NSLock()
     private var counts: [String: Int] = [:]
     private var finished = false
@@ -96,7 +109,20 @@ final class DevMCPDownload: @unchecked Sendable {
         let config = URLSessionConfiguration.ephemeral
         config.httpShouldSetCookies = false
         config.httpCookieAcceptPolicy = .never
-        session = URLSession(configuration: config)
+        super.init()
+        session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+    }
+
+    /// A redirect to another origin (scheme, host or port) does not get the tab's cookies or credentials.
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        var next = request
+        let from = task.originalRequest?.url, to = request.url
+        if from?.scheme != to?.scheme || from?.port != to?.port || from?.host?.lowercased() != to?.host?.lowercased() {
+            next.setValue(nil, forHTTPHeaderField: "Cookie")
+            next.setValue(nil, forHTTPHeaderField: "Authorization")
+        }
+        completionHandler(next)
     }
 
     /// Status counts so far (ok, exists, http, error, tooLarge) and whether every URL is done.
@@ -143,6 +169,7 @@ final class DevMCPDownload: @unchecked Sendable {
                     row["status"] = "exists"
                 } else {
                     try data.write(to: file)
+                    setQuarantineAttribute(on: file)
                     row["status"] = "ok"
                     row["bytes"] = data.count
                 }

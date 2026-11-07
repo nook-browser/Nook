@@ -21,6 +21,8 @@ struct URLBarView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering: Bool = false
     @State private var showCheckmark: Bool = false
+    @State private var showSiteSettings = false
+    @State private var confirmClearSiteData = false
     @State private var isEditing = false
     @State private var addressText = ""
     @State private var selectedSuggestion: SearchManager.SearchSuggestion?
@@ -214,6 +216,14 @@ struct URLBarView: View {
                     beginEditing(session?.url.absoluteString ?? "")
                 })
 
+                if !isEditing, !windowState.isIncognito, isHovering || showSiteSettings || confirmClearSiteData, let session {
+                    SiteSettingsButton(session: session, isPresented: $showSiteSettings, confirmClear: $confirmClearSiteData)
+                        .onChange(of: showSiteSettings || confirmClearSiteData) { _, open in
+                            hoverManager.setSiteSettingsOpen(open, in: windowState.id)
+                        }
+                        .onDisappear { hoverManager.setSiteSettingsOpen(false, in: windowState.id) }
+                }
+
                 // Copy link button (show on hover when tab is selected)
                 if !isEditing, isHovering, let session {
                     Button("Copy Link", systemImage: showCheckmark ? "checkmark" : "link") {
@@ -330,7 +340,7 @@ struct URLBarView: View {
                 let session = browserManager.tabs.session(for: item.id)
                 guard let url = session?.url ?? item.url, url.absoluteString != prefilledAddress else { return nil }
                 let title = item.customTitle ?? session?.title ?? item.displayTitle
-                let favicon = session?.favicon ?? url.host.flatMap { FaviconCache.shared.swiftUIImage(for: $0) } ?? Image(systemName: "globe")
+                let favicon = session?.favicon ?? FaviconCache.key(for: url).flatMap { FaviconCache.shared.swiftUIImage(for: $0) } ?? Image(systemName: "globe")
                 let match = SearchManager.TabMatch(itemID: item.id, title: title, url: url, favicon: favicon)
                 return SearchManager.SearchSuggestion(text: title, type: .tab(match))
             }
@@ -500,10 +510,7 @@ struct URLBarView: View {
     /// that was written out even when it is the scheme's default, so `https://x.com:443`
     /// still reads as `x.com`.
     private func displayHost(for session: PageSession?) -> String {
-        guard let url = session?.url, let host = url.host else { return displayURL(for: session) }
-        let defaultPort = url.scheme == "https" ? 443 : (url.scheme == "http" ? 80 : nil)
-        guard let port = url.port, port != defaultPort else { return host }
-        return "\(host):\(port)"
+        session?.url.nookDisplayHost ?? displayURL(for: session)
     }
     private func displayPath(for session: PageSession?) -> String {
         guard let url = session?.url, url.host != nil else { return "" }
@@ -604,9 +611,9 @@ private struct AddressSuggestionFavicon: View {
                     .font(.system(size: 16)).foregroundStyle(.secondary)
             }
         }
-        .task(id: url?.host) {
+        .task(id: url.flatMap(FaviconCache.key)) {
             cached = nil
-            if let host = url?.host { cached = await FaviconCache.shared.cachedImage(for: host) }
+            if let host = url.flatMap(FaviconCache.key) { cached = await FaviconCache.shared.cachedImage(for: host) }
         }
     }
 }
@@ -790,5 +797,15 @@ private struct SplitAddressSearchField: NSViewRepresentable {
     func updateNSView(_ nsView: Field, context: Context) {
         context.coordinator.parent = self
         if nsView.stringValue != text { nsView.stringValue = text }
+    }
+}
+
+extension URL {
+    /// The host as the address bar shows it, with a non-default port; nil when there is no host.
+    var nookDisplayHost: String? {
+        guard let host else { return nil }
+        let defaultPort = scheme == "https" ? 443 : (scheme == "http" ? 80 : nil)
+        guard let port, port != defaultPort else { return host }
+        return "\(host):\(port)"
     }
 }

@@ -7,6 +7,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 import NookDesign
 import NookTabsCore
 import NookWeb
@@ -63,6 +66,16 @@ public struct SpaceTab: View {
     public var body: some View {
         let title = tabs.title(for: item)
         Button(action: {
+            let current = tabs.selectedItemID(in: windowState)
+            if clickHolds(.command) {
+                windowState.multiSelection.toggle(item.id, current: current)
+                return
+            }
+            if clickHolds(.shift) {
+                windowState.multiSelection.extend(to: item.id, rows: tabs.sectionTabIDs(containing: item.id, in: windowState), current: current)
+                return
+            }
+            windowState.multiSelection.clear()
             if isCurrentTab {
                 startRename(title)
             } else {
@@ -185,7 +198,7 @@ public struct SpaceTab: View {
                         .strokeBorder(accentColor, lineWidth: NookDesign.Size.hairlineWidth)
                 }
             }
-            .nookTabSurface(selected: isCurrentTab, hovered: isHovering)
+            .nookTabSurface(selected: isCurrentTab || isMultiSelected, hovered: isHovering)
             // Developer Mode on this tab's site, marked as Arc marks it.
             .overlay {
                 if nookSettings.isDeveloperSite(tabs.currentURL(for: item)?.host) {
@@ -230,6 +243,20 @@ public struct SpaceTab: View {
         let tidy = tabs.tidyTitle(for: item)
         guard tidy.showsSite, let site = tidy.siteName else { return Text(tidy.title) }
         return Text(tidy.title) + Text("  " + site).foregroundColor(.secondary)
+    }
+
+    private var isMultiSelected: Bool {
+        windowState.multiSelection.contains(item.id) && tabs.selectedItems(in: windowState).contains(item.id)
+    }
+
+    /// Whether the key is down for the click being handled.
+    private func clickHolds(_ key: EventModifiers) -> Bool {
+        #if os(macOS)
+        let flags = NSEvent.modifierFlags
+        return key == .command ? flags.contains(.command) : flags.contains(.shift)
+        #else
+        return false
+        #endif
     }
 
     private var isCurrentTab: Bool {

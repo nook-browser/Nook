@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="318" viewBox="0 0 880 318" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Nook against six browsers, lower is better</title>
+<desc id="d">Nook: 2.0 GB, 34 mW, 543 ms launch; Safari: 2.5 GB, 53 mW, 907 ms launch; Zen: 3.5 GB, 41 mW, 711 ms launch; Firefox: 3.6 GB, 68 mW, 631 ms launch; Chrome: 3.7 GB, 137 mW, 390 ms launch; Arc: 4.2 GB, 155 mW, 2048 ms launch; Dia: 4.4 GB, 163 mW, 2093 ms launch</desc>
+<rect width="880" height="318" rx="12" fill="#ffffff"/>
+<text x="16" y="78" font-size="13" font-weight="600" fill="#1f2328">Nook</text>
+<text x="16" y="108" font-size="13" font-weight="400" fill="#1f2328">Safari</text>
+<text x="16" y="138" font-size="13" font-weight="400" fill="#1f2328">Zen</text>
+<text x="16" y="168" font-size="13" font-weight="400" fill="#1f2328">Firefox</text>
+<text x="16" y="198" font-size="13" font-weight="400" fill="#1f2328">Chrome</text>
+<text x="16" y="228" font-size="13" font-weight="400" fill="#1f2328">Arc</text>
+<text x="16" y="258" font-size="13" font-weight="400" fill="#1f2328">Dia</text>
+<text x="76.0" y="30" font-size="13" font-weight="600" fill="#1f2328">Memory, 16 tabs</text>
+<line x1="76.0" y1="56" x2="76.0" y2="268" stroke="#d1d9e0"/>
+<path d="M76.0,64 h69.1 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-69.1 z" fill="#2a78d6"/>
+<text x="155.1" y="77.5" font-size="12" font-weight="600" fill="#1f2328">2.0 GB</text>
+<path d="M76.0,94 h86.6 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-86.6 z" fill="#8f8e88"/>
+<text x="172.6" y="107.5" font-size="12" font-weight="400" fill="#59636e">2.5 GB</text>
+<path d="M76.0,124 h125.7 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-125.7 z" fill="#8f8e88"/>
+<text x="211.7" y="137.5" font-size="12" font-weight="400" fill="#59636e">3.5 GB</text>
+<path d="M76.0,154 h127.5 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-127.5 z" fill="#8f8e88"/>
+<text x="213.5" y="167.5" font-size="12" font-weight="400" fill="#59636e">3.6 GB</text>
+<path d="M76.0,184 h131.5 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-131.5 z" fill="#8f8e88"/>
+<text x="217.5" y="197.5" font-size="12" font-weight="400" fill="#59636e">3.7 GB</text>
+<path d="M76.0,214 h150.9 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-150.9 z" fill="#8f8e88"/>
+<text x="236.9" y="227.5" font-size="12" font-weight="400" fill="#59636e">4.2 GB</text>
+<path d="M76.0,244 h155.3 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-155.3 z" fill="#8f8e88"/>
+<text x="241.3" y="257.5" font-size="12" font-weight="400" fill="#59636e">4.4 GB</text>
+<text x="346.66666666666663" y="30" font-size="13" font-weight="600" fill="#1f2328">CPU energy, 16 tabs</text>
+<line x1="346.66666666666663" y1="56" x2="346.66666666666663" y2="268" stroke="#d1d9e0"/>
+<path d="M346.66666666666663,64 h30.5 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-30.5 z" fill="#2a78d6"/>
+<text x="387.2" y="77.5" font-size="12" font-weight="600" fill="#1f2328">34 mW</text>
+<path d="M346.66666666666663,94 h49.8 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-49.8 z" fill="#8f8e88"/>
+<text x="406.5" y="107.5" font-size="12" font-weight="400" fill="#59636e">53 mW</text>
+<path d="M346.66666666666663,124 h37.6 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-37.6 z" fill="#8f8e88"/>
+<text x="394.3" y="137.5" font-size="12" font-weight="400" fill="#59636e">41 mW</text>
+<path d="M346.66666666666663,154 h65.0 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-65.0 z" fill="#8f8e88"/>
+<text x="421.7" y="167.5" font-size="12" font-weight="400" fill="#59636e">68 mW</text>
+<path d="M346.66666666666663,184 h135.0 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-135.0 z" fill="#8f8e88"/>
+<text x="491.7" y="197.5" font-size="12" font-weight="400" fill="#59636e">137 mW</text>
+<path d="M346.66666666666663,214 h153.3 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-153.3 z" fill="#8f8e88"/>
+<text x="510.0" y="227.5" font-size="12" font-weight="400" fill="#59636e">155 mW</text>
+<path d="M346.66666666666663,244 h161.4 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-161.4 z" fill="#8f8e88"/>
+<text x="518.1" y="257.5" font-size="12" font-weight="400" fill="#59636e">163 mW</text>
+<text x="617.3333333333333" y="30" font-size="13" font-weight="600" fill="#1f2328">Launch</text>
+<line x1="617.3333333333333" y1="56" x2="617.3333333333333" y2="268" stroke="#d1d9e0"/>
+<path d="M617.3333333333333,64 h39.1 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-39.1 z" fill="#2a78d6"/>
+<text x="666.5" y="77.5" font-size="12" font-weight="600" fill="#1f2328">0.54 s</text>
+<path d="M617.3333333333333,94 h68.0 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-68.0 z" fill="#8f8e88"/>
+<text x="695.4" y="107.5" font-size="12" font-weight="400" fill="#59636e">0.91 s</text>
+<path d="M617.3333333333333,124 h52.5 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-52.5 z" fill="#8f8e88"/>
+<text x="679.8" y="137.5" font-size="12" font-weight="400" fill="#59636e">0.71 s</text>
+<path d="M617.3333333333333,154 h46.1 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-46.1 z" fill="#8f8e88"/>
+<text x="673.4" y="167.5" font-size="12" font-weight="400" fill="#59636e">0.63 s</text>
+<path d="M617.3333333333333,184 h27.0 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-27.0 z" fill="#8f8e88"/>
+<text x="654.3" y="197.5" font-size="12" font-weight="400" fill="#59636e">0.39 s</text>
+<path d="M617.3333333333333,214 h158.7 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-158.7 z" fill="#8f8e88"/>
+<text x="786.0" y="227.5" font-size="12" font-weight="400" fill="#59636e">2.05 s</text>
+<path d="M617.3333333333333,244 h162.2 a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h-162.2 z" fill="#8f8e88"/>
+<text x="789.6" y="257.5" font-size="12" font-weight="400" fill="#59636e">2.09 s</text>
+<text x="16" y="292" font-size="11.5" fill="#59636e">Lower is better. Same 15 sites at once, ad blocking off, no extensions, fresh profiles. Launch is time to first request for a link.</text>
+<text x="16" y="309" font-size="11.5" fill="#59636e">Nook 1.4.0, Safari 27.0.1, Zen 1.23.4b, Firefox 159, Chrome 156, Arc 1.171, Dia 1.55. M5 Pro, macOS 27, October 2026.</text>
+</svg>

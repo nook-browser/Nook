@@ -34,9 +34,31 @@
 -  **Minimal, modern UI** – focused on content, not chrome.  
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dbfe9e9c-82f5-4f59-a073-b86ea05e5f26" alt="Nook screenshot">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshot-dark.png">
+    <img src="assets/screenshot-light.png" alt="Nook screenshot">
+  </picture>
 </p>
 
+## Performance
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/benchmark-dark.svg">
+    <img src="assets/benchmark-light.svg" alt="Nook uses 2.0 GB and 34 mW with 16 tabs open, against 2.5 to 4.4 GB and 41 to 163 mW for Safari, Zen, Firefox, Chrome, Arc and Dia. Nook launches in 0.54 s; Chrome is fastest at 0.39 s.">
+  </picture>
+</p>
+
+
+## Launchers
+
+Raycast, Alfred and scripts can drive Nook with `nook://` links. They are off until you turn on Allow nook:// links in Settings > Links.
+
+- Open a page: `open "nook://open?url=https://example.com&space=Work&reuse=1"` (`space` and `reuse` are optional; `reuse=1` selects a tab that already shows the page)
+- Search: `open "nook://search?q=swift%20concurrency&space=Work"`
+- Switch space: `open "nook://space?name=Work"`
+
+A space is matched by its exact name (any case) or its UUID. Only `http` and `https` pages open.
 
 ## Getting Started  
 
@@ -48,15 +70,15 @@
 #### Prerequisites  
 - macOS 15.6 (Sequoia) or later, Apple Silicon. Xcode 26 needs 15.6; the built app runs on 15.5 and later
 - On-device AI chat and Tab Organizer require macOS 26 or later with Apple Intelligence enabled
-- [Xcode](https://developer.apple.com/xcode/) 26 or later
+- [Xcode](https://developer.apple.com/xcode/) 26 or later, with the Metal Toolchain component (Xcode 26 no longer bundles it)
 ```bash
-
 git clone https://github.com/nook-browser/Nook.git
 cd Nook
+xcodebuild -downloadComponent MetalToolchain
 open Nook.xcodeproj
 ```
 
-Nook builds for Apple Silicon only: the on-device tab organizer depends on MLX, which has no x86_64 slice. Xcode resolves the Swift packages on open.
+Nook builds for Apple Silicon only: the bundled adblock-rust framework ships an arm64 slice and nothing else. Xcode resolves the Swift packages on open.
 
 You’ll need to set your personal Development Team in Signing to build locally.
 
@@ -79,7 +101,7 @@ Nook/
 │   │   ├── ExtensionManager/  # WKWebExtension support
 │   │   ├── AIManager/         # AI chat providers, MCP client, browser tools
 │   │   ├── DevMCPServer/      # Local MCP server for driving the app from a coding agent
-│   │   ├── TabOrganizerManager/ # On-device LLM tab grouping (MLX)
+│   │   ├── TabOrganizerManager/ # On-device tab grouping with Apple Intelligence
 │   │   ├── WebViewCoordinator/  # Web view pool for multi-window display
 │   │   ├── DownloadManager/   # File downloads
 │   │   ├── DialogManager/     # Modal dialogs
@@ -94,10 +116,10 @@ Nook/
 ├── CommandPalette/            # Command palette UI
 ├── Navigation/                # Sidebar structure: header, bottom bar, spaces list
 ├── Onboarding/                # First-run flow
-├── Settings/                  # SwiftUI environment glue for the settings service
+├── NookiOS/                   # iOS app target, not released yet
 ├── UI/                        # Shared buttons and controls
-├── docs/                      # Architecture notes, design specs, implementation plans
-├── scripts/                   # Filter list refresh, used in CI
+├── docs/                      # Ad blocker architecture notes
+├── scripts/                   # Filter list refresh, scriptlet and redirect generators, checks
 └── assets/                    # Static assets
 ```
 

@@ -13,7 +13,7 @@ import SwiftData
 final class ExtensionEntity {
     @Attribute(.unique) var id: String
     // Extensions are global: one install, one enabled state, and one storage namespace
-    // shared by every profile. Private (ephemeral) tabs never see extensions.
+    // shared by every profile. Private windows see only extensions allowed there.
     var name: String
     var version: String
     var manifestVersion: Int
@@ -29,6 +29,8 @@ final class ExtensionEntity {
     var safariAppPath: String?
     /// Copy of a store `origin` for builds that predate `origin`; they read it to find updates.
     var sourceStore: String?
+    /// Runs in private windows (`WKWebExtensionContext.hasAccessToPrivateData`). Off by default.
+    var allowsPrivateBrowsing: Bool = false
 
     var source: ExtensionSource {
         get { ExtensionSource(origin: origin, appPath: safariAppPath) ?? .file }
@@ -174,6 +176,7 @@ struct InstalledExtension {
     let manifestVersion: Int
     let description: String?
     let isEnabled: Bool
+    let allowsPrivateBrowsing: Bool
     let installDate: Date
     let lastUpdateDate: Date
     let packagePath: String
@@ -188,6 +191,7 @@ struct InstalledExtension {
         self.manifestVersion = entity.manifestVersion
         self.description = entity.extensionDescription
         self.isEnabled = entity.isEnabled
+        self.allowsPrivateBrowsing = entity.allowsPrivateBrowsing
         self.installDate = entity.installDate
         self.lastUpdateDate = entity.lastUpdateDate
         self.packagePath = entity.packagePath

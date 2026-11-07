@@ -69,7 +69,9 @@ final class LinkPreviewService {
         guard states[url] == nil else { return }
         var target = link
         if let skipped = blocker.urlSkipTarget(for: target, from: session.webView?.url, tab: session) { target = skipped }
-        if let stripped = blocker.strippedTrackingParams(for: target, tab: session) { target = stripped }
+        if session.removesTrackingFromLinks, let stripped = blocker.strippedTrackingParams(for: target, tab: session) {
+            target = stripped
+        }
         let engine = blocker.advancedRulesEngine.engine
         // An enabled blocker with no engine yet cannot vouch for the link; an allowlisted site is exempt from the check.
         let blocked = blocker.isEnabled && !blocker.isDomainAllowed(target.host)
@@ -92,7 +94,7 @@ final class LinkPreviewService {
                     if let image = await Self.image(at: imageURL) { images[url] = image }
                 }
             }
-            if let landed = page.landedURL, let host = landed.host {
+            if let landed = page.landedURL, let host = FaviconCache.key(for: landed) {
                 let iconURL = page.iconURL ?? URL(string: "/favicon.ico", relativeTo: landed)?.absoluteURL
                 Task {
                     if let icon = await Self.icon(at: iconURL, host: host) { icons[url] = icon }

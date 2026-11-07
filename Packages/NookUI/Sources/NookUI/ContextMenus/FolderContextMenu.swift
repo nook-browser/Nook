@@ -63,6 +63,18 @@ struct FolderContextMenu: View {
             Button(action: alphabetize) {
                 Label("Alphabetize Tabs", systemImage: "textformat.abc")
             }
+            if let spaceID = windowState?.spaceID {
+                Button {
+                    tabs.setAllFolders(open: false, space: spaceID)
+                } label: {
+                    Label("Collapse All Folders", systemImage: "rectangle.compress.vertical")
+                }
+                Button {
+                    tabs.setAllFolders(open: true, space: spaceID)
+                } label: {
+                    Label("Expand All Folders", systemImage: "rectangle.expand.vertical")
+                }
+            }
             Divider()
             Button(role: .destructive) {
                 tabs.close(itemID)

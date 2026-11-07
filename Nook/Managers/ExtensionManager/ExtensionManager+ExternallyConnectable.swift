@@ -548,17 +548,9 @@ extension ExtensionManager {
         """
     }
 
-    /// `externally_connectable` match patterns Nook will honor. Chrome rejects wildcard-only and
-    /// TLD-wide hosts there; skip those so a sloppy manifest cannot expose every site.
+    /// `externally_connectable` match patterns Nook will honor (see `ExternallyConnectableMatch`).
     nonisolated static func acceptableExternallyConnectableMatches(_ patterns: [String]) -> [String] {
-        patterns.filter { pattern in
-            guard let schemeEnd = pattern.range(of: "://") else { return false }
-            let scheme = String(pattern[..<schemeEnd.lowerBound])
-            guard ["http", "https", "*"].contains(scheme) else { return false }
-            let rawHost = String(pattern[schemeEnd.upperBound...].prefix { $0 != "/" }).lowercased()
-            let host = rawHost.hasPrefix("*.") ? String(rawHost.dropFirst(2)) : rawHost
-            return !host.isEmpty && !host.contains("*") && (host.contains(".") || host == "localhost")
-        }
+        patterns.filter(ExternallyConnectableMatch.isAcceptable)
     }
 
     /// Insert or update a Nook-owned content script entry. Returns true if the manifest changed.
@@ -612,7 +604,16 @@ extension ExtensionManager {
         let ecMatches = Self.acceptableExternallyConnectableMatches(
             (manifest["externally_connectable"] as? [String: Any])?["matches"] as? [String] ?? []
         )
-        if !ecMatches.isEmpty {
+        if ecMatches.isEmpty {
+            // Drop bridge entries an earlier, looser filter wrote into this manifest.
+            var scripts = manifest["content_scripts"] as? [[String: Any]] ?? []
+            let before = scripts.count
+            scripts.removeAll { ($0["js"] as? [String])?.contains { $0 == "nook_ec_polyfill.js" || $0 == "nook_bridge.js" } == true }
+            if scripts.count != before {
+                manifest["content_scripts"] = scripts
+                changed = true
+            }
+        } else {
             let packageDir = manifestURL.deletingLastPathComponent()
             if Self.upsertContentScript(in: &manifest, file: "nook_ec_polyfill.js", matches: ecMatches, world: "MAIN") {
                 changed = true

@@ -266,6 +266,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             return
         }
 
+        // nook:// commands come only through this event, and never from Nook itself.
+        if url.scheme?.lowercased() == "nook" {
+            let sender = event.attributeDescriptor(forKeyword: AEKeyword(keySenderPIDAttr))?.int32Value
+            guard sender != getpid() else {
+                AppDelegate.log.info("Ignored nook:// link sent by Nook itself")
+                return
+            }
+            handleIncoming(url: url)
+            return
+        }
+
         // Security: Only allow http/https URLs from external automation
         guard let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else {
@@ -286,7 +297,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             return
         }
         Task { @MainActor in
-            manager.presentExternalURL(url)
+            if url.scheme?.lowercased() == "nook" {
+                manager.handleNookURL(url)
+            } else {
+                manager.presentExternalURL(url)
+            }
         }
     }
 

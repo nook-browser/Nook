@@ -30,11 +30,11 @@ struct PDFControlsView: View {
     var body: some View {
         HStack(spacing: NookDesign.Spacing.xxs) {
             Button("Zoom Out", systemImage: "minus.magnifyingglass") {
-                browserManager.zoomManager.zoomOut(for: webView, tabId: session.itemID)
+                browserManager.zoomManager.zoomOut(for: webView)
                 browserManager.shouldShowZoomPopup = true
             }
             Button("Zoom In", systemImage: "plus.magnifyingglass") {
-                browserManager.zoomManager.zoomIn(for: webView, tabId: session.itemID)
+                browserManager.zoomManager.zoomIn(for: webView)
                 browserManager.shouldShowZoomPopup = true
             }
             Button("Open in Preview", systemImage: "arrow.up.forward.app") {

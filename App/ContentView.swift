@@ -108,6 +108,8 @@ private struct WindowFocusBridge: NSViewRepresentable {
                 windowState.window = window
             }
 
+            window.setUpAsPageWindow()
+
             keyObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.didBecomeKeyNotification,
                 object: window,

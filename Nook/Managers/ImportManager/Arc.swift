@@ -7,6 +7,12 @@
 //
 
 import Foundation
+#if canImport(NookSettings)
+import NookSettings
+#endif
+#if canImport(NookTabsCore)
+import NookTabsCore
+#endif
 
 // MARK: - Arc Models
 struct ArcImportResult {
@@ -15,9 +21,24 @@ struct ArcImportResult {
     var favorites: [String: [ArcNode]] = [:]
     /// Profile names the person gave in Arc, by the same keys.
     var profileNames: [String: String] = [:]
+    var routing = ArcRouting()
+    var archive: [ArcArchivedItem] = []
+}
+
+/// A rule from `StorableLinkRouting.json` that Nook could express: a URL fragment sent to an Arc space.
+struct ArcRoute: Equatable {
+    let pattern: String
+    let spaceID: String
+}
+
+struct ArcRouting {
+    var routes: [ArcRoute] = []
+    /// Rules of a shape Nook cannot hold: `matches`, profile or Little Arc targets, several conditions.
+    var skipped = 0
 }
 
 struct ArcSpace {
+    let id: String
     let title: String
     let emoji: String?
     let accentHex: String?
@@ -82,6 +103,7 @@ func parseArcSidebarData(_ data: Data) throws -> ArcImportResult {
         let custom = space["customInfo"] as? [String: Any]
         let midTone = ((custom?["windowTheme"] as? [String: Any])?["primaryColorPalette"] as? [String: Any])?["midTone"]
         result.spaces.append(ArcSpace(
+            id: space["id"] as? String ?? "",
             title: space["title"] as? String ?? "",
             emoji: (custom?["iconType"] as? [String: Any])?["emoji_v2"] as? String,
             accentHex: hex(midTone as? [String: Any]),
@@ -139,4 +161,94 @@ private func hex(_ color: [String: Any]?) -> String? {
           let b = color["blue"] as? Double else { return nil }
     let byte = { (v: Double) in Int((min(max(v, 0), 1) * 255).rounded()) }
     return String(format: "#%02X%02X%02X", byte(r), byte(g), byte(b))
+}
+
+// MARK: - Air Traffic Control
+
+func parseArcLinkRouting(_ data: Data) -> ArcRouting {
+    let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    var routing = ArcRouting()
+    for case let rule as [String: Any] in root?["rules"] as? [Any] ?? [] {
+        let parts = rule["sourceComponents"] as? [[String: Any]] ?? []
+        let match = (parts.first?["componentType"] as? [String: Any])?["urlMatch"] as? [String: Any]
+        let target = (((rule["destination"] as? [String: Any])?["space"] as? [String: Any])?["_0"] as? [String: Any])?["space"] as? [String: Any]
+        guard parts.count == 1, (match?["_0"] as? [String: Any])?.keys.first == "contains",
+              let pattern = match?["_1"] as? String, let spaceID = target?["_0"] as? String
+        else { routing.skipped += 1; continue }
+        routing.routes.append(ArcRoute(pattern: pattern, spaceID: spaceID))
+    }
+    return routing
+}
+
+/// Nook rules for the routes whose pattern is a host with an optional path and whose space came in.
+/// A rule with the same domain and path as one in `existing` or earlier in the list is dropped, whatever its space.
+func arcSiteRules(_ routing: ArcRouting, spaceIDs: [String: UUID], existing: [SiteRoutingRule])
+    -> (rules: [SiteRoutingRule], skipped: Int) {
+    var all = existing, added: [SiteRoutingRule] = [], skipped = routing.skipped
+    for route in routing.routes {
+        var text = route.pattern.trimmingCharacters(in: .whitespaces)
+        for scheme in ["https://", "http://"] where text.lowercased().hasPrefix(scheme) { text.removeFirst(scheme.count) }
+        let (rawHost, path) = text.firstIndex(of: "/").map { (String(text[..<$0]), String(text[$0...])) } ?? (text, "")
+        let host = rawHost.lowercased()
+        let hostOK = host.range(of: #"^([a-z0-9-]+\.)+[a-z0-9-]+$"#, options: .regularExpression) != nil
+        let pathOK = path.range(of: #"^(/[A-Za-z0-9._~%/-]*)?$"#, options: .regularExpression) != nil
+        guard hostOK, pathOK, let space = spaceIDs[route.spaceID] else { skipped += 1; continue }
+        let rule = SiteRoutingRule(domain: host, pathPrefix: path.count > 1 ? path : nil, targetSpaceId: space)
+        if all.contains(where: { $0.domain == rule.domain && $0.pathPrefix == rule.pathPrefix }) { continue }
+        all.append(rule)
+        added.append(rule)
+    }
+    return (added, skipped)
+}
+
+// MARK: - Archive
+
+/// A tab from `StorableArchiveItems.json` that Arc closed out of a space.
+struct ArcArchivedItem: Equatable {
+    let spaceID: String
+    let url: String
+    let title: String
+    let archivedAt: Date
+    let auto: Bool
+}
+
+/// Archived tabs from `StorableArchiveItems.json`. Only items from a space are kept; Little Arc,
+/// standalone sidebar and unknown sources are dropped.
+func parseArcArchive(_ data: Data) -> [ArcArchivedItem] {
+    let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    return list(root?["items"]).compactMap { value in
+        guard let item = value as? [String: Any],
+              let spaceID = (((item["source"] as? [String: Any])?["space"] as? [String: Any])?["_0"]) as? String,
+              let seconds = item["archivedAt"] as? Double,
+              let sidebar = item["sidebarItem"] as? [String: Any],
+              let tab = (sidebar["data"] as? [String: Any])?["tab"] as? [String: Any],
+              let url = [tab["savedURL"], tab["currentURL"]].lazy.compactMap({ $0 as? String }).first(where: { !$0.isEmpty })
+        else { return nil }
+        let saved = tab["savedTitle"] as? String
+        let name = (sidebar["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        return ArcArchivedItem(spaceID: spaceID, url: url, title: name ?? saved ?? "",
+                               archivedAt: Date(timeIntervalSinceReferenceDate: seconds),
+                               auto: item["reason"].flatMap(key) == "auto")
+    }
+}
+
+/// Archive entries for items from imported spaces, within the Archive's retention, with an http(s)
+/// URL and not already in `existing` (same URL and time).
+func arcArchiveEntries(_ items: [ArcArchivedItem], spaceIDs: [String: UUID], existing: [ArchiveEntry], now: Date = Date()) -> [ArchiveEntry] {
+    let cutoff = now.addingTimeInterval(-Double(Archive.retentionDays) * 86_400)
+    return items.compactMap { item in
+        guard item.archivedAt >= cutoff, let space = spaceIDs[item.spaceID],
+              let url = URL(string: item.url), ["http", "https"].contains(url.scheme?.lowercased()),
+              !existing.contains(where: { $0.url == url && $0.archivedAt == item.archivedAt })
+        else { return nil }
+        return ArchiveEntry(spaceID: space, title: item.title, url: url, archivedAt: item.archivedAt, reason: item.auto ? .auto : .closed)
+    }
+}
+
+/// "4 spaces, 87 tabs, 12 folders, 3 Air Traffic Control rules and 14 archived tabs.", leaving out zero counts.
+func arcImportSummary(spaces: Int, tabs: Int, folders: Int, rules: Int, archived: Int) -> String {
+    let parts = [(spaces, "space"), (tabs, "tab"), (folders, "folder"), (rules, "Air Traffic Control rule"), (archived, "archived tab")]
+        .filter { $0.0 > 0 }.map { "\($0.0) \($0.1)\($0.0 == 1 ? "" : "s")" }
+    guard let last = parts.last else { return "" }
+    return (parts.count > 1 ? parts.dropLast().joined(separator: ", ") + " and " : "") + last + "."
 }

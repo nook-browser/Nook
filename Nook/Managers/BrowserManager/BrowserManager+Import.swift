@@ -13,9 +13,10 @@ import SwiftUI
 extension BrowserManager {
     /// Arc's spaces in order, each with its pinned and Today sections, its profile's favorites,
     /// nested folders, custom tab names and theme color. Each Arc profile becomes a Nook profile
-    /// with Arc's name. Arc's member card is kept beside the tabs. Returns whether any space came in.
+    /// with Arc's name. Arc's member card is kept beside the tabs. Air Traffic Control rules and the last 30 days of archived tabs come over too.
+    /// Returns what came in as a sentence, or nil when no space did.
     @discardableResult
-    func importArcData() async -> Bool {
+    func importArcData() async -> String? {
         let result = await importManager.importArcSidebarData()
         if let card = importManager.arcMembershipCard() {
             try? card.write(to: TabsController.defaultDirectory.deletingLastPathComponent()
@@ -23,7 +24,7 @@ extension BrowserManager {
         }
         pendingExtensionImports += importManager.arcExtensionIDs()
         installPendingExtensionImports()
-        guard let window = importWindow else { return false }
+        guard let window = importWindow else { return nil }
         // Onboarding starts with one space holding a Google tab; beside Arc's spaces it is only an extra.
         let starters = nookSettings?.didFinishOnboarding == false
             ? tabs.orderedSpaces.filter { space in
@@ -35,6 +36,8 @@ extension BrowserManager {
         var lastSpace = tabs.orderedSpaces.last?.id
         var firstImported: UUID?
         var profileSpaces: [String: UUID] = [:]
+        var arcSpaceIDs: [String: UUID] = [:]
+        var tabCount = 0, folderCount = 0
         for space in result.spaces {
             guard let spaceID = tabs.createSpace(
                 name: space.title, icon: space.emoji ?? "",
@@ -43,20 +46,27 @@ extension BrowserManager {
                 profileName: result.profileNames[space.profile]
             ) else { continue }
             lastSpace = spaceID
+            arcSpaceIDs[space.id] = spaceID
             firstImported = firstImported ?? spaceID
             if profileSpaces[space.profile] == nil { profileSpaces[space.profile] = spaceID }
 
             // Arc shows a profile's favorites in each of its spaces; a Nook space has its own.
-            importArc(result.favorites[space.profile] ?? [], into: .favorites(spaceID: spaceID), window: window)
-            importArc(space.pinned, into: .pinned(spaceID: spaceID), window: window)
-            importArc(space.unpinned, into: .tabs(spaceID: spaceID), window: window)
+            importArc(result.favorites[space.profile] ?? [], into: .favorites(spaceID: spaceID), window: window, tabs: &tabCount, folders: &folderCount)
+            importArc(space.pinned, into: .pinned(spaceID: spaceID), window: window, tabs: &tabCount, folders: &folderCount)
+            importArc(space.unpinned, into: .tabs(spaceID: spaceID), window: window, tabs: &tabCount, folders: &folderCount)
             tabs.setAllFolders(open: false, space: spaceID)
         }
 
-        guard let firstImported else { return false }
+        guard let firstImported else { return nil }
         if window.spaceID.map(starters.contains) ?? true { tabs.setSpace(firstImported, in: window) }
         starters.forEach { tabs.deleteSpace($0) }
-        return true
+
+        let routes = arcSiteRules(result.routing, spaceIDs: arcSpaceIDs, existing: nookSettings?.siteRoutingRules ?? [])
+        nookSettings?.siteRoutingRules += routes.rules
+        let archived = tabs.importArchive(arcArchiveEntries(result.archive, spaceIDs: arcSpaceIDs, existing: tabs.archive.entries))
+        nookSettings?.didImportFromArc = true
+        Self.importLog.notice("Arc import: \(routes.rules.count) routing rules added, \(routes.skipped) skipped, \(archived) archived tabs")
+        return arcImportSummary(spaces: arcSpaceIDs.count, tabs: tabCount, folders: folderCount, rules: routes.rules.count, archived: archived)
     }
 
     func importDiaData() async {
@@ -142,19 +152,22 @@ extension BrowserManager {
 
     /// Adds Arc's tree under `parent` in source order. A folder Nook cannot hold there (in
     /// favorites, or past the depth limit) gives its tabs to the parent instead.
-    private func importArc(_ nodes: [ArcNode], into parent: Parent, window: BrowserWindowState) {
+    private func importArc(_ nodes: [ArcNode], into parent: Parent, window: BrowserWindowState,
+                           tabs tabCount: inout Int, folders folderCount: inout Int) {
         for node in nodes.reversed() {
             switch node {
             case let .tab(string, title, customTitle):
                 guard let url = URL(string: string), ["http", "https", "file"].contains(url.scheme?.lowercased()),
                       let id = tabs.open(url: url, in: window, placement: .background, parent: parent, title: title)
                 else { continue }
+                tabCount += 1
                 if let customTitle { tabs.rename(id, customTitle) }
             case let .folder(title, children):
                 if let folderID = tabs.createFolder(title: title, in: parent, after: nil) {
-                    importArc(children, into: .folder(itemID: folderID), window: window)
+                    folderCount += 1
+                    importArc(children, into: .folder(itemID: folderID), window: window, tabs: &tabCount, folders: &folderCount)
                 } else {
-                    importArc(children, into: parent, window: window)
+                    importArc(children, into: parent, window: window, tabs: &tabCount, folders: &folderCount)
                 }
             }
         }

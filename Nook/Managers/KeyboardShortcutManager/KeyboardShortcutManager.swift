@@ -18,7 +18,7 @@ class KeyboardShortcutManager {
     private let userDefaults = UserDefaults.standard
     private let shortcutsKey = "keyboard.shortcuts"
     private let shortcutsVersionKey = "keyboard.shortcuts.version"
-    private let currentVersion = 10 // Increment when adding new shortcuts; 10 added Go to Space 1-9 (Ctrl+1-9) and moved Next/Previous Space to Cmd+Opt+arrows
+    private let currentVersion = 11 // Increment when adding new shortcuts; 11 added Pin/Unpin Tab (Cmd+D) and Stop Loading (Cmd+.); 10 added Go to Space 1-9 (Ctrl+1-9) and moved Next/Previous Space to Cmd+Opt+arrows
 
     /// Defaults that changed key: a user still on the old key gets the new one.
     private let movedDefaults: [(action: ShortcutAction, from: KeyCombination, version: Int)] = [
@@ -212,7 +212,11 @@ class KeyboardShortcutManager {
         // pass through so standard macOS shortcuts (Cmd+W to close, etc.) work normally
         if let keyWindow = NSApp.keyWindow,
            !(windowRegistry?.windows.values.contains(where: { $0.window === keyWindow }) ?? false) {
-            return false
+            guard let miniWindow = keyWindow as? MiniBrowserWindow,
+                  let keyCombination = KeyCombination(from: event),
+                  let shortcut = shortcutMap[keyCombination.lookupKey],
+                  shortcut.isEnabled else { return false }
+            return executeInMiniWindow(shortcut.action, miniWindow)
         }
 
         let keyCode = event.keyCode
@@ -264,7 +268,9 @@ class KeyboardShortcutManager {
 
         // MARK: - Website Shortcut Conflict Resolution
         // Check if this shortcut conflicts with a website shortcut
-        if let windowId = windowRegistry?.activeWindow?.id {
+        // Peek covers the tab the detector would look at, so its keys never yield to the site below.
+        if let windowId = windowRegistry?.activeWindow?.id,
+           browserManager?.peekManager.windowId != windowId || browserManager?.peekManager.page == nil {
             let shouldPass = websiteShortcutDetector.shouldPassToWebsite(
                 keyCombination,
                 windowId: windowId,
@@ -461,6 +467,45 @@ class KeyboardShortcutManager {
         return event.modifierFlags.contains(.control) && !event.modifierFlags.contains(.command)
     }
 
+    /// A mini window's page takes the page shortcuts. The rest are swallowed, since the menu bar
+    /// would otherwise run them on the browser window behind it; New Window and Quit pass through.
+    private func executeInMiniWindow(_ action: ShortcutAction, _ window: MiniBrowserWindow) -> Bool {
+        guard let page = window.page, let webView = page.webView else { return false }
+        switch action {
+        case .newWindow, .closeBrowser, .togglePinTab:
+            return false
+        case .stopLoading:
+            webView.stopLoading()
+        case .goBack:
+            if webView.canGoBack { webView.goBack() }
+        case .goForward:
+            if webView.canGoForward { webView.goForward() }
+        case .refresh:
+            page.refresh()
+        case .hardReload:
+            webView.reloadFromOrigin()
+        case .copyCurrentURL:
+            browserManager?.copyCurrentURL()
+        case .printPage:
+            webView.nookPrint()
+        case .muteUnmuteAudio:
+            page.toggleMute()
+        case .togglePictureInPicture:
+            page.requestPictureInPicture()
+        case .zoomIn:
+            browserManager?.zoomManager.zoomIn(for: webView)
+        case .zoomOut:
+            browserManager?.zoomManager.zoomOut(for: webView)
+        case .actualSize:
+            browserManager?.zoomManager.resetZoom(for: webView)
+        case .closeTab, .closeWindow:
+            window.performClose(nil)
+        default:
+            break
+        }
+        return true
+    }
+
     private func executeAction(_ action: ShortcutAction) {
         guard let browserManager = browserManager else { return }
 
@@ -595,6 +640,10 @@ class KeyboardShortcutManager {
                 browserManager.showSpaceSettings()
             case .organizeTabs:
                 NotificationCenter.default.post(name: .organizeTabsRequested, object: nil)
+            case .togglePinTab:
+                browserManager.togglePinCurrentTab()
+            case .stopLoading:
+                browserManager.stopLoadingCurrentPage()
             }
 
         }

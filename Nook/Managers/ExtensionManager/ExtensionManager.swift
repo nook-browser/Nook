@@ -30,7 +30,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     @Published var safariExtensions: [SafariExtensionInfo]?
     var isScanningSafari = false
     // Scope: extensions are global. One controller, one install/enabled state, and one
-    // storage namespace shared by every space. Private (ephemeral) tabs get no controller.
+    // storage namespace shared by every space. Private windows run only extensions the person
+    // allowed there (`hasAccessToPrivateData`).
 
     internal var extensionController: WKWebExtensionController?
     internal var extensionContexts: [String: WKWebExtensionContext] = [:]
@@ -42,9 +43,9 @@ final class ExtensionManager: NSObject, ObservableObject,
     /// Stable tab adapters by item id; they resolve the page session on each call.
     var tabAdapters: [UUID: ExtensionTabAdapter] = [:]
     /// Items the controller has been told about via didOpenTab. Other tab events are only
-    /// forwarded for these, so private and never-loaded pages stay invisible to extensions.
+    /// forwarded for these, so never-loaded pages stay invisible to extensions.
     var openedTabIDs: Set<UUID> = []
-    /// One adapter per regular window, by BrowserWindowState id.
+    /// One adapter per window, by BrowserWindowState id.
     var windowAdapters: [UUID: ExtensionWindowAdapter] = [:]
     /// Live `chrome.windows.create({type: "popup"})` windows; each removes itself when closed.
     var extensionPopupWindows: [ExtensionPopupWindow] = []
@@ -146,9 +147,20 @@ final class ExtensionManager: NSObject, ObservableObject,
         for applicationId: String, context: WKWebExtensionContext
     ) -> (any InternalNativePortHandler)? {
         guard let handler = internalPortHandlers[applicationId],
-              type(of: handler).extensionIdentifiers.contains(context.uniqueIdentifier)
+              type(of: handler).extensionIdentifiers.contains(context.uniqueIdentifier),
+              !ExtensionStore.isValidExtensionID(context.uniqueIdentifier) || hasStoreVerifiedChromeID(context)
         else { return nil }
         return handler
+    }
+
+    /// A Chrome-format ID is only a claim: a sideload gets one by copying a store build's public
+    /// manifest `key`. A Web Store or Edge install is what proves it.
+    func hasStoreVerifiedChromeID(_ context: WKWebExtensionContext) -> Bool {
+        let id = context.uniqueIdentifier
+        guard ExtensionStore.isValidExtensionID(id),
+              let store = fetchEntity(id: id)?.source.store
+        else { return false }
+        return store == .chrome || store == .edge
     }
 
     // MARK: - Extension Context Identity
@@ -202,7 +214,7 @@ final class ExtensionManager: NSObject, ObservableObject,
         // report themselves through notifyTabOpened when their view is created; registering
         // a tab with a nil web view caches stale state and breaks chrome.runtime messaging.
         let windows = openWindowAdapters
-        let sessions = browserManager.tabs.sessions.filter { !$0.isPrivate && !$0.isUnloaded }
+        let sessions = browserManager.tabs.sessions.filter { !$0.isUnloaded }
         for session in sessions { notifyTabOpened(session) }
 
         if let focused = browserManager.windowRegistry?.activeWindow,

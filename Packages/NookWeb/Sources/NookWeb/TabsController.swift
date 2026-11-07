@@ -28,7 +28,11 @@ public final class TabsController {
     // MARK: - State
 
     public private(set) var tree: TabTree
-    public private(set) var device: DeviceState
+    public internal(set) var device: DeviceState
+    /// Tabs closed or idle out of the tabs sections (`archive.json`).
+    public internal(set) var archive = Archive()
+    /// Tabs shielded at the last auto-archive pass; one that dropped out gets a fresh stamp.
+    var archiveShielded = Set<UUID>()
     public let loadOutcome: LoadOutcome
     public let directory: URL
     var isReadOnly: Bool {
@@ -43,6 +47,7 @@ public final class TabsController {
     private var pageOwners: [UUID: UUID] = [:]
     /// Open folders of private windows, kept apart so their ids never reach device.json.
     private var privateOpenFolders: Set<UUID> = []
+    private var privateCollapsedPinned: Set<UUID> = []
     /// Live folders whose last refresh failed, and why. No entry when it worked.
     public internal(set) var liveStatus: [UUID: LiveFolderStatus] = [:]
     @ObservationIgnored var liveRefreshed: [UUID: Date] = [:]
@@ -57,8 +62,10 @@ public final class TabsController {
     /// One `Profile` (website data store) per space, made on first use and kept for the session.
     @ObservationIgnored private var spaceProfiles: [UUID: Profile] = [:]
 
-    @ObservationIgnored private let store: TabStore
+    @ObservationIgnored let store: TabStore
     @ObservationIgnored private(set) var undoStack: [Change] = []
+    /// Collects the changes of one multi-item intent into a single undo step (`grouped`).
+    @ObservationIgnored private var undoGroup: Change?
     @ObservationIgnored private var isTerminating = false
     @ObservationIgnored public let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", category: "Tabs")
 
@@ -122,6 +129,7 @@ public final class TabsController {
         let store = TabStore(directory: directory)
         self.store = store
         let loaded = store.load()
+        archive = store.loadArchive()
         loadOutcome = loaded.outcome
         switch loaded.outcome {
         case .firstLaunch, .readOnly:
@@ -149,7 +157,10 @@ public final class TabsController {
             log.info("Merged profiles into \(self.tree.orderedSpaces.count) spaces")
         }
         NotificationCenter.default.addObserver(forName: appDidBecomeActive, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshLiveFolders() }
+            MainActor.assumeIsolated {
+                self?.refreshLiveFolders()
+                self?.archiveIdleTabs()
+            }
         }
     }
 
@@ -182,11 +193,23 @@ public final class TabsController {
         isTerminating = true
         for window in regularWindows { mirror(window) }
         store.save(tree, device)
+        store.save(archive)
         store.flush()
+    }
+
+    /// Runs `body` so every tree edit in it is one undo step.
+    func grouped(_ body: () -> Void) {
+        guard undoGroup == nil else { return body() }
+        undoGroup = Change()
+        body()
+        let change = undoGroup ?? Change()
+        undoGroup = nil
+        pushUndo(change)
     }
 
     func pushUndo(_ change: Change) {
         guard !change.isEmpty else { return }
+        if undoGroup != nil { undoGroup?.merge(change); return }
         undoStack.append(change)
         if undoStack.count > Self.undoLimit { undoStack.removeFirst(undoStack.count - Self.undoLimit) }
     }
@@ -283,6 +306,12 @@ public final class TabsController {
         return tree(owner).visibleRows(space: spaceID, openFolders: openFolders(owner))
     }
 
+    /// Loose tabs Clear closes in a space, keeping the trails of `keeping`.
+    public func tabsToClear(in spaceID: UUID, keeping: [UUID]) -> [UUID] {
+        guard let owner = owner(ofSpace: spaceID) else { return [] }
+        return tree(owner).tabsToClear(in: spaceID, keeping: keeping)
+    }
+
     public func section(of itemID: UUID) -> Parent? {
         owner(ofItem: itemID).flatMap { tree($0).section(of: itemID) }
     }
@@ -302,6 +331,11 @@ public final class TabsController {
 
     public func isOpen(folder: UUID) -> Bool {
         device.openFolders.contains(folder) || privateOpenFolders.contains(folder)
+    }
+
+    /// Whether the space's pinned section is folded into its title.
+    public func isPinnedCollapsed(space spaceID: UUID) -> Bool {
+        device.collapsedPinned?.contains(spaceID) == true || privateCollapsedPinned.contains(spaceID)
     }
 
     /// A synced tab whose open page's host and path differ from its home URL.
@@ -449,9 +483,7 @@ public final class TabsController {
         device.openPages[itemID] = nil
         guard let session else { return }
         session.tearDown()
-        if !session.isPrivate {
-            tabEvents?.tabClosed(itemID: itemID)
-        }
+        tabEvents?.tabClosed(itemID: itemID)
     }
 
     /// The website data store of a space, made on first use and shared by every space that uses
@@ -602,6 +634,20 @@ public final class TabsController {
         }
     }
 
+    /// Main-tree spaces are remembered in device.json; private ones only in memory.
+    public func setPinnedCollapsed(_ collapsed: Bool, space spaceID: UUID) {
+        guard let owner = owner(ofSpace: spaceID) else { return }
+        switch owner {
+        case .main:
+            var all = device.collapsedPinned ?? []
+            if collapsed { all.insert(spaceID) } else { all.remove(spaceID) }
+            device.collapsedPinned = all.isEmpty ? nil : all
+            save()
+        case .privateWindow:
+            if collapsed { privateCollapsedPinned.insert(spaceID) } else { privateCollapsedPinned.remove(spaceID) }
+        }
+    }
+
     func setLiveDismissed(_ folderID: UUID, _ urls: Set<URL>) {
         guard (device.liveDismissed?[folderID] ?? []) != urls else { return }
         var all = device.liveDismissed ?? [:]
@@ -671,6 +717,7 @@ public final class TabsController {
             window.selectedItemBySpace[spaceID] = first
         }
         mirror(window)
+        archiveIdleTabs()
     }
 
     /// A window closed. Private windows end their pages; a regular window's record is dropped

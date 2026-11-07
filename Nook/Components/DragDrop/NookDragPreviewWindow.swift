@@ -118,6 +118,13 @@ private struct NookDragPreviewContent: View {
                             .lineLimit(1)
                             .truncationMode(.tail)
                         Spacer(minLength: 0)
+                        if let count = manager.draggedItem?.count, count > 1 {
+                            Text("\(count)")
+                                .font(NookDesign.Font.micro)
+                                .padding(.horizontal, NookDesign.Spacing.sm)
+                                .padding(.vertical, NookDesign.Spacing.xxs)
+                                .nookControlSurface(in: Capsule())
+                        }
                     }
                 }
                 .padding(.horizontal, NookDesign.Spacing.rowPadding)

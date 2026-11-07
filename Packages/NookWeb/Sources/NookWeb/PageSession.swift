@@ -54,6 +54,8 @@ public final class PageSession: NSObject, Identifiable {
     public var favicon: SwiftUI.Image
     /// A page the ad blocker stopped from loading. The blocked-page card shows while it is set.
     public internal(set) var blockedURL: URL?
+    /// The site enhanced fingerprinting protection is off for until the tab leaves it.
+    var enhancedFingerprintingProtectionOffHost: String?
 
     public enum LoadingState: Equatable {
         case idle
@@ -205,6 +207,18 @@ public final class PageSession: NSObject, Identifiable {
     /// JavaScript dialogs since the last commit, and whether the user silenced the page.
     @ObservationIgnored var jsDialogCount = 0
     @ObservationIgnored var jsDialogsSuppressed = false
+    /// An open-in-another-app sheet is up, so a redirect loop cannot stack more.
+    @ObservationIgnored var externalAppConfirmPending = false
+    /// URL rewrites since the last commit; capped so a server redirecting back cannot loop us.
+    @ObservationIgnored var navigationRewrites = 0
+    /// Downloads since the last commit, the person's answer about more of them, and the answers
+    /// waiting on that question. Requests made inside a click are remembered until their response.
+    @ObservationIgnored var downloadsThisPage = 0
+    @ObservationIgnored var moreDownloadsAllowed: Bool?
+    @ObservationIgnored var downloadDecisionsWaiting: [(Bool) -> Void] = []
+    @ObservationIgnored var clickedRequestURLs: [URL] = []
+    /// The page's main response said `Cache-Control: no-store`, so its text stays out of history.
+    @ObservationIgnored var pageAskedNotToStore = false
     @ObservationIgnored var hasFavicon: Bool = false
     @ObservationIgnored var faviconFetchInFlight: Bool = false
     @ObservationIgnored var faviconFetchAttempts: Int = 0
@@ -332,9 +346,9 @@ public final class PageSession: NSObject, Identifiable {
             return
         }
 
-        // Private and Agent pages never get the extension controller: extensions could open
-        // windows and activate the app from an Agent page.
-        if isPrivate || isAgentPage {
+        // Agent pages never get the extension controller: extensions could open windows and
+        // activate the app from an Agent page.
+        if isAgentPage {
             configuration.webExtensionController = nil
         } else if configuration.webExtensionController == nil,
                   let extensionController = controller?.tabEvents?.nativeController {
@@ -398,6 +412,10 @@ public final class PageSession: NSObject, Identifiable {
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
         controller.add(self, contentWorld: Self.pipStateWorld, name: "pipStateChange")
+        for name in Self.linkHoverHandlerNames {
+            controller.removeScriptMessageHandler(forName: name, contentWorld: Self.linkHoverWorld)
+            controller.add(self, contentWorld: Self.linkHoverWorld, name: name)
+        }
         controller.removeScriptMessageHandler(forName: Self.translateHandlerName, contentWorld: Self.translateWorld)
         controller.add(self, contentWorld: Self.translateWorld, name: Self.translateHandlerName)
         webView.customUserAgent = PlatformUserAgent.custom
@@ -423,7 +441,7 @@ public final class PageSession: NSObject, Identifiable {
         configure(webView)
         setupThemeColorObserver(for: webView)
         setupNavigationStateObservers(for: webView)
-        if !didNotifyOpenToExtensions, !isPrivate {
+        if !didNotifyOpenToExtensions {
             controller?.tabEvents?.tabOpened(self)
             didNotifyOpenToExtensions = true
         }
@@ -481,7 +499,6 @@ public final class PageSession: NSObject, Identifiable {
         unload()
         savedHistory = nil
         isAudioMuted = false
-        controller?.sessionDelegate?.cleanupZoom(for: itemID)
         if webStoreHandler != nil {
             if let controller = primaryWebView?.configuration.userContentController {
                 self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
@@ -501,6 +518,9 @@ public final class PageSession: NSObject, Identifiable {
             controller.removeScriptMessageHandler(forName: handlerName)
         }
         controller.removeScriptMessageHandler(forName: "pipStateChange", contentWorld: Self.pipStateWorld)
+        for name in Self.linkHoverHandlerNames {
+            controller.removeScriptMessageHandler(forName: name, contentWorld: Self.linkHoverWorld)
+        }
         controller.removeScriptMessageHandler(forName: Self.translateHandlerName, contentWorld: Self.translateWorld)
         self.controller?.sessionDelegate?.removeWebStoreHandler(from: controller)
         detachDevCaptureHandler(from: webView)
@@ -543,7 +563,7 @@ public final class PageSession: NSObject, Identifiable {
         loadingState = .didStartProvisionalNavigation
 
         // Grant extension access before loading so content scripts inject at document_start.
-        controller?.tabEvents?.grantAccess(to: newURL)
+        controller?.tabEvents?.grantAccess(to: newURL, private: isPrivate)
 
         // Reset audio tracking for the new page; the mute preference is preserved.
         hasAudioContent = false
@@ -626,7 +646,7 @@ public final class PageSession: NSObject, Identifiable {
         } else if isDetached {
             onClose?()
         } else {
-            controller?.close(itemID)
+            controller?.close(itemID, archive: false)
         }
     }
 
@@ -733,7 +753,7 @@ public final class PageSession: NSObject, Identifiable {
 
     /// Memory then disk cache, synchronously. Gives restored rows their favicon at once.
     func restoreFaviconFromCache() {
-        guard url.scheme == "http" || url.scheme == "https", let host = url.host else { return }
+        guard url.scheme == "http" || url.scheme == "https", let host = FaviconCache.key(for: url) else { return }
         if let cached = FaviconCache.shared.image(for: host) ?? FaviconCache.shared.imageFromDiskSync(for: host) {
             favicon = SwiftUI.Image(platformImage: cached)
             hasFavicon = true
@@ -746,7 +766,7 @@ public final class PageSession: NSObject, Identifiable {
             favicon = defaultFavicon
             return
         }
-        let cacheKey = url.host ?? url.absoluteString
+        let cacheKey = FaviconCache.key(for: url) ?? url.absoluteString
 
         // Show the cached icon at once, and refetch it once a day so a site's new icon replaces the old one.
         let cached = await FaviconCache.shared.cachedImage(for: cacheKey)
@@ -840,10 +860,10 @@ public final class PageSession: NSObject, Identifiable {
     /// than at each caller: a page must not be able to talk Nook into opening a tab on
     /// `javascript:`, `data:` or `file:`.
     /// ponytail: http(s) only. Widen if someone reports a legitimate scheme.
-    public func openInNewTab(_ url: URL, foreground: Bool = false) {
+    public func openInNewTab(_ url: URL, title: String? = nil, foreground: Bool = false) {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
         guard let tabs = controller, let window = tabs.window(for: self) else { return }
-        tabs.open(url: url, in: window, placement: foreground ? .newTab : .background, from: itemID)
+        tabs.open(url: url, in: window, placement: foreground ? .newTab : .background, from: itemID, title: title)
     }
 
     // MARK: - Equality

@@ -17,6 +17,9 @@ public class BrowserConfiguration {
     
     public lazy var webViewConfiguration: WKWebViewConfiguration = {
         let config = WKWebViewConfiguration()
+        #if os(macOS)
+        BrowserConfiguration.applyProcessPool(to: config)
+        #endif
 
         // Use default website data store for normal browsing
         // Extensions use their own separate persistent storage managed by Apple
@@ -120,12 +123,9 @@ public class BrowserConfiguration {
         config.userContentController = freshUserContentController()
 
         // Use the profile's website data store for isolation
+        // Private pages keep the controller; WebKit runs only extensions with
+        // `hasAccessToPrivateData` in a non-persistent store's pages.
         config.websiteDataStore = profile.dataStore
-
-        // Extensions never run in private (ephemeral) profiles, matching Chrome's default.
-        if profile.isEphemeral {
-            config.webExtensionController = nil
-        }
 
         return config
     }

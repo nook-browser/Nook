@@ -25,4 +25,17 @@ public protocol AlertPresenter: AnyObject {
     func presentOpenPanel(
         allowsMultipleSelection: Bool, allowsDirectories: Bool, over webView: WKWebView,
         completion: @escaping ([URL]?) -> Void)
+    /// A question Nook asks about a page, in Nook's voice rather than as the page speaking.
+    func presentQuestion(
+        _ question: String, detail: String, allowTitle: String, denyTitle: String, over webView: WKWebView,
+        completion: @escaping (Bool) -> Void)
+}
+
+public extension AlertPresenter {
+    func presentQuestion(
+        _ question: String, detail: String, allowTitle: String, denyTitle: String, over webView: WKWebView,
+        completion: @escaping (Bool) -> Void
+    ) {
+        presentConfirm(message: question, host: "", over: webView, onSuppress: nil, completion: completion)
+    }
 }

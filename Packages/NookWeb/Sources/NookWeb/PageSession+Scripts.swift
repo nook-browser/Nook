@@ -13,8 +13,7 @@ import NookTweaks
 extension PageSession {
     /// Script message handler names this session registers on each of its web views.
     var messageHandlerNames: [String] {
-        ["linkHover", "commandHover",
-         "mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
+        ["mediaStateChange_\(itemID.uuidString)", "backgroundColor_\(itemID.uuidString)",
          "historyStateDidChange", "nookShortcutDetect",
          "nookSponsorBlock"]
     }
@@ -168,11 +167,12 @@ extension PageSession {
             })();
             """
 
-        webView.evaluateJavaScript(linkHoverScript) { result, error in
-            if let error = error {
-            }
-        }
+        webView.evaluateJavaScript(linkHoverScript, in: nil, in: Self.linkHoverWorld) { _ in }
     }
+
+    /// The status bar shows these URLs as trusted chrome, so a page must not be able to post them.
+    public static let linkHoverWorld = WKContentWorld.world(name: "NookLinkHover")
+    public static let linkHoverHandlerNames = ["linkHover", "commandHover"]
 
     func injectHistoryStateObserver(into webView: WKWebView) {
         let historyScript = """

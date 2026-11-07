@@ -83,8 +83,6 @@ extension BrowserManager: PageSessionDelegate {
 
     func loadZoom(for itemID: UUID) { loadZoomForTab(itemID) }
 
-    func cleanupZoom(for itemID: UUID) { cleanupZoomForTab(itemID) }
-
     func setMuteState(_ muted: Bool, for itemID: UUID) {
         setMuteState(muted, for: itemID, originatingWindowId: windowRegistry?.activeWindow?.id)
     }
@@ -133,8 +131,10 @@ extension BrowserManager: TabEventObserver {
     }
 
     func tabActivated(new session: PageSession, previous: PageSession?) {
-        zoomManager.showZoomLevel(for: session.itemID)
+        zoomManager.showZoomLevel(for: session.webView)
         ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
+        // Private pages report activation for extensions and the zoom readout only.
+        guard !session.isPrivate else { return }
         // The loaded-page budget was only ever reached from startup warming and split view, so
         // opening tabs by hand never checked it and no cap could bind.
         compositorManager.pageActivated(session.itemID)
@@ -155,8 +155,8 @@ extension BrowserManager: TabEventObserver {
         ExtensionManager.shared.notifyTabPropertiesChanged(session, properties: properties)
     }
 
-    func grantAccess(to url: URL) {
-        ExtensionManager.shared.grantExtensionAccessToURL(url)
+    func grantAccess(to url: URL, private: Bool) {
+        ExtensionManager.shared.grantExtensionAccessToURL(url, private: `private`)
     }
 
     func wakeBackgroundWorkers() {
@@ -293,6 +293,19 @@ extension BrowserManager: AlertPresenter {
             if alert.suppressionButton?.state == .on { onSuppress?() }
             completion($0 == .alertFirstButtonReturn)
         }
+    }
+
+    func presentQuestion(
+        _ question: String, detail: String, allowTitle: String, denyTitle: String, over webView: WKWebView,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let alert = NSAlert()
+        alert.messageText = question
+        alert.informativeText = detail
+        alert.addButton(withTitle: allowTitle)
+        alert.addButton(withTitle: denyTitle)
+        guard let window = webView.window else { return completion(false) }
+        alert.beginSheetModal(for: window) { completion($0 == .alertFirstButtonReturn) }
     }
 
     func presentPrompt(

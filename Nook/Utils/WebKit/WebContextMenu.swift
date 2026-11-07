@@ -301,6 +301,7 @@ extension FocusableWKWebView {
               let itemID = browserManager.tabs.open(url: url, in: window, placement: .background, from: session.itemID)
         else { return }
         browserManager.splitManager.enterSplit(with: itemID, in: window)
+        window.backgroundOpened.removeAll { $0 == itemID }
     }
 
     /// Downloads `url` with the page's cookies, asking where to save it.

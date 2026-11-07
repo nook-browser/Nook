@@ -19,13 +19,16 @@ public final class NookSettingsService {
     private let tabUnloadTimeoutKey = "settings.tabUnloadTimeout"
     private let tabManagementModeKey = "settings.tabManagementMode"
     private let startupLoadModeKey = "settings.startupLoadMode"
-    private let blockXSTKey = "settings.blockCrossSiteTracking"
+    private let enhancedFingerprintingProtectionKey = "settings.enhancedFingerprintingProtection"
+    private let removeTrackingFromLinksKey = "settings.removeTrackingFromLinks"
+    private let warnBeforeHTTPKey = "settings.warnBeforeHTTP"
     private let adBlockerEnabledKey = "settings.adBlockerEnabled"
     private let adBlockerWhitelistKey = "settings.adBlockerWhitelist"
     private let adBlockerLastUpdateKey = "settings.adBlockerLastUpdate"
     private let debugToggleUpdateNotificationKey = "settings.debugToggleUpdateNotification"
     private let lastSeenVersionKey = "settings.lastSeenVersion"
     private let askBeforeQuitKey = "settings.askBeforeQuit"
+    private let allowNookURLsKey = "settings.allowNookURLs"
     private let sidebarPositionKey = "settings.sidebarPosition"
     private let topBarAddressViewKey = "settings.topBarAddressView"
 
@@ -45,6 +48,7 @@ public final class NookSettingsService {
     private let webSearchContextSizeKey = "settings.webSearchContextSize"
     private let showLinkStatusBarKey = "settings.showLinkStatusBar"
     private let favoritePreviewsKey = "settings.favoritePreviews"
+    private let archiveAfterKey = "settings.archiveAfter"
     private let themeTranslucencyKey = "settings.themeTranslucency"
     private let searchPageTextInHistoryKey = "settings.searchPageTextInHistory"
     private let hideWebContentBorderKey = "settings.hideWebContentBorder"
@@ -58,8 +62,10 @@ public final class NookSettingsService {
     private let tabOrganizerEnabledKey = "settings.tabOrganizerEnabled"
     private let autoRenamePinnedTabsKey = "settings.autoRenamePinnedTabs"
     private let tidyDownloadsKey = "settings.tidyDownloads"
+    private let didImportFromArcKey = "settings.didImportFromArc"
     private let linkPreviewsKey = "settings.linkPreviews"
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
+    private let nestTabsFromLinksKey = "settings.nestTabsFromLinks"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
     private let externalLinksInMiniWindowKey = "settings.externalLinksInMiniWindow"
@@ -194,10 +200,22 @@ public final class NookSettingsService {
         tabManagementMode.unloadTimeout
     }
 
-    public var blockCrossSiteTracking: Bool {
+    public var enhancedFingerprintingProtection: ProtectionScope {
         didSet {
-            userDefaults.set(blockCrossSiteTracking, forKey: blockXSTKey)
-            NotificationCenter.default.post(name: .blockCrossSiteTrackingChanged, object: nil, userInfo: ["enabled": blockCrossSiteTracking])
+            userDefaults.set(enhancedFingerprintingProtection.rawValue, forKey: enhancedFingerprintingProtectionKey)
+        }
+    }
+
+    /// Both the filter lists' `$removeparam` rules and WebKit's own link filtering.
+    public var removeTrackingFromLinks: ProtectionScope {
+        didSet {
+            userDefaults.set(removeTrackingFromLinks.rawValue, forKey: removeTrackingFromLinksKey)
+        }
+    }
+
+    public var warnBeforeHTTP: Bool {
+        didSet {
+            userDefaults.set(warnBeforeHTTP, forKey: warnBeforeHTTPKey)
         }
     }
 
@@ -261,6 +279,13 @@ public final class NookSettingsService {
         }
     }
     
+    /// Lets other apps drive Nook through nook:// links. Off until the person turns it on.
+    public var allowNookURLs: Bool {
+        didSet {
+            userDefaults.set(allowNookURLs, forKey: allowNookURLsKey)
+        }
+    }
+
     public var askBeforeQuit: Bool {
         didSet {
             userDefaults.set(askBeforeQuit, forKey: askBeforeQuitKey)
@@ -401,6 +426,13 @@ public final class NookSettingsService {
         }
     }
 
+    /// Hours a tab can sit unopened before it moves to the Archive; 0 is never.
+    public var archiveAfter: Int {
+        didSet {
+            userDefaults.set(archiveAfter, forKey: archiveAfterKey)
+        }
+    }
+
     /// Keep visited pages' text so the command palette can find them by their words.
     public var searchPageTextInHistory: Bool {
         didSet {
@@ -445,6 +477,12 @@ public final class NookSettingsService {
         }
     }
 
+    public var didImportFromArc: Bool {
+        didSet {
+            userDefaults.set(didImportFromArc, forKey: didImportFromArcKey)
+        }
+    }
+
     /// Renames downloads with meaningless names (ids, hashes) on the on-device model.
     public var tidyDownloads: Bool {
         didSet {
@@ -476,6 +514,13 @@ public final class NookSettingsService {
     public var autoPictureInPicture: Bool {
         didSet {
             userDefaults.set(autoPictureInPicture, forKey: autoPictureInPictureKey)
+        }
+    }
+
+    /// A tab opened from a link sits under the page that opened it.
+    public var nestTabsFromLinks: Bool {
+        didSet {
+            userDefaults.set(nestTabsFromLinks, forKey: nestTabsFromLinksKey)
         }
     }
 
@@ -544,10 +589,10 @@ public final class NookSettingsService {
         userDefaults.register(defaults: [
             searchEngineKey: SearchProvider.google.rawValue,
             tabManagementModeKey: TabManagementMode.standard.rawValue,
-            blockXSTKey: false,
             adBlockerEnabledKey: false,
             debugToggleUpdateNotificationKey: false,
             askBeforeQuitKey: true,
+            allowNookURLsKey: false,
             externalLinksInMiniWindowKey: true,
             sidebarPositionKey: SidebarPosition.left.rawValue,
             topBarAddressViewKey: false,
@@ -565,6 +610,7 @@ public final class NookSettingsService {
             webSearchContextSizeKey: "medium",
             showLinkStatusBarKey: true,
             favoritePreviewsKey: true,
+            archiveAfterKey: 12,
             themeTranslucencyKey: false,
             searchPageTextInHistoryKey: true,
             hideWebContentBorderKey: false,
@@ -574,9 +620,11 @@ public final class NookSettingsService {
             tabOrganizerEnabledKey: false,
             autoRenamePinnedTabsKey: true,
             tidyDownloadsKey: false,
+            didImportFromArcKey: false,
             linkPreviewsKey: false,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
+            nestTabsFromLinksKey: true,
         ])
 
         // Initialize properties from UserDefaults
@@ -627,8 +675,23 @@ public final class NookSettingsService {
         self.startupLoadMode = StartupLoadMode(
             rawValue: userDefaults.string(forKey: startupLoadModeKey) ?? ""
         ) ?? .favoritesAndSpace
-        self.blockCrossSiteTracking = userDefaults.bool(forKey: blockXSTKey)
+        let legacyBlockCrossSiteTrackingKey = "settings.blockCrossSiteTracking"
+        if userDefaults.bool(forKey: legacyBlockCrossSiteTrackingKey) {
+            userDefaults.set(true, forKey: adBlockerEnabledKey)
+        }
+        userDefaults.removeObject(forKey: legacyBlockCrossSiteTrackingKey)
         self.adBlockerEnabled = userDefaults.bool(forKey: adBlockerEnabledKey)
+        self.enhancedFingerprintingProtection = ProtectionScope(
+            rawValue: userDefaults.string(forKey: enhancedFingerprintingProtectionKey) ?? ""
+        ) ?? .privateWindows
+        if userDefaults.string(forKey: removeTrackingFromLinksKey) == nil {
+            let migrated: ProtectionScope = userDefaults.bool(forKey: adBlockerEnabledKey) ? .allWindows : .privateWindows
+            userDefaults.set(migrated.rawValue, forKey: removeTrackingFromLinksKey)
+        }
+        self.removeTrackingFromLinks = ProtectionScope(
+            rawValue: userDefaults.string(forKey: removeTrackingFromLinksKey) ?? ""
+        ) ?? .privateWindows
+        self.warnBeforeHTTP = userDefaults.bool(forKey: warnBeforeHTTPKey)
         if let wlData = userDefaults.data(forKey: adBlockerWhitelistKey),
            let decoded = try? JSONDecoder().decode([String].self, from: wlData) {
             self.adBlockerWhitelist = decoded
@@ -656,6 +719,7 @@ public final class NookSettingsService {
         self.lastSeenVersion = userDefaults.string(forKey: lastSeenVersionKey)
         self.externalLinksInMiniWindow = userDefaults.bool(forKey: externalLinksInMiniWindowKey)
         self.askBeforeQuit = userDefaults.bool(forKey: askBeforeQuitKey)
+        self.allowNookURLs = userDefaults.bool(forKey: allowNookURLsKey)
         self.sidebarPosition = SidebarPosition(rawValue: userDefaults.string(forKey: sidebarPositionKey) ?? "left") ?? SidebarPosition.left
         self.topBarAddressView = userDefaults.bool(forKey: topBarAddressViewKey)
         self.geminiApiKey = ""  // In-memory only; persistent storage via AIKeychainStorage
@@ -678,6 +742,7 @@ public final class NookSettingsService {
         self.webSearchContextSize = userDefaults.string(forKey: webSearchContextSizeKey) ?? "medium"
         self.showLinkStatusBar = userDefaults.bool(forKey: showLinkStatusBarKey)
         self.favoritePreviews = userDefaults.bool(forKey: favoritePreviewsKey)
+        self.archiveAfter = userDefaults.integer(forKey: archiveAfterKey)
         self.themeTranslucency = userDefaults.bool(forKey: themeTranslucencyKey)
         self.searchPageTextInHistory = userDefaults.bool(forKey: searchPageTextInHistoryKey)
         self.hideWebContentBorder = userDefaults.bool(forKey: hideWebContentBorderKey)
@@ -687,8 +752,10 @@ public final class NookSettingsService {
         self.tabOrganizerEnabled = userDefaults.bool(forKey: tabOrganizerEnabledKey)
         self.autoRenamePinnedTabs = userDefaults.bool(forKey: autoRenamePinnedTabsKey)
         self.tidyDownloads = userDefaults.bool(forKey: tidyDownloadsKey)
+        self.didImportFromArc = userDefaults.bool(forKey: didImportFromArcKey)
         self.linkPreviews = userDefaults.bool(forKey: linkPreviewsKey)
         self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
+        self.nestTabsFromLinks = userDefaults.bool(forKey: nestTabsFromLinksKey)
         self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)
         if let sbData = userDefaults.data(forKey: sponsorBlockCategoryOptionsKey),
            let sbDecoded = try? JSONDecoder().decode([String: String].self, from: sbData) {
@@ -825,7 +892,6 @@ public enum OpenRouterModel: String, CaseIterable, Identifiable {
 // MARK: - Notification Names
 extension Notification.Name {
     public static let tabManagementModeChanged = Notification.Name("tabManagementModeChanged")
-    public static let blockCrossSiteTrackingChanged = Notification.Name("blockCrossSiteTrackingChanged")
     public static let appearanceModeChanged = Notification.Name("appearanceModeChanged")
     public static let adBlockerEnabledChanged = Notification.Name("adBlockerEnabledChanged")
     public static let adBlockerStateChanged = Notification.Name("adBlockerStateChanged")

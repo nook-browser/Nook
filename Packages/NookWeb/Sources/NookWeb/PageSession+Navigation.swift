@@ -49,6 +49,7 @@ extension PageSession: WKNavigationDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
+        navigationRewrites = 0
         linkPreview = nil
         pdfLoadStateChanged(webView)
         if let capture = devCapture {
@@ -61,15 +62,19 @@ extension PageSession: WKNavigationDelegate {
         // First commit of the process is the launch-to-first-paint mark; later ones no-op.
         LaunchMetrics.markFirstPaint()
         controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
-        // A new page gets its dialogs back.
+        // A new page gets its dialogs back, and asks again before downloading more than once.
         jsDialogCount = 0
         jsDialogsSuppressed = false
+        downloadsThisPage = 0
+        moreDownloadsAllowed = nil
         resetTranslation()
 
         if let newURL = webView.url {
             self.url = newURL
             controller?.pageCommitted(itemID: itemID, url: newURL)
             controller?.sessionDelegate?.navigateAcrossWindows(itemID, to: newURL)
+            // At commit, before first paint, so a zoomed site never flashes at 100%.
+            controller?.sessionDelegate?.loadZoom(for: itemID)
             // Update website shortcut detector with new URL; it follows the window's tab, not Peek.
             if !isDetached { controller?.sessionDelegate?.shortcutDetectorDidNavigate(to: newURL) }
             // Grant extension access to the committed URL. This is critical for
@@ -77,7 +82,7 @@ extension PageSession: WKNavigationDelegate {
             // where decidePolicyFor only granted access to the initial URL, not the
             // redirect target. Without this, content scripts can't inject on the
             // redirected page and chrome.tabs.query() won't return the URL.
-            controller?.tabEvents?.grantAccess(to: newURL)
+            controller?.tabEvents?.grantAccess(to: newURL, private: isPrivate)
             controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
         }
     }
@@ -97,7 +102,7 @@ extension PageSession: WKNavigationDelegate {
             // decidePolicyFor only grants access to the initial navigation URL;
             // server-side redirects land here with a different URL that needs
             // its own grant for content scripts and chrome.tabs.query().
-            controller?.tabEvents?.grantAccess(to: newURL)
+            controller?.tabEvents?.grantAccess(to: newURL, private: isPrivate)
             controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
 
             // Wake MV3 background workers so they can process the new page
@@ -112,9 +117,6 @@ extension PageSession: WKNavigationDelegate {
             controller?.pageCommitted(itemID: itemID, url: newURL)
             controller?.sessionDelegate?.navigateAcrossWindows(itemID, to: newURL)
             if let settings = controller?.settings { BoostTweaks.runScripts(for: newURL, in: webView, settings: settings) }
-
-            // Load saved zoom level for the new domain
-            controller?.sessionDelegate?.loadZoom(for: self.itemID)
 
             // CHROME WEB STORE INTEGRATION: Inject script after navigation
             injectWebStoreScriptIfNeeded(for: newURL, in: webView)
@@ -291,25 +293,51 @@ extension PageSession: WKNavigationDelegate {
     public func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
+        preferences: WKWebpagePreferences,
+        decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
+    ) {
+        if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url {
+            applyProtection(to: preferences, for: url)
+        }
+        self.webView(webView, decidePolicyFor: navigationAction) { decisionHandler($0, preferences) }
+    }
+
+    public func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        // mailto:, tel: and app schemes go to the system. A subframe needs a click, so an ad
-        // iframe cannot launch an app on its own; a page that was not clicked has to ask.
+        // mailto:, tel: and app schemes go to the system. Only a real click on a link opens one
+        // straight away; a scripted `a.click()` is also `.linkActivated`, so the gesture decides.
+        // A subframe needs that click too, and everything else asks, one sheet at a time.
+        // nook:// is for other apps. A page never triggers it, in any frame.
+        if navigationAction.request.url?.scheme?.lowercased() == "nook" {
+            decisionHandler(.cancel)
+            return
+        }
         if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
            !WKWebView.handlesURLScheme(scheme), scheme != "webkit-extension", scheme != "safari-web-extension"
         {
             decisionHandler(.cancel)
             // An agent page never opens another app or asks the person to.
             if isAgentPage { return }
-            let clicked = navigationAction.navigationType == .linkActivated
+            let gesture = navigationAction.nookIsUserInitiated
+            let clicked = gesture && navigationAction.navigationType == .linkActivated
             guard navigationAction.targetFrame?.isMainFrame != false || clicked, canOpenWithSystem(url) else { return }
-            if clicked || scheme == "mailto" || scheme == "tel" {
+            if clicked || (gesture && (scheme == "mailto" || scheme == "tel")) {
                 openWithSystem(url)
-            } else if let alerts = controller?.alerts {
+            } else if !externalAppConfirmPending, !jsDialogsSuppressed, let alerts = controller?.alerts {
+                externalAppConfirmPending = true
                 let message = systemAppName(for: url).map { "Open this link in \($0)?" } ?? "Open this link in another app?"
+                // The target frame, not `sourceFrame`, which is nil for loads the app started.
+                let host = navigationAction.targetFrame?.securityOrigin.host ?? ""
                 alerts.presentConfirm(
-                    message: message, host: webView.url?.host ?? "", over: webView, onSuppress: nil
-                ) { if $0 { openWithSystem(url) } }
+                    message: message, host: host.isEmpty ? (webView.url?.host ?? "") : host, over: webView,
+                    onSuppress: nextDialogSuppressor()
+                ) { [weak self] in
+                    self?.externalAppConfirmPending = false
+                    if $0 { openWithSystem(url) }
+                }
             }
             return
         }
@@ -319,23 +347,27 @@ extension PageSession: WKNavigationDelegate {
         {
             devCapture?.markNavigationStart()
             // urlskip= goes past a known redirector; $removeparam restarts without tracking
-            // parameters. Either way the replacement comes back through here.
-            if navigationAction.navigationType != .backForward,
+            // parameters. Either way the replacement comes back through here. Past three
+            // rewrites the server is redirecting back to the original (Reddit's /hot/), so let it load.
+            let mayRewrite = navigationRewrites < 3
+            if mayRewrite, navigationAction.navigationType != .backForward,
                (navigationAction.request.httpMethod ?? "GET") == "GET",
                let replacement = controller?.blocker.urlSkipTarget(for: url, from: self.url, tab: self)
-                   ?? controller?.blocker.strippedTrackingParams(for: url, tab: self)
+                   ?? (removesTrackingFromLinks ? controller?.blocker.strippedTrackingParams(for: url, tab: self) : nil)
             {
                 if let capture = devCapture {
                     let skipped = replacement.host != url.host
                     capture.recordBlock(DevBlockEntry(action: skipped ? .skippedRedirect : .strippedParams,
                                                       url: url.absoluteString, target: replacement.absoluteString))
                 }
+                navigationRewrites += 1
                 decisionHandler(.cancel)
                 webView.load(URLRequest(url: replacement))
                 return
             }
 
-            if let settings = controller?.settings, let hot = RedditTweaks.hotURL(for: url, settings: settings) {
+            if mayRewrite, let settings = controller?.settings, let hot = RedditTweaks.hotURL(for: url, settings: settings) {
+                navigationRewrites += 1
                 decisionHandler(.cancel)
                 webView.load(URLRequest(url: hot))
                 return
@@ -343,7 +375,7 @@ extension PageSession: WKNavigationDelegate {
 
             // Grant extension access to this URL BEFORE navigation starts
             // so content scripts can inject at document_start
-            controller?.tabEvents?.grantAccess(to: url)
+            controller?.tabEvents?.grantAccess(to: url, private: isPrivate)
 
             // Setup content blocker scripts before navigation starts
             controller?.blocker.setupContentBlockerScripts(for: url, in: webView, tab: self)
@@ -375,8 +407,12 @@ extension PageSession: WKNavigationDelegate {
             return
         }
 
+        if navigationAction.nookIsUserInitiated, let url = navigationAction.request.url {
+            clickedRequestURLs = Array((clickedRequestURLs + [url]).suffix(8))
+        }
+
         if navigationAction.shouldPerformDownload {
-            decisionHandler(.download)
+            allowDownload(clicked: navigationAction.nookIsUserInitiated, in: webView) { decisionHandler($0 ? .download : .cancel) }
             return
         }
 
@@ -418,20 +454,43 @@ extension PageSession: WKNavigationDelegate {
         decidePolicyFor navigationResponse: WKNavigationResponse,
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
-        if let response = navigationResponse.response as? HTTPURLResponse,
-            let disposition = response.allHeaderFields["Content-Disposition"] as? String,
-            disposition.lowercased().contains("attachment")
-        {
-            decisionHandler(.download)
+        let http = navigationResponse.response as? HTTPURLResponse
+        let attachment = http?.value(forHTTPHeaderField: "Content-Disposition")?.lowercased().contains("attachment") == true
+        if attachment || (navigationResponse.isForMainFrame && !navigationResponse.canShowMIMEType) {
+            // A redirected click loses its URL here and counts as unclicked: the first still goes.
+            let url = navigationResponse.response.url
+            let clicked = url.map { clickedRequestURLs.contains($0) } ?? false
+            if let url { clickedRequestURLs.removeAll { $0 == url } }
+            allowDownload(clicked: clicked, in: webView) { decisionHandler($0 ? .download : .cancel) }
             return
         }
 
-        if navigationResponse.isForMainFrame && !navigationResponse.canShowMIMEType {
-            decisionHandler(.download)
-            return
+        if navigationResponse.isForMainFrame {
+            pageAskedNotToStore = http?.value(forHTTPHeaderField: "Cache-Control")?.lowercased().contains("no-store") == true
         }
-
         decisionHandler(.allow)
+    }
+
+    /// A clicked download goes, and so does a page's first. Further ones nobody clicked ask once per
+    /// page, so an ad frame or script cannot fill the Downloads folder.
+    func allowDownload(clicked: Bool, in webView: WKWebView, _ decide: @escaping (Bool) -> Void) {
+        downloadsThisPage += 1
+        if clicked || downloadsThisPage == 1 || moreDownloadsAllowed == true { return decide(true) }
+        guard moreDownloadsAllowed == nil, !isAgentPage, let alerts = controller?.alerts else { return decide(false) }
+        downloadDecisionsWaiting.append(decide)
+        guard downloadDecisionsWaiting.count == 1 else { return }
+        let host = webView.url?.host ?? "this page"
+        // Holds self until the sheet closes: WebKit throws if a decision handler is never called.
+        alerts.presentQuestion(
+            "Allow \(host) to download multiple files?",
+            detail: "The page is downloading another file you didn't click.",
+            allowTitle: "Allow", denyTitle: "Don't Allow", over: webView
+        ) { allowed in
+            self.moreDownloadsAllowed = allowed
+            let waiting = self.downloadDecisionsWaiting
+            self.downloadDecisionsWaiting = []
+            waiting.forEach { $0(allowed) }
+        }
     }
 
     //MARK: - Downloads
@@ -465,18 +524,21 @@ extension PageSession: WKNavigationDelegate {
 // MARK: - Page Text for History Search
 extension PageSession {
     private static let pageTextWorld = WKContentWorld.world(name: "NookHistoryText")
+    /// Nothing from a page with a password field: sign-in and account pages stay out of history.
     private static let pageTextScript = """
-        (() => [document.title, ((document.body && document.body.innerText) || '').trim().slice(0, 20000)])()
+        (() => document.querySelector('input[type=password]') ? null
+            : [document.title, ((document.body && document.body.innerText) || '').trim().slice(0, 20000)])()
         """
 
     /// Reads the page's text into history search once it has settled. A same-document
     /// navigation reads again only when the path changed.
     func schedulePageTextCapture(in webView: WKWebView, sameDocument: Bool) {
         guard let url = webView.url, url.scheme == "http" || url.scheme == "https",
-              !isPrivate, !isAgentPage, controller?.settings.searchPageTextInHistory == true else { return }
+              !isPrivate, !isAgentPage, !pageAskedNotToStore,
+              controller?.settings.searchPageTextInHistory == true else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + (sameDocument ? 1.5 : 1)) { [weak self, weak webView] in
             guard let self, let webView, webView.url == url, !webView.isLoading, !self.isDisplayingPDF,
-                  self.profile?.isEphemeral != true,
+                  self.profile?.isEphemeral != true, !self.pageAskedNotToStore,
                   self.controller?.settings.searchPageTextInHistory == true else { return }
             if let last = self.lastTextCapture {
                 if sameDocument, last.url.host == url.host, last.url.path == url.path { return }
@@ -802,5 +864,15 @@ extension PageSession {
             """
 
         webView.evaluateJavaScript(script) { _, _ in }
+    }
+}
+
+private extension WKNavigationAction {
+    /// `_isUserInitiated`: true only inside a real user gesture. Without it, nothing counts as one.
+    var nookIsUserInitiated: Bool {
+        let selector = NSSelectorFromString("_isUserInitiated")
+        guard responds(to: selector) else { return false }
+        typealias Getter = @convention(c) (AnyObject, Selector) -> Bool
+        return unsafeBitCast(method(for: selector), to: Getter.self)(self, selector)
     }
 }

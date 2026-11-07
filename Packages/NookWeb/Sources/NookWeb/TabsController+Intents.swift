@@ -14,7 +14,7 @@ extension TabsController {
     // MARK: - Open
 
     /// Creates a tab for `url`: at the top of `parent` when one is given; as the last child of
-    /// `opener`, the tab whose page opened the link (`childTabPosition`); else right below the
+    /// `opener`, the tab whose page opened the link (`childTabPosition`, when nesting is on); else right below the
     /// window's selected tab (`newTabPosition`). `.newTab` selects it, `.background` leaves
     /// selection alone and loads nothing, `.replaceCurrent` loads `url` in the selected page.
     /// `title` stands in for the page title until the page loads.
@@ -36,7 +36,18 @@ extension TabsController {
         guard created != nil else { return nil }
         if opener != nil { revealTrail(position.0) }
         if placement != .background { select(id, in: window) }
+        else if let opener { noteBackgroundOpen(id, opener: opener, in: window) }
         return id
+    }
+
+    /// Feeds the "Opened in background" toast when the sidebar is hidden; gone after 2 s.
+    private func noteBackgroundOpen(_ id: UUID, opener: UUID, in window: BrowserWindowState) {
+        guard !window.isSidebarVisible, !isInAgentSpace(opener), !isInAgentSpace(id) else { return }
+        window.backgroundOpened.append(id)
+        Task { @MainActor [weak window] in
+            try? await Task.sleep(for: .seconds(2))
+            if window?.backgroundOpened.last == id { window?.backgroundOpened = [] }
+        }
     }
 
     /// Where a new tab goes: right below `anchor` when it is a tab in the window's tabs section,
@@ -53,13 +64,14 @@ extension TabsController {
         return (.tabs(spaceID: spaceID), nil)
     }
 
-    /// Where a tab opened from `opener`'s page goes: its last child, so a run of links keeps its
+    /// Where a tab opened from `opener`'s page goes: with nesting off, like a new tab; else its last child, so a run of links keeps its
     /// order under it (a trail). A tab at the depth limit gets it as its next sibling; a pinned
     /// tab or favorite takes no children, so the tab goes to the top of the tabs section.
     func childTabPosition(in window: BrowserWindowState, opener: UUID) -> (Parent, UUID?)? {
         let source = tree(owner(of: window))
         // An agent page's tabs stay in the Agent space whatever the window shows.
         let spaceID = isInAgentSpace(opener) ? agentSpaceID : window.spaceID
+        guard settings.nestTabsFromLinks else { return newTabPosition(in: window, space: spaceID, after: opener) }
         guard source.spaceID(of: opener) == spaceID, source.canTakeChild(opener) else {
             if let item = source.item(opener), source.scope(of: opener) == .device,
                source.spaceID(of: opener) == spaceID {
@@ -131,7 +143,7 @@ extension TabsController {
         session.onClose = nil
         register(session, in: window)
         // Extensions could not see the page while it had no item.
-        if !session.isPrivate { tabEvents?.tabOpened(session) }
+        tabEvents?.tabOpened(session)
         select(session.itemID, in: window)
         return session.itemID
     }
@@ -141,7 +153,7 @@ extension TabsController {
         guard session.isDetached else { return }
         session.onClose = nil
         session.tearDown()
-        if !session.isPrivate { tabEvents?.tabClosed(itemID: session.itemID) }
+        tabEvents?.tabClosed(itemID: session.itemID)
     }
 
     /// A WebKit-created popup from `opener`: a new selected tab in the opener's window whose
@@ -193,6 +205,7 @@ extension TabsController {
             toggleFolder(itemID)
             return
         }
+        window.multiSelection.clear()
         // An agent tab never pulls a window into the Agent space; the person opens it to watch.
         if isInAgentSpace(itemID) {
             guard window.spaceID == agentSpaceID else { return selectForAgent(itemID) }
@@ -206,6 +219,11 @@ extension TabsController {
         if movedSpace { sessionDelegate?.windowSpaceChanged(window) }
         window.selectedItemBySpace[spaceID] = itemID
         window.emptiedSpaces.remove(spaceID)
+        if case .main = owner {
+            let now = Date()
+            device.stampActive(itemID, at: now)
+            if let previous, tree.item(previous.itemID) != nil { device.stampActive(previous.itemID, at: now) }
+        }
         // The latest window to select a page takes its live view; others show a placeholder.
         takeControl(itemID, in: window)
         var recent = window.recentItemsBySpace[spaceID, default: []]
@@ -220,7 +238,7 @@ extension TabsController {
             }
             session.loadWebViewIfNeeded()
             session.checkMediaState()
-            if session !== previous, !session.isPrivate {
+            if session !== previous {
                 tabEvents?.tabActivated(new: session, previous: previous)
             }
         }
@@ -278,6 +296,7 @@ extension TabsController {
         guard source.space(spaceID) != nil else { return }
         let previous = selectedSession(in: window)
         let changed = window.spaceID != spaceID
+        if changed { window.multiSelection.clear() }
         window.spaceID = spaceID
         if changed { sessionDelegate?.windowSpaceChanged(window) }
         let order = displayOrder(in: window)
@@ -328,7 +347,7 @@ extension TabsController {
 
     /// A pinned or favorite tab ends its page and keeps the item. Anything in the tabs section,
     /// and any folder, is removed into the reopen history.
-    public func close(_ itemID: UUID) {
+    public func close(_ itemID: UUID, archive: Bool = true) {
         guard let owner = owner(ofItem: itemID) else { return }
         let source = tree(owner)
         guard let item = source.item(itemID) else { return }
@@ -352,7 +371,7 @@ extension TabsController {
             return
         }
         // A tab with a trail closes alone; its children move up into its place.
-        remove(itemID, promotingChildren: !item.isFolder)
+        remove(itemID, promotingChildren: !item.isFolder, archiving: archive ? .closed : nil)
     }
 
     /// Deletes an item and its subtree from the sidebar, pinned tabs and favorites included.
@@ -361,7 +380,7 @@ extension TabsController {
         remove(itemID, promotingChildren: false)
     }
 
-    private func remove(_ itemID: UUID, promotingChildren: Bool) {
+    func remove(_ itemID: UUID, promotingChildren: Bool, archiving reason: ArchiveReason? = .closed) {
         guard let owner = owner(ofItem: itemID) else { return }
         let ids = promotingChildren ? [itemID] : tree(owner).subtree(of: itemID)
         if let item = tree(owner).item(itemID) { dismissFromLiveFolder(item) }
@@ -376,15 +395,20 @@ extension TabsController {
         for id in ids { endSession(id) }
         switch owner {
         case .main:
-            recordClosed(closedEntry)
+            if reason != .auto { recordClosed(closedEntry) }
+            if let reason { archiveClosed(closedEntry, reason: reason) }
         case .privateWindow(let window):
             window.privateClosed.append(closedEntry)
             if window.privateClosed.count > DeviceState.closedLimit { window.privateClosed.removeFirst() }
         }
     }
 
-    public func close(_ itemIDs: [UUID]) {
-        for id in itemIDs { close(id) }
+    public func close(_ itemIDs: [UUID], archive: Bool = true) {
+        grouped {
+            // Move every window off the group once, so no member is selected just to be closed.
+            moveSelectionOff(Set(itemIDs))
+            for id in itemIDs { close(id, archive: archive) }
+        }
     }
 
     public func closeSelected(in window: BrowserWindowState) {
@@ -432,7 +456,7 @@ extension TabsController {
         }
         let restored = entry.items.map(\.id)
         // Older entries for the same items (a page close, then a delete) must not restore them twice.
-        if !isPrivate { dropClosed(containing: Set(restored)) }
+        if !isPrivate { dropClosed(containing: Set(restored)); dropArchived(containing: Set(restored)) }
         for host in entry.items where host.isFolder || entry.items.contains(where: { $0.parent == .folder(itemID: host.id) }) {
             openFolder(host.id)
         }
@@ -538,10 +562,12 @@ extension TabsController {
 
     /// Moves a pinned tab or favorite to the top of its space's tabs section.
     public func unpin(_ itemID: UUID) {
-        let spaceID = self.spaceID(of: itemID)
-            ?? allWindows.first(where: { $0.selectedItemID == itemID })?.spaceID
-        guard let spaceID else { return }
+        guard let spaceID = unpinSpaceID(itemID) else { return }
         move(itemID, to: .tabs(spaceID: spaceID), after: nil)
+    }
+
+    func unpinSpaceID(_ itemID: UUID) -> UUID? {
+        spaceID(of: itemID) ?? allWindows.first(where: { $0.selectedItemID == itemID })?.spaceID
     }
 
     public func rename(_ itemID: UUID, _ customTitle: String?) {
@@ -721,6 +747,10 @@ extension TabsController {
         if case .main = owner, !isAgent {
             for entry in closed { recordClosed(entry) }
         }
+        if case .main = owner, archive.entries.contains(where: { $0.spaceID == spaceID }) {
+            archive.entries.removeAll { $0.spaceID == spaceID }
+            saveArchive()
+        }
         let spaces = tree(owner).orderedSpaces
         let remaining = spaces.filter { !$0.isAgent } + spaces.filter(\.isAgent)
         for window in allWindows where window.spaceID == spaceID {
@@ -768,6 +798,7 @@ extension TabsController {
         // Items the change brought back must not also reopen from the history.
         let restored = Set(change.items.keys.filter { !before.contains($0) && tree.item($0) != nil })
         dropClosed(containing: restored)
+        dropArchived(containing: restored)
         for window in regularWindows { window.refreshCompositor() }
         save()
     }

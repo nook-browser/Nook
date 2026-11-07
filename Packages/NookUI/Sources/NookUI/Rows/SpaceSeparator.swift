@@ -14,6 +14,7 @@ public struct SpaceSeparator: View {
     let onOrganize: (() -> Void)?
     let isOrganizing: Bool
     let tabCount: Int
+    let clearCount: Int
     @State private var isClearHovered: Bool = false
     @State private var isOrganizeHovered: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -23,13 +24,15 @@ public struct SpaceSeparator: View {
         onClear: @escaping () -> Void,
         onOrganize: (() -> Void)?,
         isOrganizing: Bool,
-        tabCount: Int
+        tabCount: Int,
+        clearCount: Int
     ) {
         self._isHovering = isHovering
         self.onClear = onClear
         self.onOrganize = onOrganize
         self.isOrganizing = isOrganizing
         self.tabCount = tabCount
+        self.clearCount = clearCount
     }
 
     public var body: some View {
@@ -83,7 +86,7 @@ public struct SpaceSeparator: View {
             }
 
             // Clear button (trailing side)
-            if hasTabs && isHovering {
+            if clearCount > 0 && isHovering {
                 Button(action: onClear) {
                     HStack(spacing: NookDesign.Spacing.xs) {
                         Image(systemName: "arrow.down")
@@ -95,7 +98,7 @@ public struct SpaceSeparator: View {
                     .padding(.horizontal, NookDesign.Spacing.xs)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help("Clear all regular tabs")
+                .help("Close every tab but the current one")
                 .transition(.blur.animation(NookDesign.Motion.quick))
                 .onHoverTracking { state in
                     isClearHovered = state

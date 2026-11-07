@@ -49,9 +49,9 @@ public struct ItemFavicon: View {
             .scaledToFit()
             // Keyed on the session too: closing a pinned tab or favorite ends its page but keeps
             // the row, and the cached icon must be loaded then.
-            .task(id: "\(item.url?.host ?? "")|\(session == nil)") {
+            .task(id: "\(item.url.flatMap(FaviconCache.key) ?? "")|\(session == nil)") {
                 session?.ensureFaviconLoaded()
-                guard let host = item.url?.host,
+                guard let host = item.url.flatMap(FaviconCache.key),
                       let image = await FaviconCache.shared.cachedImage(for: host) else { return }
                 cached = Image(platformImage: image)
             }

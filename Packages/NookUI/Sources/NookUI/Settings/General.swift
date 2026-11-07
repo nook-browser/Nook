@@ -52,6 +52,12 @@ public struct SettingsGeneralTab: View {
             #endif
 
             Section {
+                Toggle("Nest tabs opened from links", isOn: $settings.nestTabsFromLinks)
+            } footer: {
+                Text("A tab opened from a link sits under the page that opened it, and Back returns to that page.")
+            }
+
+            Section {
                 Picker("Tab Management", selection: Binding(
                     get: { nookSettings.tabManagementMode },
                     set: { nookSettings.tabManagementMode = $0 }
@@ -83,6 +89,18 @@ public struct SettingsGeneralTab: View {
                     )
                     Label(nookSettings.startupLoadMode.description, systemImage: "power")
                 }
+            }
+
+            Section {
+                Picker("Archive tabs after", selection: $settings.archiveAfter) {
+                    Text("12 hours").tag(12)
+                    Text("24 hours").tag(24)
+                    Text("7 days").tag(168)
+                    Text("30 days").tag(720)
+                    Text("Never").tag(0)
+                }
+            } footer: {
+                Text("Tabs you haven't opened in that long move to the Archive. Pinned tabs and favorites stay put.")
             }
 
             Section {

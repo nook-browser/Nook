@@ -46,6 +46,8 @@ class AIService {
 
     // Per-conversation flag: if the user chose "Allow All This Chat", skip further approval prompts
     private var autoApprovedThisChat: Bool = false
+    // Allow All on an MCP prompt covers that server only, and the browser-tool flag never covers MCP
+    private var autoApprovedMCPServers: Set<String> = []
 
     /// Read-only tools that are safe to auto-approve even in `.askBeforeExecuting` mode
     private static let readOnlyTools: Set<String> = [
@@ -273,6 +275,7 @@ class AIService {
     func clearMessages() {
         messages.removeAll()
         autoApprovedThisChat = false
+        autoApprovedMCPServers = []
     }
 
     // MARK: - Tool Collection
@@ -374,13 +377,13 @@ class AIService {
             if configService.browserToolsConfig.executionMode == .disabled {
                 return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Tools are disabled.", isError: true)
             }
-            if !autoApprovedThisChat {
+            if !autoApprovedMCPServers.contains(serverId) {
                 let approval = await requestToolApproval(toolName: toolName, args: toolCall.arguments, mcpServerId: serverId)
                 switch approval {
                 case .allow:
                     break // proceed with this single execution
                 case .allowAll:
-                    autoApprovedThisChat = true
+                    autoApprovedMCPServers.insert(serverId)
                 case .deny:
                     Self.log.info("User denied tool execution: \(toolCall.name)")
                     return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "User denied execution of \(toolCall.name).", isError: true)

@@ -112,9 +112,12 @@ extension BrowserManager {
         let shown = [peek, tabs.selectedSession(in: state)]
             + [splitManager.leftTabId(for: state.id), splitManager.rightTabId(for: state.id)].map { $0.flatMap(tabs.session(for:)) }
         if let view = shown.compactMap({ $0?.webView }).first(where: { $0.fullscreenState != .notInFullscreen }) {
-            view.evaluateJavaScript("document.exitFullscreen()")
+            // In Nook's own world, where a page cannot replace exitFullscreen with a no-op.
+            view.evaluateJavaScript("document.exitFullscreen()", in: nil, in: .defaultClient) { _ in }
         } else if peek != nil {
             peekManager.dismissPeek()
+        } else {
+            state.multiSelection.clear()
         }
     }
 
@@ -139,33 +142,26 @@ extension BrowserManager {
     }
 
     // MARK: - URL Utilities
+    /// Copies the URL of the page in front: a key mini window's page, Peek while it shows, else the
+    /// active window's selected page (which follows the last split pane clicked).
     func copyCurrentURL() {
-        if let url = tabs.activeWindowSession?.url.absoluteString {
-            #if DEBUG
-            print("Attempting to copy URL: \(url)")
-            #endif
+        let state = windowRegistry?.activeWindow
+        let mini = (NSApp.keyWindow as? MiniBrowserWindow)?.page
+        let peek = state.flatMap { peekManager.windowId == $0.id ? peekManager.page : nil }
+        guard let page = mini ?? peek ?? tabs.activeWindowSession else { return }
 
-            NSPasteboard.general.clearContents()
-            let success = NSPasteboard.general.setString(url, forType: .string)
-            let e = NSHapticFeedbackManager.defaultPerformer
-            e.perform(.generic, performanceTime: .drawCompleted)
-            #if DEBUG
-            print("Clipboard operation success: \(success)")
-            #endif
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(page.url.absoluteString, forType: .string)
+        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .drawCompleted)
 
-            // Show toast on active window
-            if let windowState = windowRegistry?.activeWindow {
-                windowState.isShowingCopyURLToast = true
-
-                Task { [weak windowState] in
-                    try? await Task.sleep(for: .seconds(2))
-                    windowState?.isShowingCopyURLToast = false
-                }
+        if mini != nil {
+            NotificationCenter.default.post(name: .miniWindowCopiedURL, object: page)
+        } else if let state {
+            state.isShowingCopyURLToast = true
+            Task { [weak state] in
+                try? await Task.sleep(for: .seconds(2))
+                state?.isShowingCopyURLToast = false
             }
-        } else {
-            #if DEBUG
-            print("No URL found to copy")
-            #endif
         }
     }
 
@@ -210,6 +206,40 @@ extension BrowserManager {
         webView.nookPrint()
     }
 
+    /// Pins the window's selected tab to its space, or unpins it. Favorites are left alone.
+    func togglePinCurrentTab() {
+        guard let window = windowRegistry?.activeWindow, window.window?.attachedSheet == nil,
+              NSApp.keyWindow === window.window, let id = window.selectedItemID else { return }
+        switch tabs.section(of: id) {
+        case .tabs:
+            if let spaceID = tabs.spaceID(of: id) ?? window.spaceID { tabs.pin(id, to: .pinned(spaceID: spaceID)) }
+        case .pinned:
+            tabs.unpin(id)
+        default:
+            break
+        }
+    }
+
+    /// true to pin, false to unpin, nil for a favorite or no tab.
+    var pinToggleIsPin: Bool? {
+        guard let id = windowRegistry?.activeWindow?.selectedItemID else { return nil }
+        switch tabs.section(of: id) {
+        case .tabs: return true
+        case .pinned: return false
+        default: return nil
+        }
+    }
+
+    /// Stops the selected page loading. Cmd-. also cancels sheets, so with one up (or another window key) the key goes on as cancel.
+    func stopLoadingCurrentPage() {
+        guard let window = windowRegistry?.activeWindow, window.window?.attachedSheet == nil,
+              NSApp.keyWindow === window.window else {
+            NSApp.sendAction(#selector(NSResponder.cancelOperation(_:)), to: nil, from: nil)
+            return
+        }
+        tabs.controllableSession(in: window)?.stop()
+    }
+
     // MARK: - Zoom Management
 
     /// Zoom in for the current tab
@@ -221,7 +251,7 @@ extension BrowserManager {
             return
         }
 
-        zoomManager.zoomIn(for: webView, tabId: currentTab.itemID)
+        zoomManager.zoomIn(for: webView)
         shouldShowZoomPopup = true
     }
 
@@ -234,7 +264,7 @@ extension BrowserManager {
             return
         }
 
-        zoomManager.zoomOut(for: webView, tabId: currentTab.itemID)
+        zoomManager.zoomOut(for: webView)
         shouldShowZoomPopup = true
     }
 
@@ -247,23 +277,18 @@ extension BrowserManager {
             return
         }
 
-        zoomManager.resetZoom(for: webView, tabId: currentTab.itemID)
+        zoomManager.resetZoom(for: webView)
         shouldShowZoomPopup = true
     }
 
-    /// Reset zoom when a tab navigates, so a page never inherits the previous page's zoom.
+    /// Apply the new page's saved site zoom when a tab navigates.
     func loadZoomForTab(_ tabId: UUID) {
-        // Every window's view of the page, not just the active window's: magnification is per view.
+        // Every window's view of the page, not just the active window's: zoom is per view.
         for webView in webViewCoordinator?.getAllWebViews(for: tabId) ?? [] {
-            zoomManager.resetZoom(for: webView, tabId: tabId)
+            zoomManager.restoreZoom(for: webView)
         }
         // A background tab navigating must not move the readout off the tab being looked at.
-        zoomManager.showZoomLevel(for: windowRegistry?.activeWindow?.selectedItemID)
-    }
-
-    /// Clean up zoom data when a tab is closed
-    func cleanupZoomForTab(_ tabId: UUID) {
-        zoomManager.removeTabZoomLevel(for: tabId)
+        zoomManager.showZoomLevel(for: tabs.activeWindowSession?.webView)
     }
 
 }

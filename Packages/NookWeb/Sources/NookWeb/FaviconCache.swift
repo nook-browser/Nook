@@ -5,7 +5,7 @@
 //
 //  Global favicon cache, shared across profiles by design to raise the hit rate and avoid
 //  duplicate downloads. Memory LRU of 200 entries plus a disk cache at
-//  ~/Library/Caches/FaviconCache/{host}.png that survives relaunch. Disk I/O runs on a
+//  ~/Library/Caches/FaviconCache/{key}.png that survives relaunch. Disk I/O runs on a
 //  background queue.
 //
 
@@ -36,6 +36,13 @@ public final class FaviconCache: @unchecked Sendable {
     }()
 
     private init() {}
+
+    /// Cache key for a page: the host, plus `_port` when the port is not the scheme's default.
+    public static func key(for url: URL) -> String? {
+        guard let host = url.host else { return nil }
+        guard let port = url.port, port != (url.scheme == "https" ? 443 : 80) else { return host }
+        return "\(host)_\(port)"
+    }
 
     // MARK: - Lookup
 
@@ -149,7 +156,16 @@ public final class FaviconCache: @unchecked Sendable {
     }
 
     private func fileURL(_ key: String) -> URL {
-        directory.appendingPathComponent("\(key).png")
+        directory.appendingPathComponent(fileName(key))
+    }
+
+    /// Only [A-Za-z0-9._-] survive; the rest (IPv6 colons, slashes) become `_`.
+    func fileName(_ key: String) -> String {
+        let safe = key.unicodeScalars.map { c -> Character in
+            let ok = c.isASCII && (c.properties.isAlphabetic || ("0"..."9").contains(c) || "._-".unicodeScalars.contains(c))
+            return ok ? Character(c) : "_"
+        }
+        return String(safe) + ".png"
     }
 
     private func readFromDisk(_ key: String) -> PlatformImage? {

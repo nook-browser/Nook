@@ -23,15 +23,13 @@ final class ExternalMiniWindowManager {
         self.browserManager = browserManager
     }
 
-    /// A link from another app, in the data store of the active window's space.
+    /// A link from another app, in the data store of the last regular window's space.
+    /// A private window never takes it.
     func present(url: URL) {
         guard let browserManager else { return }
-        let window = browserManager.windowRegistry?.activeWindow
-        let profile = window.flatMap { window in
-            window.isIncognito
-                ? window.ephemeralProfile
-                : window.spaceID.flatMap { browserManager.tabs.profile(forSpace: $0) }
-        } ?? browserManager.currentProfile
+        let window = browserManager.windowRegistry?.mostRecentRegularWindow
+        let profile = window?.spaceID.flatMap { browserManager.tabs.profile(forSpace: $0) }
+            ?? browserManager.currentProfile
         guard let profile else { return }
         present(browserManager.tabs.openDetached(url: url, profile: profile, in: window))
     }
@@ -104,6 +102,8 @@ private extension NSToolbarItem.Identifier {
 /// and the window is not part of the app's menu-bar command tree.
 final class MiniBrowserWindow: NSWindow {
     var openInSpaceAction: (() -> Void)?
+    /// The page shortcuts act on while this window is key (`KeyboardShortcutManager`).
+    weak var page: PageSession?
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -159,7 +159,6 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
         )
         window.titlebarAppearsTransparent = true
         window.tabbingMode = .disallowed
-        window.isReleasedWhenClosed = false
         window.contentMinSize = Self.minimumSize
         // Without this the hosting controller shrinks the window to the view's minimum size.
         hostingController.sizingOptions = []
@@ -169,8 +168,10 @@ final class MiniBrowserWindowController: NSWindowController, NSWindowDelegate {
 
         super.init(window: window)
 
+        window.setUpAsPageWindow()
         window.delegate = self
         window.openInSpaceAction = { adoptAction(nil) }
+        window.page = page
         window.subtitle = page.profile?.name ?? "Default"
         installToolbar(on: window)
         observeNavigationState(for: window)

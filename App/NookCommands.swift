@@ -143,6 +143,12 @@ struct NookCommands: Commands {
                 windowRegistry.activeWindow?.commandPalette?.open()
             }
             .modifier(dynamicShortcut(.newTab))
+            Button(browserManager.pinToggleIsPin == false ? "Unpin Tab" : "Pin Tab") {
+                browserManager.togglePinCurrentTab()
+            }
+            .modifier(dynamicShortcut(.togglePinTab))
+            .disabled(browserManager.pinToggleIsPin == nil)
+
             Button("New Window") {
                 browserManager.createNewWindow()
             }
@@ -197,6 +203,23 @@ struct NookCommands: Commands {
                     || !(browserManager.tabs.activeWindowSession.map { $0.hasVideoContent || $0.hasPiPActive } ?? false)
             )
 
+            Divider()
+
+            Button("Collapse All Folders") {
+                if let spaceID = windowRegistry.activeWindow?.spaceID {
+                    browserManager.tabs.setAllFolders(open: false, space: spaceID)
+                }
+            }
+            .disabled(windowRegistry.activeWindow?.spaceID == nil)
+
+            Button("Expand All Folders") {
+                if let spaceID = windowRegistry.activeWindow?.spaceID {
+                    browserManager.tabs.setAllFolders(open: true, space: spaceID)
+                }
+            }
+            .modifier(dynamicShortcut(.expandAllFolders))
+            .disabled(windowRegistry.activeWindow?.spaceID == nil)
+
             if tabOrganizerManager.isAvailable {
                 Divider()
 
@@ -229,6 +252,17 @@ struct NookCommands: Commands {
             }
             .modifier(dynamicShortcut(.refresh))
             .disabled(browserManager.tabs.activeWindowSession == nil)
+
+            Button("Stop Loading") {
+                browserManager.stopLoadingCurrentPage()
+            }
+            .modifier(dynamicShortcut(.stopLoading))
+            .disabled(browserManager.tabs.activeWindowSession?.isLoading != true)
+
+            Button("Reload with Standard Fingerprinting Protection") {
+                browserManager.tabs.activeWindowSession?.reloadWithoutEnhancedFingerprintingProtection()
+            }
+            .disabled(browserManager.tabs.activeWindowSession?.usesEnhancedFingerprintingProtection != true)
 
             Button(browserManager.tabs.activeWindowSession?.isTranslated == true ? "Show Original" : "Translate Page") {
                 browserManager.tabs.activeWindowSession?.toggleTranslation()

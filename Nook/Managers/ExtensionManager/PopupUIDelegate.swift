@@ -24,7 +24,10 @@ class PopupClipboardHandler: NSObject, WKScriptMessageHandler {
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
     ) {
-        guard let text = message.body as? String, !text.isEmpty else { return }
+        // Only the popup's own page: an iframe in it must not write the pasteboard.
+        guard message.frameInfo.isMainFrame,
+              ["webkit-extension", "safari-web-extension"].contains(message.frameInfo.securityOrigin.protocol),
+              let text = message.body as? String, !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }

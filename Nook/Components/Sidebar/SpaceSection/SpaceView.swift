@@ -55,7 +55,11 @@ struct SpaceView: View {
 
     var body: some View {
         let rows = tabs.rows(space: spaceID)
-        let pinned = rows.filter { $0.section == .pinned }
+        // A folded pinned section still shows its selected tab, as Arc does.
+        let selected = windowState.spaceID == spaceID ? windowState.selectedItemID : nil
+        let pinned = rows.filter {
+            $0.section == .pinned && (!tabs.isPinnedCollapsed(space: spaceID) || $0.id == selected)
+        }
         let regular = rows.filter { $0.section == .tabs }
         let split = splitPair(in: rows)
 
@@ -121,7 +125,14 @@ struct SpaceView: View {
             layout: .rows(rows),
             manager: dragSession,
             onDrop: { itemID, position in
-                tabs.drop(itemID, at: position, section: section, rows: rows)
+                let group = tabs.selectedItems(in: windowState)
+                let land = { tabs.drop(itemID, at: position, section: section, rows: rows) }
+                if group.contains(itemID) {
+                    tabs.dropGroup(group, dragged: itemID, drop: land)
+                    windowState.multiSelection.clear()
+                } else {
+                    land()
+                }
             }
         ) {
             VStack(spacing: 0) {
@@ -221,8 +232,10 @@ struct SpaceView: View {
             SplitTabRow(left: split.left, right: split.right, zoneID: zone)
         } else {
             let session = tabs.session(for: row.item.id)
+            let group = windowState.multiSelection.contains(row.id) ? tabs.selectedItems(in: windowState) : []
             NookDragSourceView(
-                item: NookDragItem(tabId: row.item.id, title: tabs.title(for: row.item), urlString: tabs.currentURL(for: row.item)?.absoluteString ?? ""),
+                item: NookDragItem(tabId: row.item.id, title: tabs.title(for: row.item), urlString: tabs.currentURL(for: row.item)?.absoluteString ?? "",
+                                    count: group.contains(row.id) ? group.count : nil),
                 icon: row.item.isFolder ? Image(systemName: "folder.fill") : session?.favicon,
                 zoneID: zone,
                 manager: dragSession
@@ -262,18 +275,21 @@ struct SpaceView: View {
 
     private func separatorAndNewTab(regular: [Row]) -> some View {
         let looseTabs = regular.filter { $0.depth == 0 && !$0.item.isFolder }.map(\.item.id)
+        let kept = [windowState.selectedItemID, windowState.split?.leftItemID, windowState.split?.rightItemID].compactMap { $0 }
+        let clearable = tabs.tabsToClear(in: spaceID, keeping: kept)
         return VStack(spacing: NookDesign.Spacing.xs) {
             SpaceSeparator(
                 isHovering: $isSidebarHovered,
-                // Clear empties the section: a tab goes with its whole trail.
-                onClear: { looseTabs.forEach(tabs.remove) },
+                // Clear keeps the window's current tabs; a tab goes with its whole trail.
+                onClear: { clearable.forEach(tabs.remove) },
                 onOrganize: nookSettings.tabOrganizerEnabled && tabOrganizerManager.isAvailable ? {
                     Task {
                         await tabOrganizerManager.organizeTabs(in: spaceID, using: tabs)
                     }
                 } : nil,
                 isOrganizing: tabOrganizerManager.isOrganizing,
-                tabCount: looseTabs.count
+                tabCount: looseTabs.count,
+                clearCount: clearable.count
             )
             .padding(.horizontal, NookDesign.Spacing.md)
 

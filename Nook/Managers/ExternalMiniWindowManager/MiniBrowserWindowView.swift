@@ -2,10 +2,13 @@
 import SwiftUI
 import AppKit
 import NookWeb
+import NookDesign
+import NookUI
 
 struct MiniBrowserWindowView: View {
     let page: PageSession
     @EnvironmentObject private var gradientColorManager: GradientColorManager
+    @State private var showCopyToast = false
 
     var body: some View {
         // On macOS 26 the page runs up under the toolbar; the load bar sits just below it.
@@ -20,7 +23,26 @@ struct MiniBrowserWindowView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.windowBackgroundColor))
+        .overlay(alignment: .bottom) {
+            if showCopyToast {
+                CopyURLToast()
+                    .padding(.bottom, NookDesign.Spacing.xxxl)
+            }
+        }
+        .animation(.smooth(duration: 0.25), value: showCopyToast)
+        .onReceive(NotificationCenter.default.publisher(for: .miniWindowCopiedURL, object: page)) { _ in
+            showCopyToast = true
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                showCopyToast = false
+            }
+        }
     }
+}
+
+extension Notification.Name {
+    /// Posted with the page as object when Copy URL ran on a mini window.
+    static let miniWindowCopiedURL = Notification.Name("nook.miniWindowCopiedURL")
 }
 
 private extension View {

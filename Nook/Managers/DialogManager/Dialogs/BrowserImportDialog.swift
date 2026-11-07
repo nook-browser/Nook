@@ -8,6 +8,7 @@
 //
 
 import AppKit
+import NookDesign
 import SwiftUI
 
 struct BrowserImportDialog: DialogPresentable {
@@ -30,7 +31,9 @@ struct BrowserImportDialog: DialogPresentable {
 
     @ViewBuilder
     func dialogContent() -> some View {
-        EmptyView()
+        Text("Brings over spaces, tabs, folders, favorites, extensions, Air Traffic Control rules and the last 30 days of archived tabs. Passwords and history stay in Arc.")
+            .font(NookDesign.Font.body)
+            .foregroundStyle(.secondary)
     }
 
     func dialogFooter() -> DialogFooter {
@@ -55,11 +58,23 @@ struct BrowserImportDialog: DialogPresentable {
     private func handleCreate() {
         let manager = browserManager
         onCancel()
+        if manager.nookSettings?.didImportFromArc == true {
+            let again = NSAlert()
+            again.messageText = "Import from Arc again?"
+            again.informativeText = "Spaces from your last import stay, so you'll end up with two of each."
+            again.addButton(withTitle: "Import Again")
+            again.addButton(withTitle: "Cancel")
+            guard again.runModal() == .alertFirstButtonReturn else { return }
+        }
         Task {
-            guard await !manager.importArcData() else { return }
             let alert = NSAlert()
-            alert.messageText = "Couldn't import from Arc"
-            alert.informativeText = "Nook didn't find any Arc spaces on this Mac."
+            if let summary = await manager.importArcData() {
+                alert.messageText = "Imported from Arc"
+                alert.informativeText = summary
+            } else {
+                alert.messageText = "Couldn't import from Arc"
+                alert.informativeText = "Nook didn't find any Arc spaces on this Mac."
+            }
             alert.runModal()
         }
     }

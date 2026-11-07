@@ -142,6 +142,24 @@ extension TabTree {
         return change
     }
 
+    /// Puts archived records back with their original ids, the root first in `spaceID`'s tabs section.
+    public mutating func restore(_ records: [Item], toTopOf spaceID: UUID, now: Date = Date()) throws -> Change {
+        guard let root = records.first else { throw TreeError.missingItem }
+        let parent = Parent.tabs(spaceID: spaceID)
+        try validate(parent: parent, placing: nil, isFolder: root.isFolder)
+        var change = Change()
+        for var restored in records {
+            if restored.id == root.id {
+                restored.parent = parent
+                restored.order = placeKey(in: parent, after: nil, excluding: root.id, change: &change, now: now)
+            }
+            restored.deletedAt = nil
+            restored.modifiedAt = now
+            record(&change, item: restored)
+        }
+        return change
+    }
+
     // MARK: - Spaces
 
     @discardableResult

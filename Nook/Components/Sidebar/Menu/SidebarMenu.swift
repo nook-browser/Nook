@@ -33,6 +33,8 @@ struct SidebarMenu: View {
                     SidebarMenuDownloadsTab()
                 case .spaces:
                     SidebarMenuSpacesTab(onOpenSpace: openSpace, onNewSpace: newSpace)
+                case .archive:
+                    SidebarMenuArchiveTab(onRestore: close)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -76,6 +78,17 @@ struct SidebarMenu: View {
                         windowState.sidebarMenuSelectedTab = .history
                     }
                 )
+                if !windowState.isIncognito {
+                SidebarMenuTab(
+                    image: "archivebox",
+                    activeImage: "archivebox.fill",
+                    title: "Archive",
+                    isActive: windowState.sidebarMenuSelectedTab == .archive,
+                    action: {
+                        windowState.sidebarMenuSelectedTab = .archive
+                    }
+                )
+                }
                 SidebarMenuTab(
                     image: "square.on.square",
                     activeImage: "square.fill.on.square.fill",

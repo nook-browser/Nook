@@ -243,7 +243,7 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler, WKScr
         // turn either into a new tab, so the page has to report it. Shift brings the tab forward.
         if let href = (dictionary["middleClickHref"] ?? dictionary["commandClickHref"]) as? String {
             if let url = URL(string: href) {
-                session?.openInNewTab(url, foreground: dictionary["foreground"] as? Bool == true)
+                session?.openInNewTab(url, title: (dictionary["linkTitle"] as? String).flatMap { $0.isEmpty ? nil : String($0.prefix(100)) }, foreground: dictionary["foreground"] as? Bool == true)
             }
             return
         }
@@ -289,6 +289,8 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler, WKScr
         }
 
         function capturePayload(event) {
+            // A page can dispatch its own contextmenu to stage a link the next real menu offers.
+            if (!event.isTrusted) return;
             console.log('[Nook Context Menu] capturePayload called');
             try {
                 var invocations = 0;
@@ -359,13 +361,14 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler, WKScr
                 var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
                 if (!link || !link.href) { return; }
                 var href = link.href;
+                var text = (link.title || link.textContent || '').trim().slice(0, 100);
                 // Decide once the event has finished propagating. Listeners the page adds to
                 // document or window after ours run after ours, so a page that cancels the
                 // click and opens its own tab would otherwise leave the user with two.
                 setTimeout(function() {
                     if (event.defaultPrevented) { return; }
                     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload) {
-                        window.webkit.messageHandlers.contextMenuPayload.postMessage({ middleClickHref: href, foreground: event.shiftKey });
+                        window.webkit.messageHandlers.contextMenuPayload.postMessage({ middleClickHref: href, linkTitle: text, foreground: event.shiftKey });
                     }
                 }, 0);
             } catch (error) {
@@ -385,7 +388,7 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler, WKScr
                 if (!link || !link.href) { return; }
                 event.preventDefault();
                 if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.contextMenuPayload) {
-                    window.webkit.messageHandlers.contextMenuPayload.postMessage({ commandClickHref: link.href, foreground: event.shiftKey });
+                    window.webkit.messageHandlers.contextMenuPayload.postMessage({ commandClickHref: link.href, linkTitle: (link.title || link.textContent || '').trim().slice(0, 100), foreground: event.shiftKey });
                 }
             } catch (error) {
                 console.error('[Nook Context Menu] command click error', error);

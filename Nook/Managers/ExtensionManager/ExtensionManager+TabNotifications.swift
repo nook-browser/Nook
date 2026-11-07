@@ -16,15 +16,12 @@ extension ExtensionManager {
 
     // MARK: - Adapters
 
-    /// Adapter for a tab item extensions may see; nil for folders, unknown ids, private items
-    /// and Agent space items.
+    /// Adapter for a tab item; nil for folders, unknown ids and Agent space items. Private items
+    /// get one too: WebKit hides them from extensions without `hasAccessToPrivateData`.
     func adapter(for itemID: UUID) -> ExtensionTabAdapter? {
         if browserManagerRef?.tabs.isInAgentSpace(itemID) == true { return nil }
         if let existing = tabAdapters[itemID] { return existing }
-        guard let bm = browserManagerRef, let item = bm.tabs.item(itemID), !item.isFolder,
-              bm.tabs.session(for: itemID)?.isPrivate != true,
-              !(bm.windowRegistry?.allWindows ?? []).contains(where: { $0.privateTree?.item(itemID) != nil })
-        else { return nil }
+        guard let bm = browserManagerRef, let item = bm.tabs.item(itemID), !item.isFolder else { return nil }
         // ponytail: adapters for items closed without ever loading stay cached (a few bytes each);
         // prune against the tree if that ever shows up.
         let created = ExtensionTabAdapter(itemID: itemID, browserManager: bm)
@@ -32,15 +29,13 @@ extension ExtensionManager {
         return created
     }
 
-    /// Adapter for a tab the controller already knows about; nil for private or unopened tabs.
+    /// Adapter for a tab the controller already knows about; nil for unopened tabs.
     func openedAdapter(for itemID: UUID) -> ExtensionTabAdapter? {
         openedTabIDs.contains(itemID) ? adapter(for: itemID) : nil
     }
 
-    /// Adapter for a regular window, created (and announced to the controller) on first use.
-    /// nil for private windows, which extensions never see.
+    /// Adapter for a window, created (and announced to the controller) on first use.
     func windowAdapter(for window: BrowserWindowState) -> ExtensionWindowAdapter? {
-        guard window.privateTree == nil, !window.isIncognito else { return nil }
         if let existing = windowAdapters[window.id] { return existing }
         guard let bm = browserManagerRef else { return nil }
         let created = ExtensionWindowAdapter(window: window, browserManager: bm)
@@ -49,7 +44,7 @@ extension ExtensionManager {
         return created
     }
 
-    /// Regular windows, focused first.
+    /// Every window, focused first.
     var openWindowAdapters: [ExtensionWindowAdapter] {
         guard let registry = browserManagerRef?.windowRegistry else { return [] }
         let active = registry.activeWindow
@@ -83,7 +78,6 @@ extension ExtensionManager {
             }
             return
         }
-        // A private window focused: tabs.query({active: true}) has no answer, as before.
         guard let adapter = windowAdapter(for: window) else { return }
         controller.didFocusWindow(adapter)
         // Extensions resolve the active tab from the focused window, so switching windows
@@ -105,8 +99,9 @@ extension ExtensionManager {
     /// Give each loaded extension explicit access to `url`, but only when that extension's
     /// granted match patterns already cover it. Some WebKit builds did not treat a granted
     /// pattern as access to a URL (content scripts skipped, `tabs.query` without URLs), so
-    /// this makes the implicit grant explicit. It never widens what an extension may reach.
-    func grantExtensionAccessToURL(_ url: URL) {
+    /// this makes the implicit grant explicit. It never widens what an extension may reach, and
+    /// a private page's host never reaches an extension not allowed in private browsing.
+    func grantExtensionAccessToURL(_ url: URL, private isPrivate: Bool) {
         guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
               let host = url.host
         else { return }
@@ -116,7 +111,7 @@ extension ExtensionManager {
             return try? WKWebExtension.MatchPattern(string: "\(scheme)://\(hostPort)/*")
         }()
 
-        for ctx in extensionContexts.values where ctx.isLoaded {
+        for ctx in extensionContexts.values where ctx.isLoaded && (!isPrivate || ctx.hasAccessToPrivateData) {
             switch ctx.permissionStatus(for: url) {
             case .grantedExplicitly, .grantedImplicitly, .deniedExplicitly:
                 continue
