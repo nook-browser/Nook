@@ -52,6 +52,7 @@ struct StageFooter: View {
                     if(isLoading) {
                         RoundedSpinner()
                             .frame(width: 14, height: 14)
+                            .foregroundStyle(.black)
                     } else {
                         Image(systemName: "return")
                             .font(.system(size: 12, weight: .semibold))

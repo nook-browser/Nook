@@ -25,8 +25,8 @@ struct FinalStage: View {
                         .frame(width: 14, height: 14)
                     Text("Installing \(min(progress.finished + 1, progress.total)) of \(progress.total) extensions")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
                 }
+                .foregroundStyle(.white.opacity(0.6))
             }
         }
     }

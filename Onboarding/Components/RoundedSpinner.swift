@@ -14,7 +14,7 @@ struct RoundedSpinner: View {
         Circle()
             .trim(from: 0.05, to: 0.75)
             .stroke(
-                Color.black,
+                .foreground,
                 style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
             )
             .rotationEffect(.degrees(rotation))
