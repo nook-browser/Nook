@@ -27,7 +27,7 @@ extension ExtensionManager {
 
         let candidates: [(id: String, store: ExtensionStore, version: String, name: String)] =
             ((try? context.fetch(FetchDescriptor<ExtensionEntity>())) ?? []).compactMap { entity in
-                guard let store = entity.sourceStore.flatMap(ExtensionStore.init(rawValue:)) else { return nil }
+                guard let store = entity.source.store else { return nil }
                 return (entity.id, store, entity.version, entity.name)
             }
         guard !candidates.isEmpty else { return }

@@ -15,12 +15,26 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
+struct InstallConsent: Identifiable {
+    let id = UUID()
+    let name: String
+    let version: String
+    let source: ExtensionSource
+    let replacing: InstalledExtension?
+    let permissions: [String]
+    let hosts: [String]
+    let isUpdate: Bool
+    let logo: NSImage
+}
+
+typealias InstallConsentPresenter = @MainActor (InstallConsent) async -> Bool
+
 extension ExtensionManager {
 
     // MARK: - Locale String Resolution
 
     /// Resolve a `__MSG_key__` string using the extension's `_locales/` directory.
-    static func resolveLocaleString(_ value: String, in extensionDir: URL) -> String? {
+    nonisolated static func resolveLocaleString(_ value: String, in extensionDir: URL) -> String? {
         guard value.hasPrefix("__MSG_") && value.hasSuffix("__") else { return nil }
 
         let localesDir = extensionDir.appendingPathComponent("_locales")
@@ -105,15 +119,14 @@ extension ExtensionManager {
         return (addedPermissions, addedHosts)
     }
 
-    /// Show the permission sheet and wait for the user's decision.
-    private func confirmInstallation(
-        of webExtension: WKWebExtension,
-        name: String,
-        permissions: [String],
-        hosts: [String],
-        isUpdate: Bool
-    ) async -> Bool {
+    /// Show the permission dialog in the browser window and wait for the user's decision.
+    private func presentInBrowserWindow(_ consent: InstallConsent) async -> Bool {
         guard let bm = browserManagerRef else { return false }
+        let browserWindows = bm.windowRegistry?.allWindows.compactMap(\.window) ?? []
+        // The dialog draws only in browser windows, so one has to exist and be in front of other Nook windows.
+        if browserWindows.isEmpty || NSApp.keyWindow.map({ !browserWindows.contains($0) }) == true {
+            _ = bm.openBrowserWindow()
+        }
         return await withCheckedContinuation { continuation in
             let decide = ResumeOnce(fallback: false) { continuation.resume(returning: $0) }
             bm.showDialog {
@@ -121,12 +134,7 @@ extension ExtensionManager {
                     header: { EmptyView() },
                     content: {
                         ExtensionPermissionView(
-                            extensionName: name,
-                            requestedPermissions: permissions,
-                            optionalPermissions: [],
-                            requestedHostPermissions: hosts,
-                            optionalHostPermissions: [],
-                            isUpdate: isUpdate,
+                            consent: consent,
                             onGrant: {
                                 bm.closeDialog()
                                 decide(true)
@@ -134,8 +142,7 @@ extension ExtensionManager {
                             onDeny: {
                                 bm.closeDialog()
                                 decide(false)
-                            },
-                            extensionLogo: webExtension.icon(for: .init(width: 64, height: 64)) ?? NSImage()
+                            }
                         )
                     },
                     footer: { EmptyView() }
@@ -153,11 +160,15 @@ extension ExtensionManager {
     ///     ID derived from the manifest `key`, then a random UUID.
     ///   - interactive: when false (background updates), an update that needs new permissions
     ///     is skipped instead of prompting.
+    ///   - replacing: an installed extension this one takes the place of, removed after it installs.
+    ///   - presenter: shows the permission dialog where the install started; the browser window when nil.
     func installExtension(
         from url: URL,
         store: ExtensionStore? = nil,
         extensionId: String? = nil,
         interactive: Bool = true,
+        replacing replacedID: String? = nil,
+        presenter: InstallConsentPresenter? = nil,
         completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
     ) {
         guard isExtensionSupportAvailable else {
@@ -168,7 +179,8 @@ extension ExtensionManager {
         Task { @MainActor in
             do {
                 let installed = try await performInstallation(
-                    from: url, store: store, extensionId: extensionId, interactive: interactive
+                    from: url, store: store, extensionId: extensionId, interactive: interactive,
+                    replacing: replacedID, presenter: presenter
                 )
                 if let index = installedExtensions.firstIndex(where: { $0.id == installed.id }) {
                     installedExtensions[index] = installed
@@ -188,7 +200,9 @@ extension ExtensionManager {
         from sourceURL: URL,
         store: ExtensionStore?,
         extensionId callerId: String?,
-        interactive: Bool
+        interactive: Bool,
+        replacing replacedID: String?,
+        presenter: InstallConsentPresenter?
     ) async throws -> InstalledExtension {
         let fm = FileManager.default
         let extensionsDir = getExtensionsDirectory()
@@ -198,6 +212,7 @@ extension ExtensionManager {
         let tempDir = extensionsDir.appendingPathComponent("temp_\(UUID().uuidString)")
         defer { try? fm.removeItem(at: tempDir) }
 
+        var safariAppex: URL?
         switch sourceURL.pathExtension.lowercased() {
         case "zip", "xpi":  // a Firefox .xpi is a plain zip
             try await extractZip(from: sourceURL, to: tempDir)
@@ -210,7 +225,9 @@ extension ExtensionManager {
             try zip.write(to: zipURL)
             try await extractZip(from: zipURL, to: tempDir)
         case "appex", "app":
-            try fm.copyItem(at: try resolveSafariExtensionResources(at: sourceURL), to: tempDir)
+            let appex = try resolveSafariAppex(at: sourceURL)
+            safariAppex = appex
+            try fm.copyItem(at: appex.appendingPathComponent("Contents/Resources"), to: tempDir)
         default:
             try fm.copyItem(at: sourceURL, to: tempDir)
         }
@@ -222,8 +239,9 @@ extension ExtensionManager {
             try validateMV3Requirements(manifest: manifest, baseURL: tempDir)
         }
         let keyId = (manifest["key"] as? String).flatMap(Self.chromeExtensionID(fromManifestKey:))
-        let hasStableId = callerId != nil || keyId != nil
-        let extensionId = callerId ?? keyId ?? UUID().uuidString
+        let safariBundleId = safariAppex.flatMap { Bundle(url: $0)?.bundleIdentifier }
+        let hasStableId = callerId != nil || safariBundleId != nil || keyId != nil
+        let extensionId = callerId ?? safariBundleId ?? keyId ?? UUID().uuidString
         // The ID names a directory under Extensions/, and a Safari bundle identifier comes from
         // an Info.plist nobody vetted. Keep it to one plain path component.
         guard !extensionId.isEmpty, extensionId != ".", extensionId != "..",
@@ -237,6 +255,14 @@ extension ExtensionManager {
         let staged = try await WKWebExtension(resourceBaseURL: tempDir)
         let name = staged.displayName ?? manifest["name"] as? String ?? "Unknown Extension"
         let version = manifest["version"] as? String ?? "1.0"
+        let source: ExtensionSource = if let store {
+            .store(store)
+        } else if let safariAppex {
+            .safari(appPath: Self.containingApp(of: safariAppex)?.path)
+        } else {
+            .file
+        }
+        let replaced = replacedID.flatMap { id in installedExtensions.first { $0.id == id } }
 
         // STEP 2: Decide between fresh install, in-place update, and duplicate.
         let existing = fetchEntity(id: extensionId)
@@ -249,7 +275,7 @@ extension ExtensionManager {
             guard existing.version != version else {
                 throw ExtensionError.installationFailed("\(name) v\(version) is already installed")
             }
-        } else if legacyCopy == nil,
+        } else if legacyCopy == nil, replaced == nil,
                   installedExtensions.contains(where: { $0.name == name && $0.version == version }) {
             throw ExtensionError.installationFailed("\(name) v\(version) is already installed")
         }
@@ -265,7 +291,7 @@ extension ExtensionManager {
         // A sideloaded package gets a store install's ID by copying its manifest `key`, and as an
         // update it would take over that extension's storage without a word. Ask as for a fresh
         // install, listing everything it requests.
-        let replacesStoreInstall = existing?.sourceStore != nil && store == nil
+        let replacesStoreInstall = existing?.source.store != nil && store == nil
         let consent = Self.consentItems(for: staged, comparedTo: replacesStoreInstall ? nil : previous)
         let needsConsent = existing == nil || replacesStoreInstall
             || !consent.permissions.isEmpty || !consent.hosts.isEmpty
@@ -274,11 +300,18 @@ extension ExtensionManager {
                 Self.logger.info("Skipping update of '\(name, privacy: .public)': new version requests additional permissions")
                 throw ExtensionError.cancelled
             }
-            guard await confirmInstallation(
-                of: staged, name: name,
+            let request = InstallConsent(
+                name: name, version: version, source: source, replacing: replaced,
                 permissions: consent.permissions, hosts: consent.hosts,
-                isUpdate: existing != nil && !replacesStoreInstall
-            ) else {
+                isUpdate: existing != nil && !replacesStoreInstall,
+                logo: staged.icon(for: .init(width: 64, height: 64)) ?? NSImage()
+            )
+            let granted = if let presenter {
+                await presenter(request)
+            } else {
+                await presentInBrowserWindow(request)
+            }
+            guard granted else {
                 throw ExtensionError.cancelled
             }
         }
@@ -328,13 +361,18 @@ extension ExtensionManager {
             )
             context.insert(entity)
         }
-        if let store { entity.sourceStore = store.rawValue }
+        entity.source = source
         try context.save()
 
         // STEP 6: Load from the final location so resource URLs resolve to real files.
         if entity.isEnabled {
             let webExtension = try await WKWebExtension(resourceBaseURL: finalDir)
             registerContext(for: entity, webExtension: webExtension)
+        }
+
+        if let replaced, replaced.id != extensionId, replaced.id != legacyCopy?.id {
+            Self.logger.info("Replacing '\(replaced.name, privacy: .public)' (\(replaced.id, privacy: .public)) with \(extensionId, privacy: .public)")
+            uninstallExtension(replaced.id)
         }
 
         Self.logger.info("\(existing == nil ? "Installed" : "Updated", privacy: .public) '\(name, privacy: .public)' v\(version, privacy: .public) as \(extensionId, privacy: .public)")
@@ -450,45 +488,40 @@ extension ExtensionManager {
         }
     }
 
-    /// Resolve the web extension resources directory from a Safari .appex or .app bundle.
-    /// - .appex: look for `Contents/Resources/manifest.json`
-    /// - .app: find the first `.appex` inside `Contents/PlugIns/` that contains web extension resources
-    private func resolveSafariExtensionResources(at bundleURL: URL) throws -> URL {
-        let ext = bundleURL.pathExtension.lowercased()
-
-        if ext == "appex" {
-            let resourcesDir = bundleURL.appendingPathComponent("Contents/Resources")
-            let manifest = resourcesDir.appendingPathComponent("manifest.json")
-            if FileManager.default.fileExists(atPath: manifest.path) {
-                Self.logger.info("Found Safari extension resources at \(resourcesDir.path, privacy: .public)")
-                return resourcesDir
-            }
-            throw ExtensionError.installationFailed(
-                "No manifest.json found in .appex bundle at Contents/Resources"
-            )
+    /// Resolve the Safari web extension bundle from a .appex or .app.
+    /// - .appex: it must hold `Contents/Resources/manifest.json`
+    /// - .app: the first `.appex` inside `Contents/PlugIns/` that holds web extension resources
+    private func resolveSafariAppex(at bundleURL: URL) throws -> URL {
+        func hasManifest(_ appex: URL) -> Bool {
+            FileManager.default.fileExists(atPath: appex.appendingPathComponent("Contents/Resources/manifest.json").path)
         }
 
-        if ext == "app" {
-            // Search PlugIns directory for .appex bundles containing web extension resources
-            let plugInsDir = bundleURL.appendingPathComponent("Contents/PlugIns")
-            if let items = try? FileManager.default.contentsOfDirectory(
-                at: plugInsDir, includingPropertiesForKeys: nil
-            ) {
-                for item in items where item.pathExtension.lowercased() == "appex" {
-                    let resourcesDir = item.appendingPathComponent("Contents/Resources")
-                    let manifest = resourcesDir.appendingPathComponent("manifest.json")
-                    if FileManager.default.fileExists(atPath: manifest.path) {
-                        Self.logger.info("Found Safari extension in \(item.lastPathComponent): \(resourcesDir.path, privacy: .public)")
-                        return resourcesDir
-                    }
-                }
+        switch bundleURL.pathExtension.lowercased() {
+        case "appex":
+            guard hasManifest(bundleURL) else {
+                throw ExtensionError.installationFailed("No manifest.json found in .appex bundle at Contents/Resources")
             }
-            throw ExtensionError.installationFailed(
-                "No Safari Web Extension found in app bundle. Check Contents/PlugIns/ for .appex with manifest.json"
-            )
+            return bundleURL
+        case "app":
+            let plugIns = (try? FileManager.default.contentsOfDirectory(
+                at: bundleURL.appendingPathComponent("Contents/PlugIns"), includingPropertiesForKeys: nil
+            )) ?? []
+            guard let appex = plugIns.first(where: { $0.pathExtension.lowercased() == "appex" && hasManifest($0) }) else {
+                throw ExtensionError.installationFailed(
+                    "No Safari Web Extension found in app bundle. Check Contents/PlugIns/ for .appex with manifest.json"
+                )
+            }
+            Self.logger.info("Found Safari extension in \(appex.lastPathComponent, privacy: .public)")
+            return appex
+        case let ext:
+            throw ExtensionError.installationFailed("Unsupported bundle format: .\(ext)")
         }
+    }
 
-        throw ExtensionError.installationFailed("Unsupported bundle format: .\(ext)")
+    /// The app an `.appex` ships in, from `<App>.app/Contents/PlugIns/<Extension>.appex`.
+    nonisolated static func containingApp(of appex: URL) -> URL? {
+        let app = appex.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return app.pathExtension.lowercased() == "app" ? app : nil
     }
 
     private func findExtensionIcon(in directory: URL, manifest: [String: Any])
@@ -519,6 +552,16 @@ extension ExtensionManager {
     }
 
     // MARK: - Extension Management
+
+    func hasOptionsPage(_ extensionId: String) -> Bool {
+        guard let context = extensionContexts[extensionId] else { return false }
+        return context.isLoaded && context.optionsPageURL != nil
+    }
+
+    func openOptionsPage(_ extensionId: String) {
+        guard let controller = extensionController, let context = extensionContexts[extensionId] else { return }
+        webExtensionController(controller, openOptionsPageFor: context) { _ in }
+    }
 
     func enableExtension(_ extensionId: String) {
         guard let entity = fetchEntity(id: extensionId) else { return }
@@ -624,14 +667,57 @@ extension ExtensionManager {
     struct SafariExtensionInfo: Identifiable {
         let id: String           // bundle identifier
         let name: String         // display name
+        let version: String
         let appPath: URL         // path to the parent .app
         let appexPath: URL       // path to the .appex bundle
-        let resourcesPath: URL   // path to Contents/Resources with manifest.json
+    }
+
+    func refreshSafariExtensions() async {
+        guard !isScanningSafari else { return }
+        isScanningSafari = true
+        safariExtensions = await discoverSafariExtensions()
+        isScanningSafari = false
+    }
+
+    /// Safari extensions with nothing installed for them, under their own ID or as another version.
+    var uninstalledSafariExtensions: [SafariExtensionInfo] {
+        (safariExtensions ?? []).filter { info in
+            !installedExtensions.contains {
+                $0.id == info.id || (!$0.source.isSafari && Self.isSameProduct($0.name, info.name))
+            }
+        }
+    }
+
+    func safariExtension(id: String) -> SafariExtensionInfo? {
+        safariExtensions?.first { $0.id == id }
+    }
+
+    func safariUpdate(for ext: InstalledExtension) -> SafariExtensionInfo? {
+        safariExtension(id: ext.id).flatMap { ExtensionVersion.isNewer($0.version, than: ext.version) ? $0 : nil }
+    }
+
+    func safariAlternative(to ext: InstalledExtension) -> SafariExtensionInfo? {
+        guard !ext.source.isSafari else { return nil }
+        return safariExtensions?.first { info in
+            Self.isSameProduct(ext.name, info.name) && !installedExtensions.contains { $0.id == info.id }
+        }
+    }
+
+    /// Names match when one's words all appear in the other's, ignoring "for Safari", so
+    /// "LastPass" matches "LastPass: Free Password Manager".
+    private static func isSameProduct(_ a: String, _ b: String) -> Bool {
+        func words(_ name: String) -> Set<String> {
+            Set(name.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init))
+                .subtracting(["for", "safari"])
+        }
+        let wa = words(a), wb = words(b)
+        guard !wa.isEmpty, !wb.isEmpty else { return false }
+        return wa.isSubset(of: wb) || wb.isSubset(of: wa)
     }
 
     /// Discover Safari Web Extensions installed on this Mac by scanning application
     /// bundles for .appex plugins that contain a manifest.json (web extension resources).
-    func discoverSafariExtensions() async -> [SafariExtensionInfo] {
+    private func discoverSafariExtensions() async -> [SafariExtensionInfo] {
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 var results: [SafariExtensionInfo] = []
@@ -677,11 +763,14 @@ extension ExtensionManager {
 
                             // Read extension name from manifest
                             var extName = appURL.deletingPathExtension().lastPathComponent
-                            if let data = try? Data(contentsOf: manifestPath),
-                               let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                               let name = manifest["name"] as? String,
-                               !name.hasPrefix("__MSG_") {
-                                extName = name
+                            let manifest = (try? Data(contentsOf: manifestPath))
+                                .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                            if let name = manifest?["name"] as? String {
+                                if let resolved = Self.resolveLocaleString(name, in: resourcesDir) {
+                                    extName = resolved
+                                } else if !name.hasPrefix("__MSG_") {
+                                    extName = name
+                                }
                             }
 
                             // Get bundle identifier from Info.plist
@@ -690,9 +779,9 @@ extension ExtensionManager {
                             results.append(SafariExtensionInfo(
                                 id: bundleId,
                                 name: extName,
+                                version: manifest?["version"] as? String ?? "1.0",
                                 appPath: appURL,
-                                appexPath: pluginURL,
-                                resourcesPath: resourcesDir
+                                appexPath: pluginURL
                             ))
                         }
                     }
@@ -703,14 +792,23 @@ extension ExtensionManager {
         }
     }
 
-    /// Install a discovered Safari extension by its resources path
-    func installSafariExtension(_ info: SafariExtensionInfo, completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void) {
-        installExtension(from: info.appexPath, extensionId: info.id, completionHandler: completionHandler)
+    /// Install or update a discovered Safari extension. With `replacing`, the installed extension
+    /// with that ID is removed once this one is in place.
+    func installSafariExtension(
+        _ info: SafariExtensionInfo,
+        replacing replacedID: String? = nil,
+        presenter: InstallConsentPresenter? = nil,
+        completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
+    ) {
+        installExtension(
+            from: info.appexPath, extensionId: info.id, replacing: replacedID, presenter: presenter,
+            completionHandler: completionHandler
+        )
     }
 
     // MARK: - File Picker
 
-    func showExtensionInstallDialog() {
+    func showExtensionInstallDialog(presenter: InstallConsentPresenter? = nil) {
         let openPanel = NSOpenPanel()
         openPanel.title = "Install Extension"
         openPanel.message = "Select an extension folder, ZIP, XPI or CRX file, or Safari extension (.app/.appex)"
@@ -725,7 +823,7 @@ extension ExtensionManager {
         ] + ["xpi", "crx"].compactMap { UTType(filenameExtension: $0) }
 
         if openPanel.runModal() == .OK, let url = openPanel.url {
-            installExtension(from: url) { result in
+            installExtension(from: url, presenter: presenter) { result in
                 switch result {
                 case .success(let ext):
                     Self.logger.info("Successfully installed extension: \(ext.name, privacy: .public)")
@@ -739,7 +837,7 @@ extension ExtensionManager {
         }
     }
 
-    private func showErrorAlert(_ error: ExtensionError) {
+    func showErrorAlert(_ error: ExtensionError) {
         let alert = NSAlert()
         alert.messageText = "Extension Installation Failed"
         alert.informativeText = error.localizedDescription
@@ -820,6 +918,10 @@ extension ExtensionManager {
                         entity.name = resolved
                         try? self.context.save()
                     }
+                }
+                if entity.origin == nil {
+                    entity.source = ExtensionSource(inferredFrom: entity)
+                    try? self.context.save()
                 }
                 loadedExtensions.append(InstalledExtension(from: entity, manifest: manifest))
                 if entity.isEnabled {

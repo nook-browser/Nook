@@ -14,6 +14,16 @@ enum ExtensionStore: String {
     case edge
     case firefox
 
+    static let chromeWebStoreURL = URL(string: "https://chromewebstore.google.com/category/extensions")!
+
+    var name: String {
+        switch self {
+        case .chrome: "Chrome Web Store"
+        case .edge: "Edge Add-ons"
+        case .firefox: "Firefox Add-ons"
+        }
+    }
+
     /// Nook's ID for a Firefox Add-ons install: "amo-" plus AMO's numeric add-on id.
     static func firefoxID(_ amoID: Int) -> String { "amo-\(amoID)" }
 
@@ -98,7 +108,7 @@ struct WebStoreDownloader {
     ) async -> String? {
         if store == .firefox {
             guard let version = try? await amoAddon(extensionId).current_version.version else { return nil }
-            return isVersion(version, newerThan: currentVersion) ? version : nil
+            return ExtensionVersion.isNewer(version, than: currentVersion) ? version : nil
         }
         let prodVersion = await latestChromeVersion()
         guard let url = store.updateServiceURL(
@@ -116,19 +126,7 @@ struct WebStoreDownloader {
               let versionRange = tag.range(of: "version=\"[0-9.]+\"", options: .regularExpression)
         else { return nil }
         let version = String(tag[versionRange].dropFirst(9).dropLast())
-        return isVersion(version, newerThan: currentVersion) ? version : nil
-    }
-
-    /// Chrome version strings are up to four dot-separated integers.
-    nonisolated static func isVersion(_ a: String, newerThan b: String) -> Bool {
-        let lhs = a.split(separator: ".").map { Int($0) ?? 0 }
-        let rhs = b.split(separator: ".").map { Int($0) ?? 0 }
-        for i in 0..<max(lhs.count, rhs.count) {
-            let l = i < lhs.count ? lhs[i] : 0
-            let r = i < rhs.count ? rhs[i] : 0
-            if l != r { return l > r }
-        }
-        return false
+        return ExtensionVersion.isNewer(version, than: currentVersion) ? version : nil
     }
 
     // MARK: - Firefox Add-ons

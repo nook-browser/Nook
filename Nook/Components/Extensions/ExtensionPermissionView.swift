@@ -18,6 +18,9 @@ struct ExtensionPermissionView: View {
     let optionalHostPermissions: [String]
     var isRuntimeRequest: Bool = false
     var isUpdate: Bool = false
+    var source: ExtensionSource? = nil
+    var version: String = ""
+    var replacing: InstalledExtension? = nil
     let onGrant: () -> Void
     let onDeny: () -> Void
     let extensionLogo: NSImage
@@ -46,6 +49,14 @@ struct ExtensionPermissionView: View {
             Text(title)
                 .font(NookDesign.Font.title)
 
+            if let replacing, let source {
+                switchDetails(from: replacing, to: source)
+            } else if let source {
+                Text(source.consentLine)
+                    .font(NookDesign.Font.label)
+                    .foregroundStyle(.secondary)
+            }
+
             if requestedPermissions.isEmpty && requestedHostPermissions.isEmpty {
                 Text("It does not request any special permissions.")
                     .font(NookDesign.Font.label)
@@ -71,17 +82,46 @@ struct ExtensionPermissionView: View {
                 Button("Cancel") {
                     onDeny()
                 }
+                .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(isRuntimeRequest ? "Allow" : (isUpdate ? "Update" : "Add Extension")) {
+                Button(grantTitle) {
                     onGrant()
                 }
             }
         }
         .padding(20)
     }
-    
+
+    private func switchDetails(from old: InstalledExtension, to new: ExtensionSource) -> some View {
+        VStack(alignment: .leading, spacing: NookDesign.Spacing.lg) {
+            Grid(alignment: .leading, horizontalSpacing: NookDesign.Spacing.lg, verticalSpacing: NookDesign.Spacing.xs) {
+                GridRow {
+                    Text("Now").foregroundStyle(.secondary)
+                    Text(old.source.summary(version: old.version))
+                }
+                GridRow {
+                    Text("After").foregroundStyle(.secondary)
+                    Text(new.summary(version: version))
+                }
+            }
+            .font(NookDesign.Font.label)
+
+            Text("\(extensionName)'s data in Nook doesn't carry over, so you may need to sign in to \(extensionName) again. The \(old.source.versionName) version is removed once the \(new.versionName) version is installed.")
+                .font(NookDesign.Font.bodyRegular)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var grantTitle: String {
+        if isRuntimeRequest { return "Allow" }
+        if replacing != nil { return "Switch" }
+        return isUpdate ? "Update" : "Add Extension"
+    }
+
     private var title: String {
         if isRuntimeRequest { return "\"\(extensionName)\" wants additional permissions" }
+        if replacing != nil, let source { return "Switch \"\(extensionName)\" to the \(source.versionName) version?" }
         if isUpdate { return "The new version of \"\(extensionName)\" needs more permissions" }
         return "Add the \"\(extensionName)\" extension to Nook?"
     }
@@ -142,6 +182,25 @@ struct ExtensionPermissionView: View {
         default:
             return "Access \(permission) functionality"
         }
+    }
+}
+
+extension ExtensionPermissionView {
+    init(consent: InstallConsent, onGrant: @escaping () -> Void, onDeny: @escaping () -> Void) {
+        self.init(
+            extensionName: consent.name,
+            requestedPermissions: consent.permissions,
+            optionalPermissions: [],
+            requestedHostPermissions: consent.hosts,
+            optionalHostPermissions: [],
+            isUpdate: consent.isUpdate,
+            source: consent.source,
+            version: consent.version,
+            replacing: consent.replacing,
+            onGrant: onGrant,
+            onDeny: onDeny,
+            extensionLogo: consent.logo
+        )
     }
 }
 
