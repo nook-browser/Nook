@@ -38,8 +38,8 @@ struct ExtensionsSettingsView: View {
                                 }
                             },
                             onPrivateBrowsingChange: { extensionManager.setAllowsPrivateBrowsing(ext.id, allowed: $0) },
-                            onUpdate: update.map { info in { install(info, replacing: nil) } },
-                            onSwitch: alternative.map { info in { install(info, replacing: ext) } },
+                            onUpdate: update.map { info in { install(info) } },
+                            onSwitch: alternative.map { info in { install(info) } },
                             onOpenOptions: { extensionManager.openOptionsPage(ext.id) },
                             onRemove: { pendingRemoval = ext }
                         )
@@ -65,7 +65,7 @@ struct ExtensionsSettingsView: View {
                             Image(nsImage: NSWorkspace.shared.icon(forFile: info.appPath.path))
                                 .resizable()
                         },
-                        onAction: { install(info, replacing: nil) }
+                        onAction: { install(info) }
                     )
                 }
                 AddExtensionRow(
@@ -141,8 +141,8 @@ struct ExtensionsSettingsView: View {
 
     // MARK: - Actions
 
-    private func install(_ info: ExtensionManager.SafariExtensionInfo, replacing replaced: InstalledExtension?) {
-        extensionManager.installSafariExtension(info, replacing: replaced?.id, presenter: presentConsent) { result in
+    private func install(_ info: ExtensionManager.SafariExtensionInfo) {
+        extensionManager.installSafariExtension(info, presenter: presentConsent) { result in
             guard case .failure(let error) = result else { return }
             if case .cancelled = error { return }
             extensionManager.showErrorAlert(error)

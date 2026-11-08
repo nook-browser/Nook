@@ -151,7 +151,7 @@ enum ExtensionSource {
     }
 
     func summary(version: String) -> String {
-        [name, appName, version].compactMap { $0 }.joined(separator: " · ")
+        [name, appName, version].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 }
 

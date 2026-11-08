@@ -52,6 +52,11 @@ extension ExtensionManager {
             }
             candidates.append(lang)
         }
+        let manifest = (try? Data(contentsOf: extensionDir.appendingPathComponent("manifest.json")))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        if let defaultLocale = manifest?["default_locale"] as? String {
+            candidates.append(defaultLocale)
+        }
         candidates.append("en")
 
         // Find matching locale directory
@@ -156,13 +161,11 @@ extension ExtensionManager {
     ///   - store: set for Chrome Web Store / Edge Add-ons installs; enables automatic updates.
     ///   - extensionId: stable ID from the caller (store ID, Safari bundle ID). Falls back to the
     ///     ID derived from the manifest `key`, then a random UUID.
-    ///   - replacing: an installed extension this one takes the place of, removed after it installs.
     ///   - presenter: asks for consent where the install started; the browser window when nil.
     func installExtension(
         from url: URL,
         store: ExtensionStore? = nil,
         extensionId: String? = nil,
-        replacing replacedID: String? = nil,
         presenter: InstallConsentPresenter? = nil,
         completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
     ) {
@@ -174,8 +177,7 @@ extension ExtensionManager {
         Task { @MainActor in
             do {
                 let installed = try await performInstallation(
-                    from: url, store: store, extensionId: extensionId,
-                    replacing: replacedID, presenter: presenter
+                    from: url, store: store, extensionId: extensionId, presenter: presenter
                 )
                 if let index = installedExtensions.firstIndex(where: { $0.id == installed.id }) {
                     installedExtensions[index] = installed
@@ -195,7 +197,6 @@ extension ExtensionManager {
         from sourceURL: URL,
         store: ExtensionStore?,
         extensionId callerId: String?,
-        replacing replacedID: String?,
         presenter: InstallConsentPresenter?
     ) async throws -> InstalledExtension {
         let fm = FileManager.default
@@ -256,7 +257,6 @@ extension ExtensionManager {
         } else {
             .file
         }
-        let replaced = replacedID.flatMap { id in installedExtensions.first { $0.id == id } }
 
         // STEP 2: Decide between fresh install, in-place update, and duplicate.
         let existing = fetchEntity(id: extensionId)
@@ -264,6 +264,9 @@ extension ExtensionManager {
         // treated as the same extension and replaced; its storage does not carry over.
         let legacyCopy = (existing == nil && hasStableId)
             ? installedExtensions.first { $0.name == name && UUID(uuidString: $0.id) != nil }
+            : nil
+        let replaced = existing == nil
+            ? installedExtensions.first { $0.name == name && $0.source.isSafari != source.isSafari }
             : nil
         if let existing {
             guard existing.version != version else {
@@ -282,18 +285,25 @@ extension ExtensionManager {
                 previous = try? await WKWebExtension(resourceBaseURL: URL(fileURLWithPath: existing.packagePath))
             }
         }
-        // A sideloaded package gets a store install's ID by copying its manifest `key`, and as an
+        // A package from somewhere else can claim an installed extension's ID: a sideload copying a
+        // store install's manifest `key`, or another app reusing a Safari bundle identifier. As an
         // update it would take over that extension's storage without a word. Ask as for a fresh
         // install, listing everything it requests.
-        let replacesStoreInstall = existing?.source.store != nil && store == nil
-        let consent = Self.consentItems(for: staged, comparedTo: replacesStoreInstall ? nil : previous)
-        let needsConsent = existing == nil || replacesStoreInstall
+        let takesOver = existing.map { previous in
+            switch (previous.source, source) {
+            case (.store, .store), (.file, _): false
+            case let (.safari(oldApp), .safari(newApp)): oldApp != newApp
+            default: true
+            }
+        } ?? false
+        let consent = Self.consentItems(for: staged, comparedTo: takesOver ? nil : previous)
+        let needsConsent = existing == nil || takesOver
             || !consent.permissions.isEmpty || !consent.hosts.isEmpty
         if needsConsent {
             let request = InstallConsent(
                 name: name, version: version, source: source, replacing: replaced,
                 permissions: consent.permissions, hosts: consent.hosts,
-                isUpdate: existing != nil && !replacesStoreInstall,
+                isUpdate: existing != nil && !takesOver,
                 logo: staged.icon(for: .init(width: 64, height: 64)) ?? NSImage()
             )
             let granted = if let presenter {
@@ -304,11 +314,6 @@ extension ExtensionManager {
             guard granted else {
                 throw ExtensionError.cancelled
             }
-        }
-
-        if let legacyCopy {
-            Self.logger.info("Replacing legacy copy of '\(name, privacy: .public)' (\(legacyCopy.id, privacy: .public)) with \(extensionId, privacy: .public)")
-            uninstallExtension(legacyCopy.id)
         }
 
         // STEP 4: Swap files into place. Unload the running version first.
@@ -333,8 +338,7 @@ extension ExtensionManager {
             entity.lastUpdateDate = Date()
             entity.packagePath = finalDir.path
             entity.iconPath = Self.findExtensionIcon(in: finalDir, manifest: manifest)
-            if replacesStoreInstall {
-                // Optional grants were given to the store build, not to this package.
+            if takesOver {
                 entity.grantedOptionalPermissions = nil
                 entity.grantedOptionalMatchPatterns = nil
             }
@@ -356,13 +360,21 @@ extension ExtensionManager {
 
         // STEP 6: Load from the final location so resource URLs resolve to real files.
         if entity.isEnabled {
-            let webExtension = try await WKWebExtension(resourceBaseURL: finalDir)
-            registerContext(for: entity, webExtension: webExtension)
+            do {
+                let webExtension = try await WKWebExtension(resourceBaseURL: finalDir)
+                try registerContext(for: entity, webExtension: webExtension)
+            } catch {
+                guard existing != nil else {
+                    uninstallExtension(extensionId)
+                    throw error
+                }
+                Self.logger.error("Failed to load '\(name, privacy: .public)' v\(version, privacy: .public) after updating: \(error.localizedDescription, privacy: .public)")
+            }
         }
 
-        if let replaced, replaced.id != extensionId, replaced.id != legacyCopy?.id {
-            Self.logger.info("Replacing '\(replaced.name, privacy: .public)' (\(replaced.id, privacy: .public)) with \(extensionId, privacy: .public)")
-            uninstallExtension(replaced.id)
+        for oldID in Set([legacyCopy?.id, replaced?.id].compactMap { $0 }) {
+            Self.logger.info("Replacing \(oldID, privacy: .public) with \(extensionId, privacy: .public)")
+            uninstallExtension(oldID)
         }
 
         Self.logger.info("\(existing == nil ? "Installed" : "Updated", privacy: .public) '\(name, privacy: .public)' v\(version, privacy: .public) as \(extensionId, privacy: .public)")
@@ -372,8 +384,7 @@ extension ExtensionManager {
     /// Create a context for an installed extension, grant its manifest permissions, and load it.
     /// The externally_connectable bridge ships as the extension's own content scripts (see
     /// `patchManifestForWebKit`), so loading and unloading the context is all it needs.
-    @discardableResult
-    func registerContext(for entity: ExtensionEntity, webExtension: WKWebExtension) -> WKWebExtensionContext? {
+    func registerContext(for entity: ExtensionEntity, webExtension: WKWebExtension) throws {
         let extensionContext = WKWebExtensionContext(for: webExtension)
         configureContextIdentity(extensionContext, extensionId: entity.id)
 
@@ -400,12 +411,8 @@ extension ExtensionManager {
         extensionContext.hasAccessToPrivateData = entity.allowsPrivateBrowsing
         extensionContexts[entity.id] = extensionContext
 
-        do {
-            try extensionController?.load(extensionContext)
-        } catch {
-            Self.logger.error("Failed to load extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
-            return nil
-        }
+        try extensionController?.load(extensionContext)
+        objectWillChange.send()
 
         if webExtension.hasBackgroundContent {
             let name = entity.name
@@ -429,7 +436,6 @@ extension ExtensionManager {
         }
 
         Self.logger.info("Loaded '\(entity.name, privacy: .public)' MV\(Int(webExtension.manifestVersion)) (contexts: \(self.extensionController?.extensionContexts.count ?? 0))")
-        return extensionContext
     }
 
     /// Only the MV3 service worker file is checked; WebKit validates the rest when loading.
@@ -580,7 +586,7 @@ extension ExtensionManager {
         Task { @MainActor [weak self] in
             do {
                 let webExtension = try await WKWebExtension(resourceBaseURL: packageURL)
-                self?.registerContext(for: entity, webExtension: webExtension)
+                try self?.registerContext(for: entity, webExtension: webExtension)
             } catch {
                 Self.logger.error("Failed to enable extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
             }
@@ -679,10 +685,11 @@ extension ExtensionManager {
     }
 
     func refreshSafariExtensions() async {
-        guard !isScanningSafari else { return }
-        isScanningSafari = true
-        safariExtensions = await discoverSafariExtensions()
-        isScanningSafari = false
+        if let safariScan { return await safariScan.value }
+        let scan = Task { safariExtensions = await discoverSafariExtensions() }
+        safariScan = scan
+        await scan.value
+        safariScan = nil
     }
 
     /// Safari extensions with nothing installed for them, under their own ID or as another version.
@@ -697,7 +704,7 @@ extension ExtensionManager {
         var safari = available.filter(\.isSafari)
         var choices: [ExtensionChoice] = []
         for offer in available where !offer.isSafari {
-            if let match = safari.firstIndex(where: { Self.isSameProduct($0.name, offer.name) }) {
+            if let match = safari.firstIndex(where: { $0.name == offer.name }) {
                 choices.append(ExtensionChoice(versions: [offer, safari.remove(at: match)]))
             } else {
                 choices.append(ExtensionChoice(versions: [offer]))
@@ -710,7 +717,7 @@ extension ExtensionManager {
     /// Installed under `id`, or as the same product from the other kind of source: Safari or a store.
     private func hasInstalled(id: String, name: String, isSafari: Bool) -> Bool {
         installedExtensions.contains {
-            $0.id == id || ($0.source.isSafari != isSafari && Self.isSameProduct($0.name, name))
+            $0.id == id || ($0.source.isSafari != isSafari && $0.name == name)
         }
     }
 
@@ -725,20 +732,8 @@ extension ExtensionManager {
     func safariAlternative(to ext: InstalledExtension) -> SafariExtensionInfo? {
         guard !ext.source.isSafari else { return nil }
         return safariExtensions?.first { info in
-            Self.isSameProduct(ext.name, info.name) && !installedExtensions.contains { $0.id == info.id }
+            ext.name == info.name && !installedExtensions.contains { $0.id == info.id }
         }
-    }
-
-    /// Names match when one's words all appear in the other's, ignoring "for Safari", so
-    /// "LastPass" matches "LastPass: Free Password Manager".
-    private static func isSameProduct(_ a: String, _ b: String) -> Bool {
-        func words(_ name: String) -> Set<String> {
-            Set(name.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init))
-                .subtracting(["for", "safari"])
-        }
-        let wa = words(a), wb = words(b)
-        guard !wa.isEmpty, !wb.isEmpty else { return false }
-        return wa.isSubset(of: wb) || wb.isSubset(of: wa)
     }
 
     /// Discover Safari Web Extensions installed on this Mac by scanning application
@@ -801,6 +796,7 @@ extension ExtensionManager {
 
                             // Get bundle identifier from Info.plist
                             let bundleId = Bundle(url: pluginURL)?.bundleIdentifier ?? pluginURL.lastPathComponent
+                            guard !results.contains(where: { $0.id == bundleId }) else { continue }
 
                             results.append(SafariExtensionInfo(
                                 id: bundleId,
@@ -818,17 +814,13 @@ extension ExtensionManager {
         }
     }
 
-    /// Install or update a discovered Safari extension. With `replacing`, the installed extension
-    /// with that ID is removed once this one is in place.
     func installSafariExtension(
         _ info: SafariExtensionInfo,
-        replacing replacedID: String? = nil,
         presenter: InstallConsentPresenter? = nil,
         completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
     ) {
         installExtension(
-            from: info.appexPath, extensionId: info.id, replacing: replacedID, presenter: presenter,
-            completionHandler: completionHandler
+            from: info.appexPath, extensionId: info.id, presenter: presenter, completionHandler: completionHandler
         )
     }
 
@@ -1040,7 +1032,11 @@ extension ExtensionManager {
 
             // Phase 2: Register contexts sequentially (must be on MainActor)
             for (entity, webExtension) in parsed {
-                self.registerContext(for: entity, webExtension: webExtension)
+                do {
+                    try self.registerContext(for: entity, webExtension: webExtension)
+                } catch {
+                    Self.logger.error("Failed to load extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                }
             }
 
             Self.logger.info("All extensions loaded — signaling ready")

@@ -32,7 +32,8 @@ class ImportManager: ObservableObject {
         return result
     }
 
-    /// Web Store extensions enabled in any Arc profile, described from the copy Arc keeps of each.
+    /// Web Store extensions enabled in any Arc profile, described from the copy Arc keeps of each,
+    /// or by their ID where Arc has no copy.
     func arcExtensions() -> [ExtensionOffer] {
         let userData = arcDirectory.appendingPathComponent("User Data")
         let profiles = ((try? FileManager.default.contentsOfDirectory(atPath: userData.path)) ?? [])
@@ -41,7 +42,10 @@ class ImportManager: ObservableObject {
         let ids = parseChromiumExtensionIDs(profiles.flatMap { profile in
             ["Secure Preferences", "Preferences"].compactMap { try? Data(contentsOf: profile.appendingPathComponent($0)) }
         })
-        return ids.compactMap { id in profiles.lazy.compactMap { Self.chromiumExtension(id, in: $0) }.first }
+        return ids.map { id in
+            profiles.lazy.compactMap { Self.chromiumExtension(id, in: $0) }.first
+                ?? ExtensionOffer(id: id, name: id, version: "", icon: nil, package: .store(.chrome))
+        }
     }
 
     /// The newest unpacked copy of a store extension in a Chromium profile, `Extensions/<id>/<version>_<n>`.

@@ -28,7 +28,7 @@ final class ExtensionManager: NSObject, ObservableObject,
     @Published var extensionsLoaded: Bool = false
     /// Safari extensions found in the Applications folders; nil until the first scan finishes.
     @Published var safariExtensions: [SafariExtensionInfo]?
-    var isScanningSafari = false
+    var safariScan: Task<Void, Never>?
     /// The last install from an import list, kept after it finishes until the next one starts.
     @Published var listInstallProgress: ListInstallProgress?
     // Scope: extensions are global. One controller, one install/enabled state, and one

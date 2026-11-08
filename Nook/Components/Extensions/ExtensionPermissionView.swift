@@ -65,18 +65,14 @@ struct ExtensionPermissionView: View {
                 Text("It can:")
                     .font(NookDesign.Font.label)
                     .foregroundColor(.secondary)
-                VStack(alignment: .leading, spacing: 12) {
-                    if let hostLine {
-                        Text("•  \(hostLine)")
-                            .font(NookDesign.Font.label)
-                            .foregroundStyle(.secondary)
+                ViewThatFits(in: .vertical) {
+                    permissionList
+                    ScrollView {
+                        permissionList
                     }
-                    ForEach(requestedPermissions, id: \.self) { permission in
-                        Text("•  \(getPermissionDescription(permission))")
-                            .font(NookDesign.Font.label)
-                            .foregroundStyle(.secondary)
-                    }
+                    .scrollIndicators(.visible)
                 }
+                .frame(maxHeight: 240)
             }
             HStack{
                 Button("Cancel") {
@@ -90,6 +86,22 @@ struct ExtensionPermissionView: View {
             }
         }
         .padding(20)
+    }
+
+    private var permissionList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let hostLine {
+                Text("•  \(hostLine)")
+                    .font(NookDesign.Font.label)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(requestedPermissions, id: \.self) { permission in
+                Text("•  \(getPermissionDescription(permission))")
+                    .font(NookDesign.Font.label)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func switchDetails(from old: InstalledExtension, to new: ExtensionSource) -> some View {
