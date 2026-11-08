@@ -13,6 +13,7 @@ struct StageFooter: View {
     var currentStage: Int
     var totalStages: Int = 3
     var isLoading: Bool = false
+    var canGoBack = true
     var onContinue: () -> Void
     var onBack: () -> Void
     var onSkip: (() -> Void)? = nil
@@ -67,7 +68,7 @@ struct StageFooter: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(isLoading)
-            if !(currentStage == 0) {
+            if currentStage != 0, canGoBack {
                 Button {
                     if currentStage == 1, let onSkip { onSkip() } else { onBack() }
                 } label: {
