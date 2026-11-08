@@ -708,7 +708,8 @@ final class DevMCPServer {
                 let timeout = min((args["timeout"] as? NSNumber)?.doubleValue ?? 20, Self.toolTimeout - 5)
                 let deadline = Date().addingTimeInterval(timeout)
                 // ponytail: 100 ms poll, debug-only and bounded by the timeout; use navigation delegate callbacks if this ever matters.
-                if name == "reload" { try await Task.sleep(for: .milliseconds(150)) }
+                // A load started by the previous call may not have set isLoading yet.
+                try await Task.sleep(for: .milliseconds(150))
                 while wv.isLoading, Date() < deadline { try await Task.sleep(for: .milliseconds(100)) }
                 return text(wv.isLoading ? "Still loading after \(timeout)s: \(wv.url?.absoluteString ?? "")" : "Loaded: \(wv.url?.absoluteString ?? "") | \(wv.title ?? "")", error: wv.isLoading)
 
