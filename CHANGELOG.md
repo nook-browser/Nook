@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+
+- Archive for closed tabs, auto-archive
+- Select several tabs and act on them together
+- Site Settings in the address bar
+- Arc import brings archived tabs and Air Traffic Control rules
+- Extensions in private windows, per extension
+- nook:// links for launchers
+- Cmd-D pins a tab, Cmd-. stops loading, Close All Above
+- Collapse and expand all folders
+
+### Changed
+
+- Zoom remembered per site
+- Option to open links as plain tabs
+- Mouse back and forward switch spaces
+- Space title folds the pinned tabs
+- Ad blocker on for new installs
+- Reddit Hot on the Following feed, and faster
+- Smaller download
+
+### Fixed
+
+- Clear keeps the current tab
+- No beep on keys a page ignores
+- Favicons for apps sharing one host
+- Bugs
+
+### Thanks
+
+- @autaut03, @aaravk7, @MontaraGroup
+
 ## 1.4.0
 
 ### Added
