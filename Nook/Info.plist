@@ -71,7 +71,7 @@
 	<key>SUPublicEDKey</key>
 	<string>oWrc3J4HWz5PEVE5fIMKj5fEnCUwqYl0bO1li3xOYM4=</string>
 	<key>SUScheduledCheckInterval</key>
-	<integer>86400</integer>
+	<integer>3600</integer>
 	<key>SUUpdateRelaunchDelay</key>
 	<integer>3</integer>
 	<key>UIBackgroundModes</key>
