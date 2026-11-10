@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import OSLog
 import NookTabsCore
 import SwiftUI
 
@@ -201,6 +202,20 @@ public class BrowserWindowState {
     /// Increment the compositor version to trigger UI updates
     public func refreshCompositor() {
         compositorVersion += 1
+    }
+
+    /// Open `TabSwitch` signpost: from a selection to its page sitting in the window.
+    @ObservationIgnored private var tabSwitch: OSSignpostIntervalState?
+
+    public func beginTabSwitch() {
+        endTabSwitch()
+        tabSwitch = BrowserPerformance.signposter.beginInterval("TabSwitch")
+    }
+
+    public func endTabSwitch() {
+        guard let tabSwitch else { return }
+        BrowserPerformance.signposter.endInterval("TabSwitch", tabSwitch)
+        self.tabSwitch = nil
     }
 }
 

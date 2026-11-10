@@ -646,6 +646,7 @@ struct TabCompositorWrapper: NSViewRepresentable {
 
             // Restore focus when tab changed (webview is now in hierarchy)
             if previousCurrentId != currentId {
+                windowState.endTabSwitch()
                 DispatchQueue.main.async {
                     guard let window = nsView.window else { return }
                     for subview in nsView.subviews.reversed() {

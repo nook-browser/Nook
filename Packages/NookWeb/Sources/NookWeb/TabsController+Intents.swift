@@ -216,6 +216,7 @@ extension TabsController {
             window.spaceID = spaceID
         }
         guard let spaceID = window.spaceID else { return }
+        if previous?.itemID != itemID { window.beginTabSwitch() }
         if movedSpace { sessionDelegate?.windowSpaceChanged(window) }
         window.selectedItemBySpace[spaceID] = itemID
         window.emptiedSpaces.remove(spaceID)
