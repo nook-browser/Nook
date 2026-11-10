@@ -107,7 +107,8 @@ public struct PinnedTabView<Icon: View>: View {
             .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
             .modifier(TileSelection(isActive: isActive, themed: colors != nil))
         }
-        .buttonStyle(.plain)
+        // The action is a selection, safe to run on the press and again on the release.
+        .buttonStyle(NookPressButtonStyle(onPress: action))
         .onHoverTracking { hovering in
             self.isHovered = hovering
         }
