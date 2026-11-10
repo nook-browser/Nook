@@ -148,8 +148,8 @@ struct TopBarView: View {
                     refreshCurrentTab()
                 }
             } label: {
+                // No `.symbolEffect(.replace)` here: it held the main thread about 130 ms at each end of a load.
                 Image(systemName: session?.isLoading == true ? "xmark" : "arrow.clockwise")
-                    .contentTransition(.symbolEffect(.replace))
             }
             .labelStyle(.iconOnly)
             .buttonStyle(NookIconButtonStyle())
