@@ -282,9 +282,15 @@ extension FocusableWKWebView {
         owningSession?.controller?.sessionDelegate as? BrowserManager
     }
 
+    /// A page's link may not open an extension's page, as in Chrome. An extension's own pages may.
+    private func mayOpenLink(_ url: URL) -> Bool {
+        let target = PageSession.extensionOrigin(of: url)
+        return target == nil || target == owningSession?.viewExtensionOrigin
+    }
+
     /// Opens `url` in a new regular window on the page's space.
     func openLinkInNewWindow(_ url: URL) {
-        guard let browserManager,
+        guard mayOpenLink(url), let browserManager,
               let spaceID = owningSession.flatMap({ browserManager.tabs.window(for: $0) })?.spaceID,
               let window = browserManager.createNewWindow() else {
             return
@@ -296,7 +302,7 @@ extension FocusableWKWebView {
 
     /// Opens `url` as a trail child and pairs it with the window's selection.
     func openLinkInSplitView(_ url: URL) {
-        guard let browserManager, let session = owningSession,
+        guard mayOpenLink(url), let browserManager, let session = owningSession,
               let window = browserManager.tabs.window(for: session),
               let itemID = browserManager.tabs.open(url: url, in: window, placement: .background, from: session.itemID)
         else { return }

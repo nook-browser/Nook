@@ -83,6 +83,13 @@ extension PageSession: WKUIDelegate {
         let sourceScheme = navigationAction.sourceFrame.request.url?.scheme?.lowercased() ?? ""
         let isFromExtension = sourceScheme == "webkit-extension" || sourceScheme == "safari-web-extension"
 
+        // The view WebKit would make for this popup carries the extension's configuration, which
+        // is for its own pages. A web link out of an extension page opens as an ordinary tab.
+        if viewExtensionOrigin != nil, let url, Self.extensionOrigin(of: url) == nil {
+            openInNewTab(url, foreground: true)
+            return nil
+        }
+
         // WebKit's configuration shares the opener's userContentController. Handlers are keyed
         // by name, so registering the popup's on it would reroute the opener's messages to the
         // popup, and closing the popup would strip them from the opener. Give the popup its own

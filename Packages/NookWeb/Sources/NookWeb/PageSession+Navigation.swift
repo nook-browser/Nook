@@ -342,6 +342,16 @@ extension PageSession: WKNavigationDelegate {
             return
         }
 
+        // An extension page's view cannot show a web page, so a link out of one gets a new view.
+        if viewExtensionOrigin != nil, webView === primaryWebView, navigationAction.targetFrame?.isMainFrame == true,
+           let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+           (navigationAction.request.httpMethod ?? "GET") == "GET"
+        {
+            decisionHandler(.cancel)
+            DispatchQueue.main.async { [weak self] in self?.load(url) }
+            return
+        }
+
         if let url = navigationAction.request.url,
             navigationAction.targetFrame?.isMainFrame == true
         {

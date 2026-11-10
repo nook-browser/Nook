@@ -1,0 +1,179 @@
+// Licensed under GPL-3.0. See LICENSE.
+//
+//  ExtensionCompatPatcher.swift
+//  Nook
+//
+//  Loads Nook's compatibility shim first in every context of a store-built extension package.
+//  Foundation only: scripts/tests/ExtensionCompatPatcherCheck.swift compiles this file directly.
+//
+
+import Foundation
+
+enum ExtensionCompatPatcher {
+    /// The browser a store build was made for, which the shim tells it it runs in.
+    enum Identity: String {
+        case chrome, edge, firefox
+    }
+
+    static let shimFile = "nook_compat.js"
+    static let workerFile = "nook_compat_worker.js"
+    static let identityToken = "__NOOK_IDENTITY__"
+    static let pageTag = "<script src=\"/\(shimFile)\"></script>"
+    private static let maxPageBytes = 4 << 20
+
+    /// Puts the shim in the package at `root` and first in every context `manifest` declares.
+    /// Returns true when `manifest` changed. It runs at install, on update and at every launch,
+    /// so a package that is already patched costs one small read and changes nothing.
+    @discardableResult
+    static func patch(manifest: inout [String: Any], packageAt root: URL, shim: String, identity: Identity) -> Bool {
+        // Pages are rewritten once per package: the shim file is written last and marks it done.
+        if !FileManager.default.fileExists(atPath: root.appendingPathComponent(shimFile).path) {
+            patchPages(in: root, named: namedPages(manifest))
+        }
+        var changed = patchBackground(&manifest, root: root)
+        if patchContentScripts(&manifest) { changed = true }
+        write(shim.replacingOccurrences(of: identityToken, with: identity.rawValue), to: shimFile, in: root)
+        return changed
+    }
+
+    /// A store build's manifest names itself `__MSG_extName__`, so the short name and the
+    /// known install IDs count too.
+    static func isBitwarden(manifest: [String: Any], extensionId: String, knownIDs: Set<String>) -> Bool {
+        knownIDs.contains(extensionId)
+            || [manifest["name"], manifest["short_name"]].contains { ($0 as? String)?.contains("Bitwarden") == true }
+    }
+
+    // MARK: - Background
+
+    /// A service worker is replaced by a wrapper beside it that loads the shim, then the worker.
+    /// Background scripts get the shim as their first entry. A background page is an HTML page.
+    private static func patchBackground(_ manifest: inout [String: Any], root: URL) -> Bool {
+        guard var background = manifest["background"] as? [String: Any] else { return false }
+        var changed = false
+        if let worker = (background["service_worker"] as? String).map(packagePath), !worker.isEmpty,
+           (worker as NSString).lastPathComponent != workerFile {
+            let directory = (worker as NSString).deletingLastPathComponent
+            let wrapper = directory.isEmpty ? workerFile : directory + "/" + workerFile
+            let shim = jsString("/" + shimFile)
+            let original = jsString("./" + (worker as NSString).lastPathComponent)
+            // A classic worker survives a shim that fails to load. A module's imports are all or nothing.
+            let source = (background["type"] as? String) == "module"
+                ? "import \(shim);\nimport \(original);\n"
+                : "try { importScripts(\(shim)); } catch (e) {}\nimportScripts(\(original));\n"
+            // The manifest points at the wrapper only once it is on disk, inside the package.
+            if write(source, to: wrapper, in: root) {
+                background["service_worker"] = wrapper
+                changed = true
+            }
+        }
+        if var scripts = background["scripts"] as? [String], !scripts.isEmpty, packagePath(scripts[0]) != shimFile {
+            scripts.insert(shimFile, at: 0)
+            background["scripts"] = scripts
+            changed = true
+        }
+        if changed { manifest["background"] = background }
+        return changed
+    }
+
+    // MARK: - Content scripts
+
+    private static func patchContentScripts(_ manifest: inout [String: Any]) -> Bool {
+        guard var entries = manifest["content_scripts"] as? [[String: Any]] else { return false }
+        var changed = false
+        for index in entries.indices {
+            guard var scripts = entries[index]["js"] as? [String], !scripts.isEmpty,
+                  // The MAIN world is the site's own. The shim never runs there.
+                  (entries[index]["world"] as? String)?.uppercased() != "MAIN",
+                  // Nook's bridge entries are compared whole by the code that writes them.
+                  !scripts.allSatisfy({ packagePath($0).hasPrefix("nook_") }),
+                  packagePath(scripts[0]) != shimFile
+            else { continue }
+            scripts.insert(shimFile, at: 0)
+            entries[index]["js"] = scripts
+            changed = true
+        }
+        if changed { manifest["content_scripts"] = entries }
+        return changed
+    }
+
+    // MARK: - Pages
+
+    /// Adds the shim's script tag to the HTML pages in the package.
+    private static func patchPages(in root: URL, named: Set<String>) {
+        // Paths come back relative to the package, and a link to a folder is not followed.
+        guard let files = FileManager.default.enumerator(atPath: root.path) else { return }
+        for case let path as String in files where ["html", "htm"].contains((path as NSString).pathExtension.lowercased()) {
+            guard files.fileAttributes?[.type] as? FileAttributeType == .typeRegular,
+                  (files.fileAttributes?[.size] as? Int ?? 0) < maxPageBytes,
+                  let html = try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8),
+                  let patched = pageWithShim(html, named: named.contains(path.lowercased()))
+            else { continue }
+            write(patched, to: path, in: root)
+        }
+    }
+
+    /// The HTML files the manifest itself loads as pages, as lowercased package paths.
+    static func namedPages(_ manifest: [String: Any]) -> Set<String> {
+        func entry(_ key: String) -> [String: Any] { manifest[key] as? [String: Any] ?? [:] }
+        var pages: [Any?] = [
+            entry("background")["page"], entry("action")["default_popup"], entry("browser_action")["default_popup"],
+            entry("page_action")["default_popup"], manifest["options_page"], entry("options_ui")["page"],
+            manifest["devtools_page"], entry("side_panel")["default_path"], entry("sidebar_action")["default_panel"],
+        ]
+        pages += Array(entry("chrome_url_overrides").values)
+        pages += entry("sandbox")["pages"] as? [Any] ?? []
+        // `popup.html?tab=1#x` names the file popup.html.
+        return Set(pages.compactMap { $0 as? String }.map { page in
+            packagePath(String(page.prefix { $0 != "?" && $0 != "#" })).lowercased()
+        })
+    }
+
+    /// `html` with the shim as the first script its head runs, or nil to leave the file alone:
+    /// the tag is already there, or the file has no document tags and the manifest does not
+    /// name it. Such a file is a fragment the extension inserts into one of its pages.
+    static func pageWithShim(_ html: String, named: Bool) -> String? {
+        guard !html.contains(pageTag) else { return nil }
+        // Ahead of the doctype the tag would put the page in quirks mode, so that is the last resort.
+        for pattern in ["<head(\\s[^>]*)?>", "<html(\\s[^>]*)?>", "<!doctype[^>]*>"] {
+            if let tag = html.range(of: pattern, options: [.regularExpression, .caseInsensitive]) {
+                return html.replacingCharacters(in: tag.upperBound..<tag.upperBound, with: pageTag)
+            }
+        }
+        return named ? pageTag + html : nil
+    }
+
+    // MARK: - Helpers
+
+    /// A manifest path as a plain relative path: no leading `./` or `/`.
+    private static func packagePath(_ path: String) -> String {
+        var path = path.replacingOccurrences(of: "\\", with: "/")
+        while path.hasPrefix("./") { path.removeFirst(2) }
+        while path.hasPrefix("/") { path.removeFirst() }
+        return path
+    }
+
+    private static func jsString(_ value: String) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        return (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+    }
+
+    /// Where `path` is inside the package, or nil when it leaves it through `..` or a symbolic
+    /// link. The manifest is the package's own word and does not get to say where Nook writes.
+    static func location(of path: String, in root: URL) -> URL? {
+        guard !path.isEmpty, !path.split(separator: "/").contains("..") else { return nil }
+        let url = root.appendingPathComponent(path)
+        let package = root.resolvingSymlinksInPath().path
+        let folder = url.deletingLastPathComponent().resolvingSymlinksInPath().path
+        return folder == package || folder.hasPrefix(package + "/") ? url : nil
+    }
+
+    /// The one place the patcher writes. True when the file holds `text` afterwards; a file
+    /// that already does is not touched, so a relaunch changes nothing.
+    @discardableResult
+    private static func write(_ text: String, to path: String, in root: URL) -> Bool {
+        guard let url = location(of: path, in: root) else { return false }
+        if (try? String(contentsOf: url, encoding: .utf8)) == text { return true }
+        return (try? text.write(to: url, atomically: true, encoding: .utf8)) != nil
+    }
+}

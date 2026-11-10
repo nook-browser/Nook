@@ -328,8 +328,7 @@ extension ExtensionManager {
         }
         let parent: Parent? = configuration.shouldBePinned ? .pinned(spaceID: spaceID) : nil
         guard let itemID = openExtensionTab(
-            url, in: window, placement: configuration.shouldBeActive ? .newTab : .background,
-            parent: parent, controller: controller)
+            url, in: window, placement: configuration.shouldBeActive ? .newTab : .background, parent: parent)
         else {
             completionHandler(nil, NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not open tab"]))
             return
@@ -339,24 +338,13 @@ extension ExtensionManager {
         completionHandler(adapter(for: itemID), nil)
     }
 
-    /// Opens one tab for an extension. An extension page (popup, options, a FIDO2 or OAuth popout)
-    /// needs the extension's own configuration; without it the `webkit-extension://` URL does not
-    /// resolve and the tab renders blank.
+    /// Opens one tab for an extension. When the URL is one of its own pages, `PageSession` builds
+    /// the view from the extension's configuration; no other view can load it.
     @discardableResult
     private func openExtensionTab(
-        _ url: URL, in window: BrowserWindowState, placement: TabsController.Placement,
-        parent: Parent? = nil, controller: WKWebExtensionController
+        _ url: URL, in window: BrowserWindowState, placement: TabsController.Placement, parent: Parent? = nil
     ) -> UUID? {
-        guard let bm = browserManagerRef,
-              let itemID = bm.tabs.open(url: url, in: window, placement: placement, parent: parent)
-        else { return nil }
-        if let scheme = url.scheme?.lowercased(), scheme == "safari-web-extension" || scheme == "webkit-extension",
-           let resolvedContext = controller.extensionContext(for: url),
-           let session = bm.tabs.session(for: itemID) {
-            session.applyConfigurationOverride(
-                resolvedContext.webViewConfiguration ?? BrowserConfiguration.shared.webViewConfiguration)
-        }
-        return itemID
+        browserManagerRef?.tabs.open(url: url, in: window, placement: placement, parent: parent)
     }
 
     /// One extension page in its own window, for `chrome.windows.create({type: "popup"})`.
@@ -418,9 +406,9 @@ extension ExtensionManager {
         }
         // Each tab opens at the top, so open in reverse and select the first URL last.
         for url in urls.dropFirst().reversed() {
-            openExtensionTab(url, in: window, placement: .background, controller: controller)
+            openExtensionTab(url, in: window, placement: .background)
         }
-        openExtensionTab(urls[0], in: window, placement: .newTab, controller: controller)
+        openExtensionTab(urls[0], in: window, placement: .newTab)
         Self.logger.info("Extension opened window as \(urls.count) tabs in the current space")
         completionHandler(windowAdapter(for: window), nil)
     }

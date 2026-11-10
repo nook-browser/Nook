@@ -14,6 +14,7 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
+import NookWeb
 
 extension ExtensionManager {
 
@@ -230,7 +231,7 @@ extension ExtensionManager {
             throw ExtensionError.installationFailed("Invalid extension identifier")
         }
         // Patch before parsing so the consent sheet sees Nook's bridge content script hosts too.
-        patchManifestForWebKit(at: manifestURL, extensionId: extensionId)
+        patchManifestForWebKit(at: manifestURL, extensionId: extensionId, store: store)
 
         let staged = try await WKWebExtension(resourceBaseURL: tempDir)
         let name = staged.displayName ?? manifest["name"] as? String ?? "Unknown Extension"
@@ -392,15 +393,41 @@ extension ExtensionManager {
             }
         }
 
+        // A module worker that throws never completes the load above, so the errors WebKit
+        // recorded are read on a delay, whether the background loaded, failed or hung.
+        let extensionName = entity.name
+        Task { @MainActor [weak extensionContext] in
+            try? await Task.sleep(for: .seconds(5))
+            guard let extensionContext, extensionContext.isLoaded else { return }
+            Self.logErrors(of: extensionContext, name: extensionName)
+        }
+
         // Tabs that navigated before this extension loaded missed their URL grants.
         if let bm = browserManagerRef {
             for session in bm.tabs.sessions where openedTabIDs.contains(session.itemID) {
                 grantExtensionAccessToURL(session.url, private: session.isPrivate)
             }
+            // A restored tab on one of this extension's pages was built before the context
+            // existed, so its view cannot show the page. Loading again gives it the right one.
+            if let origin = PageSession.extensionOrigin(of: extensionContext.baseURL) {
+                for session in bm.tabs.sessions
+                where !session.isUnloaded && session.viewExtensionOrigin == nil
+                    && PageSession.extensionOrigin(of: session.url) == origin {
+                    session.load(session.url)
+                }
+            }
         }
 
         Self.logger.info("Loaded '\(entity.name, privacy: .public)' MV\(Int(webExtension.manifestVersion)) (contexts: \(self.extensionController?.extensionContexts.count ?? 0))")
         return extensionContext
+    }
+
+    /// WebKit keeps an extension's manifest and script errors, with file and line. Nothing else
+    /// reports a background that died while starting.
+    static func logErrors(of context: WKWebExtensionContext, name: String) {
+        for error in context.errors.prefix(20) {
+            logger.error("Extension '\(name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Only the MV3 service worker file is checked; WebKit validates the rest when loading.
@@ -826,7 +853,9 @@ extension ExtensionManager {
                 .appendingPathComponent("manifest.json")
             do {
                 // Refresh Nook's bridge scripts so app updates reach installed extensions
-                patchManifestForWebKit(at: manifestURL, extensionId: entity.id)
+                patchManifestForWebKit(
+                    at: manifestURL, extensionId: entity.id,
+                    store: entity.sourceStore.flatMap(ExtensionStore.init(rawValue:)))
                 let manifest = try ExtensionUtils.validateManifest(at: manifestURL)
                 // Re-resolve __MSG_ names that weren't properly resolved at install time
                 if entity.name.hasPrefix("__MSG_") {
