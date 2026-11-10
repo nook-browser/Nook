@@ -113,7 +113,7 @@ private struct SpaceColumn: View {
         }
         .spaceThemeAppearance(space.theme)
         .scaleEffect(isHovering ? 1.005 : 1)
-        .animation(NookDesign.Motion.quick, value: isHovering)
+        .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
         .onTapGesture(perform: onOpen)
         .onHoverTracking { isHovering = $0 }

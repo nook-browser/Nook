@@ -167,7 +167,7 @@ struct SidebarMenuHoverDownloadItem: View {
         .padding(.vertical, NookDesign.Spacing.xs)
         .background(isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-        .animation(NookDesign.Motion.quick, value: isHovering)
+        .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
         .onHoverTracking { state in
             isHovering = state
         }

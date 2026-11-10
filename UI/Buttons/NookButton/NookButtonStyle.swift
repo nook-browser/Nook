@@ -76,7 +76,7 @@ struct NookButtonStyle: ButtonStyle {
         .compositingGroup()
         .opacity(isEnabled ? 1.0 : disabledOpacity)
         .animation(NookDesign.Motion.quick, value: configuration.isPressed)
-        .animation(NookDesign.Motion.quick, value: isHovering)
+        .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
         .onHoverTracking { hovering in
             isHovering = hovering
         }

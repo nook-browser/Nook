@@ -507,7 +507,7 @@ private struct AgentSpaceRow: View {
         }
         .buttonStyle(.plain)
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) { isHovering = hovering }
+            withAnimation(NookDesign.Motion.hover(hovering)) { isHovering = hovering }
         }
     }
 }

@@ -63,7 +63,7 @@ public struct PinnedTabView<Icon: View>: View {
             ZStack {
                 NookDesign.Radius.shape(NookDesign.Radius.lg)
                     .fill(backgroundColor)
-                    .animation(NookDesign.Motion.quick, value: isHovered)
+                    .animation(NookDesign.Motion.hover(isHovered), value: isHovered)
                 if let glow, colors != nil {
                     glowImage(glow)
                         .opacity(NookDesign.Surface.favoriteGlowOpacity(dark: colorScheme == .dark, hovered: isHovered, dimmed: isDimmed))

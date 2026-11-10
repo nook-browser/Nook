@@ -210,7 +210,7 @@ public struct SpaceTab: View {
         .buttonStyle(NookTabButtonStyle())
         .padding(.vertical, NookDesign.Tab.verticalInset)
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(hovering)) {
                 isHovering = hovering
             }
             // Read by the middle-click handler in AppDelegate. Only clear the slot if

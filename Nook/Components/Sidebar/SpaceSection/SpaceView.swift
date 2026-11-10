@@ -330,7 +330,7 @@ struct SpaceView: View {
         }
         .buttonStyle(NookTabButtonStyle())
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) { isNewTabHovering = hovering }
+            withAnimation(NookDesign.Motion.hover(hovering)) { isNewTabHovering = hovering }
         }
     }
 }

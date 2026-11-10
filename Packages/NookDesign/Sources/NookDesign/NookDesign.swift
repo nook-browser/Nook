@@ -187,6 +187,8 @@ public enum NookDesign {
         public static let tabClose = Animation.easeOut(duration: tabCloseDuration)
         public static let tabLandingDuration: TimeInterval = 0.10
         public static let quick = Animation.easeOut(duration: 0.12)      // hover, press
+        /// A highlight under the pointer shows at once; only leaving fades.
+        public static func hover(_ isOn: Bool) -> Animation? { isOn ? nil : quick }
         public static let standardDuration: TimeInterval = 0.22          // `standard`, for AppKit animations
         public static let standard = Animation.smooth(duration: standardDuration)    // selection, reveal, fold
         public static let settle = Animation.smooth(duration: 0.6)       // the separator wave rising and flattening

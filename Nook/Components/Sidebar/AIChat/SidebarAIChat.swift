@@ -588,7 +588,7 @@ struct MessageBubble: View {
             }
         }
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(hovering)) {
                 isHovered = hovering
             }
         }
@@ -775,7 +775,7 @@ struct CitationView: View {
         }
         .buttonStyle(.plain)
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(hovering)) {
                 isHovered = hovering
             }
         }

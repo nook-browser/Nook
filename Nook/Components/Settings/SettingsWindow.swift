@@ -216,7 +216,7 @@ private struct SettingsSidebarRow: View {
             .nookElevation(isSelected ? .raised : .flat)
         }
         .buttonStyle(.plain)
-        .animation(NookDesign.Motion.quick, value: isHovering)
+        .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
         .onHoverTracking { isHovering = $0 }
     }
 }

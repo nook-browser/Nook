@@ -220,7 +220,7 @@ struct TopBarView: View {
         )
         .clipShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(hovering)) {
                 isHovering = hovering
             }
         }

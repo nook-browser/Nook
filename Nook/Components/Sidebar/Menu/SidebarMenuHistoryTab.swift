@@ -370,7 +370,7 @@ struct HistoryRowView: View {
         .background(isHovered ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { hovered in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(hovered)) {
                 isHovered = hovered
             }
         }
@@ -479,7 +479,7 @@ struct FiltersSelectButton: View {
                 .nookRowSelection(isActive)
         }
         .buttonStyle(.plain)
-        .animation(NookDesign.Motion.quick, value: isHovering)
+        .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
         .animation(NookDesign.Motion.standard, value: isActive)
         .onHoverTracking { state in
             isHovering = state

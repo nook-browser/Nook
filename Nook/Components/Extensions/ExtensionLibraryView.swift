@@ -318,7 +318,7 @@ private struct ActionTileStyle: ButtonStyle {
             .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(NookDesign.Motion.quick, value: configuration.isPressed)
-            .animation(NookDesign.Motion.quick, value: isHovering)
+            .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
             .onHoverTracking { isHovering = $0 }
     }
 }
