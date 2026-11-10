@@ -158,13 +158,5 @@ struct FindBarView: View {
                 isTextFieldFocused = false
             }
         }
-        // Only handle escape when find bar is visible
-        if findManager.isFindBarVisible {
-            EmptyView()
-                .onKeyPress(.escape) {
-                    findManager.hideFindBar()
-                    return .handled
-                }
-        }
     }
 }

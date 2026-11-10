@@ -105,7 +105,7 @@ extension BrowserManager {
     }
 
     /// An Escape the page left alone (`EscapeKey`). Closes the innermost thing the window shows:
-    /// a page's own full screen, then Peek. The window itself stays as it is.
+    /// a page's own full screen, then Peek, then the find bar. The window itself stays as it is.
     func escapePressed(in nsWindow: NSWindow) {
         guard let state = windowRegistry?.windows.values.first(where: { $0.window === nsWindow }) else { return }
         let peek = peekManager.windowId == state.id ? peekManager.page : nil
@@ -116,6 +116,8 @@ extension BrowserManager {
             view.evaluateJavaScript("document.exitFullscreen()", in: nil, in: .defaultClient) { _ in }
         } else if peek != nil {
             peekManager.dismissPeek()
+        } else if findManager.isFindBarVisible {
+            findManager.hideFindBar()
         } else {
             state.multiSelection.clear()
         }

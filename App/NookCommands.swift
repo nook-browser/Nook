@@ -126,10 +126,19 @@ struct NookCommands: Commands {
 
         // Edit Section
         CommandGroup(replacing: .undoRedo) {
-            Button("Undo Close Tab") {
-                if let window = windowRegistry.activeWindow { browserManager.tabs.reopenLastClosed(in: window) }
+            Button("Undo") {
+                if KeyboardShortcutManager.textHasFocus, NSApp.keyWindow?.firstResponder?.undoManager?.canUndo == true {
+                    NSApp.sendAction(Selector(("undo:")), to: nil, from: nil)
+                } else if let window = windowRegistry.activeWindow {
+                    browserManager.tabs.reopenLastClosed(in: window)
+                }
             }
             .modifier(dynamicShortcut(.undoCloseTab))
+
+            Button("Redo") {
+                NSApp.sendAction(Selector(("redo:")), to: nil, from: nil)
+            }
+            .keyboardShortcut("z", modifiers: [.command, .shift])
 
             Button("Reopen Closed Tab") {
                 if let window = windowRegistry.activeWindow { browserManager.tabs.reopenLastClosed(in: window) }

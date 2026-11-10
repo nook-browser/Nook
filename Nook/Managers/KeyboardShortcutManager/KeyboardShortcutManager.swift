@@ -208,6 +208,11 @@ class KeyboardShortcutManager {
             return false
         }
 
+        // A page or text field gets Undo first; whatever it leaves reaches the Undo menu item.
+        if Self.textHasFocus, let combo = KeyCombination(from: event), shortcutMap[combo.lookupKey]?.action == .undoCloseTab {
+            return false
+        }
+
         // If the key window is not a Nook browser window (e.g. Settings), let the event
         // pass through so standard macOS shortcuts (Cmd+W to close, etc.) work normally
         if let keyWindow = NSApp.keyWindow,
@@ -647,6 +652,12 @@ class KeyboardShortcutManager {
             }
 
         }
+    }
+
+    /// A web page or native text field has keyboard focus, so Undo means its edits.
+    static var textHasFocus: Bool {
+        let responder = NSApp.keyWindow?.firstResponder
+        return responder is NSTextView || responder is WKWebView
     }
 
     // MARK: - Global Event Monitoring
