@@ -85,13 +85,16 @@ extension ExtensionManager {
     /// everything required; for an update it is only what the new version adds.
     static func consentItems(
         for new: WKWebExtension,
-        comparedTo previous: WKWebExtension?
+        comparedTo previous: WKWebExtension?,
+        hiding added: Set<String> = [],
+        previouslyHiding previouslyAdded: Set<String> = []
     ) -> (permissions: [String], hosts: [String]) {
         func requiredPatterns(_ ext: WKWebExtension) -> [WKWebExtension.MatchPattern] {
             let optional = ext.optionalPermissionMatchPatterns
             return ext.allRequestedMatchPatterns.filter { !optional.contains($0) }
         }
-        let newPermissions = Set(new.requestedPermissions.map(\.rawValue))
+        // What Nook added for its own channel is not the extension's request, in either version.
+        let newPermissions = Set(new.requestedPermissions.map(\.rawValue)).subtracting(added)
         let newPatterns = requiredPatterns(new)
         guard let previous else {
             return (newPermissions.sorted(), Set(newPatterns.map(\.string)).sorted())
@@ -100,7 +103,8 @@ extension ExtensionManager {
         // WebKit's own containment: `<all_urls>` and `*://*/*` cover neither `file:` nor a wider scheme.
         let addedHosts = Set(newPatterns.filter { pattern in !oldPatterns.contains { $0.matches(pattern) } }
             .map(\.string)).sorted()
-        let addedPermissions = newPermissions.subtracting(previous.requestedPermissions.map(\.rawValue)).sorted()
+        let oldPermissions = Set(previous.requestedPermissions.map(\.rawValue)).subtracting(previouslyAdded)
+        let addedPermissions = newPermissions.subtracting(oldPermissions).sorted()
         return (addedPermissions, addedHosts)
     }
 
@@ -174,6 +178,7 @@ extension ExtensionManager {
                 } else {
                     installedExtensions.append(installed)
                 }
+                notifyManagement(installed.id) { .installed($0) }
                 completionHandler(.success(installed))
             } catch let error as ExtensionError {
                 completionHandler(.failure(error))
@@ -230,6 +235,8 @@ extension ExtensionManager {
         else {
             throw ExtensionError.installationFailed("Invalid extension identifier")
         }
+        // Whatever the package ships under Nook's own file names goes first: one of them says what the consent sheet hides.
+        ExtensionCompatPatcher.disown(packageAt: tempDir)
         // Patch before parsing so the consent sheet sees Nook's bridge content script hosts too.
         patchManifestForWebKit(at: manifestURL, extensionId: extensionId, store: store)
 
@@ -265,7 +272,10 @@ extension ExtensionManager {
         // update it would take over that extension's storage without a word. Ask as for a fresh
         // install, listing everything it requests.
         let replacesStoreInstall = existing?.sourceStore != nil && store == nil
-        let consent = Self.consentItems(for: staged, comparedTo: replacesStoreInstall ? nil : previous)
+        let consent = Self.consentItems(
+            for: staged, comparedTo: replacesStoreInstall ? nil : previous,
+            hiding: ExtensionCompatPatcher.addedPermissions(packageAt: tempDir),
+            previouslyHiding: existing.map { ExtensionCompatPatcher.addedPermissions(packageAt: URL(fileURLWithPath: $0.packagePath)) } ?? [])
         let needsConsent = existing == nil || replacesStoreInstall
             || !consent.permissions.isEmpty || !consent.hosts.isEmpty
         if needsConsent {
@@ -289,6 +299,7 @@ extension ExtensionManager {
 
         // STEP 4: Swap files into place. Unload the running version first.
         if let running = extensionContexts.removeValue(forKey: extensionId) {
+            compatBridge.contextUnloaded(running)
             if running.isLoaded { try? extensionController?.unload(running) }
         }
         let finalDir = extensionsDir.appendingPathComponent(extensionId)
@@ -371,6 +382,7 @@ extension ExtensionManager {
         extensionContext.isInspectable = true
         extensionContext.hasAccessToPrivateData = entity.allowsPrivateBrowsing
         extensionContexts[entity.id] = extensionContext
+        loadCompatState(for: extensionContext, entity: entity)
 
         do {
             try extensionController?.load(extensionContext)
@@ -550,10 +562,12 @@ extension ExtensionManager {
     func enableExtension(_ extensionId: String) {
         guard let entity = fetchEntity(id: extensionId) else { return }
         updateExtensionEnabled(extensionId, enabled: true)
+        notifyManagement(extensionId) { .enabled($0) }
 
         if let context = extensionContexts[extensionId] {
             guard !context.isLoaded else { return }
             do {
+                loadCompatState(for: context, entity: entity)
                 try extensionController?.load(context)
                 if context.webExtension.hasBackgroundContent {
                     context.loadBackgroundContent { error in
@@ -582,6 +596,7 @@ extension ExtensionManager {
 
     func disableExtension(_ extensionId: String) {
         if let context = extensionContexts[extensionId], context.isLoaded {
+            compatBridge.contextUnloaded(context)
             do {
                 try extensionController?.unload(context)
             } catch {
@@ -590,6 +605,7 @@ extension ExtensionManager {
             }
         }
         updateExtensionEnabled(extensionId, enabled: false)
+        notifyManagement(extensionId) { .disabled($0) }
     }
 
     /// WebKit adds or removes the extension's content scripts in private pages at once.
@@ -623,6 +639,7 @@ extension ExtensionManager {
         }
 
         if let context = extensionContexts.removeValue(forKey: extensionId), context.isLoaded {
+            compatBridge.contextUnloaded(context)
             do {
                 try extensionController?.unload(context)
             } catch {
@@ -642,6 +659,8 @@ extension ExtensionManager {
             }
         }
         installedExtensions.removeAll { $0.id == extensionId }
+        compatManagement.changed(.uninstalled(extensionId))
+        compatSidePanel.forget(extensionId)
     }
 
     private func updateExtensionEnabled(_ extensionId: String, enabled: Bool) {

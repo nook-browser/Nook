@@ -26,6 +26,21 @@ const FILL = ['action', 'alarms', 'commands', 'contextMenus', 'cookies', 'declar
 // Namespaces WebKit lacks whose absence stops a background script while it starts. Each is a plain
 // object with every member Chrome defines. A namespace is listed only with a measured failure behind it.
 const STUB = ['management', 'notifications', 'privacy'];
+// Namespaces `ExtensionCompatBridge` answers natively, with the manifest permission each needs. Keep
+// in step with `ExtensionCompatPatcher.bridgedPermissions`. `extra` names functions the typings leave out.
+const BRIDGED = {
+    offscreen: { permission: 'offscreen', extra: ['hasDocument'] },
+    idle: { permission: 'idle', extra: [] },
+    notifications: { permission: 'notifications', extra: [] },
+    management: { permission: 'management', extra: [] },
+    identity: { permission: 'identity', extra: [] },
+    sidePanel: { permission: 'sidePanel', extra: ['close', 'getLayout'] },
+};
+// Events Nook fires in a namespace WebKit has, each with the permission it needs.
+const BRIDGED_EVENTS = {
+    'webNavigation.onHistoryStateUpdated': 'webNavigation',
+    'webNavigation.onReferenceFragmentUpdated': 'webNavigation',
+};
 
 const root = path.dirname(fileURLToPath(new URL('.', import.meta.url)));
 const template = path.join(root, 'scripts/extension-compat/shim.js');
@@ -96,7 +111,7 @@ const enumKey = v => v.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/[^A-Za-z0
 const enumObject = values => Object.fromEntries(values.map(v => [enumKey(v), v]));
 const enumObjects = enums => Object.fromEntries(Object.keys(enums).sort().map(n => [n, enumObject(enums[n])]));
 
-const tables = { enums: {}, events: [], functions: [], stubs: {} };
+const tables = { enums: {}, events: [], functions: [], stubs: {}, bridged: {}, bridgedEvents: BRIDGED_EVENTS };
 for (const name of FILL) {
     const ns = namespace(name);
     for (const [id, object] of Object.entries(enumObjects(ns.enums))) { tables.enums[`${name}.${id}`] = object; }
@@ -114,6 +129,12 @@ for (const name of STUB) {
     tables.stubs[name] = { functions: ns.functions, events: ns.events, enums: enumObjects(ns.enums), settings };
 }
 
+for (const [name, { permission, extra }] of Object.entries(BRIDGED)) {
+    const ns = namespace(name);
+    tables.bridged[name] = { permission, functions: [...new Set([...ns.functions, ...extra])].sort(),
+                             events: ns.events, enums: enumObjects(ns.enums) };
+}
+
 // The pin moving under the shim should fail here, not in someone's extension.
 const expect = (ok, what) => { if (!ok) { throw new Error(`tables look wrong: ${what}`); } };
 expect(tables.enums['runtime.OnInstalledReason']?.INSTALL === 'install', 'runtime.OnInstalledReason');
@@ -128,7 +149,14 @@ expect(tables.stubs.privacy.settings.services?.passwordSavingEnabled === false, 
 expect(tables.stubs.privacy.settings.network?.webRTCIPHandlingPolicy === 'default', 'privacy.network');
 
 let shim = readFileSync(template, 'utf8');
-for (const token of ['__NOOK_TABLES__', '__NOOK_IDENTITY__', '__CHROME_MAJOR__', '__FIREFOX_MAJOR__']) {
+expect(tables.bridged.offscreen.functions.includes('createDocument'), 'offscreen.createDocument');
+expect(tables.bridged.idle.functions.includes('queryState') && tables.bridged.idle.events.includes('onStateChanged'), 'idle');
+expect(tables.bridged.notifications.functions.includes('create') && tables.bridged.notifications.events.includes('onButtonClicked'), 'notifications');
+expect(tables.bridged.management.functions.includes('getAll') && tables.bridged.management.events.includes('onDisabled'), 'management');
+expect(tables.bridged.identity.functions.includes('launchWebAuthFlow') && tables.bridged.identity.functions.includes('getRedirectURL'), 'identity');
+expect(tables.bridged.sidePanel.functions.includes('setPanelBehavior') && tables.bridged.sidePanel.functions.includes('open'), 'sidePanel');
+for (const event of Object.keys(BRIDGED_EVENTS)) { expect(tables.events.includes(event), event); }
+for (const token of ['__NOOK_TABLES__', '__NOOK_IDENTITY__', '__NOOK_OWNS_CHANNEL__', '__CHROME_MAJOR__', '__FIREFOX_MAJOR__']) {
     expect(shim.includes(token), `${token} in the template`);
 }
 const header = `// Nook extension compatibility shim: runs first in every context of a store-built extension.\n` +
@@ -142,4 +170,4 @@ shim = header + shim.split('\n').slice(2).join('\n')
 new Function(shim);
 writeFileSync(out, shim);
 console.log(`${Object.keys(tables.enums).length} enums, ${tables.events.length} events, ${tables.functions.length} functions, ` +
-            `${STUB.length} stubbed namespaces, ${shim.length} bytes -> ${path.relative(root, out)}`);
+            `${STUB.length} stubbed and ${Object.keys(BRIDGED).length} bridged namespaces, ${shim.length} bytes -> ${path.relative(root, out)}`);

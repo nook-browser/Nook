@@ -195,6 +195,75 @@ struct ExtensionCompatPatcherCheck {
         precondition(!patch(&bare, bareRoot, as: .edge))
         precondition(read(bareRoot, "nook_compat.js") == "/* shim */ var identity = 'edge';")
 
+        // The channel to Nook rides on nativeMessaging. A package that declares an API the bridge
+        // answers gets the permission, and Nook records that the package never asked for it.
+        let channelShim = "owns:__NOOK_OWNS_CHANNEL__ as:__NOOK_IDENTITY__"
+        var bridged: [String: Any] = ["permissions": ["storage", "offscreen", "https://example.com/*"]]
+        let bridgedRoot = try package("bridged", ["readme.txt": ""])
+        precondition(patch(&bridged, bridgedRoot, shim: channelShim))
+        precondition(bridged["permissions"] as? [String] == ["storage", "offscreen", "https://example.com/*", "nativeMessaging"])
+        precondition(ExtensionCompatPatcher.addedPermissions(packageAt: bridgedRoot) == ["nativeMessaging"])
+        precondition(read(bridgedRoot, "nook_compat.js") == "owns:true as:chrome")
+        // The second run finds the permission already there and still knows whose it is.
+        precondition(!patch(&bridged, bridgedRoot, shim: channelShim))
+        precondition(bridged["permissions"] as? [String] == ["storage", "offscreen", "https://example.com/*", "nativeMessaging"])
+        precondition(ExtensionCompatPatcher.addedPermissions(packageAt: bridgedRoot) == ["nativeMessaging"])
+        precondition(read(bridgedRoot, "nook_compat.js") == "owns:true as:chrome")
+
+        // An extension that asked for nativeMessaging itself keeps it as its own.
+        var declared: [String: Any] = ["permissions": ["offscreen", "nativeMessaging"]]
+        let declaredRoot = try package("declared", ["readme.txt": ""])
+        precondition(!patch(&declared, declaredRoot, shim: channelShim))
+        precondition(declared["permissions"] as? [String] == ["offscreen", "nativeMessaging"])
+        precondition(ExtensionCompatPatcher.addedPermissions(packageAt: declaredRoot).isEmpty)
+        precondition(read(declaredRoot, "nook_compat.js") == "owns:false as:chrome")
+
+        // No API the bridge answers, no channel.
+        var plain: [String: Any] = ["permissions": ["storage", "tabs"]]
+        let plainRoot = try package("plain", ["readme.txt": ""])
+        precondition(!patch(&plain, plainRoot, shim: channelShim))
+        precondition(plain["permissions"] as? [String] == ["storage", "tabs"])
+        precondition(read(plainRoot, "nook_compat.js") == "owns:false as:chrome")
+
+        // What the consent sheet lists is what the package requests, less `addedPermissions`. A package
+        // gets no say in that: the record it ships under Nook's file name is gone before anything reads it.
+        let fake = "{\"addedPermissions\":[\"cookies\",\"history\",\"webRequest\",\"nativeMessaging\"]}"
+        /// The install path: `disown`, then the patcher for a store build, then the names the sheet shows.
+        func listed(_ name: String, _ permissions: [String], files: [String: String], store: Bool) throws -> Set<String> {
+            var manifest: [String: Any] = ["permissions": permissions]
+            let root = try package(name, files)
+            ExtensionCompatPatcher.disown(packageAt: root)
+            if store { _ = patch(&manifest, root, shim: channelShim) }
+            return Set(permissions).subtracting(ExtensionCompatPatcher.addedPermissions(packageAt: root))
+        }
+        let greedy = ["cookies", "history", "webRequest", "storage"]
+        for store in [true, false] {
+            // Every name it tried to hide is listed, from a store or from a file.
+            let hidden = try listed("hides-\(store)", greedy, files: ["nook_compat.json": fake], store: store)
+            precondition(hidden == Set(greedy))
+            // So is nativeMessaging when the package asks for it itself, with or without a shim file of its own making.
+            let own = ["offscreen", "nativeMessaging"]
+            let record = try listed("own-\(store)", own, files: ["nook_compat.json": fake], store: store)
+            let both = try listed("own-shim-\(store)", own, files: ["nook_compat.json": fake, "nook_compat.js": "mine"], store: store)
+            precondition(record == Set(own) && both == Set(own))
+        }
+        // The one name Nook does hide is the one it added.
+        let added = try listed("added", ["offscreen", "cookies"], files: [:], store: true)
+        precondition(added == ["offscreen", "cookies"])
+        precondition(ExtensionCompatPatcher.addedPermissions(packageAt: bridgedRoot) == ["nativeMessaging"])
+
+        // A package installed before this layer is first patched at a launch, with no `disown`:
+        // the patcher itself drops a record that is there ahead of its own shim file.
+        var forged: [String: Any] = ["permissions": ["nativeMessaging", "cookies"]]
+        let forgedRoot = try package("forged", ["nook_compat.json": fake])
+        precondition(!patch(&forged, forgedRoot, shim: channelShim))
+        precondition(ExtensionCompatPatcher.addedPermissions(packageAt: forgedRoot).isEmpty)
+        precondition(!FileManager.default.fileExists(atPath: forgedRoot.appendingPathComponent("nook_compat.json").path))
+        precondition(read(forgedRoot, "nook_compat.js") == "owns:false as:chrome")
+        // Whatever a record says, by whatever hand, only the channel permission is ever read from it.
+        try fake.write(to: forgedRoot.appendingPathComponent("nook_compat.json"), atomically: true, encoding: .utf8)
+        precondition(ExtensionCompatPatcher.addedPermissions(packageAt: forgedRoot) == ["nativeMessaging"])
+
         // Bitwarden by its short name or a known ID: the store manifest's name is a locale key.
         let ids: Set<String> = ["nngceckbapebfimnlniiiahkandclblb"]
         precondition(ExtensionCompatPatcher.isBitwarden(manifest: ["name": "__MSG_extName__", "short_name": "Bitwarden"], extensionId: "x", knownIDs: ids))

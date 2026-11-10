@@ -9,6 +9,10 @@
   var keep = g.__nookCompat = [];
   var IDENTITY = '__NOOK_IDENTITY__';
   var inExtensionOrigin = !!g.location && /-extension:$/.test(g.location.protocol);
+  // Nook's own native messaging application: the delegate answers it, and no host process carries the name.
+  var BRIDGE = 'com.gstudios.nook.compat';
+  // True when nativeMessaging is in the manifest only because Nook put it there for this channel.
+  var OWNS_CHANNEL = '__NOOK_OWNS_CHANNEL__' === 'true';
 
   function message(e) { return String((e && e.message) || e); }
 
@@ -28,6 +32,18 @@
     var cb = args.length && typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
     if (cb) { cb(value); return undefined; }
     return Promise.resolve(value);
+  }
+
+  // The same for a promise that settles later. A failure reaches a callback with runtime.lastError set, as in Chrome.
+  // Only WebKit can set that, so the callback rides on a native message Nook answers with the failure.
+  function settle(root, args, promise) {
+    var cb = args.length && typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
+    if (!cb) return promise;
+    promise.then(function (value) { cb(value); }, function (e) {
+      if (!fail) return cb();
+      try { fail(message(e), function () { cb(); }); } catch (x) { cb(); }
+    });
+    return undefined;
   }
 
   // ponytail: a stub's reply is guessed from its name (lists for getAll and query, false for has and is). Phase 2 replaces stubs with real APIs.
@@ -65,6 +81,102 @@
       try { out = call(args); } catch (e) { return recover(args, e, call); }
       return out && typeof out.then === 'function' ? out.then(null, function (e) { return recover(args, e, call); }) : out;
     };
+  }
+
+  // The channel to Nook. Requests are single native messages; events arrive on one port per context.
+  var send = null, fail = null, connect = null, port = null, events = {}, announcing = false, background = false;
+  function channel(root) {
+    var runtime = root.runtime;
+    if (!inExtensionOrigin || typeof runtime.sendNativeMessage !== 'function') return;
+    keep.push(runtime);
+    // A worker, or an MV2 background page: WebKit may stop it, and Nook then remembers what it listened for.
+    background = !!(g.clients && g.registration);
+    try { background = background || root.extension.getBackgroundPage() === g.window; } catch (e) {}
+    var sendNative = runtime.sendNativeMessage, connectNative = runtime.connectNative;
+    send = function (request) { return sendNative.call(runtime, BRIDGE, request); };
+    fail = function (text, callback) { sendNative.call(runtime, BRIDGE, { api: 'nook', method: 'fail', args: [text] }, callback); };
+    connect = function () { return connectNative.call(runtime, BRIDGE); };
+  }
+  function native(api, method, args) {
+    if (!send) return Promise.reject(new Error(api + '.' + method + ' is not available'));
+    return Promise.resolve().then(function () { return send({ api: api, method: method, args: args || [] }); }).then(function (reply) {
+      if (reply && reply.error !== undefined) throw new Error(reply.error);
+      // "No value" crosses the channel as null; Chrome's functions resolve with undefined.
+      return reply && reply.result !== null ? reply.result : undefined;
+    });
+  }
+  // A function Nook implements. A trailing callback stays here; the other arguments go over the channel.
+  function nativeFunction(root, api, method) {
+    return function () {
+      var args = Array.prototype.slice.call(arguments);
+      if (args.length && typeof args[args.length - 1] === 'function') args.pop();
+      return settle(root, arguments, native(api, method, args));
+    };
+  }
+  // An event Nook fires. The port opens with the first listener and tells Nook what this context listens for.
+  function nativeEvent(name) {
+    if (events[name]) return events[name].event;
+    var listeners = [];
+    events[name] = {
+      listening: function () { return listeners.length > 0; },
+      fire: function (args) { listeners.slice().forEach(function (f) { try { f.apply(null, args); } catch (e) { console.error(e); } }); },
+      event: {
+        addListener: function (f) { if (listeners.indexOf(f) < 0) listeners.push(f); announce(); },
+        removeListener: function (f) { listeners = listeners.filter(function (x) { return x !== f; }); announce(); },
+        hasListener: function (f) { return listeners.indexOf(f) >= 0; },
+        hasListeners: function () { return listeners.length > 0; }
+      }
+    };
+    return events[name].event;
+  }
+  function announce() {
+    if (announcing || !connect) return;
+    announcing = true;
+    // One message for every listener added in this turn: a background script registers them all at once.
+    Promise.resolve().then(function () {
+      announcing = false;
+      try {
+        if (!port) {
+          port = connect();
+          port.onMessage.addListener(function (m) { var e = m && events[m.event]; if (e) e.fire(m.args || []); });
+          port.onDisconnect.addListener(function () { port = null; });
+        }
+        port.postMessage({ subscribe: Object.keys(events).filter(function (n) { return events[n].listening(); }), lazy: background });
+      } catch (e) {}
+    });
+  }
+
+  // Nook put nativeMessaging in the manifest for the channel. The extension is answered as its own manifest reads.
+  function ownChannel(root) {
+    var permissions = root.permissions, NAME = 'nativeMessaging';
+    if (!OWNS_CHANNEL || !send || !permissions) return;
+    // runtime.sendNativeMessage and connectNative stay visible: WebKit lets nothing replace a member of `runtime`
+    // (measured). Nook refuses every host but its own for such an extension.
+    keep.push(permissions);
+    var original = { getAll: permissions.getAll, contains: permissions.contains, request: permissions.request, remove: permissions.remove };
+    function asks(query) { return !!query && Array.isArray(query.permissions) && query.permissions.indexOf(NAME) >= 0; }
+    // The query without the name, or null when nothing else is in it.
+    function rest(query) {
+      var others = query.permissions.filter(function (p) { return p !== NAME; });
+      return others.length || (query.origins && query.origins.length) ? Object.assign({}, query, { permissions: others }) : null;
+    }
+    permissions.getAll = function () {
+      return settle(root, arguments, Promise.all([original.getAll.call(permissions), native('nook', 'nativeMessagingGranted')]).then(function (found) {
+        var all = Object.assign({}, found[0]);
+        all.permissions = (all.permissions || []).filter(function (p) { return p !== NAME || found[1]; });
+        return all;
+      }));
+    };
+    // Each of the three asks Nook about nativeMessaging and WebKit about whatever else the query holds.
+    [['contains', 'nativeMessagingGranted'], ['request', 'requestNativeMessaging'], ['remove', 'removeNativeMessaging']].forEach(function (pair) {
+      permissions[pair[0]] = function (query) {
+        if (!asks(query)) return original[pair[0]].apply(permissions, arguments);
+        return settle(root, arguments, native('nook', pair[1]).then(function (yes) {
+          var others = rest(query);
+          return yes && others ? original[pair[0]].call(permissions, others) : !!yes;
+        }));
+      };
+    });
   }
 
   // A store build asks which browser it is in. Under Nook's Safari user agent it takes paths its package was never tested on.
@@ -140,6 +252,25 @@
       });
     });
     ruleBatches(root.declarativeNetRequest);
+    // Chrome still takes the MV2 names for the toolbar button's menu. WebKit knows one name per manifest version.
+    [root.contextMenus, root.menus !== root.contextMenus ? root.menus : null].forEach(function (menus) {
+      ['create', 'update'].forEach(function (name, at) {
+        recoverable(menus, name, function (args, e, call) {
+          for (var tries = 0; tries < 8; tries++) {
+            var bad = /'([^']+)' is not a valid context/.exec(message(e)), props = args[at];
+            if (!bad || !props || !Array.isArray(props.contexts)) throw e;
+            var contexts = props.contexts.filter(function (c) { return c !== bad[1]; });
+            if (/^(browser|page)_action$/.test(bad[1]) && contexts.indexOf('action') < 0) contexts.push('action');
+            // No context left that WebKit can show the item in.
+            if (!contexts.length) return props.id;
+            args = args.slice();
+            args[at] = Object.assign({}, props, { contexts: contexts });
+            try { return call(args); } catch (next) { e = next; }
+          }
+          throw e;
+        });
+      });
+    });
   }
 
   // WebKit rejects a whole batch when one rule uses something it lacks. The rest of the batch still goes in.
@@ -179,6 +310,278 @@
     });
   }
 
+  // Namespaces Nook implements natively, each for an extension whose manifest asks for it. Nook checks the same thing.
+  function bridged(root, T) {
+    if (!send) return;
+    var declared = root.runtime.getManifest().permissions || [];
+    Object.keys(T.bridged).forEach(function (name) {
+      var def = T.bridged[name];
+      if (declared.indexOf(def.permission) < 0) return;
+      add(root, name, function () {
+        var o = {};
+        def.functions.forEach(function (f) { o[f] = nativeFunction(root, name, f); });
+        def.events.forEach(function (e) { o[e] = nativeEvent(name + '.' + e); });
+        Object.keys(def.enums).forEach(function (e) { o[e] = def.enums[e]; });
+        return o;
+      });
+    });
+    // Chrome answers this one at once, with the address a provider sends the person back to.
+    if (root.identity && T.bridged.identity && declared.indexOf('identity') >= 0) {
+      root.identity.getRedirectURL = function (path) {
+        return 'https://' + root.runtime.id + '.chromiumapp.org/' + String(path === undefined ? '' : path).replace(/^\//, '');
+      };
+    }
+    Object.keys(T.bridgedEvents).forEach(function (path) {
+      if (declared.indexOf(T.bridgedEvents[path]) >= 0) add(root, path, function () { return tabEvent(root, path); });
+    });
+    // runtime.getContexts answers for the offscreen document, the one context only Nook knows of.
+    if (root.offscreen && T.bridged.offscreen) {
+      windowlessTabs(root);
+      workerClients(root);
+      workerLink(root);
+      add(root, 'runtime.getContexts', function () {
+        return function (filter) {
+          var wanted = filter && typeof filter === 'object' ? filter : {};
+          function allows(key, value) { return !Array.isArray(wanted[key]) || wanted[key].indexOf(value) >= 0; }
+          return settle(root, arguments, native('offscreen', 'document').then(function (doc) {
+            if (!doc || wanted.incognito === true) return [];
+            var context = { contextType: 'OFFSCREEN_DOCUMENT', contextId: doc.documentId, documentId: doc.documentId, documentUrl: doc.url,
+                            documentOrigin: doc.url.split('/').slice(0, 3).join('/'), frameId: 0, tabId: -1, windowId: -1, incognito: false };
+            var keys = { contextTypes: 'contextType', contextIds: 'contextId', documentIds: 'documentId', documentUrls: 'documentUrl',
+                         documentOrigins: 'documentOrigin', frameIds: 'frameId', tabIds: 'tabId', windowIds: 'windowId' };
+            return Object.keys(keys).every(function (k) { return allows(k, context[keys[k]]); }) ? [context] : [];
+          }));
+        };
+      });
+    }
+  }
+
+  // Chrome's UrlFilter, for a listener added with { url: [...] }: any one filter, every key of it.
+  function urlMatches(filters, href) {
+    var list = filters && filters.url, u;
+    if (!Array.isArray(list) || !list.length) return true;
+    try { u = new URL(href); } catch (e) { return false; }
+    var tests = {}, bare = u.href.split('#')[0], port = +u.port || { 'http:': 80, 'https:': 443 }[u.protocol] || 0;
+    function four(name, text, form) {
+      form = form || function (v) { return v; };
+      tests[name + 'Contains'] = function (v) { return text.indexOf(v) >= 0; };
+      tests[name + 'Equals'] = function (v) { return text === form(v); };
+      tests[name + 'Prefix'] = function (v) { return text.startsWith(form(v)); };
+      tests[name + 'Suffix'] = function (v) { return text.endsWith(v); };
+    }
+    // Chrome matches a host with a dot in front, so '.example.com' finds the domain and its subdomains.
+    four('host', '.' + u.hostname, function (v) { return v.charAt(0) === '.' ? v : '.' + v; });
+    four('path', u.pathname);
+    four('query', u.search.slice(1));
+    four('url', bare);
+    tests.urlMatches = function (v) { return new RegExp(v).test(bare); };
+    tests.originAndPathMatches = function (v) { return new RegExp(v).test(u.origin + u.pathname); };
+    tests.schemes = function (v) { return v.indexOf(u.protocol.slice(0, -1)) >= 0; };
+    tests.ports = function (v) { return v.some(function (p) { return Array.isArray(p) ? port >= p[0] && port <= p[1] : port === p; }); };
+    return list.some(function (filter) {
+      return Object.keys(filter).every(function (key) { try { return !!tests[key] && !!tests[key](filter[key]); } catch (e) { return false; } });
+    });
+  }
+
+  // An event Nook fires about a tab names the tab by address and place: WebKit keeps its tab ids to itself.
+  // WebKit's own tabs.onUpdated for the same change carries the id, and the two are paired by address.
+  var tabWatch = null;
+  function tabIds(root) {
+    if (tabWatch) return tabWatch;
+    var seen = [], waiting = [], resolved = new WeakMap();
+    root.tabs.onUpdated.addListener(function (id, change) {
+      var url = change && change.url;
+      if (!url) return;
+      for (var i = 0; i < waiting.length; i++) if (waiting[i].url === url) { waiting.splice(i, 1)[0].done(id); return; }
+      seen.push({ id: id, url: url, at: Date.now() });
+      if (seen.length > 20) seen.shift();
+    });
+    function find(details) {
+      for (var i = seen.length - 1; i >= 0; i--) {
+        if (seen[i].url === details.url && Date.now() - seen[i].at < 2000) return Promise.resolve(seen.splice(i, 1)[0].id);
+      }
+      return new Promise(function (done) {
+        var entry = { url: details.url, done: done };
+        waiting.push(entry);
+        setTimeout(function () {
+          var i = waiting.indexOf(entry);
+          if (i < 0) return;
+          waiting.splice(i, 1);
+          // No update came, as after a worker restart: the one tab at that address, by its place when two share it.
+          Promise.resolve().then(function () { return root.tabs.query({}); }).then(function (tabs) {
+            var same = tabs.filter(function (t) { return t.url === details.url; });
+            var placed = same.filter(function (t) { return t.index === details.tabIndex; });
+            done(same.length === 1 ? same[0].id : placed.length === 1 ? placed[0].id : undefined);
+          }, function () { done(undefined); });
+        }, 400);
+      });
+    }
+    // One answer per event, however many listeners ask.
+    return tabWatch = function (details) {
+      if (!resolved.has(details)) resolved.set(details, find(details));
+      return resolved.get(details);
+    };
+  }
+  function tabEvent(root, name) {
+    var source = nativeEvent(name), pairs = [];
+    function index(f) { for (var i = 0; i < pairs.length; i++) if (pairs[i][0] === f) return i; return -1; }
+    return {
+      addListener: function (f, filters) {
+        if (typeof f !== 'function' || index(f) >= 0 || !root.tabs) return;
+        var tabId = tabIds(root);
+        var through = function (details) {
+          if (!details || !urlMatches(filters, details.url)) return;
+          tabId(details).then(function (id) {
+            if (id === undefined) return;
+            var out = Object.assign({}, details, { tabId: id });
+            delete out.tabIndex;
+            try { f(out); } catch (e) { console.error(e); }
+          });
+        };
+        pairs.push([f, through]);
+        source.addListener(through);
+      },
+      removeListener: function (f) { var i = index(f); if (i >= 0) source.removeListener(pairs.splice(i, 1)[0][1]); },
+      hasListener: function (f) { return index(f) >= 0; },
+      hasListeners: function () { return pairs.length > 0; }
+    };
+  }
+
+  // WebKit routes runtime messages to the offscreen document only as a tab, so Nook announces it as one that sits in
+  // no window. The extension must not see that tab: its tab events are dropped, and its messages carry no sender.tab.
+  function windowlessTabs(root) {
+    function windowless(info) { return !!info && info.windowId === -1; }
+    // Replaces event.addListener so each listener runs through `through(listener, arguments)`.
+    function rewire(event, through) {
+      if (!event || typeof event.addListener !== 'function') return;
+      keep.push(event);
+      var add = event.addListener, remove = event.removeListener, pairs = [];
+      function index(f) { for (var i = 0; i < pairs.length; i++) if (pairs[i][0] === f) return i; return -1; }
+      event.addListener = function (f) {
+        if (typeof f !== 'function' || index(f) >= 0) return undefined;
+        var wrapped = function () { return through.call(this, f, Array.prototype.slice.call(arguments)); };
+        pairs.push([f, wrapped]);
+        return add.apply(event, [wrapped].concat(Array.prototype.slice.call(arguments, 1)));
+      };
+      event.removeListener = function (f) { var i = index(f); return i < 0 ? undefined : remove.call(event, pairs.splice(i, 1)[0][1]); };
+      event.hasListener = function (f) { return index(f) >= 0; };
+    }
+    function dropping(position) {
+      return function (f, args) { return windowless(args[position]) ? undefined : f.apply(this, args); };
+    }
+    if (root.tabs) {
+      keep.push(root.tabs);
+      rewire(root.tabs.onCreated, dropping(0));
+      rewire(root.tabs.onUpdated, dropping(2));
+      rewire(root.tabs.onRemoved, dropping(1));
+    }
+    function withoutTab(sender) {
+      if (!sender || !windowless(sender.tab)) return sender;
+      var plain = Object.assign({}, sender);
+      delete plain.tab;
+      return plain;
+    }
+    rewire(root.runtime.onMessage, function (f, args) { args[1] = withoutTab(args[1]); return f.apply(this, args); });
+    rewire(root.runtime.onConnect, function (f, args) {
+      var port = args[0];
+      // The link to the worker is the shim's own port.
+      if (port && port.name === LINK) return f.nookLink ? f.apply(this, args) : undefined;
+      if (f.nookLink) return undefined;
+      try { if (port && windowless(port.sender && port.sender.tab)) delete port.sender.tab; } catch (e) {}
+      return f.apply(this, args);
+    });
+  }
+
+  // WebKit connects no extension page to the extension's service worker: clients.matchAll() is empty in the worker and
+  // ServiceWorker.postMessage from a page arrives nowhere. For the offscreen document both run over one runtime port.
+  var LINK = 'nook.compat.worker';
+  // ponytail: messages cross as JSON, so an ArrayBuffer or a Blob does not survive, and a port sent through a port is dropped.
+  function link(port, side, deliver) {
+    var ports = {}, made = 0;
+    function relay(local, key) {
+      ports[key] = local;
+      local.onmessage = function (e) { try { port.postMessage({ to: key, data: e.data }); } catch (x) {} };
+    }
+    port.onMessage.addListener(function (m) {
+      if (!m) return;
+      if (m.to !== undefined) { if (ports[m.to]) ports[m.to].postMessage(m.data); return; }
+      deliver(m.data, (m.ports || []).map(function (key) { var c = new MessageChannel(); relay(c.port2, key); return c.port1; }));
+    });
+    return function (data, transfer) {
+      var list = Array.isArray(transfer) ? transfer : (transfer && transfer.transfer) || [];
+      var keys = list.filter(function (p) { return !!p && typeof p.postMessage === 'function'; }).map(function (p) { var key = side + made++; relay(p, key); return key; });
+      port.postMessage({ data: data, ports: keys });
+    };
+  }
+
+  // In the worker: the offscreen document is a client, as in Chrome, where extensions find theirs with clients.matchAll().
+  function workerClients(root) {
+    var clients = g.clients;
+    if (!clients || typeof clients.matchAll !== 'function' || !root.offscreen || keep.indexOf(clients) >= 0) return;
+    keep.push(clients);
+    var pages = [], waiting = [], count = 0;
+    var onLink = function (port) {
+      var client = { id: 'nook-offscreen-' + (++count), url: (port.sender && port.sender.url) || '', type: 'window', frameType: 'top-level', focused: false, visibilityState: 'hidden' };
+      client.postMessage = link(port, 'w', function (data, ports) {
+        var e = new MessageEvent('message', { data: data, ports: ports });
+        Object.defineProperty(e, 'source', { value: client });
+        e.waitUntil = function () {};
+        g.dispatchEvent(e);
+      });
+      pages.push(client);
+      port.onDisconnect.addListener(function () { pages = pages.filter(function (c) { return c !== client; }); });
+      waiting.splice(0).forEach(function (f) { f(); });
+    };
+    onLink.nookLink = true;
+    root.runtime.onConnect.addListener(onLink);
+    var matchAll = clients.matchAll, get = clients.get;
+    clients.matchAll = function (options) {
+      var type = (options && options.type) || 'window';
+      return matchAll.call(clients, options).then(function (found) {
+        if (type !== 'window' && type !== 'all') return found;
+        if (pages.length) return found.concat(pages);
+        // A restarted worker has no link yet to a document that outlived the last one. Nook asks the document for it.
+        return native('offscreen', 'link').then(function (exists) {
+          if (!exists || pages.length) return found.concat(pages);
+          return new Promise(function (done) { waiting.push(done); setTimeout(done, 2000); }).then(function () { return found.concat(pages); });
+        }, function () { return found; });
+      });
+    };
+    clients.get = function (id) {
+      var mine = pages.filter(function (c) { return c.id === id; })[0];
+      return mine ? Promise.resolve(mine) : get.call(clients, id);
+    };
+  }
+
+  // In the offscreen document, which Nook marks before this runs: what it posts to the worker goes over the link.
+  function workerLink(root) {
+    var sw = g.navigator && g.navigator.serviceWorker, proto = g.ServiceWorker && g.ServiceWorker.prototype;
+    if (!g.__nookOffscreen || !sw || !proto || keep.indexOf(sw) >= 0) return;
+    keep.push(sw);
+    var post = null, active = null;
+    function open() {
+      if (post) return post;
+      var port = root.runtime.connect({ name: LINK });
+      post = link(port, 'p', function (data, ports) {
+        var e = new MessageEvent('message', { data: data, ports: ports });
+        Object.defineProperty(e, 'source', { value: active });
+        sw.dispatchEvent(e);
+      });
+      port.onDisconnect.addListener(function () { post = null; });
+      return post;
+    }
+    proto.postMessage = function (data, transfer) { open()(data, transfer); };
+    // Nook asks for the link again when a restarted worker looks for its document.
+    g.addEventListener('nook-relink', function () { try { open(); } catch (e) {} });
+    // WebKit leaves `controller` null in an extension page.
+    var controller = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(sw), 'controller');
+    if (controller && controller.get) {
+      Object.defineProperty(sw, 'controller', { get: function () { return controller.get.call(sw) || active; }, configurable: true });
+      sw.getRegistration().then(function (r) { active = (r && r.active) || null; }, function () {});
+    }
+    try { open(); } catch (e) {}
+  }
+
   // What Chrome defines and WebKit lacks in the namespaces both have, and the few namespaces whose absence stops a background script at startup.
   function tables() { return __NOOK_TABLES__; }
   function surface(root) {
@@ -194,6 +597,7 @@
     // A content script stops here, as in Chrome, and never parses the tables.
     if (!inExtensionOrigin) return;
     var T = tables();
+    bridged(root, T);
     Object.keys(T.enums).forEach(function (path) { add(root, path, function () { return T.enums[path]; }); });
     T.events.forEach(function (path) { add(root, path, inertEvent); });
     // A build told it runs in Chrome calls Chrome's functions without asking whether they exist.
@@ -249,6 +653,6 @@
   [identity, globals].forEach(function (part) { try { part(); } catch (e) {} });
   var roots = g.browser && g.browser !== g.chrome ? [g.chrome, g.browser] : [g.chrome];
   roots.forEach(function (root) {
-    [answers, surface].forEach(function (part) { try { part(root); } catch (e) {} });
+    [channel, answers, ownChannel, surface].forEach(function (part) { try { part(root); } catch (e) {} });
   });
 })();

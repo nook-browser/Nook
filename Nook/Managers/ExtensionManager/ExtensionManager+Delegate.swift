@@ -352,20 +352,30 @@ extension ExtensionManager {
         _ url: URL, configuration: WKWebExtension.WindowConfiguration,
         extensionContext: WKWebExtensionContext, controller: WKWebExtensionController
     ) -> ExtensionPopupWindow? {
+        openExtensionPopupWindow(url, frame: configuration.frame, focused: configuration.shouldBeFocused,
+                                 extensionContext: extensionContext, controller: controller)
+    }
+
+    /// The same window for a caller that is not WebKit: the side panel page. `closed` runs when it goes.
+    func openExtensionPopupWindow(
+        _ url: URL, frame: CGRect, focused: Bool, extensionContext: WKWebExtensionContext,
+        controller: WKWebExtensionController, closed: (() -> Void)? = nil
+    ) -> ExtensionPopupWindow? {
         guard let webConfig = extensionContext.webViewConfiguration else { return nil }
         let popup = ExtensionPopupWindow(
             url: url,
-            frame: configuration.frame,
+            frame: frame,
             configuration: webConfig,
             title: extensionContext.webExtension.displayName ?? "Extension",
             controller: controller,
-            onClose: { [weak self] closed in
-                self?.extensionPopupWindows.removeAll { $0 === closed }
+            onClose: { [weak self] window in
+                self?.extensionPopupWindows.removeAll { $0 === window }
+                closed?()
             })
         extensionPopupWindows.append(popup)
         controller.didOpenWindow(popup)
         controller.didOpenTab(popup.tab)
-        if configuration.shouldBeFocused { popup.show() } else { popup.window.orderFront(nil) }
+        if focused { popup.show() } else { popup.window.orderFront(nil) }
         Self.logger.info("Extension opened popup window \(url.lastPathComponent, privacy: .public)")
         return popup
     }
@@ -422,6 +432,15 @@ extension ExtensionManager {
         for extensionContext: WKWebExtensionContext,
         replyHandler: @escaping (Any?, (any Error)?) -> Void
     ) {
+        // Nook's own channel, for the compatibility shim. The calling context is the authentication.
+        if applicationId == ExtensionCompatBridge.applicationID {
+            return compatBridge.handle(message, from: extensionContext, reply: replyHandler)
+        }
+        // This extension has nativeMessaging only because Nook added it for that channel.
+        if compatBridge.mayOnlyReachBridge(extensionContext) {
+            return replyHandler(nil, Self.noNativeHostError())
+        }
+
         // Intercept Safari-specific native messages that we can handle natively.
         // Bitwarden's Safari extension sends commands via native messaging instead of
         // using web clipboard APIs.
@@ -515,6 +534,13 @@ extension ExtensionManager {
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping ((any Error)?) -> Void
     ) {
+        if port.applicationIdentifier == ExtensionCompatBridge.applicationID {
+            compatBridge.connect(port, for: extensionContext)
+            return completionHandler(nil)
+        }
+        if compatBridge.mayOnlyReachBridge(extensionContext) {
+            return completionHandler(Self.noNativeHostError())
+        }
         guard let applicationId = port.applicationIdentifier else {
             Self.logger.error("[NativeMessaging] Port connection missing application identifier")
             completionHandler(NSError(domain: "NativeMessaging", code: 1, userInfo: [NSLocalizedDescriptionKey: "No application identifier"]))
@@ -551,6 +577,12 @@ extension ExtensionManager {
             self.setupInternalPortHandler(port: port, extensionContext: extensionContext, applicationId: applicationId)
         }
         completionHandler(nil)
+    }
+
+    /// What Chrome answers when an extension names a native host that does not exist.
+    private static func noNativeHostError() -> NSError {
+        NSError(domain: NativeMessagingHandler.errorDomain, code: NativeMessagingHandler.ErrorCode.hostNotFound.rawValue,
+                userInfo: [NSLocalizedDescriptionKey: "Specified native messaging host not found."])
     }
 
     /// Host availability depends on the calling extension (allowed_origins), so cache per pair.

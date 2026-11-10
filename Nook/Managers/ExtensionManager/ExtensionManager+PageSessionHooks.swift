@@ -60,6 +60,11 @@ extension ExtensionManager {
             context.action(for: tab)?.closePopup()
             shownPopover = nil
         }
+        // As in Chrome: a button with no popup opens the side panel when the extension asked for that.
+        if context.action(for: tab)?.presentsPopup != true, compatSidePanel.opensOnActionClick(context) {
+            compatSidePanel.open(context)
+            return
+        }
         context.performAction(for: tab)
     }
 

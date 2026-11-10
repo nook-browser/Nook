@@ -115,6 +115,14 @@ extension TabsController {
             isPrivate: opener.isPrivate, controller: self)
         session.detachedProfile = profile
         session.detachedWindow = window(for: opener)
+        // A sign-in flow run for an extension may end in this window. It then closes too.
+        if let ends = opener.navigationInterceptor {
+            session.navigationInterceptor = { [weak session] url in
+                guard ends(url) else { return false }
+                DispatchQueue.main.async { session?.onClose?() }
+                return true
+            }
+        }
         session.installPopupWebView(webView)
         return session
     }

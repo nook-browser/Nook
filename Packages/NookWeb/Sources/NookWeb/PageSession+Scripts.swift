@@ -332,6 +332,7 @@ extension PageSession: WKScriptMessageHandler {
             // the message arrives.
             if let url = message.webView?.url {
                 if self.url.absoluteString != url.absoluteString {
+                    let previous = self.url
                     self.url = url
                     // NOTE: Do NOT call syncTabAcrossWindows here. SPA navigations
                     // (pushState/replaceState/popstate) happen inside the webview — the
@@ -356,6 +357,7 @@ extension PageSession: WKScriptMessageHandler {
                     // The store coalesces writes, so SPA URL changes report directly.
                     controller?.pageCommitted(itemID: itemID, url: url)
                     controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
+                    controller?.tabEvents?.sameDocumentNavigation(self, from: previous)
                     if let webView = message.webView { schedulePageTextCapture(in: webView, sameDocument: true) }
                 }
             }

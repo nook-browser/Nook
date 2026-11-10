@@ -17,23 +17,56 @@ enum ExtensionCompatPatcher {
 
     static let shimFile = "nook_compat.js"
     static let workerFile = "nook_compat_worker.js"
+    static let stateFile = "nook_compat.json"
     static let identityToken = "__NOOK_IDENTITY__"
+    static let channelToken = "__NOOK_OWNS_CHANNEL__"
+    /// The permission the shim's channel to Nook rides on (`runtime.sendNativeMessage`).
+    static let channelPermission = "nativeMessaging"
+    /// Permissions whose APIs `ExtensionCompatBridge` answers natively. A package that declares
+    /// one gets the channel; a package that declares none is left without it.
+    static let bridgedPermissions: Set<String> = ["offscreen", "webNavigation", "idle", "notifications", "management", "identity", "sidePanel"]
     static let pageTag = "<script src=\"/\(shimFile)\"></script>"
     private static let maxPageBytes = 4 << 20
 
-    /// Puts the shim in the package at `root` and first in every context `manifest` declares.
-    /// Returns true when `manifest` changed. It runs at install, on update and at every launch,
-    /// so a package that is already patched costs one small read and changes nothing.
+    /// Puts the shim in the package at `root` and first in every context `manifest` declares, and
+    /// returns true when `manifest` changed. Safe to repeat: it runs at install and at every launch.
     @discardableResult
     static func patch(manifest: inout [String: Any], packageAt root: URL, shim: String, identity: Identity) -> Bool {
         // Pages are rewritten once per package: the shim file is written last and marks it done.
         if !FileManager.default.fileExists(atPath: root.appendingPathComponent(shimFile).path) {
+            // A record that is here before Nook's first pass is the package's own, and says nothing.
+            if let record = location(of: stateFile, in: root) { try? FileManager.default.removeItem(at: record) }
             patchPages(in: root, named: namedPages(manifest))
         }
         var changed = patchBackground(&manifest, root: root)
         if patchContentScripts(&manifest) { changed = true }
-        write(shim.replacingOccurrences(of: identityToken, with: identity.rawValue), to: shimFile, in: root)
+        var ownsChannel = addedPermissions(packageAt: root).contains(channelPermission)
+        if patchChannel(&manifest) {
+            changed = true
+            ownsChannel = true
+        }
+        if ownsChannel { write("{\"addedPermissions\":[\"\(channelPermission)\"]}", to: stateFile, in: root) }
+        let text = shim.replacingOccurrences(of: identityToken, with: identity.rawValue)
+            .replacingOccurrences(of: channelToken, with: ownsChannel ? "true" : "false")
+        write(text, to: shimFile, in: root)
         return changed
+    }
+
+    /// What Nook added to the package at `root`: the channel permission, or nothing. It stays out
+    /// of the consent sheet, so no other name is ever taken from the record, whoever wrote it.
+    static func addedPermissions(packageAt root: URL) -> Set<String> {
+        guard let data = try? Data(contentsOf: root.appendingPathComponent(stateFile)),
+              let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return [] }
+        return Set(state["addedPermissions"] as? [String] ?? []).intersection([channelPermission])
+    }
+
+    /// A package that was just staged holds nothing of Nook's. A file under one of Nook's names
+    /// is the package's own, and is removed before anything reads it.
+    static func disown(packageAt root: URL) {
+        for name in [stateFile, shimFile] {
+            if let url = location(of: name, in: root) { try? FileManager.default.removeItem(at: url) }
+        }
     }
 
     /// A store build's manifest names itself `__MSG_extName__`, so the short name and the
@@ -73,6 +106,19 @@ enum ExtensionCompatPatcher {
         }
         if changed { manifest["background"] = background }
         return changed
+    }
+
+    // MARK: - Channel
+
+    /// Adds the channel permission when the manifest declares an API the bridge answers and
+    /// does not already require native messaging itself.
+    private static func patchChannel(_ manifest: inout [String: Any]) -> Bool {
+        var permissions = manifest["permissions"] as? [Any] ?? []
+        let declared = Set(permissions.compactMap { $0 as? String })
+        guard !declared.isDisjoint(with: bridgedPermissions), !declared.contains(channelPermission) else { return false }
+        permissions.append(channelPermission)
+        manifest["permissions"] = permissions
+        return true
     }
 
     // MARK: - Content scripts
@@ -128,9 +174,8 @@ enum ExtensionCompatPatcher {
         })
     }
 
-    /// `html` with the shim as the first script its head runs, or nil to leave the file alone:
-    /// the tag is already there, or the file has no document tags and the manifest does not
-    /// name it. Such a file is a fragment the extension inserts into one of its pages.
+    /// `html` with the shim as the first script its head runs. Nil leaves the file alone: it has
+    /// the tag already, or it is a fragment, with no document tags and no mention in the manifest.
     static func pageWithShim(_ html: String, named: Bool) -> String? {
         guard !html.contains(pageTag) else { return nil }
         // Ahead of the doctype the tag would put the page in quirks mode, so that is the last resort.

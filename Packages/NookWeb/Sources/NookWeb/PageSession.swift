@@ -44,6 +44,9 @@ public final class PageSession: NSObject, Identifiable {
     @ObservationIgnored public internal(set) weak var detachedWindow: BrowserWindowState?
     /// Runs when the page calls `window.close()`, so Peek or the mini window can close.
     @ObservationIgnored public var onClose: (() -> Void)?
+    /// Asked about each main-frame address before it loads. True ends the navigation there:
+    /// an extension's sign-in flow stops at its redirect address, which is never loaded.
+    @ObservationIgnored public var navigationInterceptor: ((URL) -> Bool)?
     public var isDetached: Bool { detachedProfile != nil }
 
     // MARK: - Page State

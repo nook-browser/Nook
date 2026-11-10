@@ -315,6 +315,12 @@ extension PageSession: WKNavigationDelegate {
             decisionHandler(.cancel)
             return
         }
+        // The main frame, or no frame yet: a provider may finish in a window it opens.
+        if navigationAction.targetFrame?.isMainFrame != false, let url = navigationAction.request.url,
+           navigationInterceptor?(url) == true {
+            decisionHandler(.cancel)
+            return
+        }
         if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
            !WKWebView.handlesURLScheme(scheme), scheme != "webkit-extension", scheme != "safari-web-extension"
         {
