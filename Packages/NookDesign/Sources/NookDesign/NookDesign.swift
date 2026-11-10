@@ -192,6 +192,9 @@ public enum NookDesign {
         public static let standardDuration: TimeInterval = 0.22          // `standard`, for AppKit animations
         public static let standard = Animation.smooth(duration: standardDuration)    // selection, reveal, fold
         public static let settle = Animation.smooth(duration: 0.6)       // the separator wave rising and flattening
+        public static let pulseDuration: TimeInterval = 0.5              // one fade of `nookPulse`, down or back up
+        public static let pulse = Animation.easeInOut(duration: pulseDuration).repeatForever(autoreverses: true)
+        public static let pulseDim: Double = 0.4                          // opacity at the bottom of a pulse
         public static let wavePeriod: TimeInterval = 1.6                 // seconds for the wave to travel one cycle
         public static let flight = Animation.easeIn(duration: 0.6)       // a download flying from the page to its button
         public static let spring = Animation.snappy(duration: 0.3)      // palette, dialog, toast, drag reorder, gesture-tracked motion
@@ -233,9 +236,9 @@ public enum NookDesign {
         public static let incognitoAccent = Color(hex: "#8E8E93")
         /// The Agent space's fixed identity, amber to magenta: its chrome, switcher icon, and the
         /// frame around its pages. No space accent comes close, so it never reads as a user space.
+        public static let agentColors = [Color(hex: "#FFB000"), Color(hex: "#FF5A1F"), Color(hex: "#E5177E")]
         public static let agentGradient = LinearGradient(
-            colors: [Color(hex: "#FFB000"), Color(hex: "#FF5A1F"), Color(hex: "#E5177E")],
-            startPoint: .topLeading, endPoint: .bottomTrailing)
+            colors: agentColors, startPoint: .topLeading, endPoint: .bottomTrailing)
         public static let agentChromeOpacity: Double = 0.45   // over the sidebar's own background
         public static let agentIconInactiveOpacity: Double = 0.4  // switcher icon while another space is open
         /// Onboarding's fixed backdrop: the app icon's forest green as a soft mesh, lightest at the

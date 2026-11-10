@@ -493,7 +493,7 @@ private struct AgentSpaceRow: View {
                     .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                     .foregroundStyle(NookDesign.Surface.agentGradient)
                     .frame(width: NookDesign.Size.favicon)
-                    .symbolEffect(.pulse, isActive: busy)
+                    .nookPulse(while: busy)
                 Text("Agent · \(tabCount) \(tabCount == 1 ? "tab" : "tabs")")
                     .font(NookDesign.Font.body)
                 Spacer(minLength: 0)
