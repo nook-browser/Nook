@@ -157,7 +157,7 @@ struct OnboardingView: View {
 
     private func finishExtensions(_ chosen: [ExtensionOffer]) {
         guard currentStage == 2 else { return }
-        Task { await extensionManager.install(chosen) }
+        extensionManager.install(chosen)
         withAnimation(.easeInOut(duration: 0.25)) {
             currentStage = 3
         }

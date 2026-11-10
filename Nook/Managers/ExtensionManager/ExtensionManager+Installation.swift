@@ -59,22 +59,16 @@ extension ExtensionManager {
         }
         candidates.append("en")
 
-        // Find matching locale directory
-        var localeDir: URL?
-        for candidate in candidates {
-            if let match = items.first(where: { $0.lastPathComponent.caseInsensitiveCompare(candidate) == .orderedSame }) {
-                localeDir = match
-                break
-            }
-        }
-
-        guard let localeDir, let data = try? Data(contentsOf: localeDir.appendingPathComponent("messages.json")),
-              let messages = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-
         let key = String(value.dropFirst(6).dropLast(2))
-        let entry = messages.first(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame })?.value
-        if let dict = entry as? [String: Any], let text = dict["message"] as? String {
-            return text
+        for candidate in candidates {
+            guard let localeDir = items.first(where: { $0.lastPathComponent.caseInsensitiveCompare(candidate) == .orderedSame }),
+                  let data = try? Data(contentsOf: localeDir.appendingPathComponent("messages.json")),
+                  let messages = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+            let entry = messages.first(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame })?.value
+            if let text = (entry as? [String: Any])?["message"] as? String {
+                return text
+            }
         }
         return nil
     }
@@ -292,7 +286,7 @@ extension ExtensionManager {
         let takesOver = existing.map { previous in
             switch (previous.source, source) {
             case (.store, .store), (.file, _): false
-            case let (.safari(oldApp), .safari(newApp)): oldApp != newApp
+            case let (.safari(oldApp?), .safari(newApp?)): oldApp != newApp
             default: true
             }
         } ?? false
@@ -316,61 +310,59 @@ extension ExtensionManager {
             }
         }
 
-        // STEP 4: Swap files into place. Unload the running version first.
-        if let running = extensionContexts.removeValue(forKey: extensionId) {
-            if running.isLoaded { try? extensionController?.unload(running) }
-        }
+        // STEP 4: Swap files into place and load them from there, so resource URLs resolve to real
+        // files. The previous version's files and context come back if anything fails.
         let finalDir = extensionsDir.appendingPathComponent(extensionId)
-        if fm.fileExists(atPath: finalDir.path) {
-            _ = try fm.replaceItemAt(finalDir, withItemAt: tempDir)
-        } else {
+        let backupDir = extensionsDir.appendingPathComponent("backup_\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: backupDir) }
+        let running = extensionContexts.removeValue(forKey: extensionId)
+        let wasRunning = running?.isLoaded == true
+        if let running, wasRunning { try? extensionController?.unload(running) }
+        let entity = existing ?? ExtensionEntity(
+            id: extensionId,
+            name: name,
+            version: version,
+            manifestVersion: manifest["manifest_version"] as? Int ?? 3,
+            packagePath: finalDir.path
+        )
+        var placedNewFiles = false
+        do {
+            if fm.fileExists(atPath: finalDir.path) {
+                try fm.moveItem(at: finalDir, to: backupDir)
+            }
             try fm.moveItem(at: tempDir, to: finalDir)
+            placedNewFiles = true
+            if entity.isEnabled {
+                let webExtension = try await WKWebExtension(resourceBaseURL: finalDir)
+                try registerContext(for: entity, webExtension: webExtension, restoringGrants: !takesOver)
+            }
+        } catch {
+            extensionContexts[extensionId] = running
+            if placedNewFiles { try? fm.removeItem(at: finalDir) }
+            if fm.fileExists(atPath: backupDir.path) { try? fm.moveItem(at: backupDir, to: finalDir) }
+            if let running, wasRunning { try? extensionController?.load(running) }
+            throw error
         }
 
         // STEP 5: Persist. Updates keep the entity, so enabled state and optional grants survive.
-        let entity: ExtensionEntity
-        if let existing {
-            entity = existing
-            entity.name = name
-            entity.version = version
-            entity.manifestVersion = manifest["manifest_version"] as? Int ?? 3
-            entity.extensionDescription = staged.displayDescription ?? ""
-            entity.lastUpdateDate = Date()
-            entity.packagePath = finalDir.path
-            entity.iconPath = Self.findExtensionIcon(in: finalDir, manifest: manifest)
-            if takesOver {
-                entity.grantedOptionalPermissions = nil
-                entity.grantedOptionalMatchPatterns = nil
-            }
-        } else {
-            entity = ExtensionEntity(
-                id: extensionId,
-                name: name,
-                version: version,
-                manifestVersion: manifest["manifest_version"] as? Int ?? 3,
-                extensionDescription: staged.displayDescription ?? "",
-                isEnabled: true,
-                packagePath: finalDir.path,
-                iconPath: Self.findExtensionIcon(in: finalDir, manifest: manifest)
-            )
-            context.insert(entity)
-        }
+        entity.name = name
+        entity.version = version
+        entity.manifestVersion = manifest["manifest_version"] as? Int ?? 3
+        entity.extensionDescription = staged.displayDescription ?? ""
+        entity.packagePath = finalDir.path
+        entity.iconPath = Self.findExtensionIcon(in: finalDir, manifest: manifest)
         entity.source = source
-        try context.save()
-
-        // STEP 6: Load from the final location so resource URLs resolve to real files.
-        if entity.isEnabled {
-            do {
-                let webExtension = try await WKWebExtension(resourceBaseURL: finalDir)
-                try registerContext(for: entity, webExtension: webExtension)
-            } catch {
-                guard existing != nil else {
-                    uninstallExtension(extensionId)
-                    throw error
-                }
-                Self.logger.error("Failed to load '\(name, privacy: .public)' v\(version, privacy: .public) after updating: \(error.localizedDescription, privacy: .public)")
-            }
+        if existing == nil {
+            context.insert(entity)
+        } else {
+            entity.lastUpdateDate = Date()
         }
+        if takesOver {
+            entity.grantedOptionalPermissions = nil
+            entity.grantedOptionalMatchPatterns = nil
+            entity.allowsPrivateBrowsing = false
+        }
+        try context.save()
 
         for oldID in Set([legacyCopy?.id, replaced?.id].compactMap { $0 }) {
             Self.logger.info("Replacing \(oldID, privacy: .public) with \(extensionId, privacy: .public)")
@@ -384,7 +376,12 @@ extension ExtensionManager {
     /// Create a context for an installed extension, grant its manifest permissions, and load it.
     /// The externally_connectable bridge ships as the extension's own content scripts (see
     /// `patchManifestForWebKit`), so loading and unloading the context is all it needs.
-    func registerContext(for entity: ExtensionEntity, webExtension: WKWebExtension) throws {
+    /// - Parameter restoringGrants: applies the optional grants and private-page access saved on `entity`.
+    func registerContext(
+        for entity: ExtensionEntity,
+        webExtension: WKWebExtension,
+        restoringGrants: Bool = true
+    ) throws {
         let extensionContext = WKWebExtensionContext(for: webExtension)
         configureContextIdentity(extensionContext, extensionId: entity.id)
 
@@ -397,18 +394,19 @@ extension ExtensionManager {
             extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
         }
 
-        // Restore optional grants the user approved at runtime.
-        let savedPerms = Set(entity.grantedOptionalPermissions ?? [])
-        for p in webExtension.optionalPermissions where savedPerms.contains(String(describing: p)) {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
-        }
-        let savedMatches = Set(entity.grantedOptionalMatchPatterns ?? [])
-        for m in optionalMatches where savedMatches.contains(String(describing: m)) {
-            extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
+        if restoringGrants {
+            let savedPerms = Set(entity.grantedOptionalPermissions ?? [])
+            for p in webExtension.optionalPermissions where savedPerms.contains(String(describing: p)) {
+                extensionContext.setPermissionStatus(.grantedExplicitly, for: p)
+            }
+            let savedMatches = Set(entity.grantedOptionalMatchPatterns ?? [])
+            for m in optionalMatches where savedMatches.contains(String(describing: m)) {
+                extensionContext.setPermissionStatus(.grantedExplicitly, for: m)
+            }
+            extensionContext.hasAccessToPrivateData = entity.allowsPrivateBrowsing
         }
 
         extensionContext.isInspectable = true
-        extensionContext.hasAccessToPrivateData = entity.allowsPrivateBrowsing
         extensionContexts[entity.id] = extensionContext
 
         try extensionController?.load(extensionContext)
@@ -796,15 +794,21 @@ extension ExtensionManager {
 
                             // Get bundle identifier from Info.plist
                             let bundleId = Bundle(url: pluginURL)?.bundleIdentifier ?? pluginURL.lastPathComponent
-                            guard !results.contains(where: { $0.id == bundleId }) else { continue }
 
-                            results.append(SafariExtensionInfo(
+                            let info = SafariExtensionInfo(
                                 id: bundleId,
                                 name: extName,
                                 version: manifest?["version"] as? String ?? "1.0",
                                 appPath: appURL,
                                 appexPath: pluginURL
-                            ))
+                            )
+                            if let index = results.firstIndex(where: { $0.id == bundleId }) {
+                                if ExtensionVersion.isNewer(info.version, than: results[index].version) {
+                                    results[index] = info
+                                }
+                            } else {
+                                results.append(info)
+                            }
                         }
                     }
                 }
@@ -878,10 +882,14 @@ extension ExtensionManager {
 
     /// Installs extensions the person chose from a list, one at a time without asking again, then
     /// lists any that failed in one alert.
-    func install(_ offers: [ExtensionOffer]) async {
+    func install(_ offers: [ExtensionOffer]) {
+        listInstallProgress = offers.isEmpty ? nil : ListInstallProgress(total: offers.count)
+        Task { await installInOrder(offers) }
+    }
+
+    private func installInOrder(_ offers: [ExtensionOffer]) async {
         let chosen: InstallConsentPresenter = { _ in true }
         var failures: [String] = []
-        listInstallProgress = offers.isEmpty ? nil : ListInstallProgress(total: offers.count)
         for offer in offers {
             let result: Result<InstalledExtension, ExtensionError> = await withCheckedContinuation { continuation in
                 let finish = { (result: Result<InstalledExtension, ExtensionError>) in continuation.resume(returning: result) }

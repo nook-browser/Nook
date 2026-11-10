@@ -81,7 +81,7 @@ struct BrowserImportDialog: DialogPresentable {
             manager.dialogManager.showDialog(
                 ExtensionImportDialog(choices: choices) { chosen in
                     manager.closeDialog()
-                    Task { await manager.extensionManager?.install(chosen) }
+                    manager.extensionManager?.install(chosen)
                 },
                 closesOnBackdropClick: false
             )
