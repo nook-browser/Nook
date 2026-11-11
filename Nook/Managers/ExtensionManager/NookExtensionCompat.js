@@ -14,8 +14,35 @@
   var BRIDGE = 'com.gstudios.nook.compat';
   // True when nativeMessaging is in the manifest only because Nook put it there for this channel.
   var OWNS_CHANNEL = '__NOOK_OWNS_CHANNEL__' === 'true';
+  // True when Nook put this shim in the extension's background too.
+  var BACKGROUND_SHIM = '__NOOK_BACKGROUND_SHIM__' === 'true';
+  // Package paths of the scripts that hold nothing, which Nook lists when it patches the package.
+  var EMPTY_SCRIPTS = (function (list) { try { return JSON.parse(list); } catch (e) { return []; } })('__NOOK_EMPTY_SCRIPTS__');
 
   function message(e) { return String((e && e.message) || e); }
+  // A worker, or an MV2 background page.
+  function inBackground(root) {
+    if (g.clients && g.registration) return true;
+    try { return root.extension.getBackgroundPage() === g.window; } catch (e) { return false; }
+  }
+
+  // Replaces event.addListener so each listener runs through `through(listener, arguments)`.
+  function rewire(event, through) {
+    if (!event || typeof event.addListener !== 'function') return;
+    keep.push(event);
+    var add = event.addListener, remove = event.removeListener, pairs = [];
+    function index(f) { for (var i = 0; i < pairs.length; i++) if (pairs[i][0] === f) return i; return -1; }
+    event.addListener = function (f) {
+      if (typeof f !== 'function' || index(f) >= 0) return undefined;
+      var wrapped = function () { return through.call(this, f, Array.prototype.slice.call(arguments)); };
+      pairs.push([f, wrapped]);
+      return add.apply(event, [wrapped].concat(Array.prototype.slice.call(arguments, 1)));
+    };
+    event.removeListener = function (f) { var i = index(f); return i < 0 ? undefined : remove.call(event, pairs.splice(i, 1)[0][1]); };
+    event.hasListener = function (f) { return index(f) >= 0; };
+    // The shim's own listeners are not the extension's.
+    event.hasListeners = function () { return pairs.some(function (p) { return !p[0].nookLink; }); };
+  }
 
   // An event nothing in WebKit ever fires. Listeners register and stay silent.
   function inertEvent() {
@@ -90,9 +117,8 @@
     var runtime = root.runtime;
     if (!inExtensionOrigin || typeof runtime.sendNativeMessage !== 'function') return;
     keep.push(runtime);
-    // A worker, or an MV2 background page: WebKit may stop it, and Nook then remembers what it listened for.
-    background = !!(g.clients && g.registration);
-    try { background = background || root.extension.getBackgroundPage() === g.window; } catch (e) {}
+    // WebKit may stop a background, and Nook then remembers what it listened for.
+    background = inBackground(root);
     var sendNative = runtime.sendNativeMessage, connectNative = runtime.connectNative;
     send = function (request) { return sendNative.call(runtime, BRIDGE, request); };
     fail = function (text, callback) { sendNative.call(runtime, BRIDGE, { api: 'nook', method: 'fail', args: [text] }, callback); };
@@ -210,6 +236,67 @@
       return setTimeout(function () { callback({ didTimeout: false, timeRemaining: function () { return 10; } }); }, 1);
     };
     g.cancelIdleCallback = function (id) { clearTimeout(id); };
+  }
+
+  // WebKit runs the waiting microtasks when an imported script returns, and Chrome does not. A worker that counts on
+  // Chrome's order around the import of an empty file (Tampermonkey's startup test) keeps it: nothing is imported.
+  function imports() {
+    var original = g.importScripts;
+    if (!inExtensionOrigin || typeof original !== 'function' || !Array.isArray(EMPTY_SCRIPTS) || !EMPTY_SCRIPTS.length) return;
+    g.importScripts = function () {
+      var rest = Array.prototype.filter.call(arguments, function (url) {
+        try {
+          // `origin` is of no use here: a URL of a scheme the parser does not know has none.
+          var u = new URL(url, g.location.href), own = u.protocol === g.location.protocol && u.host === g.location.host;
+          return !own || EMPTY_SCRIPTS.indexOf(decodeURIComponent(u.pathname).slice(1)) < 0;
+        } catch (e) { return true; }
+      });
+      return rest.length ? original.apply(g, rest) : undefined;
+    };
+  }
+
+  // Chrome holds a content script's message until the worker has started. WebKit answers it at once with nothing while
+  // the worker has no listener yet, as on its first run after an install or an update. So a content script's first
+  // message waits until the worker's shim answers a question no listener of the extension's ever sees.
+  var PING = '__nookCompatPing', gated = false;
+  function startup(root) {
+    var runtime = root.runtime;
+    if (gated || !runtime.onMessage || typeof runtime.onMessage.addListener !== 'function') return;
+    gated = true;
+    keep.push(runtime);
+    function asks(m) { return !!m && typeof m === 'object' && m[PING] === 1; }
+    if (inExtensionOrigin) {
+      if (inBackground(root)) runtime.onMessage.addListener(function (m, sender, reply) { if (asks(m)) reply(true); });
+      rewire(runtime.onMessage, function (f, args) { return asks(args[0]) ? undefined : f.apply(this, args); });
+      return;
+    }
+    // Without the shim in the background nobody would answer, and the extension's own listeners would be asked.
+    var sendMessage = runtime.sendMessage, up = false, waiting = null;
+    if (!BACKGROUND_SHIM || typeof sendMessage !== 'function') return;
+    function started() {
+      if (waiting) return waiting;
+      // By the clock: a hidden page's timers run late.
+      var question = {}, pause = 25, began = Date.now();
+      question[PING] = 1;
+      return waiting = new Promise(function (done) {
+        function go() { up = true; done(); }
+        (function ask() {
+          var asked;
+          try { asked = sendMessage.call(runtime, question); } catch (e) { return go(); }
+          Promise.resolve(asked).then(function (yes) {
+            // ponytail: gives up after about 4 s, and a worker slower than that is messaged as it was before.
+            if (yes === true || Date.now() - began >= 4000) return go();
+            setTimeout(ask, pause);
+            pause = Math.min(pause * 2, 400);
+          }, go);
+        })();
+      });
+    }
+    runtime.sendMessage = function () {
+      if (up) return sendMessage.apply(runtime, arguments);
+      var args = arguments, sent = started().then(function () { return sendMessage.apply(runtime, args); });
+      return typeof args[args.length - 1] === 'function' ? undefined : sent;
+    };
   }
 
   // WebKit's address patterns have no port and match every port of a host. Chrome's may name one.
@@ -494,21 +581,6 @@
   // no window. The extension must not see that tab: its tab events are dropped, and its messages carry no sender.tab.
   function windowlessTabs(root) {
     function windowless(info) { return !!info && info.windowId === -1; }
-    // Replaces event.addListener so each listener runs through `through(listener, arguments)`.
-    function rewire(event, through) {
-      if (!event || typeof event.addListener !== 'function') return;
-      keep.push(event);
-      var add = event.addListener, remove = event.removeListener, pairs = [];
-      function index(f) { for (var i = 0; i < pairs.length; i++) if (pairs[i][0] === f) return i; return -1; }
-      event.addListener = function (f) {
-        if (typeof f !== 'function' || index(f) >= 0) return undefined;
-        var wrapped = function () { return through.call(this, f, Array.prototype.slice.call(arguments)); };
-        pairs.push([f, wrapped]);
-        return add.apply(event, [wrapped].concat(Array.prototype.slice.call(arguments, 1)));
-      };
-      event.removeListener = function (f) { var i = index(f); return i < 0 ? undefined : remove.call(event, pairs.splice(i, 1)[0][1]); };
-      event.hasListener = function (f) { return index(f) >= 0; };
-    }
     function dropping(position) {
       return function (f, args) { return windowless(args[position]) ? undefined : f.apply(this, args); };
     }
@@ -528,7 +600,7 @@
     rewire(root.runtime.onConnect, function (f, args) {
       var port = args[0];
       // The link to the worker is the shim's own port.
-      if (port && port.name === LINK) return f.nookLink ? f.apply(this, args) : undefined;
+      if (port && (port.name === LINK || port.name === PAGE_LINK)) return f.nookLink ? f.apply(this, args) : undefined;
       if (f.nookLink) return undefined;
       try { if (port && windowless(port.sender && port.sender.tab)) delete port.sender.tab; } catch (e) {}
       return f.apply(this, args);
@@ -536,8 +608,9 @@
   }
 
   // WebKit connects no extension page to the extension's service worker: clients.matchAll() is empty in the worker and
-  // ServiceWorker.postMessage from a page arrives nowhere. For the offscreen document both run over one runtime port.
-  var LINK = 'nook.compat.worker';
+  // ServiceWorker.postMessage from a page arrives nowhere. Both run over one runtime port: the offscreen document's
+  // from its start, as the worker's client, and any other page's from the first message it posts.
+  var LINK = 'nook.compat.worker', PAGE_LINK = LINK + '.page';
   // ponytail: messages cross as JSON, so an ArrayBuffer or a Blob does not survive, and a port sent through a port is dropped.
   function link(port, side, deliver) {
     var ports = {}, made = 0;
@@ -571,6 +644,8 @@
         e.waitUntil = function () {};
         g.dispatchEvent(e);
       });
+      // Only the offscreen document is listed as a client. Another page is answered through the message's source.
+      if (port.name !== LINK) return;
       pages.push(client);
       port.onDisconnect.addListener(function () { pages = pages.filter(function (c) { return c !== client; }); });
       waiting.splice(0).forEach(function (f) { f(); });
@@ -596,15 +671,15 @@
     };
   }
 
-  // In the offscreen document, which Nook marks before this runs: what it posts to the worker goes over the link.
+  // In an extension page: what it posts to the worker goes over the link. Nook marks the offscreen document before this runs.
   function workerLink(root) {
     var sw = g.navigator && g.navigator.serviceWorker, proto = g.ServiceWorker && g.ServiceWorker.prototype;
-    if (!g.__nookOffscreen || !sw || !proto || keep.indexOf(sw) >= 0) return;
+    if (inBackground(root) || !sw || !proto || keep.indexOf(sw) >= 0) return;
     keep.push(sw);
-    var post = null, active = null;
+    var offscreen = !!g.__nookOffscreen, post = null, active = null;
     function open() {
       if (post) return post;
-      var port = root.runtime.connect({ name: LINK });
+      var port = root.runtime.connect({ name: offscreen ? LINK : PAGE_LINK });
       post = link(port, 'p', function (data, ports) {
         var e = new MessageEvent('message', { data: data, ports: ports });
         Object.defineProperty(e, 'source', { value: active });
@@ -613,14 +688,16 @@
       port.onDisconnect.addListener(function () { post = null; });
       return post;
     }
-    proto.postMessage = function (data, transfer) { open()(data, transfer); };
+    // A page whose extension has been unloaded posts to nobody, as before.
+    proto.postMessage = function (data, transfer) { try { open()(data, transfer); } catch (e) {} };
+    try { sw.getRegistration().then(function (r) { active = (r && r.active) || null; }, function () {}); } catch (e) {}
+    if (!offscreen) return;
     // Nook asks for the link again when a restarted worker looks for its document.
     g.addEventListener('nook-relink', function () { try { open(); } catch (e) {} });
-    // WebKit leaves `controller` null in an extension page.
+    // WebKit leaves `controller` null in an extension page. Chrome sets it for the offscreen document.
     var controller = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(sw), 'controller');
     if (controller && controller.get) {
       Object.defineProperty(sw, 'controller', { get: function () { return controller.get.call(sw) || active; }, configurable: true });
-      sw.getRegistration().then(function (r) { active = (r && r.active) || null; }, function () {});
     }
     try { open(); } catch (e) {}
   }
@@ -693,9 +770,9 @@
   }
 
   // Each part stands alone: a failure in one must never stop the extension's own code from loading.
-  [identity, globals].forEach(function (part) { try { part(); } catch (e) {} });
+  [identity, globals, imports].forEach(function (part) { try { part(); } catch (e) {} });
   var roots = g.browser && g.browser !== g.chrome ? [g.chrome, g.browser] : [g.chrome];
   roots.forEach(function (root) {
-    [channel, answers, ownChannel, surface].forEach(function (part) { try { part(root); } catch (e) {} });
+    [channel, startup, answers, ownChannel, surface].forEach(function (part) { try { part(root); } catch (e) {} });
   });
 })();
