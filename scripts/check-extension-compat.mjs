@@ -64,12 +64,24 @@ const webkit = `
   }
   chrome.runtime.onMessage = liveEvent();
   chrome.runtime.onConnect = liveEvent();
+  // WebKit's patterns have no port: one that names a port is refused, as one with no scheme is.
+  const refused = p => typeof p !== 'string' || !p.includes('://') || p.split('://')[1].split('/')[0].includes(':');
   if (KIND === 'extension') Object.assign(chrome, {
-    scripting: {}, webNavigation: {}, action: {},
-    tabs: { onCreated: liveEvent(), onUpdated: liveEvent(), onRemoved: liveEvent(), query() { return Promise.resolve(globalThis.TABS || []); } },
+    scripting: { registerContentScripts(scripts) {
+      for (const s of scripts) for (const m of s.matches || []) if (refused(m)) return Promise.reject(invalid('scripting.registerContentScripts', "Script with ID '" + s.id + "' has an invalid match pattern '" + m + "'."));
+      this.registered = scripts; return Promise.resolve();
+    } },
+    webNavigation: {}, action: {},
+    tabs: { onCreated: liveEvent(), onUpdated: liveEvent(), onRemoved: liveEvent(), query(query) {
+      for (const u of [].concat((query && query.url) || [])) if (refused(u)) throw invalid('tabs.query', "The 'url' value is invalid, because '" + u + "' is not a valid pattern.");
+      const tabs = Promise.resolve(globalThis.TABS || []), cb = arguments[arguments.length - 1];
+      return typeof cb === 'function' ? void tabs.then(cb) : tabs;
+    } },
     permissions: {
       contains(query) {
         for (const p of query.permissions || []) if (p !== 'tabs' && p !== 'nativeMessaging') throw invalid('permissions.contains', "The 'permissions' value is invalid, because '" + p + "' is not a valid permission.");
+        for (const o of query.origins || []) if (refused(o)) throw invalid('permissions.contains', "The 'origins' value is invalid, because '" + o + "' is not a valid pattern.");
+        this.asked = query.origins;
         return Promise.resolve(true);
       },
       getAll() { return Promise.resolve({ permissions: ['tabs', 'nativeMessaging'], origins: [] }); },
@@ -111,6 +123,28 @@ assert.equal(run('typeof requestIdleCallback'), 'function');
 assert.equal(await run(`chrome.permissions.contains({ permissions: ['bookmarks'] })`), false);
 assert.equal(await run(`chrome.permissions.contains({ permissions: ['tabs'] })`), true);
 assert.equal(await run(`new Promise(done => chrome.permissions.contains({ permissions: ['tabs', 'offscreen'] }, done))`), false);
+
+// An address pattern with a port, which Chrome takes and WebKit refuses, is asked again without it.
+assert.equal(await run(`chrome.permissions.contains({ origins: ['http://localhost:8080/*', 'https://example.com/*', '*://*.example.org:*/*'] })`), true);
+assert.equal(run(`JSON.stringify(chrome.permissions.asked)`), '["http://localhost/*","https://example.com/*","*://*.example.org/*"]');
+// Both of WebKit's refusals in one call, each in its turn.
+assert.equal(await run(`chrome.permissions.contains({ permissions: ['bookmarks'], origins: ['http://localhost:*/*'] })`), false);
+// A pattern that is wrong for another reason is still an error.
+await assert.rejects(async () => run(`chrome.permissions.contains({ origins: ['nonsense'] })`), /not a valid pattern/);
+// A tab search keeps to the port that was asked for, since WebKit's pattern matches them all.
+run(`globalThis.TABS = [{ id: 1, url: 'http://localhost:8080/a' }, { id: 2, url: 'http://localhost:3000/b' }, { id: 3, url: 'http://localhost/c' }]`);
+const found = code => run(`(${code}).then(tabs => tabs.map(t => t.id).join())`);
+assert.equal(await found(`chrome.tabs.query({ url: 'http://localhost:8080/*' })`), '1');
+assert.equal(await found(`chrome.tabs.query({ url: ['http://localhost:80/*', 'http://localhost:3000/*'] })`), '2,3');
+assert.equal(await found(`chrome.tabs.query({ url: 'http://localhost:*/*' })`), '1,2,3');
+assert.equal(await found(`chrome.tabs.query({ url: 'http://localhost/*' })`), '1,2,3');
+assert.equal(await found(`new Promise(done => chrome.tabs.query({ url: 'http://localhost:3000/*' }, done))`), '2');
+assert.throws(() => run(`chrome.tabs.query({ url: 'nonsense' })`), /not a valid pattern/);
+run(`globalThis.TABS = undefined`);
+// A content script registered for one port is registered for the host.
+await run(`chrome.scripting.registerContentScripts([{ id: 'a', matches: ['http://localhost:3000/*', 'https://example.com/*'], js: ['a.js'] }])`);
+assert.equal(run(`JSON.stringify(chrome.scripting.registered[0].matches)`), '["http://localhost/*","https://example.com/*"]');
+await assert.rejects(async () => run(`chrome.scripting.registerContentScripts([{ id: 'b', matches: ['nonsense'], js: ['a.js'] }])`), /invalid match pattern/);
 
 assert.equal(run(`chrome.i18n.getMessage('')`), '');
 assert.equal(run(`chrome.i18n.getMessage('title')`), 'text:title');

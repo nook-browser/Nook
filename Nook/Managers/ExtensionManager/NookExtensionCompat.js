@@ -212,13 +212,55 @@
     g.cancelIdleCallback = function (id) { clearTimeout(id); };
   }
 
+  // WebKit's address patterns have no port and match every port of a host. Chrome's may name one.
+  var PORT = /^([a-z*][a-z0-9+.*-]*:\/\/[^\/:\[]+):(\d+|\*)(?=\/|$)/i;
+  function portless(value) {
+    if (Array.isArray(value)) return value.map(portless);
+    return typeof value === 'string' ? value.replace(PORT, '$1') : value;
+  }
+  function badPattern(e) { return /not a valid pattern|invalid match pattern/.test(message(e)); }
+
   // Calls WebKit throws on and Chrome and Firefox answer.
   function answers(root) {
     // A permission name WebKit does not know is a permission the extension does not have.
     ['contains', 'request', 'remove'].forEach(function (name) {
       recoverable(root.permissions, name, function (args, e) {
+        var origins = args[0] && args[0].origins;
+        if (badPattern(e) && String(portless(origins)) !== String(origins)) {
+          return root.permissions[name].apply(root.permissions, [Object.assign({}, args[0], { origins: portless(origins) })].concat(args.slice(1)));
+        }
         if (!/is not a valid permission/.test(message(e))) throw e;
         return answer(args, false);
+      });
+    });
+    // A tab search by address keeps to the port that was asked for.
+    recoverable(root.tabs, 'query', function (args, e, call) {
+      var query = args[0], url = query && query.url, bare = portless(url);
+      if (!badPattern(e) || String(bare) === String(url)) throw e;
+      var asked = [].concat(url).map(function (p) { return (PORT.exec(p) || [])[2] || '*'; });
+      function kept(tabs) {
+        if (!Array.isArray(tabs) || asked.indexOf('*') >= 0) return tabs;
+        return tabs.filter(function (t) {
+          try { var u = new URL(t.url); return asked.indexOf(u.port || (u.protocol === 'https:' ? '443' : '80')) >= 0; } catch (x) { return true; }
+        });
+      }
+      var rest = args.slice(1), cb = typeof rest[rest.length - 1] === 'function' ? rest.pop() : null;
+      var next = [Object.assign({}, query, { url: bare })];
+      return cb ? call(next.concat([function (tabs) { cb(kept(tabs)); }])) : call(next).then(kept);
+    });
+    // ponytail: a content script registered for one port runs on the host's other ports too. WebKit has no narrower pattern.
+    ['registerContentScripts', 'updateContentScripts'].forEach(function (name) {
+      recoverable(root.scripting, name, function (args, e, call) {
+        if (!badPattern(e) || !Array.isArray(args[0])) throw e;
+        var scripts = args[0].map(function (s) {
+          if (!s || typeof s !== 'object') return s;
+          var out = Object.assign({}, s);
+          if (s.matches) out.matches = portless(s.matches);
+          if (s.excludeMatches) out.excludeMatches = portless(s.excludeMatches);
+          return out;
+        });
+        if (JSON.stringify(scripts) === JSON.stringify(args[0])) throw e;
+        return call([scripts].concat(args.slice(1)));
       });
     });
     // An unknown or empty message name gives the empty string.
