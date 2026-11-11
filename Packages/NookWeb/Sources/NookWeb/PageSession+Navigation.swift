@@ -195,6 +195,15 @@ extension PageSession: WKNavigationDelegate {
         updateNavigationStateEnhanced(source: "didFail")
     }
 
+    // MARK: - Address Changed Without a Load
+
+    /// WebKit's own report, after it has the new address. The page script misses the Navigation
+    /// API and a pushState made from an extension's world.
+    @objc(_webView:navigation:didSameDocumentNavigation:)
+    func webView(_ webView: WKWebView, navigation: WKNavigation?, didSameDocumentNavigation type: Int) {
+        addressChangedWithoutLoad(in: webView)
+    }
+
     // MARK: - Web Process Crash Recovery
     public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         let now = Date()
