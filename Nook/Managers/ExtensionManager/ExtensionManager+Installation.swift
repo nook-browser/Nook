@@ -302,7 +302,12 @@ extension ExtensionManager {
         // STEP 4: Swap files into place. Unload the running version first.
         if let running = extensionContexts.removeValue(forKey: extensionId) {
             compatBridge.contextUnloaded(running)
-            if running.isLoaded { try? extensionController?.unload(running) }
+            if running.isLoaded {
+                try? extensionController?.unload(running)
+                // WebKit starts the new worker in the old background's process while that still stands, and the worker
+                // then has no extension API. ponytail: a fixed pause; wait on that process's exit if it proves short.
+                try? await Task.sleep(for: .milliseconds(700))
+            }
         }
         let finalDir = extensionsDir.appendingPathComponent(extensionId)
         if fm.fileExists(atPath: finalDir.path) {
