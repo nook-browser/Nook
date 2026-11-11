@@ -7,7 +7,6 @@
 //
 
 import AppKit
-import CryptoKit
 import Foundation
 import os
 import SwiftData
@@ -66,11 +65,7 @@ extension ExtensionManager {
     /// Chrome's extension ID for a manifest `key` (base64 DER public key): SHA-256 of the key,
     /// first 16 bytes as hex, with hex digits 0-f mapped to letters a-p.
     nonisolated static func chromeExtensionID(fromManifestKey key: String) -> String? {
-        guard let der = Data(base64Encoded: key.filter { !$0.isWhitespace }), !der.isEmpty else { return nil }
-        let hex = SHA256.hash(data: der).prefix(16).map { String(format: "%02x", $0) }.joined()
-        return String(hex.compactMap { digit in
-            Int(String(digit), radix: 16).map { Character(UnicodeScalar(UInt8(97 + $0))) }
-        })
+        ExtensionPackageOrigin.chromeID(fromManifestKey: key)
     }
 
     func fetchEntity(id: String) -> ExtensionEntity? {
@@ -157,11 +152,14 @@ extension ExtensionManager {
     ///     ID derived from the manifest `key`, then a random UUID.
     ///   - interactive: when false (background updates), an update that needs new permissions
     ///     is skipped instead of prompting.
+    ///   - migrating: the id of a legacy install this one takes over from, data and settings
+    ///     included. See `ExtensionManager+Migration.swift`.
     func installExtension(
         from url: URL,
         store: ExtensionStore? = nil,
         extensionId: String? = nil,
         interactive: Bool = true,
+        migrating: String? = nil,
         completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
     ) {
         guard isExtensionSupportAvailable else {
@@ -172,7 +170,7 @@ extension ExtensionManager {
         Task { @MainActor in
             do {
                 let installed = try await performInstallation(
-                    from: url, store: store, extensionId: extensionId, interactive: interactive
+                    from: url, store: store, extensionId: extensionId, interactive: interactive, migrating: migrating
                 )
                 if let index = installedExtensions.firstIndex(where: { $0.id == installed.id }) {
                     installedExtensions[index] = installed
@@ -193,7 +191,8 @@ extension ExtensionManager {
         from sourceURL: URL,
         store: ExtensionStore?,
         extensionId callerId: String?,
-        interactive: Bool
+        interactive: Bool,
+        migrating: String?
     ) async throws -> InstalledExtension {
         let fm = FileManager.default
         let extensionsDir = getExtensionsDirectory()
@@ -245,13 +244,31 @@ extension ExtensionManager {
         let name = staged.displayName ?? manifest["name"] as? String ?? "Unknown Extension"
         let version = manifest["version"] as? String ?? "1.0"
 
+        // This function suspends, and a second install of the same id would start from the same state.
+        guard installingIDs.insert(extensionId).inserted else {
+            throw ExtensionError.installationFailed("\(extensionId) is already being installed")
+        }
+        defer { installingIDs.remove(extensionId) }
+
         // STEP 2: Decide between fresh install, in-place update, and duplicate.
         let existing = fetchEntity(id: extensionId)
-        // ponytail: a copy installed before stable IDs existed (random UUID) with the same name is
-        // treated as the same extension and replaced; its storage does not carry over.
+        // A copy installed before stable IDs existed (random UUID) with the same name is treated as
+        // the same extension and replaced.
         let legacyCopy = (existing == nil && hasStableId)
-            ? installedExtensions.first { $0.name == name && UUID(uuidString: $0.id) != nil }
+            ? installedExtensions.first { copy in
+                if let migrating { return copy.id == migrating }
+                return copy.name == name && UUID(uuidString: copy.id) != nil
+            }
             : nil
+        // Whether the copy's data comes along. See `LegacyCarry`: a name alone carries nothing.
+        let carry = legacyCopy.flatMap { copy in
+            legacyCarry(of: copy, to: extensionId, in: store, from: sourceURL, manifest: manifest,
+                        migrating: migrating != nil, interactive: interactive)
+        }
+        let carriedID = carry == nil ? nil : legacyCopy?.id
+        if migrating != nil, carriedID == nil {
+            throw ExtensionError.installationFailed("Nothing to migrate to \(extensionId)")
+        }
         if let existing {
             guard existing.version != version else {
                 throw ExtensionError.installationFailed("\(name) v\(version) is already installed")
@@ -263,10 +280,12 @@ extension ExtensionManager {
 
         // STEP 3: Consent. Fresh installs always ask; updates ask only when permissions grow.
         var previous: WKWebExtension?
-        if let existing {
-            previous = extensionContexts[extensionId]?.webExtension
+        // A proven copy stands in for an earlier version. A copy the person only chose is new to the sheet.
+        let predecessor = existing ?? (carry == .proven ? carriedID.flatMap(fetchEntity(id:)) : nil)
+        if let predecessor {
+            previous = extensionContexts[predecessor.id]?.webExtension
             if previous == nil {
-                previous = try? await WKWebExtension(resourceBaseURL: URL(fileURLWithPath: existing.packagePath))
+                previous = try? await WKWebExtension(resourceBaseURL: URL(fileURLWithPath: predecessor.packagePath))
             }
         }
         // A sideloaded package gets a store install's ID by copying its manifest `key`, and as an
@@ -276,9 +295,9 @@ extension ExtensionManager {
         let consent = Self.consentItems(
             for: staged, comparedTo: replacesStoreInstall ? nil : previous,
             hiding: ExtensionCompatPatcher.addedPermissions(packageAt: tempDir),
-            previouslyHiding: existing.map { ExtensionCompatPatcher.addedPermissions(packageAt: URL(fileURLWithPath: $0.packagePath)) } ?? [],
+            previouslyHiding: predecessor.map { ExtensionCompatPatcher.addedPermissions(packageAt: URL(fileURLWithPath: $0.packagePath)) } ?? [],
             bridged: compatBridge.gatedPermissions)
-        let needsConsent = existing == nil || replacesStoreInstall
+        let needsConsent = predecessor == nil || replacesStoreInstall
             || !consent.permissions.isEmpty || !consent.hosts.isEmpty
         if needsConsent {
             guard interactive else {
@@ -288,13 +307,15 @@ extension ExtensionManager {
             guard await confirmInstallation(
                 of: staged, name: name,
                 permissions: consent.permissions, hosts: consent.hosts,
-                isUpdate: existing != nil && !replacesStoreInstall
+                isUpdate: predecessor != nil && !replacesStoreInstall
             ) else {
                 throw ExtensionError.cancelled
             }
         }
 
-        if let legacyCopy {
+        // The sheet and the loads above suspended, and the copy may have been removed meanwhile.
+        if let carriedID, fetchEntity(id: carriedID) == nil { throw ExtensionError.cancelled }
+        if carriedID == nil, let legacyCopy {
             Self.logger.info("Replacing legacy copy of '\(name, privacy: .public)' (\(legacyCopy.id, privacy: .public)) with \(extensionId, privacy: .public)")
             uninstallExtension(legacyCopy.id)
         }
@@ -314,6 +335,18 @@ extension ExtensionManager {
             _ = try fm.replaceItemAt(finalDir, withItemAt: tempDir)
         } else {
             try fm.moveItem(at: tempDir, to: finalDir)
+        }
+
+        // A carried copy hands over its storage here, between its context and the new one.
+        var returnStorage: (() async -> Void)?
+        if let carriedID {
+            Self.logger.info("Migrating '\(name, privacy: .public)' from \(carriedID, privacy: .public) to \(extensionId, privacy: .public)")
+            do {
+                returnStorage = try await takeStorage(ofLegacyCopy: carriedID, for: extensionId)
+            } catch {
+                try? fm.removeItem(at: finalDir)
+                throw error
+            }
         }
 
         // STEP 5: Persist. Updates keep the entity, so enabled state and optional grants survive.
@@ -347,12 +380,36 @@ extension ExtensionManager {
         }
         // Cleared when a sideload replaces a store build: the store vouched for that package only.
         entity.sourceStore = store?.rawValue
-        try context.save()
+        let legacy = carriedID.flatMap(fetchEntity(id:))
+        if let legacy { entity.takeSettings(from: legacy, grants: carry == .proven) }
+        do {
+            try context.save()
+        } catch {
+            guard let returnStorage else { throw error }
+            // Nothing half done: the copy keeps its record, its storage and its context.
+            context.delete(entity)
+            try? fm.removeItem(at: finalDir)
+            await returnStorage()
+            throw error
+        }
+        if let legacy, let carriedID {
+            // Its record goes second. Should that save fail, the launch prunes a record with no package.
+            let package = legacy.packagePath
+            context.delete(legacy)
+            try? context.save()
+            forget(legacyCopy: carriedID, packageAt: package, nowInstalledAs: extensionId)
+        }
 
         // STEP 6: Load from the final location so resource URLs resolve to real files.
         if entity.isEnabled {
-            let webExtension = try await WKWebExtension(resourceBaseURL: finalDir)
-            registerContext(for: entity, webExtension: webExtension)
+            do {
+                let webExtension = try await WKWebExtension(resourceBaseURL: finalDir)
+                registerContext(for: entity, webExtension: webExtension)
+            } catch {
+                // A carried copy is installed under its new id by now, and loads at the next launch.
+                guard carriedID != nil else { throw error }
+                Self.logger.error("'\(name, privacy: .public)' did not load after its migration: \(error.localizedDescription, privacy: .public)")
+            }
         }
 
         Self.logger.info("\(existing == nil ? "Installed" : "Updated", privacy: .public) '\(name, privacy: .public)' v\(version, privacy: .public) as \(extensionId, privacy: .public)")
@@ -972,6 +1029,7 @@ extension ExtensionManager {
         extensionId: String,
         store: ExtensionStore = .chrome,
         interactive: Bool = true,
+        migrating: String? = nil,
         completionHandler: @escaping (Result<InstalledExtension, ExtensionError>) -> Void
     ) {
         WebStoreDownloader.downloadExtension(extensionId: extensionId, store: store) { [weak self] result in
@@ -979,7 +1037,7 @@ extension ExtensionManager {
             switch result {
             case .success(let download):
                 self.installExtension(
-                    from: download.file, store: store, extensionId: download.id, interactive: interactive
+                    from: download.file, store: store, extensionId: download.id, interactive: interactive, migrating: migrating
                 ) { installResult in
                     try? FileManager.default.removeItem(at: download.file)
                     completionHandler(installResult)

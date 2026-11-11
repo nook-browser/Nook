@@ -73,8 +73,9 @@ struct ExtensionsSettingsView: View {
                         ForEach(safariExtensions) { ext in
                             SafariExtensionRowView(
                                 info: ext,
+                                // A copy from before stable IDs can be installed again from here, which moves it to its real id.
                                 isAlreadyInstalled: extensionManager.installedExtensions.contains(where: {
-                                    $0.name == ext.name
+                                    $0.id == ext.id || ($0.name == ext.name && UUID(uuidString: $0.id) == nil)
                                 }),
                                 onInstall: {
                                     installSafariExtension(ext)
