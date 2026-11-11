@@ -45,6 +45,18 @@ extension ExtensionManager {
 
         let identity = ExtensionCompatIdentity()
         identity.present = { [weak self] url, redirected, closed in self?.presentAuthFlow(url, redirected: redirected, closed: closed) }
+        identity.hiddenView = { [weak self] in
+            // Never a private window's cookies: the extension may not be allowed in one.
+            guard let profile = self?.authFlowSpace()?.profile, !profile.isEphemeral else { return nil }
+            // A configuration of its own, so no extension's scripts run in the page.
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = profile.dataStore
+            // Nobody can click in it, so nothing in it plays.
+            configuration.mediaTypesRequiringUserActionForPlayback = .all
+            let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 1024, height: 768), configuration: configuration)
+            view.customUserAgent = PlatformUserAgent.custom
+            return view
+        }
         compatBridge.register(identity)
 
         // Nook has no side panel: the page gets the window `windows.create({type: "popup"})` gets, at a panel's proportions.
@@ -94,12 +106,17 @@ extension ExtensionManager {
             from: old, to: session.url, in: adapter, isPrivate: session.isPrivate, contexts: extensionContexts.values)
     }
 
-    /// A sign-in page for `identity.launchWebAuthFlow`, in a mini window with the cookies of the space in front.
-    private func presentAuthFlow(_ url: URL, redirected: @escaping (URL) -> Bool, closed: @escaping () -> Void) -> (() -> Void)? {
+    /// The space in front, whose cookies a sign-in flow uses.
+    private func authFlowSpace() -> (profile: Profile, window: BrowserWindowState?)? {
         guard let browserManager = browserManagerRef else { return nil }
         let window = browserManager.windowRegistry?.mostRecentRegularWindow
-        guard let profile = window?.spaceID.flatMap({ browserManager.tabs.profile(forSpace: $0) }) ?? browserManager.currentProfile
-        else { return nil }
+        let profile = window?.spaceID.flatMap { browserManager.tabs.profile(forSpace: $0) } ?? browserManager.currentProfile
+        return profile.map { ($0, window) }
+    }
+
+    /// A sign-in page for `identity.launchWebAuthFlow`, in a mini window with the cookies of the space in front.
+    private func presentAuthFlow(_ url: URL, redirected: @escaping (URL) -> Bool, closed: @escaping () -> Void) -> (() -> Void)? {
+        guard let browserManager = browserManagerRef, let (profile, window) = authFlowSpace() else { return nil }
         let page = browserManager.tabs.openDetached(url: url, profile: profile, in: window)
         page.navigationInterceptor = redirected
         // Closed by the person, or moved to a tab: either way the flow is over.

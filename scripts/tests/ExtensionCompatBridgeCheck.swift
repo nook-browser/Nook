@@ -11,6 +11,8 @@
 //
 
 import Foundation
+import Network
+import WebKit
 
 @main
 struct ExtensionCompatBridgeCheck {
@@ -22,6 +24,7 @@ struct ExtensionCompatBridgeCheck {
         notifications()
         management()
         identity()
+        silentFlow()
         sidePanel()
         print("ExtensionCompatBridgeCheck passed")
     }
@@ -150,6 +153,82 @@ struct ExtensionCompatBridgeCheck {
         for bad in ["file:///etc/passwd", "javascript:alert(1)", "data:text/html,x", "webkit-extension://abcdef/page.html", "https:///nohost", "about:blank"] {
             precondition(!I.mayStart(at: url(bad)), bad)
         }
+    }
+
+    /// `identity` with no window: pages from a server on this Mac, in a real web view.
+    @MainActor
+    static func silentFlow() {
+        typealias I = ExtensionCompatIdentity
+        precondition(I.silentLimit(nil) == 60 && I.silentLimit(5000) == 5 && I.silentLimit(600_000) == 60)
+        precondition(I.silentLimit(-1) == 60 && I.silentLimit("5000") == 60)
+        // Unseen, a page loads over TLS only: no router, no plain-http port on this Mac.
+        precondition(I.mayLoadUnseen(at: URL(string: "https://accounts.example.com/o/oauth2/auth")!))
+        for bad in ["http://192.168.1.1/", "http://localhost:8080/", "http://accounts.example.com/", "file:///etc/passwd", "https:///nohost"] {
+            precondition(!I.mayLoadUnseen(at: URL(string: bad)!), bad)
+        }
+
+        func spin(_ seconds: TimeInterval, until done: () -> Bool) {
+            let end = Date() + seconds
+            while !done() && Date() < end { RunLoop.main.run(until: Date() + 0.02) }
+        }
+        let back = "https://abcdef.chromiumapp.org/cb?code=1"
+        let local = NWParameters.tcp
+        local.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+        let listener = try! NWListener(using: local)
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: .main)
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, _, _ in
+                let path = String(decoding: data ?? Data(), as: UTF8.self).split(separator: " ").dropFirst().first.map(String.init) ?? "/"
+                let moved = ["/go": back, "/hop": "/page", "/app": "nook://open?url=x"][path]
+                let body = path == "/late" ? "<script>setTimeout(function () { location.href = '\(back)' }, 200)</script>" : "<body>Sign in"
+                let answer = moved.map { "HTTP/1.1 302 Found\r\nLocation: \($0)\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" }
+                    ?? "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+                connection.send(content: Data(answer.utf8), completion: .contentProcessed { _ in connection.cancel() })
+            }
+        }
+        listener.start(queue: .main)
+        spin(5) { listener.state == .ready }
+        guard listener.state == .ready, let port = listener.port?.rawValue else { preconditionFailure("no local server") }
+
+        // The server here speaks plain http, so every case but `shipped` runs under the rule for a window.
+        func expect(_ path: String, waits: Bool = false, limit: TimeInterval = 20, shipped: Bool = false,
+                    atLimit: Bool = false, gives wanted: String) {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            var got: String?
+            let started = Date()
+            let page = ExtensionCompatSilentPage(
+                view: WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration),
+                extensionID: "abcdef", waitsAfterLoad: waits, limit: limit, mayLoad: shipped ? I.mayLoadUnseen : I.mayStart
+            ) { result in
+                switch result {
+                case .success(let value): got = value as? String ?? "no address"
+                case .failure(let error): got = "error: " + error.message
+                }
+            }
+            page.load(URL(string: "http://127.0.0.1:\(port)\(path)")!)
+            spin(30) { got != nil }
+            page.stop()
+            precondition(got == wanted, "\(path): \(got ?? "no answer")")
+            // The time limit gives the same answer as a page that stays, so say which of them answered.
+            let waited = Date().timeIntervalSince(started)
+            precondition(atLimit == (waited >= limit - 0.1), "\(path): answered after \(waited) s")
+        }
+        let needsPerson = "error: User interaction required."
+        // The provider sends the person straight back: the flow ends at that address.
+        expect("/go", gives: back)
+        // A page that loads and stays wants the person, after a hop too.
+        expect("/page", gives: needsPerson)
+        expect("/hop", gives: needsPerson)
+        // A provider that redirects from script is waited for only when the extension says so, and not for ever.
+        expect("/late", gives: needsPerson)
+        expect("/late", waits: true, gives: back)
+        expect("/page", waits: true, limit: 1, atLimit: true, gives: needsPerson)
+        // A redirect out of the web goes nowhere, and under the shipped rule neither does plain http.
+        let notLoaded = "error: Authorization page could not be loaded."
+        expect("/app", gives: notLoaded)
+        expect("/go", shipped: true, gives: notLoaded)
+        listener.cancel()
     }
 
     /// `sidePanel`: which page a tab's panel is, and that it is the extension's own.
