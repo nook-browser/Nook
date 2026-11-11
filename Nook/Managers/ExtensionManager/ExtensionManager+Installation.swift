@@ -814,6 +814,10 @@ extension ExtensionManager {
     // MARK: - Persistence
 
     func loadInstalledExtensions() {
+        // A quit while an install waited for consent left its staged copy behind.
+        let staged = (try? FileManager.default.contentsOfDirectory(at: getExtensionsDirectory(), includingPropertiesForKeys: nil)) ?? []
+        for url in staged where url.lastPathComponent.hasPrefix("temp_") { try? FileManager.default.removeItem(at: url) }
+
         let entities: [ExtensionEntity]
         do {
             entities = try self.context.fetch(FetchDescriptor<ExtensionEntity>())
