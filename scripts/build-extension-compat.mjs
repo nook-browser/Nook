@@ -156,7 +156,7 @@ expect(tables.bridged.management.functions.includes('getAll') && tables.bridged.
 expect(tables.bridged.identity.functions.includes('launchWebAuthFlow') && tables.bridged.identity.functions.includes('getRedirectURL'), 'identity');
 expect(tables.bridged.sidePanel.functions.includes('setPanelBehavior') && tables.bridged.sidePanel.functions.includes('open'), 'sidePanel');
 for (const event of Object.keys(BRIDGED_EVENTS)) { expect(tables.events.includes(event), event); }
-for (const token of ['__NOOK_TABLES__', '__NOOK_IDENTITY__', '__NOOK_OWNS_CHANNEL__', '__CHROME_MAJOR__', '__FIREFOX_MAJOR__']) {
+for (const token of ['__NOOK_TABLES__', '__NOOK_IDENTITY__', '__NOOK_OWNS_CHANNEL__', '__NOOK_BACKGROUND_SHIM__', "'__NOOK_EMPTY_SCRIPTS__'", '__CHROME_MAJOR__', '__FIREFOX_MAJOR__']) {
     expect(shim.includes(token), `${token} in the template`);
 }
 const header = `// Nook extension compatibility shim: runs first in every context of a store-built extension.\n` +

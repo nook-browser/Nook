@@ -20,6 +20,10 @@ enum ExtensionCompatPatcher {
     static let stateFile = "nook_compat.json"
     static let identityToken = "__NOOK_IDENTITY__"
     static let channelToken = "__NOOK_OWNS_CHANNEL__"
+    static let backgroundToken = "__NOOK_BACKGROUND_SHIM__"
+    /// Quotes included: the shim holds it as a string, and gets a string holding a JSON list.
+    static let emptyScriptsToken = "'__NOOK_EMPTY_SCRIPTS__'"
+    private static let maxEmptyScripts = 64
     /// The permission the shim's channel to Nook rides on (`runtime.sendNativeMessage`).
     static let channelPermission = "nativeMessaging"
     /// Permissions whose APIs `ExtensionCompatBridge` answers natively. A package that declares
@@ -32,11 +36,13 @@ enum ExtensionCompatPatcher {
     /// returns true when `manifest` changed. Safe to repeat: it runs at install and at every launch.
     @discardableResult
     static func patch(manifest: inout [String: Any], packageAt root: URL, shim: String, identity: Identity) -> Bool {
-        // Pages are rewritten once per package: the shim file is written last and marks it done.
+        // The package is walked once: the shim file is written last and marks it done.
+        var empty = emptyScripts(packageAt: root)
         if !FileManager.default.fileExists(atPath: root.appendingPathComponent(shimFile).path) {
             // A record that is here before Nook's first pass is the package's own, and says nothing.
             if let record = location(of: stateFile, in: root) { try? FileManager.default.removeItem(at: record) }
             patchPages(in: root, named: namedPages(manifest))
+            empty = findEmptyScripts(in: root)
         }
         var changed = patchBackground(&manifest, root: root)
         if patchContentScripts(&manifest) { changed = true }
@@ -45,11 +51,25 @@ enum ExtensionCompatPatcher {
             changed = true
             ownsChannel = true
         }
-        if ownsChannel { write("{\"addedPermissions\":[\"\(channelPermission)\"]}", to: stateFile, in: root) }
+        var record: [String: Any] = [:]
+        if ownsChannel { record["addedPermissions"] = [channelPermission] }
+        if !empty.isEmpty { record["emptyScripts"] = empty }
+        if !record.isEmpty { write(json(record), to: stateFile, in: root) }
         let text = shim.replacingOccurrences(of: identityToken, with: identity.rawValue)
             .replacingOccurrences(of: channelToken, with: ownsChannel ? "true" : "false")
+            .replacingOccurrences(of: backgroundToken, with: backgroundHasShim(manifest, root: root) ? "true" : "false")
+            .replacingOccurrences(of: emptyScriptsToken, with: jsString(json(empty)))
         write(text, to: shimFile, in: root)
         return changed
+    }
+
+    /// The scripts in the package at `root` that hold nothing, as Nook recorded them on its first
+    /// pass. The shim leaves them out of a worker's imports.
+    static func emptyScripts(packageAt root: URL) -> [String] {
+        guard let data = try? Data(contentsOf: root.appendingPathComponent(stateFile)),
+              let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return [] }
+        return Array((state["emptyScripts"] as? [String] ?? []).filter { $0.count <= 512 }.prefix(maxEmptyScripts))
     }
 
     /// What Nook added to the package at `root`: the channel permission, or nothing. It stays out
@@ -108,6 +128,16 @@ enum ExtensionCompatPatcher {
         return changed
     }
 
+    /// True when the background `manifest` names loads the shim. The shim in a content script
+    /// then waits for the one in the background before the extension's first message.
+    private static func backgroundHasShim(_ manifest: [String: Any], root: URL) -> Bool {
+        guard let background = manifest["background"] as? [String: Any] else { return false }
+        if let worker = background["service_worker"] as? String { return (packagePath(worker) as NSString).lastPathComponent == workerFile }
+        if let scripts = background["scripts"] as? [String], let first = scripts.first { return packagePath(first) == shimFile }
+        guard let page = background["page"] as? String, let url = location(of: packagePath(page), in: root) else { return false }
+        return (try? String(contentsOf: url, encoding: .utf8))?.contains(pageTag) == true
+    }
+
     // MARK: - Channel
 
     /// Adds the channel permission when the manifest declares an API the bridge answers and
@@ -158,6 +188,21 @@ enum ExtensionCompatPatcher {
         }
     }
 
+    /// Package paths of the scripts that hold only white space.
+    private static func findEmptyScripts(in root: URL) -> [String] {
+        guard let files = FileManager.default.enumerator(atPath: root.path) else { return [] }
+        var found: [String] = []
+        for case let path as String in files where (path as NSString).pathExtension.lowercased() == "js" {
+            guard files.fileAttributes?[.type] as? FileAttributeType == .typeRegular,
+                  (files.fileAttributes?[.size] as? Int ?? .max) <= 16, path.count <= 512,
+                  let text = try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8),
+                  text.allSatisfy(\.isWhitespace)
+            else { continue }
+            found.append(path)
+        }
+        return Array(found.sorted().prefix(maxEmptyScripts))
+    }
+
     /// The HTML files the manifest itself loads as pages, as lowercased package paths.
     static func namedPages(_ manifest: [String: Any]) -> Set<String> {
         func entry(_ key: String) -> [String: Any] { manifest[key] as? [String: Any] ?? [:] }
@@ -201,6 +246,12 @@ enum ExtensionCompatPatcher {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .withoutEscapingSlashes
         return (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+    }
+
+    /// Compact JSON with its keys in order, so the same value is always the same text.
+    private static func json(_ value: Any) -> String {
+        let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
+        return data.flatMap { String(data: $0, encoding: .utf8) } ?? "null"
     }
 
     /// Where `path` is inside the package, or nil when it leaves it through `..` or a symbolic

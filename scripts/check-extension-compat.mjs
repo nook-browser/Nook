@@ -105,12 +105,16 @@ const webkit = `
   globalThis.browser = chrome;
 `;
 
-function load(identity, kind = 'extension', { permissions = [], ownsChannel = false, globals = {}, before = '' } = {}) {
-    const context = vm.createContext({ KIND: kind, PERMISSIONS: permissions, location: { protocol: kind === 'extension' ? 'webkit-extension:' : 'https:' },
-                                       setTimeout, clearTimeout, URL, console: { warn() {}, error() {} }, ...globals });
+function load(identity, kind = 'extension', { permissions = [], ownsChannel = false, globals = {}, before = '', empty = null, backgroundShim = true } = {}) {
+    const location = kind === 'extension' ? { protocol: 'webkit-extension:', host: 'abc', href: 'webkit-extension://abc/sw.js' }
+                                          : { protocol: 'https:', host: 'site.test', href: 'https://site.test/' };
+    const context = vm.createContext({ KIND: kind, PERMISSIONS: permissions, location, setTimeout, clearTimeout, URL, console: { warn() {}, error() {} }, ...globals });
     vm.runInContext(webkit, context);
     vm.runInContext(before, context);
-    vm.runInContext(shim.replace('__NOOK_IDENTITY__', identity).replace('__NOOK_OWNS_CHANNEL__', String(ownsChannel)), context);
+    // The patcher writes the list of empty scripts as a string holding JSON. A shim it never touched has none.
+    const listed = empty ? shim.replace("'__NOOK_EMPTY_SCRIPTS__'", JSON.stringify(JSON.stringify(empty))) : shim;
+    vm.runInContext(listed.replace('__NOOK_IDENTITY__', identity).replace('__NOOK_OWNS_CHANNEL__', String(ownsChannel))
+        .replace('__NOOK_BACKGROUND_SHIM__', String(backgroundShim)), context);
     return { context, run: code => vm.runInContext(code, context) };
 }
 
@@ -404,11 +408,102 @@ assert.equal(offscreenPage.run('got.sort().join()'), 'back,port ping');
 assert.equal(offscreenPage.run('nowhere'), 0);
 // The link is the shim's own: the extension's onConnect listeners never see it.
 assert.equal(worker.run('ownPorts.length'), 0);
-// Any other extension page keeps WebKit's service worker objects as they are.
-const plainPage = load('chrome', 'extension', { permissions: ['offscreen'], globals: dom, before: `
-  globalThis.ServiceWorker = class ServiceWorker { postMessage() { return 'native'; } };
-  navigator.serviceWorker = new EventTarget();` });
-assert.equal(plainPage.run('new ServiceWorker().postMessage()'), 'native');
+// Any other page of the extension reaches the worker the same way, from its first post on. It is answered through
+// the message's source, is not one of the worker's clients, and keeps the null controller WebKit gives it.
+let pageLinks = 0;
+const connectPage = info => { pageLinks++; const [mine, theirs] = portPair(info.name, { url: 'webkit-extension://abc/popup.html' });
+                              queueMicrotask(() => worker.context.chrome.runtime.onConnect.fire(theirs)); return mine; };
+const plainPage = load('chrome', 'extension', { permissions: ['offscreen'], globals: { ...dom, CONNECT: connectPage }, before: `
+  globalThis.addEventListener = () => {};
+  globalThis.nowhere = 0;
+  globalThis.ServiceWorker = class ServiceWorker { postMessage() { nowhere++; } };
+  class Container extends EventTarget { get controller() { return null; } getRegistration() { return Promise.resolve({ active: new ServiceWorker() }); } }
+  navigator.serviceWorker = new Container();
+  chrome.runtime.connect = CONNECT;` });
+await pause(10);
+assert.equal(pageLinks, 0);
+worker.run('heard.length = 0');
+plainPage.run(`globalThis.got = [];
+  navigator.serviceWorker.addEventListener('message', e => got.push(e.data + ' from worker:' + (e.source instanceof ServiceWorker)));
+  navigator.serviceWorker.getRegistration().then(r => { r.active.postMessage('from popup'); r.active.postMessage('again'); });`);
+await pause(100);
+assert.equal(worker.run('heard.join()'), 'from popup,again');
+assert.equal(plainPage.run('got.join()'), 'back from worker:true,back from worker:true');
+assert.equal(plainPage.run('nowhere + " " + navigator.serviceWorker.controller'), '0 null');
+// A post from a page whose extension is gone throws nothing, as WebKit's own does not.
+const orphan = load('chrome', 'extension', { permissions: ['offscreen'], globals: dom, before: `
+  globalThis.addEventListener = () => {};
+  globalThis.ServiceWorker = class ServiceWorker { postMessage() {} };
+  class Container extends EventTarget { get controller() { return null; } getRegistration() { return Promise.resolve({ active: new ServiceWorker() }); } }
+  navigator.serviceWorker = new Container();
+  chrome.runtime.connect = () => { throw new Error('Extension context invalidated.'); };` });
+assert.equal(orphan.run(`new ServiceWorker().postMessage('x')`), undefined);
+assert.equal(pageLinks, 1);
+assert.equal((await worker.run('clients.matchAll()')).length, 1);
+assert.equal(worker.run('ownPorts.length'), 0);
+
+// A content script's first message waits for the worker. WebKit answers a message with nothing while the worker has
+// no listener yet, so the shim asks until the worker's shim answers, and only then sends what the extension sent.
+const starting = load('chrome', 'content', { before: `
+  globalThis.sent = [];
+  globalThis.workerUpAfter = 2;
+  chrome.runtime.sendMessage = function (m) {
+    const ping = !!m && m.__nookCompatPing === 1, cb = typeof arguments[arguments.length - 1] === 'function' ? arguments[arguments.length - 1] : null;
+    sent.push(ping ? 'ping' : m);
+    const reply = Promise.resolve(ping ? (sent.filter(x => x === 'ping').length > workerUpAfter ? true : undefined) : 'reply:' + m);
+    return cb ? void reply.then(cb) : reply;
+  };` });
+const first = starting.run(`Promise.all([chrome.runtime.sendMessage('a'), new Promise(done => chrome.runtime.sendMessage('b', done)), chrome.runtime.sendMessage('c')])`);
+assert.equal(starting.run('sent.join()'), 'ping');
+assert.equal((await first).join(), 'reply:a,reply:b,reply:c');
+assert.equal(starting.run('sent.join()'), 'ping,ping,ping,a,b,c');
+// Once the worker has answered, nothing more is asked.
+assert.equal(await starting.run(`chrome.runtime.sendMessage('d')`), 'reply:d');
+assert.equal(starting.run('sent.length'), 7);
+// A worker that never answers is messaged all the same, once the wait has run out. The wait is by the clock:
+// here each pause runs a hundred times faster and the clock a hundred times faster with it.
+const fast = { setTimeout: (f, ms) => setTimeout(f, ms / 100), Date: { now: () => Date.now() * 100 } };
+const stuck = load('chrome', 'content', { globals: fast, before: `
+  globalThis.pings = 0;
+  chrome.runtime.sendMessage = m => Promise.resolve(m && m.__nookCompatPing === 1 ? void pings++ : 'late:' + m);` });
+assert.equal(await stuck.run(`chrome.runtime.sendMessage('x')`), 'late:x');
+assert.ok(stuck.run('pings') >= 8 && stuck.run('pings') <= 20, 'the wait backs off: ' + stuck.run('pings'));
+// A hidden page's timers run a second apart or worse. The wait still ends after its four seconds.
+const hidden = load('chrome', 'content', { globals: { setTimeout: (f, ms) => setTimeout(f, 10), Date: { now: () => Date.now() * 100 } }, before: `
+  globalThis.pings = 0;
+  chrome.runtime.sendMessage = m => Promise.resolve(m && m.__nookCompatPing === 1 ? void pings++ : 'late:' + m);` });
+assert.equal(await hidden.run(`chrome.runtime.sendMessage('x')`), 'late:x');
+assert.ok(hidden.run('pings') <= 6, 'a throttled page asks a few times, not fourteen: ' + hidden.run('pings'));
+// A background Nook could not put the shim in has nobody to answer, and its own listeners are never asked.
+const alone = load('chrome', 'content', { backgroundShim: false, before: `globalThis.native = () => 'native'; chrome.runtime.sendMessage = native;` });
+assert.equal(alone.run('chrome.runtime.sendMessage === native'), true);
+// The worker's shim answers the question, and no listener of the extension's sees it, in the worker or in a page.
+worker.run(`globalThis.messages = []; chrome.runtime.onMessage.addListener(m => { messages.push(m); });`);
+assert.equal(worker.run(`globalThis.answers = []; chrome.runtime.onMessage.fire({ __nookCompatPing: 1 }, {}, a => answers.push(a)); answers.join() + ' ' + messages.length`), 'true 0');
+worker.run(`chrome.runtime.onMessage.fire('real', {}, () => {})`);
+assert.equal(worker.run('messages.join()'), 'real');
+// An MV2 background page is the background too, and answers.
+const mv2 = load('firefox', 'extension', { before: `globalThis.window = globalThis; chrome.extension = { getBackgroundPage: () => globalThis };` });
+assert.equal(mv2.run(`globalThis.answers = []; chrome.runtime.onMessage.fire({ __nookCompatPing: 1 }, {}, a => answers.push(a)); answers.join()`), 'true');
+// The extension is told of its own listeners only, not of the shim's.
+assert.equal(mv2.run('chrome.runtime.onMessage.hasListeners()'), false);
+assert.equal(mv2.run('chrome.runtime.onMessage.addListener(() => {}); chrome.runtime.onMessage.hasListeners()'), true);
+plainPage.run(`globalThis.messages = []; chrome.runtime.onMessage.addListener(m => { messages.push(m); });`);
+assert.equal(plainPage.run(`globalThis.answers = []; chrome.runtime.onMessage.fire({ __nookCompatPing: 1 }, {}, a => answers.push(a)); answers.length + ' ' + messages.length`), '0 0');
+// A page of its own keeps sendMessage as WebKit made it: only a content script can be ahead of the worker.
+const ownPage = load('chrome', 'extension', { before: `globalThis.native = () => 'native'; chrome.runtime.sendMessage = native;` });
+assert.equal(ownPage.run('chrome.runtime.sendMessage === native'), true);
+
+// A worker's import of a script that holds nothing is not made: WebKit would run the waiting microtasks after it,
+// which Chrome does not, and Tampermonkey's startup depends on the difference.
+const importing = load('chrome', 'extension', { empty: ['test.js', 'lib/blank file.js'], globals: { IMPORTED: [] },
+                                                before: `globalThis.importScripts = (...urls) => { IMPORTED.push(urls.join('+')); };` });
+importing.run(`importScripts('/test.js'); importScripts('test.js', './lib/blank%20file.js'); importScripts('/a.js', '/test.js', 'b.js');
+  importScripts('https://cdn.test/test.js'); importScripts('/lib/test.js');`);
+assert.equal(importing.context.IMPORTED.join(), '/a.js+b.js,https://cdn.test/test.js,/lib/test.js');
+// With nothing listed, importScripts is WebKit's own.
+const importingAll = load('chrome', 'extension', { before: `globalThis.native = () => {}; globalThis.importScripts = native;` });
+assert.equal(importingAll.run('importScripts === native'), true);
 
 console.log('extension compat shim: all checks passed');
 // The relay's message ports stay open, and would keep the process alive.

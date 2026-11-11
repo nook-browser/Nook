@@ -264,6 +264,63 @@ struct ExtensionCompatPatcherCheck {
         try fake.write(to: forgedRoot.appendingPathComponent("nook_compat.json"), atomically: true, encoding: .utf8)
         precondition(ExtensionCompatPatcher.addedPermissions(packageAt: forgedRoot) == ["nativeMessaging"])
 
+        // A script that holds nothing is listed for the shim, which leaves it out of a worker's imports.
+        // The list is made on the first pass and kept in Nook's record.
+        let listShim = "empty:'__NOOK_EMPTY_SCRIPTS__' owns:__NOOK_OWNS_CHANNEL__"
+        var importer: [String: Any] = ["background": ["service_worker": "sw.js"], "permissions": ["offscreen"]]
+        let importerRoot = try package("importer", [
+            "sw.js": "importScripts('/test.js');", "test.js": "\n", "lib/blank.js": "", "we\"ird'.js": " \t",
+            "lib/real.js": "var a = 1;", "padded.js": String(repeating: " ", count: 17), "notes.txt": "",
+        ])
+        precondition(patch(&importer, importerRoot, shim: listShim))
+        let empties = ["lib/blank.js", "test.js", "we\"ird'.js"]
+        precondition(ExtensionCompatPatcher.emptyScripts(packageAt: importerRoot) == empties)
+        // The shim gets the list as a string literal holding JSON, whatever the file names hold.
+        let written = read(importerRoot, "nook_compat.js") ?? ""
+        precondition(written.hasPrefix("empty:\"[") && written.hasSuffix(" owns:true"), written)
+        let literal = Data(written.dropFirst("empty:".count).dropLast(" owns:true".count).utf8)
+        let inner = try JSONSerialization.jsonObject(with: literal, options: .fragmentsAllowed) as? String ?? ""
+        let parsed = try JSONSerialization.jsonObject(with: Data(inner.utf8)) as? [String]
+        precondition(parsed == empties)
+        // A later pass reads the list back, and Nook's own files change nothing in it.
+        precondition(!patch(&importer, importerRoot, shim: listShim))
+        precondition(read(importerRoot, "nook_compat.js") == written)
+        precondition(ExtensionCompatPatcher.addedPermissions(packageAt: importerRoot) == ["nativeMessaging"])
+        // A package with none gets an empty list and no record.
+        precondition(ExtensionCompatPatcher.emptyScripts(packageAt: bareRoot).isEmpty)
+        precondition(read(bareRoot, "nook_compat.json") == nil)
+        // A list the package ships under Nook's file name names nothing: the first pass makes its own.
+        var planted: [String: Any] = ["background": ["service_worker": "sw.js"]]
+        let plantedRoot = try package("planted", ["sw.js": "importScripts('/real.js');", "real.js": "var a = 1;", "nook_compat.json": "{\"emptyScripts\":[\"real.js\"]}"])
+        precondition(patch(&planted, plantedRoot, shim: listShim))
+        precondition(ExtensionCompatPatcher.emptyScripts(packageAt: plantedRoot).isEmpty)
+        precondition(read(plantedRoot, "nook_compat.js") == "empty:\"[]\" owns:false")
+        var none: [String: Any] = ["name": "none"]
+        let noneRoot = try package("none", ["a.js": "1"])
+        precondition(!patch(&none, noneRoot, shim: listShim))
+        precondition(read(noneRoot, "nook_compat.js") == "empty:\"[]\" owns:false")
+
+        // The shim is told whether the background got it too. A content script's first message waits
+        // for that copy's answer, and must not wait where nobody would give one.
+        let flagged: [(String, [String: Any], [String: String], String)] = [
+            ("flag-worker", ["background": ["service_worker": "sw.js"]], ["sw.js": "1"], "true"),
+            ("flag-module", ["background": ["service_worker": "sw.js", "type": "module"]], ["sw.js": "1"], "true"),
+            ("flag-scripts", ["background": ["scripts": ["a.js"]]], ["a.js": "1"], "true"),
+            ("flag-page", ["background": ["page": "bg.html"]], ["bg.html": "<html><head></head></html>"], "true"),
+            ("flag-none", ["name": "no background"], ["a.js": "1"], "false"),
+            // No wrapper could be written beside a worker in a folder that is not there.
+            ("flag-missing", ["background": ["service_worker": "gone/sw.js"]], ["a.js": "1"], "false"),
+            ("flag-no-page", ["background": ["page": "gone.html"]], ["a.js": "1"], "false"),
+        ]
+        for (name, manifest, files, expected) in flagged {
+            var manifest = manifest
+            let root = try package(name, files)
+            _ = patch(&manifest, root, shim: "__NOOK_BACKGROUND_SHIM__")
+            precondition(read(root, "nook_compat.js") == expected, name)
+            _ = patch(&manifest, root, shim: "__NOOK_BACKGROUND_SHIM__")
+            precondition(read(root, "nook_compat.js") == expected, name + " again")
+        }
+
         // Bitwarden by its short name or a known ID: the store manifest's name is a locale key.
         let ids: Set<String> = ["nngceckbapebfimnlniiiahkandclblb"]
         precondition(ExtensionCompatPatcher.isBitwarden(manifest: ["name": "__MSG_extName__", "short_name": "Bitwarden"], extensionId: "x", knownIDs: ids))
