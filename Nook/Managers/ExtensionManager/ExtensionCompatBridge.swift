@@ -68,6 +68,16 @@ final class ExtensionCompatBridge {
 
     func register(_ api: ExtensionCompatAPI) { apis[api.name] = api }
 
+    /// The manifest permissions the APIs here answer to. WebKit knows only some of them.
+    var gatedPermissions: Set<String> { Set(apis.values.compactMap(\.permission)) }
+
+    /// What the consent sheet lists for a package. WebKit leaves out the names it does not know,
+    /// so the `bridged` ones are read from the manifest; `added` is what Nook put there itself.
+    static func consentPermissions(of webExtension: WKWebExtension, hiding added: Set<String>, bridged: Set<String>) -> Set<String> {
+        let declared = (webExtension.manifest["permissions"] as? [Any] ?? []).compactMap { $0 as? String }
+        return Set(webExtension.requestedPermissions.map(\.rawValue)).subtracting(added).union(bridged.intersection(declared))
+    }
+
     // MARK: - Contexts
 
     /// `ownsChannel`: Nook added `nativeMessaging` to this package for the bridge alone.

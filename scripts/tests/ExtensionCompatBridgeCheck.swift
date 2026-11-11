@@ -26,7 +26,37 @@ struct ExtensionCompatBridgeCheck {
         identity()
         silentFlow()
         sidePanel()
+        consent()
         print("ExtensionCompatBridgeCheck passed")
+    }
+
+    /// The consent sheet names a permission WebKit does not know when the manifest asks for it and Nook answers it.
+    @MainActor
+    static func consent() {
+        typealias B = ExtensionCompatBridge
+        let bridge = B()
+        [ExtensionCompatIdentity(), ExtensionCompatOffscreen(), ExtensionCompatSidePanel()].forEach(bridge.register)
+        precondition(bridge.gatedPermissions == ["identity", "offscreen", "sidePanel"])
+
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("nook-consent-check-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let manifest: [String: Any] = [
+            "manifest_version": 3, "name": "Consent", "version": "1.0", "background": ["service_worker": "sw.js"],
+            "permissions": ["storage", "management", "identity", "nativeMessaging", "notARealPermission"],
+            "optional_permissions": ["idle"]]
+        try! JSONSerialization.data(withJSONObject: manifest).write(to: folder.appendingPathComponent("manifest.json"))
+        try! Data().write(to: folder.appendingPathComponent("sw.js"))
+        var loaded: WKWebExtension?
+        Task { @MainActor in loaded = try? await WKWebExtension(resourceBaseURL: folder) }
+        let end = Date() + 10
+        while loaded == nil && Date() < end { RunLoop.main.run(until: Date() + 0.02) }
+        guard let loaded else { preconditionFailure("the test extension did not load") }
+
+        // Nook's own channel stays hidden. A name nothing answers stays out, and so does an optional one.
+        let bridged: Set = ["offscreen", "idle", "notifications", "management", "identity", "sidePanel", "webNavigation"]
+        let shown = B.consentPermissions(of: loaded, hiding: ["nativeMessaging"], bridged: bridged)
+        precondition(shown == ["storage", "management", "identity"], "\(shown.sorted())")
     }
 
     /// An event for a background that listens wakes it unless the event just reached the background's own port.

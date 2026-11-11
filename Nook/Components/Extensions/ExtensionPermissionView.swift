@@ -137,7 +137,17 @@ struct ExtensionPermissionView: View {
             return "Add items to context menus"
         case "unlimitedStorage":
             return "Store an unlimited amount of data"
-        case "alarms", "idle", "i18n", "runtime", "commands", "sidePanel", "offscreen", "action":
+        case "management":
+            return "See your other installed extensions"
+        case "identity":
+            return "Sign you in to web services, sometimes in the background"
+        case "idle":
+            return "See when you are away from your Mac"
+        case "offscreen":
+            return "Run a hidden page in the background"
+        case "sidePanel":
+            return "Open a panel of its own"
+        case "alarms", "i18n", "runtime", "commands", "action":
             return "Run in the background and respond to browser events"
         default:
             return "Access \(permission) functionality"

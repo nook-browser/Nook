@@ -87,14 +87,15 @@ extension ExtensionManager {
         for new: WKWebExtension,
         comparedTo previous: WKWebExtension?,
         hiding added: Set<String> = [],
-        previouslyHiding previouslyAdded: Set<String> = []
+        previouslyHiding previouslyAdded: Set<String> = [],
+        bridged: Set<String> = []
     ) -> (permissions: [String], hosts: [String]) {
         func requiredPatterns(_ ext: WKWebExtension) -> [WKWebExtension.MatchPattern] {
             let optional = ext.optionalPermissionMatchPatterns
             return ext.allRequestedMatchPatterns.filter { !optional.contains($0) }
         }
         // What Nook added for its own channel is not the extension's request, in either version.
-        let newPermissions = Set(new.requestedPermissions.map(\.rawValue)).subtracting(added)
+        let newPermissions = ExtensionCompatBridge.consentPermissions(of: new, hiding: added, bridged: bridged)
         let newPatterns = requiredPatterns(new)
         guard let previous else {
             return (newPermissions.sorted(), Set(newPatterns.map(\.string)).sorted())
@@ -103,7 +104,7 @@ extension ExtensionManager {
         // WebKit's own containment: `<all_urls>` and `*://*/*` cover neither `file:` nor a wider scheme.
         let addedHosts = Set(newPatterns.filter { pattern in !oldPatterns.contains { $0.matches(pattern) } }
             .map(\.string)).sorted()
-        let oldPermissions = Set(previous.requestedPermissions.map(\.rawValue)).subtracting(previouslyAdded)
+        let oldPermissions = ExtensionCompatBridge.consentPermissions(of: previous, hiding: previouslyAdded, bridged: bridged)
         let addedPermissions = newPermissions.subtracting(oldPermissions).sorted()
         return (addedPermissions, addedHosts)
     }
@@ -275,7 +276,8 @@ extension ExtensionManager {
         let consent = Self.consentItems(
             for: staged, comparedTo: replacesStoreInstall ? nil : previous,
             hiding: ExtensionCompatPatcher.addedPermissions(packageAt: tempDir),
-            previouslyHiding: existing.map { ExtensionCompatPatcher.addedPermissions(packageAt: URL(fileURLWithPath: $0.packagePath)) } ?? [])
+            previouslyHiding: existing.map { ExtensionCompatPatcher.addedPermissions(packageAt: URL(fileURLWithPath: $0.packagePath)) } ?? [],
+            bridged: compatBridge.gatedPermissions)
         let needsConsent = existing == nil || replacesStoreInstall
             || !consent.permissions.isEmpty || !consent.hosts.isEmpty
         if needsConsent {
