@@ -309,7 +309,7 @@ private struct HistoryPageRow: View {
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .padding(.horizontal, NookDesign.Spacing.sm)
         .onHoverTracking { hovered in
-            withAnimation(NookDesign.Motion.quick) { isHovered = hovered }
+            withAnimation(NookDesign.Motion.hover(hovered)) { isHovered = hovered }
         }
         .onTapGesture(perform: onOpen)
         .contextMenu {

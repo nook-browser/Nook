@@ -63,7 +63,7 @@ public struct PinnedTabView<Icon: View>: View {
             ZStack {
                 NookDesign.Radius.shape(NookDesign.Radius.lg)
                     .fill(backgroundColor)
-                    .animation(NookDesign.Motion.quick, value: isHovered)
+                    .animation(NookDesign.Motion.hover(isHovered), value: isHovered)
                 if let glow, colors != nil {
                     glowImage(glow)
                         .opacity(NookDesign.Surface.favoriteGlowOpacity(dark: colorScheme == .dark, hovered: isHovered, dimmed: isDimmed))
@@ -107,7 +107,8 @@ public struct PinnedTabView<Icon: View>: View {
             .contentShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
             .modifier(TileSelection(isActive: isActive, themed: colors != nil))
         }
-        .buttonStyle(.plain)
+        // The action is a selection, safe to run on the press and again on the release.
+        .buttonStyle(NookPressButtonStyle(onPress: action))
         .onHoverTracking { hovering in
             self.isHovered = hovering
         }

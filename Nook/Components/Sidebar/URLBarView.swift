@@ -68,7 +68,7 @@ struct URLBarView: View {
         }
         .onDisappear { cancelEditing() }
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(hovering)) {
                 isHovering = hovering
             }
         }

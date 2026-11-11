@@ -25,6 +25,7 @@ public struct SpaceTab: View {
     @State private var isCloseHovering: Bool = false
     @State private var isResetHovering: Bool = false
     @State private var draftName: String = ""
+    @State private var selectedOnPress = false
     @FocusState private var isTextFieldFocused: Bool
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(\.tabActions) private var actions
@@ -76,7 +77,9 @@ public struct SpaceTab: View {
                 return
             }
             windowState.multiSelection.clear()
-            if isCurrentTab {
+            if selectedOnPress {
+                selectedOnPress = false
+            } else if isCurrentTab {
                 startRename(title)
             } else {
                 if isRenaming { commitRename() }
@@ -207,10 +210,10 @@ public struct SpaceTab: View {
                 }
             }
         }
-        .buttonStyle(NookTabButtonStyle())
+        .buttonStyle(NookTabButtonStyle(onPress: selectOnPress))
         .padding(.vertical, NookDesign.Tab.verticalInset)
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(hovering)) {
                 isHovering = hovering
             }
             // Read by the middle-click handler in AppDelegate. Only clear the slot if
@@ -264,6 +267,15 @@ public struct SpaceTab: View {
     }
 
     private var showsReset: Bool { tabs.hasLeftHome(item.id) }
+
+    /// A plain press on another tab selects it at once; the release then has nothing to do.
+    private func selectOnPress() {
+        selectedOnPress = false
+        guard !isCurrentTab, !clickHolds(.command), !clickHolds(.shift) else { return }
+        windowState.multiSelection.clear()
+        selectedOnPress = true
+        tabs.select(item.id, in: windowState)
+    }
 
     private func startRename(_ title: String) {
         draftName = title

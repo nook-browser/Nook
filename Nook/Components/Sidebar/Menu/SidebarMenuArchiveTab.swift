@@ -133,7 +133,7 @@ private struct ArchiveRowView: View {
         .background(isHovered ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { hovered in
-            withAnimation(NookDesign.Motion.quick) { isHovered = hovered }
+            withAnimation(NookDesign.Motion.hover(hovered)) { isHovered = hovered }
         }
         .onTapGesture(perform: restore)
         .contextMenu {

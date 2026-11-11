@@ -109,7 +109,7 @@ public struct TabFolderView: View {
         .buttonStyle(NookTabButtonStyle())
         .padding(.vertical, NookDesign.Tab.verticalInset)
         .onHoverTracking { hovering in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(hovering)) {
                 isHovering = hovering
             }
         }
