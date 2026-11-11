@@ -27,6 +27,7 @@ enum LegacyCarry {
 
 extension ExtensionManager {
     static let migrationTriedKey = "ExtensionLegacyMigrationTried"
+    static let migrationCutoffKey = "ExtensionLegacyMigrationCutoff"
 
     /// An install from before stable IDs: a random UUID for an id, and no store.
     static func isLegacy(id: String, sourceStore: String?) -> Bool {
@@ -66,8 +67,12 @@ extension ExtensionManager {
     /// Installs each legacy copy that names a store listing again from that listing, without the
     /// person: a copy whose listing asks for more than it has is left for them.
     func migrateLegacyInstalls() async {
+        // A file install made after this first ran is the person's choice of that package, and stays.
+        let defaults = UserDefaults.standard
+        let cutoff = defaults.object(forKey: Self.migrationCutoffKey) as? Date ?? Date()
+        defaults.set(cutoff, forKey: Self.migrationCutoffKey)
         let legacy = ((try? context.fetch(FetchDescriptor<ExtensionEntity>())) ?? [])
-            .filter { Self.isLegacy(id: $0.id, sourceStore: $0.sourceStore) }
+            .filter { Self.isLegacy(id: $0.id, sourceStore: $0.sourceStore) && $0.installDate < cutoff }
             .map { (id: $0.id, name: $0.name, package: URL(fileURLWithPath: $0.packagePath)) }
         for copy in legacy {
             guard let listing = Self.storeListing(packageAt: copy.package) else { continue }
