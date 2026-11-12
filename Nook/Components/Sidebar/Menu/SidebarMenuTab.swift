@@ -54,7 +54,7 @@ struct SidebarMenuTab: View {
         .background(!isActive && isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.xl))
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.xl))
         .nookRowSelection(isActive, radius: NookDesign.Radius.xl)
-        .animation(NookDesign.Motion.quick, value: isHovering)
+        .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
         .animation(NookDesign.Motion.standard, value: isActive)
     }
 }

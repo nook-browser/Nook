@@ -155,6 +155,10 @@ extension BrowserManager: TabEventObserver {
         ExtensionManager.shared.notifyTabPropertiesChanged(session, properties: properties)
     }
 
+    func sameDocumentNavigation(_ session: PageSession, from old: URL) {
+        ExtensionManager.shared.notifySameDocumentNavigation(session, from: old)
+    }
+
     func grantAccess(to url: URL, private: Bool) {
         ExtensionManager.shared.grantExtensionAccessToURL(url, private: `private`)
     }

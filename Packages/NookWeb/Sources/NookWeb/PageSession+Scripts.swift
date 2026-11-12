@@ -174,6 +174,41 @@ extension PageSession {
     public static let linkHoverWorld = WKContentWorld.world(name: "NookLinkHover")
     public static let linkHoverHandlerNames = ["linkHover", "commandHover"]
 
+    /// The page's address changed without a load (pushState, the Navigation API, a fragment, Back
+    /// within a page). Takes the address from WebKit and tells everything that follows it.
+    func addressChangedWithoutLoad(in webView: WKWebView?) {
+        guard let webView, let url = webView.url else { return }
+        if self.url.absoluteString != url.absoluteString {
+            let previous = self.url
+            self.url = url
+            // NOTE: Do NOT call syncTabAcrossWindows here. SPA navigations
+            // (pushState/replaceState/popstate) happen inside the webview — the
+            // content is already at the correct state. Calling syncTab would
+            // webView.load() every view of this item whose URL differs, a full
+            // page reload that breaks SPA
+            // back/forward (e.g., Facebook lightbox close via browser back).
+
+            // Fetch updated title after SPA navigation
+            webView.evaluateJavaScript("document.title") { [weak self] result, _ in
+                // evaluateJavaScript completion runs on main thread
+                if let title = result as? String, !title.isEmpty {
+                    self?.updateTitle(title)
+                }
+            }
+
+            // Fetch favicon for new URL
+            Task { @MainActor [weak self] in
+                await self?.fetchAndSetFavicon(for: url)
+            }
+
+            // The store coalesces writes, so SPA URL changes report directly.
+            controller?.pageCommitted(itemID: itemID, url: url)
+            controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
+            controller?.tabEvents?.sameDocumentNavigation(self, from: previous)
+            schedulePageTextCapture(in: webView, sameDocument: true)
+        }
+    }
+
     func injectHistoryStateObserver(into webView: WKWebView) {
         let historyScript = """
             (function() {
@@ -204,7 +239,8 @@ extension PageSession {
                     return result;
                 };
 
-                window.addEventListener('popstate', notify);
+                // WebKit tells the app the new address only after popstate has run, so the signal waits a turn.
+                window.addEventListener('popstate', function() { setTimeout(notify, 0); });
                 window.addEventListener('hashchange', notify);
                 document.addEventListener('yt-navigate-finish', notify);
 
@@ -327,38 +363,8 @@ extension PageSession: WKScriptMessageHandler {
 
         case "historyStateDidChange":
             // The message is only a signal. The address comes from WebKit, never from the body:
-            // a page could otherwise put any URL, lock icon included, in the URL bar. WebKit
-            // has already updated webView.url for a same-document navigation by the time
-            // the message arrives.
-            if let url = message.webView?.url {
-                if self.url.absoluteString != url.absoluteString {
-                    self.url = url
-                    // NOTE: Do NOT call syncTabAcrossWindows here. SPA navigations
-                    // (pushState/replaceState/popstate) happen inside the webview — the
-                    // content is already at the correct state. Calling syncTab would
-                    // webView.load() every view of this item whose URL differs, a full
-                    // page reload that breaks SPA
-                    // back/forward (e.g., Facebook lightbox close via browser back).
-
-                    // Fetch updated title after SPA navigation
-                    message.webView?.evaluateJavaScript("document.title") { [weak self] result, _ in
-                        // evaluateJavaScript completion runs on main thread
-                        if let title = result as? String, !title.isEmpty {
-                            self?.updateTitle(title)
-                        }
-                    }
-
-                    // Fetch favicon for new URL
-                    Task { @MainActor [weak self] in
-                        await self?.fetchAndSetFavicon(for: url)
-                    }
-
-                    // The store coalesces writes, so SPA URL changes report directly.
-                    controller?.pageCommitted(itemID: itemID, url: url)
-                    controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
-                    if let webView = message.webView { schedulePageTextCapture(in: webView, sameDocument: true) }
-                }
-            }
+            // a page could otherwise put any URL, lock icon included, in the URL bar.
+            addressChangedWithoutLoad(in: message.webView)
 
         case "nookShortcutDetect":
             handleShortcutDetection(message: message)

@@ -3,7 +3,8 @@
 //  ExtensionManager+Updates.swift
 //  Nook
 //
-//  Automatic updates for extensions installed from the Chrome Web Store, Edge Add-ons or Firefox Add-ons.
+//  Automatic updates for extensions installed from the Chrome Web Store, Edge Add-ons or Firefox
+//  Add-ons, and the same daily pass for Safari imports and installs from before stable IDs.
 //
 
 import AppKit
@@ -21,23 +22,31 @@ extension ExtensionManager {
     func checkForExtensionUpdatesIfDue() {
         let defaults = UserDefaults.standard
         let lastCheck = defaults.double(forKey: Self.lastUpdateCheckKey)
+        let entities = (try? context.fetch(FetchDescriptor<ExtensionEntity>())) ?? []
+        // The first launch that can migrate does not wait out the day.
+        let legacyWaiting = !defaults.bool(forKey: Self.migrationTriedKey)
+            && entities.contains { Self.isLegacy(id: $0.id, sourceStore: $0.sourceStore) }
         guard !isCheckingForUpdates,
-              Date().timeIntervalSince1970 - lastCheck > Self.updateInterval
+              legacyWaiting || Date().timeIntervalSince1970 - lastCheck > Self.updateInterval
         else { return }
 
         let candidates: [(id: String, store: ExtensionStore, version: String, name: String)] =
-            ((try? context.fetch(FetchDescriptor<ExtensionEntity>())) ?? []).compactMap { entity in
+            entities.compactMap { entity in
                 guard let store = entity.sourceStore.flatMap(ExtensionStore.init(rawValue:)) else { return nil }
                 return (entity.id, store, entity.version, entity.name)
             }
-        guard !candidates.isEmpty else { return }
+        guard !entities.isEmpty else { return }
 
         isCheckingForUpdates = true
-        defaults.set(Date().timeIntervalSince1970, forKey: Self.lastUpdateCheckKey)
 
         Task(priority: .utility) { @MainActor [weak self] in
             // Stay clear of launch and activation work.
             try? await Task.sleep(for: .seconds(30))
+            // Marked once the pass starts, so a quit during the wait leaves it due.
+            defaults.set(Date().timeIntervalSince1970, forKey: Self.lastUpdateCheckKey)
+            defaults.set(true, forKey: Self.migrationTriedKey)
+            await self?.migrateLegacyInstalls()
+            await self?.refreshSafariImports()
             for candidate in candidates {
                 guard let newVersion = await WebStoreDownloader.availableUpdate(
                     extensionId: candidate.id, store: candidate.store, currentVersion: candidate.version
@@ -57,12 +66,5 @@ extension ExtensionManager {
             }
             self?.isCheckingForUpdates = false
         }
-    }
-}
-
-private extension ExtensionError {
-    var isCancelled: Bool {
-        if case .cancelled = self { return true }
-        return false
     }
 }

@@ -195,6 +195,15 @@ extension PageSession: WKNavigationDelegate {
         updateNavigationStateEnhanced(source: "didFail")
     }
 
+    // MARK: - Address Changed Without a Load
+
+    /// WebKit's own report, after it has the new address. The page script misses the Navigation
+    /// API and a pushState made from an extension's world.
+    @objc(_webView:navigation:didSameDocumentNavigation:)
+    func webView(_ webView: WKWebView, navigation: WKNavigation?, didSameDocumentNavigation type: Int) {
+        addressChangedWithoutLoad(in: webView)
+    }
+
     // MARK: - Web Process Crash Recovery
     public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         let now = Date()
@@ -315,6 +324,12 @@ extension PageSession: WKNavigationDelegate {
             decisionHandler(.cancel)
             return
         }
+        // The main frame, or no frame yet: a provider may finish in a window it opens.
+        if navigationAction.targetFrame?.isMainFrame != false, let url = navigationAction.request.url,
+           navigationInterceptor?(url) == true {
+            decisionHandler(.cancel)
+            return
+        }
         if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
            !WKWebView.handlesURLScheme(scheme), scheme != "webkit-extension", scheme != "safari-web-extension"
         {
@@ -339,6 +354,16 @@ extension PageSession: WKNavigationDelegate {
                     if $0 { openWithSystem(url) }
                 }
             }
+            return
+        }
+
+        // An extension page's view cannot show a web page, so a link out of one gets a new view.
+        if viewExtensionOrigin != nil, webView === primaryWebView, navigationAction.targetFrame?.isMainFrame == true,
+           let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+           (navigationAction.request.httpMethod ?? "GET") == "GET"
+        {
+            decisionHandler(.cancel)
+            DispatchQueue.main.async { [weak self] in self?.load(url) }
             return
         }
 

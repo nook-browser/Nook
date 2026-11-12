@@ -16,6 +16,8 @@ public protocol TabEventObserver: AnyObject {
     func tabClosed(itemID: UUID)
     func tabMoved(itemID: UUID, from oldIndex: Int?, in oldWindow: BrowserWindowState?, pinnedChanged: Bool)
     func tabPropertiesChanged(_ session: PageSession, properties: WKWebExtension.TabChangedProperties)
+    /// The page changed its own address without a load (history API, fragment). `session.url` is the new one.
+    func sameDocumentNavigation(_ session: PageSession, from old: URL)
 
     /// Lets extensions with host permissions for this URL inject before the load starts.
     func grantAccess(to url: URL, private: Bool)

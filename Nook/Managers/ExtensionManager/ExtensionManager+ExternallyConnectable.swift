@@ -584,6 +584,14 @@ extension ExtensionManager {
         try? contents.write(to: url, atomically: true, encoding: .utf8)
     }
 
+    /// The shim scripts/build-extension-compat.mjs generates, nil when the bundle lacks it.
+    private static let compatShim: String? = {
+        let shim = Bundle.main.url(forResource: "NookExtensionCompat", withExtension: "js")
+            .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+        if shim == nil { logger.error("NookExtensionCompat.js is missing from the app bundle") }
+        return shim
+    }()
+
     /// Patch an extension package for WebKit compatibility. Runs at install and on every launch
     /// so fixes in newer Nook builds reach installed extensions. It never changes the `world`
     /// an extension declared for its own content scripts.
@@ -592,7 +600,9 @@ extension ExtensionManager {
     ///   `externally_connectable` is present. `extensionId` is baked into the polyfill.
     /// - Adds `scripting` to MV2 manifests, which WebKit exposes and some MV2 extensions probe for.
     /// - Bitwarden only: adds a MAIN-world relay for its inline menu iframe height messages.
-    func patchManifestForWebKit(at manifestURL: URL, extensionId: String) {
+    /// - Store builds (`store` set): loads the compatibility shim first in every context
+    ///   (`ExtensionCompatPatcher`). File and Safari installs are left as they are.
+    func patchManifestForWebKit(at manifestURL: URL, extensionId: String, store: ExtensionStore?) {
         guard let data = try? Data(contentsOf: manifestURL),
               var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return }
@@ -903,8 +913,9 @@ extension ExtensionManager {
         // parent.postMessage(). In WKWebExtension, content scripts run in an isolated world
         // and don't receive these messages. We inject a MAIN-world script that forwards
         // iframe messages to the isolated content script.
-        let isBitwarden = (manifest["name"] as? String)?.contains("Bitwarden") == true ||
-                          extensionId == "9c120cf8-9b3a-468c-9f1f-a37f29bd519c"
+        let isBitwarden = ExtensionCompatPatcher.isBitwarden(
+            manifest: manifest, extensionId: extensionId,
+            knownIDs: BitwardenBiometricHandler.extensionIdentifiers.union(["9c120cf8-9b3a-468c-9f1f-a37f29bd519c"]))
         if isBitwarden {
             var contentScripts = manifest["content_scripts"] as? [[String: Any]] ?? []
             let bridgeExists = contentScripts.contains { entry in
@@ -987,6 +998,14 @@ extension ExtensionManager {
                 Self.logger.info("Updated nook_iframe_bridge.js for Bitwarden iframe message forwarding")
                 changed = true
             }
+        }
+
+        // --- Compatibility shim ---
+        // Last, so it sees the entries added above and leaves Nook's own alone.
+        if let identity = store.flatMap({ ExtensionCompatPatcher.Identity(rawValue: $0.rawValue) }), let shim = Self.compatShim,
+           ExtensionCompatPatcher.patch(
+               manifest: &manifest, packageAt: manifestURL.deletingLastPathComponent(), shim: shim, identity: identity) {
+            changed = true
         }
 
         if changed {

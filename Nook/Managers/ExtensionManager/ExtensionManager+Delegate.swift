@@ -328,8 +328,7 @@ extension ExtensionManager {
         }
         let parent: Parent? = configuration.shouldBePinned ? .pinned(spaceID: spaceID) : nil
         guard let itemID = openExtensionTab(
-            url, in: window, placement: configuration.shouldBeActive ? .newTab : .background,
-            parent: parent, controller: controller)
+            url, in: window, placement: configuration.shouldBeActive ? .newTab : .background, parent: parent)
         else {
             completionHandler(nil, NSError(domain: "ExtensionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not open tab"]))
             return
@@ -339,24 +338,13 @@ extension ExtensionManager {
         completionHandler(adapter(for: itemID), nil)
     }
 
-    /// Opens one tab for an extension. An extension page (popup, options, a FIDO2 or OAuth popout)
-    /// needs the extension's own configuration; without it the `webkit-extension://` URL does not
-    /// resolve and the tab renders blank.
+    /// Opens one tab for an extension. When the URL is one of its own pages, `PageSession` builds
+    /// the view from the extension's configuration; no other view can load it.
     @discardableResult
     private func openExtensionTab(
-        _ url: URL, in window: BrowserWindowState, placement: TabsController.Placement,
-        parent: Parent? = nil, controller: WKWebExtensionController
+        _ url: URL, in window: BrowserWindowState, placement: TabsController.Placement, parent: Parent? = nil
     ) -> UUID? {
-        guard let bm = browserManagerRef,
-              let itemID = bm.tabs.open(url: url, in: window, placement: placement, parent: parent)
-        else { return nil }
-        if let scheme = url.scheme?.lowercased(), scheme == "safari-web-extension" || scheme == "webkit-extension",
-           let resolvedContext = controller.extensionContext(for: url),
-           let session = bm.tabs.session(for: itemID) {
-            session.applyConfigurationOverride(
-                resolvedContext.webViewConfiguration ?? BrowserConfiguration.shared.webViewConfiguration)
-        }
-        return itemID
+        browserManagerRef?.tabs.open(url: url, in: window, placement: placement, parent: parent)
     }
 
     /// One extension page in its own window, for `chrome.windows.create({type: "popup"})`.
@@ -364,20 +352,30 @@ extension ExtensionManager {
         _ url: URL, configuration: WKWebExtension.WindowConfiguration,
         extensionContext: WKWebExtensionContext, controller: WKWebExtensionController
     ) -> ExtensionPopupWindow? {
+        openExtensionPopupWindow(url, frame: configuration.frame, focused: configuration.shouldBeFocused,
+                                 extensionContext: extensionContext, controller: controller)
+    }
+
+    /// The same window for a caller that is not WebKit: the side panel page. `closed` runs when it goes.
+    func openExtensionPopupWindow(
+        _ url: URL, frame: CGRect, focused: Bool, extensionContext: WKWebExtensionContext,
+        controller: WKWebExtensionController, closed: (() -> Void)? = nil
+    ) -> ExtensionPopupWindow? {
         guard let webConfig = extensionContext.webViewConfiguration else { return nil }
         let popup = ExtensionPopupWindow(
             url: url,
-            frame: configuration.frame,
+            frame: frame,
             configuration: webConfig,
             title: extensionContext.webExtension.displayName ?? "Extension",
             controller: controller,
-            onClose: { [weak self] closed in
-                self?.extensionPopupWindows.removeAll { $0 === closed }
+            onClose: { [weak self] window in
+                self?.extensionPopupWindows.removeAll { $0 === window }
+                closed?()
             })
         extensionPopupWindows.append(popup)
         controller.didOpenWindow(popup)
         controller.didOpenTab(popup.tab)
-        if configuration.shouldBeFocused { popup.show() } else { popup.window.orderFront(nil) }
+        if focused { popup.show() } else { popup.window.orderFront(nil) }
         Self.logger.info("Extension opened popup window \(url.lastPathComponent, privacy: .public)")
         return popup
     }
@@ -418,9 +416,9 @@ extension ExtensionManager {
         }
         // Each tab opens at the top, so open in reverse and select the first URL last.
         for url in urls.dropFirst().reversed() {
-            openExtensionTab(url, in: window, placement: .background, controller: controller)
+            openExtensionTab(url, in: window, placement: .background)
         }
-        openExtensionTab(urls[0], in: window, placement: .newTab, controller: controller)
+        openExtensionTab(urls[0], in: window, placement: .newTab)
         Self.logger.info("Extension opened window as \(urls.count) tabs in the current space")
         completionHandler(windowAdapter(for: window), nil)
     }
@@ -434,6 +432,15 @@ extension ExtensionManager {
         for extensionContext: WKWebExtensionContext,
         replyHandler: @escaping (Any?, (any Error)?) -> Void
     ) {
+        // Nook's own channel, for the compatibility shim. The calling context is the authentication.
+        if applicationId == ExtensionCompatBridge.applicationID {
+            return compatBridge.handle(message, from: extensionContext, reply: replyHandler)
+        }
+        // This extension has nativeMessaging only because Nook added it for that channel.
+        if compatBridge.mayOnlyReachBridge(extensionContext) {
+            return replyHandler(nil, Self.noNativeHostError())
+        }
+
         // Intercept Safari-specific native messages that we can handle natively.
         // Bitwarden's Safari extension sends commands via native messaging instead of
         // using web clipboard APIs.
@@ -527,6 +534,13 @@ extension ExtensionManager {
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping ((any Error)?) -> Void
     ) {
+        if port.applicationIdentifier == ExtensionCompatBridge.applicationID {
+            compatBridge.connect(port, for: extensionContext)
+            return completionHandler(nil)
+        }
+        if compatBridge.mayOnlyReachBridge(extensionContext) {
+            return completionHandler(Self.noNativeHostError())
+        }
         guard let applicationId = port.applicationIdentifier else {
             Self.logger.error("[NativeMessaging] Port connection missing application identifier")
             completionHandler(NSError(domain: "NativeMessaging", code: 1, userInfo: [NSLocalizedDescriptionKey: "No application identifier"]))
@@ -541,7 +555,7 @@ extension ExtensionManager {
         let cacheKey = nativeHostCacheKey(applicationId, extensionContext)
         if unavailableNativeHosts.contains(cacheKey) {
             guard handlesPortInProcess(applicationId, extensionContext) else {
-                completionHandler(Self.hostNotFoundError(applicationId))
+                completionHandler(Self.noNativeHostError())
                 return
             }
             Self.logger.debug("[NativeMessaging] Handling port internally for '\(applicationId, privacy: .public)' (no external host)")
@@ -564,7 +578,7 @@ extension ExtensionManager {
             self.unavailableNativeHosts.insert(cacheKey)
             guard self.handlesPortInProcess(applicationId, extensionContext) else {
                 Self.logger.info("[NativeMessaging] No allowed host '\(applicationId, privacy: .public)'; disconnecting port")
-                port.disconnect(throwing: Self.hostNotFoundError(applicationId))
+                port.disconnect(throwing: Self.noNativeHostError())
                 return
             }
             Self.logger.info("[NativeMessaging] No allowed host '\(applicationId, privacy: .public)'; handling port in-process")
@@ -581,7 +595,8 @@ extension ExtensionManager {
             || fetchEntity(id: context.uniqueIdentifier)?.sourceStore == nil
     }
 
-    private static func hostNotFoundError(_ applicationId: String) -> NSError {
+    /// What Chrome answers when an extension names a native host that does not exist.
+    private static func noNativeHostError() -> NSError {
         NSError(domain: NativeMessagingHandler.errorDomain, code: NativeMessagingHandler.ErrorCode.hostNotFound.rawValue,
                 userInfo: [NSLocalizedDescriptionKey: "Specified native messaging host not found."])
     }

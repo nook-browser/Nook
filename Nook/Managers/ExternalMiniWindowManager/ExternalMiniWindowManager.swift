@@ -34,8 +34,10 @@ final class ExternalMiniWindowManager {
         present(browserManager.tabs.openDetached(url: url, profile: profile, in: window))
     }
 
-    func present(_ page: PageSession) {
-        guard let browserManager else { return }
+    /// `closed` runs when the window goes, whether the person closed it or moved the page to a tab.
+    @discardableResult
+    func present(_ page: PageSession, closed: (() -> Void)? = nil) -> Bool {
+        guard let browserManager else { return false }
         let tabs = browserManager.tabs
         let target = page.detachedWindow?.spaceID.flatMap { tabs.space($0) }
             ?? tabs.orderedSpaces.first
@@ -49,6 +51,7 @@ final class ExternalMiniWindowManager {
             onClose: { [weak self, weak browserManager] in
                 self?.controllers[page.itemID] = nil
                 browserManager?.tabs.endDetached(page)
+                closed?()
             },
             gradientColorManager: browserManager.gradientColorManager
         )
@@ -56,6 +59,7 @@ final class ExternalMiniWindowManager {
         controllers[page.itemID] = controller
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+        return true
     }
 
     /// Returns to the window and Space captured at presentation, unless another Space is chosen.

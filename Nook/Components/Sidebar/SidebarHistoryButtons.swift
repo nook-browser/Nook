@@ -30,8 +30,8 @@ struct SidebarHistoryButtons: View {
                     NavigationHistoryContextMenu(historyType: .forward, windowState: windowState)
                 }
             Button(action: reloadOrStop) {
+                // No `.symbolEffect(.replace)` here: it held the main thread about 130 ms at each end of a load.
                 Image(systemName: session?.isLoading == true ? "xmark" : "arrow.clockwise")
-                    .contentTransition(.symbolEffect(.replace))
             }
             .accessibilityLabel(session?.isLoading == true ? "Stop Loading" : "Reload")
         }

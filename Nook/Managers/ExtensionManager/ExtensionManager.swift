@@ -65,9 +65,19 @@ final class ExtensionManager: NSObject, ObservableObject,
     // to respond on native messaging channels (keyed by applicationIdentifier).
     var internalPortHandlers: [String: any InternalNativePortHandler] = [:]
 
+    /// Extension APIs WebKit lacks, answered natively for the compatibility shim.
+    let compatBridge = ExtensionCompatBridge()
+    lazy var compatWebNavigation = ExtensionCompatWebNavigation(bridge: compatBridge)
+    lazy var compatManagement = ExtensionCompatManagement(bridge: compatBridge)
+    let compatSidePanel = ExtensionCompatSidePanel()
+    /// The app's one notification delegate. The center holds it weakly.
+    let notificationCenter = ExtensionNotificationCenter()
+
     /// Last automatic store update check, persisted so relaunches do not re-check.
     static let lastUpdateCheckKey = "Nook.Extensions.LastUpdateCheck"
     var isCheckingForUpdates = false
+    /// Ids with an install in flight.
+    var installingIDs: Set<String> = []
 
     private override init() {
         self.context = Persistence.shared.container.mainContext
@@ -77,6 +87,7 @@ final class ExtensionManager: NSObject, ObservableObject,
 
         if isExtensionSupportAvailable {
             setupExtensionController()
+            setupCompatBridge()
             loadInstalledExtensions()
             registerInternalNativePortHandlers()
             NotificationCenter.default.addObserver(

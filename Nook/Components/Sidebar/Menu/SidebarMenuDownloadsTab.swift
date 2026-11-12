@@ -244,7 +244,7 @@ struct DownloadItem: View {
         .background(isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
         .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
         .onHoverTracking { state in
-            withAnimation(NookDesign.Motion.quick) {
+            withAnimation(NookDesign.Motion.hover(state)) {
                 isHovering = state
             }
         }

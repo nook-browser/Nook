@@ -44,6 +44,9 @@ public final class PageSession: NSObject, Identifiable {
     @ObservationIgnored public internal(set) weak var detachedWindow: BrowserWindowState?
     /// Runs when the page calls `window.close()`, so Peek or the mini window can close.
     @ObservationIgnored public var onClose: (() -> Void)?
+    /// Asked about each main-frame address before it loads. True ends the navigation there:
+    /// an extension's sign-in flow stops at its redirect address, which is never loaded.
+    @ObservationIgnored public var navigationInterceptor: ((URL) -> Bool)?
     public var isDetached: Bool { detachedProfile != nil }
 
     // MARK: - Page State
@@ -204,6 +207,9 @@ public final class PageSession: NSObject, Identifiable {
     @ObservationIgnored var navigationGestureCount = 0
     /// One-shot initial-navigation suppression for a WebKit-created popup.
     @ObservationIgnored var isPopupHost: Bool = false
+    /// The extension whose pages this view was built to show (`scheme://host`), nil for a web view.
+    @ObservationIgnored public internal(set) var viewExtensionOrigin: String?
+    @ObservationIgnored private var isReplacingView = false
     /// JavaScript dialogs since the last commit, and whether the user silenced the page.
     @ObservationIgnored var jsDialogCount = 0
     @ObservationIgnored var jsDialogsSuppressed = false
@@ -317,7 +323,13 @@ public final class PageSession: NSObject, Identifiable {
         defer { BrowserPerformance.signposter.endInterval("WebViewCreation", interval) }
         let resolvedProfile = profile
         let configuration: WKWebViewConfiguration
-        if let resolvedProfile {
+        if let ownersConfiguration = extensionConfiguration(for: url) {
+            // Handlers are keyed by name, so the view gets a controller of its own. Nook's page
+            // scripts and rule lists are for web pages and stay off an extension's.
+            ownersConfiguration.userContentController = WKUserContentController()
+            configuration = ownersConfiguration
+            viewExtensionOrigin = Self.extensionOrigin(of: url)
+        } else if let resolvedProfile {
             configuration = BrowserConfiguration.shared.webViewConfiguration(for: resolvedProfile)
         } else {
             // Edge case: no profile yet. Delay creating WKWebView until one resolves.
@@ -402,6 +414,32 @@ public final class PageSession: NSObject, Identifiable {
         }
     }
 
+    /// `scheme://host` of an extension page's URL, nil for any other URL.
+    public static func extensionOrigin(of url: URL) -> String? {
+        guard let scheme = url.scheme?.lowercased(), scheme == "webkit-extension" || scheme == "safari-web-extension",
+              let host = url.host?.lowercased(), !host.isEmpty
+        else { return nil }
+        return scheme + "://" + host
+    }
+
+    /// The configuration of the loaded extension that owns `url`. WebKit serves an extension's
+    /// page only to a view built from it. Private, Agent, Peek and mini window pages get none.
+    private func extensionConfiguration(for url: URL) -> WKWebViewConfiguration? {
+        guard Self.extensionOrigin(of: url) != nil, !isPrivate, !isAgentPage, !isDetached else { return nil }
+        return controller?.tabEvents?.nativeController?.extensionContext(for: url)?.webViewConfiguration
+    }
+
+    /// Drops the view and loads `newURL` in a new one. Back and forward history does not carry over.
+    private func replaceView(toLoad newURL: URL) {
+        isReplacingView = true
+        defer { isReplacingView = false }
+        unload()
+        savedHistory = nil
+        url = newURL
+        loadWebViewIfNeeded()
+        controller?.refreshWindows(showing: itemID)
+    }
+
     /// Handlers, user agent and preferences shared by primary, clone and popup views.
     /// The view's controller must belong to this view alone: handlers are keyed by name.
     public func configure(_ webView: WKWebView) {
@@ -447,14 +485,6 @@ public final class PageSession: NSObject, Identifiable {
         }
     }
 
-    /// Updates the extension controller on the existing web view.
-    public func applyConfigurationOverride(_ configuration: WKWebViewConfiguration) {
-        guard let existing = primaryWebView else { return }
-        if let extensionController = configuration.webExtensionController {
-            existing.configuration.webExtensionController = extensionController
-        }
-    }
-
     /// Releases every web view for this page (primary and window clones) and resets
     /// live state. The item and its URL stay; selecting it again loads a fresh view.
     public func unload() {
@@ -474,6 +504,7 @@ public final class PageSession: NSObject, Identifiable {
         // WebKit only supplies the original popup navigation. A replacement view must load the
         // saved URL through the normal setup path.
         isPopupHost = false
+        viewExtensionOrigin = nil
         primaryWindowId = nil
         // The next view announces itself again (activation included).
         didNotifyOpenToExtensions = false
@@ -557,6 +588,15 @@ public final class PageSession: NSObject, Identifiable {
     }
 
     public func load(_ newURL: URL) {
+        // A view shows web pages or one extension's pages. Crossing over takes a new view.
+        // A popup's view is WebKit's and stays as it is.
+        if primaryWebView != nil, !isPopupHost, !isReplacingView {
+            let wanted = extensionConfiguration(for: newURL) != nil ? Self.extensionOrigin(of: newURL) : nil
+            if wanted != viewExtensionOrigin {
+                replaceView(toLoad: newURL)
+                return
+            }
+        }
         url = newURL
         // A new page on an unloaded session starts fresh instead of restoring, then leaving, the old one.
         savedHistory = nil

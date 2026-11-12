@@ -37,7 +37,7 @@ public struct NookIconButtonStyle: ButtonStyle {
         .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
         .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
         .animation(NookDesign.Motion.quick, value: configuration.isPressed)
-        .animation(NookDesign.Motion.quick, value: isHovering)
+        .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
         .onHoverTracking { hovering in isHovering = hovering }
     }
 
@@ -90,7 +90,7 @@ public struct RectNavButtonStyle: ButtonStyle {
             .contentTransition(.symbolEffect(.replace.upUp.byLayer, options: .nonRepeating))
             .scaleEffect(configuration.isPressed && isEnabled ? 0.95 : 1.0)
             .animation(NookDesign.Motion.quick, value: configuration.isPressed)
-            .animation(NookDesign.Motion.quick, value: isHovering)
+            .animation(NookDesign.Motion.hover(isHovering), value: isHovering)
             .onHoverTracking { hovering in
                 isHovering = hovering
             }

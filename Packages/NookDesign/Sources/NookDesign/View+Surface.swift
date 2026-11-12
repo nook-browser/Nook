@@ -74,13 +74,28 @@ public extension View {
 /// Native tab interaction; Reduce Motion keeps the pressed card at its original scale.
 public struct NookTabButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let onPress: (() -> Void)?
 
-    public init() {}
+    /// `onPress` runs as the button goes down, ahead of the action on release.
+    public init(onPress: (() -> Void)? = nil) { self.onPress = onPress }
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? NookDesign.Tab.pressScale : 1)
             .animation(reduceMotion ? nil : NookDesign.Motion.quick, value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, pressed in if pressed { onPress?() } }
+    }
+}
+
+/// A plain button that reports the press, so a favorite selects before the click ends.
+public struct NookPressButtonStyle: ButtonStyle {
+    private let onPress: () -> Void
+
+    public init(onPress: @escaping () -> Void) { self.onPress = onPress }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, pressed in if pressed { onPress() } }
     }
 }
 
