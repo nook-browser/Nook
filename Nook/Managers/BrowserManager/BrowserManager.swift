@@ -401,8 +401,6 @@ class BrowserManager: ObservableObject {
     var cookieManager: CookieManager
     var cacheManager: CacheManager
     var extensionManager: ExtensionManager?
-    /// Store ids an import found, installed once a browser window can show their permission sheets.
-    var pendingExtensionImports: [String] = []
     var compositorManager: TabCompositorManager
     var splitManager: SplitViewManager
     var gradientColorManager: GradientColorManager
@@ -993,7 +991,6 @@ class BrowserManager: ObservableObject {
         windowSpaceChanged(windowState)
         applyStartupLoadMode(for: windowState)
         restoreSavedWindows()
-        installPendingExtensionImports()
     }
 
     /// Set the active window state (called when a window gains focus)

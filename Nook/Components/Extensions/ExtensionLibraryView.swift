@@ -264,11 +264,9 @@ struct ExtensionLibraryView: View {
 
     /// Extensions come from the Chrome Web Store, whose pages get Nook's install button.
     private func openWebStore() {
-        browserManager.tabs.open(url: Self.webStoreURL, in: windowState, placement: .newTab)
+        browserManager.tabs.open(url: ExtensionStore.chromeWebStoreURL, in: windowState, placement: .newTab)
         onDismiss()
     }
-
-    private static let webStoreURL = URL(string: "https://chromewebstore.google.com/category/extensions")!
 
     private func clear(cache: Bool) {
         guard let host = currentHost else { return }

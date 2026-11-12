@@ -76,7 +76,52 @@ struct BrowserImportDialog: DialogPresentable {
                 alert.informativeText = "Nook didn't find any Arc spaces on this Mac."
             }
             alert.runModal()
+            let choices = await manager.extensionChoices(includingArc: true)
+            guard !choices.isEmpty else { return }
+            manager.dialogManager.showDialog(
+                ExtensionImportDialog(choices: choices) { chosen in
+                    manager.closeDialog()
+                    manager.extensionManager?.install(chosen)
+                },
+                closesOnBackdropClick: false
+            )
         }
+    }
+}
+
+struct ExtensionImportDialog: DialogPresentable {
+    let choices: [ExtensionChoice]
+    let onDone: ([ExtensionOffer]) -> Void
+
+    @State private var selection: ExtensionSelection
+
+    init(choices: [ExtensionChoice], onDone: @escaping ([ExtensionOffer]) -> Void) {
+        self.choices = choices
+        self.onDone = onDone
+        _selection = State(initialValue: ExtensionSelection(choices))
+    }
+
+    func dialogHeader() -> DialogHeader {
+        DialogHeader(
+            icon: "puzzlepiece.extension",
+            title: "Bring your extensions",
+            subtitle: ExtensionChoiceList.subtitle(for: choices)
+        )
+    }
+
+    func dialogContent() -> some View {
+        ExtensionChoiceList(choices: choices, selection: $selection)
+    }
+
+    func dialogFooter() -> DialogFooter {
+        DialogFooter(
+            rightButtons: [
+                DialogButton(text: "Skip") { onDone([]) },
+                DialogButton(text: selection.installTitle, variant: .primary, keyboardShortcut: .return) {
+                    onDone(selection.chosen(from: choices))
+                },
+            ]
+        )
     }
 }
 

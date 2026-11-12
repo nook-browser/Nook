@@ -26,6 +26,11 @@ final class ExtensionManager: NSObject, ObservableObject,
     @Published var isExtensionSupportAvailable: Bool = false
     @Published var isPopupActive: Bool = false
     @Published var extensionsLoaded: Bool = false
+    /// Safari extensions found in the Applications folders; nil until the first scan finishes.
+    @Published var safariExtensions: [SafariExtensionInfo]?
+    var safariScan: Task<Void, Never>?
+    /// The last install from an import list, kept after it finishes until the next one starts.
+    @Published var listInstallProgress: ListInstallProgress?
     // Scope: extensions are global. One controller, one install/enabled state, and one
     // storage namespace shared by every space. Private windows run only extensions the person
     // allowed there (`hasAccessToPrivateData`).
@@ -155,7 +160,7 @@ final class ExtensionManager: NSObject, ObservableObject,
     func hasStoreVerifiedChromeID(_ context: WKWebExtensionContext) -> Bool {
         let id = context.uniqueIdentifier
         guard ExtensionStore.isValidExtensionID(id),
-              let store = fetchEntity(id: id)?.sourceStore.flatMap(ExtensionStore.init(rawValue:))
+              let store = fetchEntity(id: id)?.source.store
         else { return false }
         return store == .chrome || store == .edge
     }
