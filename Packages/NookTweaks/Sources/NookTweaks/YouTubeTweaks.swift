@@ -78,8 +78,7 @@ public enum YouTubeTweaks {
         let current = all.first { $0.source.hasPrefix(marker) }?.source
         guard current != source else { return }
 
-        ucc.removeAllUserScripts()
-        others.forEach { ucc.addUserScript($0) }
+        ucc.resetUserScripts(to: others)
         if let source {
             ucc.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
         }

@@ -82,8 +82,7 @@ public final class SponsorBlockManager {
         guard current != markedSource else { return }
 
         let remaining = all.nookOwned.filter { !$0.source.hasPrefix(marker) }
-        ucc.removeAllUserScripts()
-        remaining.forEach { ucc.addUserScript($0) }
+        ucc.resetUserScripts(to: remaining)
 
         let userScript = WKUserScript(
             source: markedSource,

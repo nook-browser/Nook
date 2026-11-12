@@ -64,8 +64,7 @@ public enum SocialImageTweaks {
         guard wanted != current else { return }
 
         let others = all.nookOwned.filter { !$0.source.hasPrefix(marker) && !$0.source.hasPrefix(pageMarker) }
-        ucc.removeAllUserScripts()
-        others.forEach { ucc.addUserScript($0) }
+        ucc.resetUserScripts(to: others)
         ucc.removeScriptMessageHandler(forName: handlerName, contentWorld: world)
         guard let wanted else { return }
         ucc.add(Handler.shared, contentWorld: world, name: handlerName)

@@ -39,8 +39,7 @@ public enum FacebookTweaks {
         let others = all.nookOwned.filter { !$0.source.hasPrefix(marker) }
         let current = all.first { $0.source.hasPrefix(marker) }?.source
         guard current != source else { return }
-        ucc.removeAllUserScripts()
-        others.forEach { ucc.addUserScript($0) }
+        ucc.resetUserScripts(to: others)
         if let source {
             // Page world: the hook has to replace the JSON.parse Facebook's own code calls.
             ucc.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page))

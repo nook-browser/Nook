@@ -194,8 +194,7 @@ public enum RedditTweaks {
         let installed = all.contains { $0.source.hasPrefix(marker) }
         guard installed != settings.redditSortHot else { return }
         let others = all.nookOwned.filter { !$0.source.hasPrefix(marker) }
-        ucc.removeAllUserScripts()
-        others.forEach { ucc.addUserScript($0) }
+        ucc.resetUserScripts(to: others)
         if settings.redditSortHot {
             ucc.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
         }

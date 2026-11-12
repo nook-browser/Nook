@@ -792,6 +792,10 @@ final class DevMCPServer {
                         entry["pid"] = wv.nookWebProcessIdentifier
                         entry["inWindow"] = wv.window != nil
                         entry["visibility"] = (try? await wv.evaluateJavaScript("document.visibilityState")) as? String ?? ""
+                        // Every script rides in each new process's CreateWebPage message; a climbing count is a leak.
+                        let scripts = wv.configuration.userContentController.userScripts
+                        entry["userScripts"] = scripts.count
+                        entry["userScriptBytes"] = scripts.reduce(0) { $0 + $1.source.utf8.count }
                     }
                     pages.append(entry)
                 }

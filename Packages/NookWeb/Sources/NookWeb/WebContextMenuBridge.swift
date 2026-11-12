@@ -209,8 +209,7 @@ public final class WebContextMenuBridge: NSObject, WKScriptMessageHandler, WKScr
                 ucc.addUserScript(previewUserScript)
             } else {
                 let others = all.nookOwned.filter { !$0.source.hasPrefix(previewMarker) }
-                ucc.removeAllUserScripts()
-                others.forEach { ucc.addUserScript($0) }
+                ucc.resetUserScripts(to: others)
             }
         }
     }

@@ -367,9 +367,7 @@ public final class ContentBlockerManager: NSObject {
         // always compared content here; this one did not.
         guard current != script?.source else { return }
 
-        ucc.removeAllUserScripts()
-        if let script { ucc.addUserScript(script) }
-        others.forEach { ucc.addUserScript($0) }
+        ucc.resetUserScripts(to: (script.map { [$0] } ?? []) + others)
     }
 
     // MARK: - New controllers (from BrowserConfiguration.freshUserContentController)
@@ -455,8 +453,7 @@ public final class ContentBlockerManager: NSObject {
         let ours = all.nookOwned
         let remaining = ours.filter { script in !markers.contains { script.source.hasPrefix($0) } }
         guard remaining.count != ours.count else { return }
-        ucc.removeAllUserScripts()
-        remaining.forEach { ucc.addUserScript($0) }
+        ucc.resetUserScripts(to: remaining)
     }
 
     private func session(for webView: WKWebView) -> (any BlockablePage)? {

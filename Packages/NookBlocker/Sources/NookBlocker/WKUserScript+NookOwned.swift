@@ -34,3 +34,15 @@ extension Array where Element == WKUserScript {
     /// The subset safe to re-add after `removeAllUserScripts()`.
     public var nookOwned: [WKUserScript] { filter(\.isNookOwned) }
 }
+
+extension WKUserContentController {
+    /// Clears the scripts and re-adds `scripts`, skipping any WebKit kept. removeAllUserScripts() leaves
+    /// extension content scripts in place, and some begin with `// Nook`, so re-adding them stacked a copy per call.
+    public func resetUserScripts(to scripts: [WKUserScript]) {
+        removeAllUserScripts()
+        var kept = userScripts.reduce(into: [String: Int]()) { $0[$1.source, default: 0] += 1 }
+        for script in scripts {
+            if let n = kept[script.source], n > 0 { kept[script.source] = n - 1 } else { addUserScript(script) }
+        }
+    }
+}
