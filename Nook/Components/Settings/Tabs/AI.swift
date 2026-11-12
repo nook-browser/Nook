@@ -32,6 +32,18 @@ struct SettingsAITab: View {
     var body: some View {
         @Bindable var settings = nookSettings
         Form {
+            Section {
+                Toggle(isOn: $settings.showAIAssistant) {
+                    VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                        Text("AI Assistant")
+                            .font(NookDesign.Font.body)
+                        Text("Shows the chat button in the sidebar and toolbar")
+                            .font(NookDesign.Font.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             // MARK: - Tab Organizer
             Section {
                 if let note = TabOrganizationModel.unavailableNote {
