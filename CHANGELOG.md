@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.6.0
+
+### Added
+
+- More store extensions work, extension pages open in tabs
+- Extension sign-in without a window
+- Consent sheet lists extra extension permissions
+- Assistant toggle in Settings
+
+### Changed
+
+- Tabs and favorites select on press
+- Hover highlights show at once
+- Smoother page loads
+
+### Fixed
+
+- Escape stays in the page in full screen
+- Cmd-Z undoes typing
+- Address follows in-page Back
+- Older extension installs keep their data
+- Updated extensions keep their background
+- Bugs
+
 ## 1.5.0
 
 ### Added
