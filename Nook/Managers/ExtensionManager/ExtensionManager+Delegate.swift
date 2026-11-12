@@ -540,6 +540,10 @@ extension ExtensionManager {
         // Instead, keep the port alive and handle known commands (clipboard, popover).
         let cacheKey = nativeHostCacheKey(applicationId, extensionContext)
         if unavailableNativeHosts.contains(cacheKey) {
+            guard handlesPortInProcess(applicationId, extensionContext) else {
+                completionHandler(Self.hostNotFoundError(applicationId))
+                return
+            }
             Self.logger.debug("[NativeMessaging] Handling port internally for '\(applicationId, privacy: .public)' (no external host)")
             setupInternalPortHandler(port: port, extensionContext: extensionContext, applicationId: applicationId)
             completionHandler(nil)
@@ -558,11 +562,28 @@ extension ExtensionManager {
             guard let self, !hostFound else { return }
             self.nativeMessagingHandlers.removeAll { $0 === handler }
             self.unavailableNativeHosts.insert(cacheKey)
+            guard self.handlesPortInProcess(applicationId, extensionContext) else {
+                Self.logger.info("[NativeMessaging] No allowed host '\(applicationId, privacy: .public)'; disconnecting port")
+                port.disconnect(throwing: Self.hostNotFoundError(applicationId))
+                return
+            }
             Self.logger.info("[NativeMessaging] No allowed host '\(applicationId, privacy: .public)'; handling port in-process")
             // Keep the port alive so Safari extension commands (clipboard, popover) still work.
             self.setupInternalPortHandler(port: port, extensionContext: extensionContext, applicationId: applicationId)
         }
         completionHandler(nil)
+    }
+
+    /// Safari and file installs expect their host app on the port, so a missing host is answered
+    /// in-process. A store install gets Chrome's disconnect and falls back on its own (1Password).
+    private func handlesPortInProcess(_ applicationId: String, _ context: WKWebExtensionContext) -> Bool {
+        internalHandler(for: applicationId, context: context) != nil
+            || fetchEntity(id: context.uniqueIdentifier)?.sourceStore == nil
+    }
+
+    private static func hostNotFoundError(_ applicationId: String) -> NSError {
+        NSError(domain: NativeMessagingHandler.errorDomain, code: NativeMessagingHandler.ErrorCode.hostNotFound.rawValue,
+                userInfo: [NSLocalizedDescriptionKey: "Specified native messaging host not found."])
     }
 
     /// Host availability depends on the calling extension (allowed_origins), so cache per pair.
