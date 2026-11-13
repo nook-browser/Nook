@@ -37,21 +37,23 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
 
     private var nsWindow: NSWindow? { state?.window }
 
-    // ponytail: no query cache; displayOrder is cheap and a generation cache missed tree moves.
+    // The order comes from `ExtensionManager.tabOrder(in:)`, kept per space: one query reads it
+    // several times per tab, and Observation drops it when the trees, open folders or device
+    // state change.
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
         guard let state else { return nil }
-        let tabs = browserManager.tabs
-        if let front = ExtensionManager.shared.detachedAdapters(in: state).first(where: { $0.isInFront }) {
+        let manager = ExtensionManager.shared
+        if let front = manager.detachedAdapters(in: state).first(where: { $0.isInFront }) {
             return front
         }
-        guard let itemID = tabs.selectedItemID(in: state) ?? tabs.displayOrder(in: state).first else { return nil }
-        return ExtensionManager.shared.adapter(for: itemID)
+        guard let itemID = browserManager.tabs.selectedItemID(in: state) ?? manager.tabOrder(in: state).ids.first else { return nil }
+        return manager.adapter(for: itemID)
     }
 
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
         guard let state else { return [] }
-        let items = browserManager.tabs.displayOrder(in: state).compactMap { ExtensionManager.shared.adapter(for: $0) }
-        return items + ExtensionManager.shared.detachedAdapters(in: state)
+        let manager = ExtensionManager.shared
+        return manager.adapters(in: state) + manager.detachedAdapters(in: state)
     }
 
     func frame(for extensionContext: WKWebExtensionContext) -> CGRect {
@@ -200,7 +202,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
             return page.detachedWindow.flatMap { $0.privateTree == nil ? $0 : nil } ?? active ?? regular.first
         }
         let candidates = (active.map { [$0] } ?? []) + regular.filter { $0 !== active }
-        return candidates.first { tabs.displayOrder(in: $0).contains(itemID) } ?? active ?? regular.first
+        return candidates.first { ExtensionManager.shared.tabOrder(in: $0).contains(itemID) } ?? active ?? regular.first
     }
 
     private func error(_ code: Int, _ message: String) -> NSError {
@@ -226,8 +228,8 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
 
     func indexInWindow(for extensionContext: WKWebExtensionContext) -> Int {
         guard let window = hostWindow else { return 0 }
-        let order = tabs.displayOrder(in: window)
-        return order.firstIndex(of: itemID) ?? (detached != nil ? order.count : 0)
+        let order = ExtensionManager.shared.tabOrder(in: window)
+        return order.index(of: itemID) ?? (detached != nil ? order.count : 0)
     }
 
     func isLoadingComplete(for extensionContext: WKWebExtensionContext) -> Bool {

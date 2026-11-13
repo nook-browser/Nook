@@ -42,6 +42,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     /// Items the controller has been told about via didOpenTab. Other tab events are only
     /// forwarded for these, so never-loaded pages stay invisible to extensions.
     var openedTabIDs: Set<UUID> = []
+    /// Each space's tab order for the adapters, kept until the tab model changes.
+    let tabOrders = ExtensionTabOrderCache()
     /// One adapter per window, by BrowserWindowState id.
     var windowAdapters: [UUID: ExtensionWindowAdapter] = [:]
     /// Live `chrome.windows.create({type: "popup"})` windows; each removes itself when closed.
