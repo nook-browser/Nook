@@ -599,7 +599,7 @@
     rewire(root.runtime.onConnect, function (f, args) {
       var port = args[0];
       // The link to the worker is the shim's own port.
-      if (port && (port.name === LINK || port.name === PAGE_LINK)) return f.nookLink ? f.apply(this, args) : undefined;
+      if (isLink(port)) return f.nookLink ? f.apply(this, args) : undefined;
       if (f.nookLink) return undefined;
       try { if (port && windowless(port.sender && port.sender.tab)) delete port.sender.tab; } catch (e) {}
       return f.apply(this, args);
@@ -609,7 +609,8 @@
   // WebKit connects no extension page to the extension's service worker: clients.matchAll() is empty in the worker and
   // ServiceWorker.postMessage from a page arrives nowhere. Both run over one runtime port: the offscreen document's
   // from its start, as the worker's client, and any other page's from the first message it posts.
-  var LINK = 'nook.compat.worker', PAGE_LINK = LINK + '.page';
+  var LINK = 'nook.compat.worker', PAGE_LINK = LINK + '.page', SHOWN_LINK = LINK + '.shown';
+  function isLink(port) { return !!port && (port.name === LINK || port.name === PAGE_LINK || port.name === SHOWN_LINK); }
   // ponytail: messages cross as JSON, so an ArrayBuffer or a Blob does not survive, and a port sent through a port is dropped.
   function link(port, side, deliver) {
     var ports = {}, made = 0;
@@ -618,7 +619,7 @@
       local.onmessage = function (e) { try { port.postMessage({ to: key, data: e.data }); } catch (x) {} };
     }
     port.onMessage.addListener(function (m) {
-      if (!m) return;
+      if (!m || m.nook) return;
       if (m.to !== undefined) { if (ports[m.to]) ports[m.to].postMessage(m.data); return; }
       deliver(m.data, (m.ports || []).map(function (key) { var c = new MessageChannel(); relay(c.port2, key); return c.port1; }));
     });
@@ -629,21 +630,32 @@
     };
   }
 
-  // In the worker: the offscreen document is a client, as in Chrome, where extensions find theirs with clients.matchAll().
+  // In the worker: the offscreen document is a client, as in Chrome, where extensions find theirs with clients.matchAll(),
+  // and so is each page that shows, which is how a worker learns that its popup is open (1Password).
   function workerClients(root) {
     var clients = g.clients;
-    if (!clients || typeof clients.matchAll !== 'function' || !root.offscreen || keep.indexOf(clients) >= 0) return;
+    if (!clients || typeof clients.matchAll !== 'function' || keep.indexOf(clients) >= 0) return;
     keep.push(clients);
-    var pages = [], waiting = [], count = 0;
+    var pages = [], shown = [], waiting = [], count = 0;
     var onLink = function (port) {
-      var client = { id: 'nook-offscreen-' + (++count), url: (port.sender && port.sender.url) || '', type: 'window', frameType: 'top-level', focused: false, visibilityState: 'hidden' };
+      var url = (port.sender && port.sender.url) || '', isShown = port.name === SHOWN_LINK;
+      // A build made for Chrome looks for its pages under Chrome's scheme. The offscreen document is looked up by getURL.
+      if (isShown && IDENTITY !== 'firefox') url = url.replace(/^[a-z-]+:\/\/[^\/]+/, 'chrome-extension://' + root.runtime.id);
+      var client = { id: 'nook-' + (isShown ? 'page-' : 'offscreen-') + (++count), url: url, type: 'window', frameType: 'top-level', focused: isShown, visibilityState: isShown ? 'visible' : 'hidden' };
       client.postMessage = link(port, 'w', function (data, ports) {
         var e = new MessageEvent('message', { data: data, ports: ports });
         Object.defineProperty(e, 'source', { value: client });
         e.waitUntil = function () {};
         g.dispatchEvent(e);
       });
-      // Only the offscreen document is listed as a client. Another page is answered through the message's source.
+      // A page that shows is listed until it says it is gone. WebKit tells a worker nothing when a port from one of
+      // its extension's own pages closes (measured), so the page says so itself.
+      if (isShown) {
+        shown.push(client);
+        port.onMessage.addListener(function (m) { if (m && m.nook === 'gone') shown = shown.filter(function (c) { return c !== client; }); });
+        return;
+      }
+      // Of the rest only the offscreen document is listed. Another page is answered through the message's source.
       if (port.name !== LINK) return;
       pages.push(client);
       port.onDisconnect.addListener(function () { pages = pages.filter(function (c) { return c !== client; }); });
@@ -656,16 +668,17 @@
       var type = (options && options.type) || 'window';
       return matchAll.call(clients, options).then(function (found) {
         if (type !== 'window' && type !== 'all') return found;
-        if (pages.length) return found.concat(pages);
+        function all() { return found.concat(pages, shown); }
+        if (pages.length || !root.offscreen) return all();
         // A restarted worker has no link yet to a document that outlived the last one. Nook asks the document for it.
         return native('offscreen', 'link').then(function (exists) {
-          if (!exists || pages.length) return found.concat(pages);
-          return new Promise(function (done) { waiting.push(done); setTimeout(done, 2000); }).then(function () { return found.concat(pages); });
-        }, function () { return found; });
+          if (!exists || pages.length) return all();
+          return new Promise(function (done) { waiting.push(done); setTimeout(done, 2000); }).then(all);
+        }, all);
       });
     };
     clients.get = function (id) {
-      var mine = pages.filter(function (c) { return c.id === id; })[0];
+      var mine = pages.concat(shown).filter(function (c) { return c.id === id; })[0];
       return mine ? Promise.resolve(mine) : get.call(clients, id);
     };
   }
@@ -701,6 +714,50 @@
     try { open(); } catch (e) {}
   }
 
+  // Chrome counts an extension's open pages among its worker's clients. Here each top-level page holds a port to the
+  // worker for as long as it shows, and the worker lists it.
+  // ponytail: a page that outlives its worker is listed again only once it is next shown.
+  function shownPages(root) {
+    var event = root.runtime.onConnect, doc = g.document, port = null;
+    if (inBackground(root)) {
+      // With an offscreen document, windowlessTabs has already kept the shim's ports from the extension's listeners.
+      if (keep.indexOf(event) < 0) {
+        rewire(event, function (f, args) {
+          if (isLink(args[0])) return f.nookLink ? f.apply(this, args) : undefined;
+          if (!f.nookLink) return f.apply(this, args);
+          // Nobody but the shim listens, under either name of the namespace: the port closes, as with no listener at all.
+          if (!roots.some(function (r) { return r.runtime.onConnect.hasListeners(); })) { try { args[0].disconnect(); } catch (e) {} }
+          return undefined;
+        });
+      }
+      workerClients(root);
+      return;
+    }
+    // Given scripts as well as a worker, WebKit runs the scripts as a page, and a page has no clients (measured).
+    var background = root.runtime.getManifest().background || {}, worker = background.service_worker && !background.scripts && !background.page;
+    if (!BACKGROUND_SHIM || !worker || !doc || g.top !== g || keep.indexOf(doc) >= 0) return;
+    keep.push(doc);
+    // WebKit loads a popup before it shows it, and the worker may ask in between: a popup counts until it has shown.
+    var loading = false;
+    try { loading = root.extension.getViews({ type: 'popup' }).indexOf(g) >= 0; } catch (e) {}
+    function show(e) {
+      var leaving = !!e && e.type === 'pagehide', sw = g.navigator && g.navigator.serviceWorker;
+      if (leaving || doc.visibilityState === 'visible') loading = false;
+      var visible = !leaving && (loading || doc.visibilityState === 'visible');
+      if (visible === !!port) return;
+      try {
+        if (!visible) { port.postMessage({ nook: 'gone' }); port.disconnect(); port = null; return; }
+        port = root.runtime.connect({ name: SHOWN_LINK });
+        link(port, 'p', function (data, ports) { if (sw) sw.dispatchEvent(new MessageEvent('message', { data: data, ports: ports })); });
+        port.onDisconnect.addListener(function () { port = null; });
+      } catch (e) { port = null; }
+    }
+    doc.addEventListener('visibilitychange', show);
+    // A popup that closes is told so here, whether or not it ever counted as visible.
+    if (g.addEventListener) { g.addEventListener('pagehide', show); g.addEventListener('pageshow', show); }
+    show();
+  }
+
   // What Chrome defines and WebKit lacks in the namespaces both have, and the few namespaces whose absence stops a background script at startup.
   function tables() { return __NOOK_TABLES__; }
   function surface(root) {
@@ -717,6 +774,7 @@
     if (!inExtensionOrigin) return;
     var T = tables();
     bridged(root, T);
+    shownPages(root);
     Object.keys(T.enums).forEach(function (path) { add(root, path, function () { return T.enums[path]; }); });
     T.events.forEach(function (path) { add(root, path, inertEvent); });
     // A build told it runs in Chrome calls Chrome's functions without asking whether they exist.
