@@ -8,32 +8,37 @@
 //
 
 import SwiftUI
+import NookDesign
 import NookWeb
 
 struct LoadErrorView: View {
     let session: PageSession
 
+    // The scene and the text keep a reading width however wide the page is.
+    private static let sceneWidth: CGFloat = 480, textWidth: CGFloat = 420, margin: CGFloat = 32
+    private static let titleFont = Font.system(size: 22, weight: .semibold, design: .serif)
+
     var body: some View {
         if let error = session.loadError {
             let host = error.url.host ?? error.url.absoluteString
             let copy = Self.copy(for: error, host: host)
-            VStack(spacing: 24) {
+            VStack(spacing: NookDesign.Spacing.xxxl) {
                 NookCornerScene(lampLit: error.kind != .offline)
-                    .frame(maxWidth: 480)
-                VStack(spacing: 8) {
+                    .frame(maxWidth: Self.sceneWidth)
+                VStack(spacing: NookDesign.Spacing.md) {
                     Text(copy.title)
-                        .font(.system(size: 22, weight: .semibold, design: .serif))
+                        .font(Self.titleFont)
                         .accessibilityAddTraits(.isHeader)
                     Text(copy.body)
                         .font(.body)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                .frame(maxWidth: 420)
+                .frame(maxWidth: Self.textWidth)
                 DialogFooter(rightButtons: buttons)
                     .fixedSize()
             }
-            .padding(32)
+            .padding(Self.margin)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(NSColor.windowBackgroundColor))
         }
