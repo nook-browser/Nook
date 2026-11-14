@@ -359,7 +359,8 @@ assert.equal(notifying.run('chrome.identity'), undefined);
 // The offscreen document and the worker. WebKit joins neither to the other as a service worker client,
 // so clients.matchAll() and postMessage in both directions run over one runtime port.
 function portPair(name, sender) {
-    const end = () => { const heard = []; return { name, sender, heard, onMessage: { addListener: f => heard.push(f) }, onDisconnect: { addListener() {} } }; };
+    // Closing one end tells the other nothing, as between an extension's own contexts in WebKit.
+    const end = () => { const heard = []; return { name, sender, heard, closed: 0, onMessage: { addListener: f => heard.push(f) }, onDisconnect: { addListener() {} }, disconnect() { this.closed++; } }; };
     const a = end(), b = end();
     a.postMessage = m => { const copy = JSON.parse(JSON.stringify(m)); queueMicrotask(() => b.heard.forEach(f => f(copy))); };
     b.postMessage = m => { const copy = JSON.parse(JSON.stringify(m)); queueMicrotask(() => a.heard.forEach(f => f(copy))); };
@@ -441,6 +442,86 @@ assert.equal(orphan.run(`new ServiceWorker().postMessage('x')`), undefined);
 assert.equal(pageLinks, 1);
 assert.equal((await worker.run('clients.matchAll()')).length, 1);
 assert.equal(worker.run('ownPorts.length'), 0);
+
+// A page that shows is one of its worker's clients under Chrome's scheme, with or without an offscreen document:
+// 1Password's worker asks whether its popup is open before it tells the popup anything. Hidden, the page is gone.
+const plainWorker = load('chrome', 'extension', { globals: dom, before: `
+  globalThis.registration = {};
+  globalThis.dispatchEvent = () => {};
+  globalThis.clients = { matchAll: () => Promise.resolve([]), get: () => Promise.resolve(undefined) };` });
+plainWorker.run(`globalThis.ownPorts = []; chrome.runtime.onConnect.addListener(p => ownPorts.push(p.name));`);
+let shownLinks = 0;
+const connectShown = info => { shownLinks++; const [mine, theirs] = portPair(info.name, { url: 'webkit-extension://abc/popup/index.html#x' });
+                               queueMicrotask(() => plainWorker.context.chrome.runtime.onConnect.fire(theirs)); return mine; };
+const shownPage = (doc, { extra = '', ...options } = {}) => load('chrome', 'extension', { ...options, globals: { ...dom, CONNECT: connectShown, document: doc }, before: `
+  globalThis.top = globalThis;
+  ${extra}
+  navigator.serviceWorker = new EventTarget();
+  globalThis.got = [];
+  navigator.serviceWorker.addEventListener('message', e => got.push(e.data));
+  chrome.runtime.getManifest = () => ({ name: 'N', version: '1.2', background: globalThis.BOTH ? { service_worker: 'sw.js', scripts: ['bg.js'] } : { service_worker: 'sw.js' } });
+  chrome.runtime.connect = CONNECT;` });
+const shownClients = async () => JSON.stringify((await plainWorker.run(`clients.matchAll({ type: 'window' })`)).map(c => c.url + ' ' + c.visibilityState));
+const popupDocument = Object.assign(new EventTarget(), { visibilityState: 'visible' });
+const popup = shownPage(popupDocument);
+await pause(10);
+assert.equal(await shownClients(), '["chrome-extension://abc/popup/index.html#x visible"]');
+plainWorker.run(`clients.matchAll().then(found => found[0].postMessage('to popup'))`);
+await pause(10);
+assert.equal(popup.run('got.join()'), 'to popup');
+popupDocument.visibilityState = 'hidden';
+popupDocument.dispatchEvent(new Event('visibilitychange'));
+await pause(10);
+assert.equal(await shownClients(), '[]');
+popupDocument.visibilityState = 'visible';
+popupDocument.dispatchEvent(new Event('visibilitychange'));
+await pause(10);
+assert.equal(await shownClients(), '["chrome-extension://abc/popup/index.html#x visible"]');
+assert.equal(shownLinks, 2);
+// A hidden page holds no port. A popup does: WebKit loads it before it shows it, and it counts from then on.
+shownPage(Object.assign(new EventTarget(), { visibilityState: 'hidden' }));
+await pause(10);
+assert.equal(shownLinks, 2);
+const popupLoading = Object.assign(new EventTarget(), { visibilityState: 'hidden' });
+shownPage(popupLoading, { extra: `chrome.extension = { getViews: () => [globalThis] };` });
+await pause(10);
+assert.equal(shownLinks, 3);
+assert.equal(JSON.parse(await shownClients()).length, 2);
+// Once it has shown, hidden means closed, whether or not WebKit has let go of the page.
+for (const state of ['visible', 'hidden']) { popupLoading.visibilityState = state; popupLoading.dispatchEvent(new Event('visibilitychange')); }
+await pause(10);
+assert.equal(JSON.parse(await shownClients()).length, 1);
+// A popup that closes before it ever counted as visible leaves the list too. WebKit tells it of the page going,
+// and then of a change in visibility with nothing changed.
+const unseenDocument = Object.assign(new EventTarget(), { visibilityState: 'hidden' });
+const unseen = shownPage(unseenDocument, { extra: `chrome.extension = { getViews: () => [globalThis] }; globalThis.addEventListener = (type, f) => { (globalThis.on = globalThis.on || {})[type] = f; };` });
+await pause(10);
+assert.equal(JSON.parse(await shownClients()).length, 2);
+unseen.run(`on.pagehide({ type: 'pagehide' })`);
+unseenDocument.dispatchEvent(new Event('visibilitychange'));
+await pause(10);
+assert.equal(JSON.parse(await shownClients()).length, 1);
+assert.equal(shownLinks, 4);
+// A page in a frame, a page whose background has no shim to answer, and a page of an extension that also lists
+// background scripts, which WebKit runs in place of the worker, hold no port.
+shownPage(Object.assign(new EventTarget(), { visibilityState: 'visible' }), { backgroundShim: false });
+shownPage(Object.assign(new EventTarget(), { visibilityState: 'visible' }), { extra: `globalThis.BOTH = true;` });
+load('chrome', 'extension', { globals: { ...dom, CONNECT: connectShown, document: Object.assign(new EventTarget(), { visibilityState: 'visible' }) }, before: `
+  globalThis.top = {};
+  chrome.runtime.getManifest = () => ({ name: 'N', version: '1.2', background: { service_worker: 'sw.js' } });
+  chrome.runtime.connect = CONNECT;` });
+await pause(10);
+assert.equal(shownLinks, 4);
+// The extension's listeners hear their own ports and none of the shim's. With no listener of its own a port closes.
+const [, foreign] = portPair('own', {});
+plainWorker.context.chrome.runtime.onConnect.fire(foreign);
+assert.equal(plainWorker.run('ownPorts.join()'), 'own');
+const silentWorker = load('chrome', 'extension', { globals: dom, before: `
+  globalThis.registration = {};
+  globalThis.clients = { matchAll: () => Promise.resolve([]), get: () => Promise.resolve(undefined) };` });
+const [, near] = portPair('own', {});
+silentWorker.context.chrome.runtime.onConnect.fire(near);
+assert.equal(near.closed, 1);
 
 // A content script's first message waits for the worker. WebKit answers a message with nothing while the worker has
 // no listener yet, so the shim asks until the worker's shim answers, and only then sends what the extension sent.

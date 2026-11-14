@@ -600,7 +600,7 @@
     rewire(root.runtime.onConnect, function (f, args) {
       var port = args[0];
       // The link to the worker is the shim's own port.
-      if (port && (port.name === LINK || port.name === PAGE_LINK)) return f.nookLink ? f.apply(this, args) : undefined;
+      if (isLink(port)) return f.nookLink ? f.apply(this, args) : undefined;
       if (f.nookLink) return undefined;
       try { if (port && windowless(port.sender && port.sender.tab)) delete port.sender.tab; } catch (e) {}
       return f.apply(this, args);
@@ -610,7 +610,8 @@
   // WebKit connects no extension page to the extension's service worker: clients.matchAll() is empty in the worker and
   // ServiceWorker.postMessage from a page arrives nowhere. Both run over one runtime port: the offscreen document's
   // from its start, as the worker's client, and any other page's from the first message it posts.
-  var LINK = 'nook.compat.worker', PAGE_LINK = LINK + '.page';
+  var LINK = 'nook.compat.worker', PAGE_LINK = LINK + '.page', SHOWN_LINK = LINK + '.shown';
+  function isLink(port) { return !!port && (port.name === LINK || port.name === PAGE_LINK || port.name === SHOWN_LINK); }
   // ponytail: messages cross as JSON, so an ArrayBuffer or a Blob does not survive, and a port sent through a port is dropped.
   function link(port, side, deliver) {
     var ports = {}, made = 0;
@@ -619,7 +620,7 @@
       local.onmessage = function (e) { try { port.postMessage({ to: key, data: e.data }); } catch (x) {} };
     }
     port.onMessage.addListener(function (m) {
-      if (!m) return;
+      if (!m || m.nook) return;
       if (m.to !== undefined) { if (ports[m.to]) ports[m.to].postMessage(m.data); return; }
       deliver(m.data, (m.ports || []).map(function (key) { var c = new MessageChannel(); relay(c.port2, key); return c.port1; }));
     });
@@ -630,21 +631,32 @@
     };
   }
 
-  // In the worker: the offscreen document is a client, as in Chrome, where extensions find theirs with clients.matchAll().
+  // In the worker: the offscreen document is a client, as in Chrome, where extensions find theirs with clients.matchAll(),
+  // and so is each page that shows, which is how a worker learns that its popup is open (1Password).
   function workerClients(root) {
     var clients = g.clients;
-    if (!clients || typeof clients.matchAll !== 'function' || !root.offscreen || keep.indexOf(clients) >= 0) return;
+    if (!clients || typeof clients.matchAll !== 'function' || keep.indexOf(clients) >= 0) return;
     keep.push(clients);
-    var pages = [], waiting = [], count = 0;
+    var pages = [], shown = [], waiting = [], count = 0;
     var onLink = function (port) {
-      var client = { id: 'nook-offscreen-' + (++count), url: (port.sender && port.sender.url) || '', type: 'window', frameType: 'top-level', focused: false, visibilityState: 'hidden' };
+      var url = (port.sender && port.sender.url) || '', isShown = port.name === SHOWN_LINK;
+      // A build made for Chrome looks for its pages under Chrome's scheme. The offscreen document is looked up by getURL.
+      if (isShown && IDENTITY !== 'firefox') url = url.replace(/^[a-z-]+:\/\/[^\/]+/, 'chrome-extension://' + root.runtime.id);
+      var client = { id: 'nook-' + (isShown ? 'page-' : 'offscreen-') + (++count), url: url, type: 'window', frameType: 'top-level', focused: isShown, visibilityState: isShown ? 'visible' : 'hidden' };
       client.postMessage = link(port, 'w', function (data, ports) {
         var e = new MessageEvent('message', { data: data, ports: ports });
         Object.defineProperty(e, 'source', { value: client });
         e.waitUntil = function () {};
         g.dispatchEvent(e);
       });
-      // Only the offscreen document is listed as a client. Another page is answered through the message's source.
+      // A page that shows is listed until it says it is gone. WebKit tells a worker nothing when a port from one of
+      // its extension's own pages closes (measured), so the page says so itself.
+      if (isShown) {
+        shown.push(client);
+        port.onMessage.addListener(function (m) { if (m && m.nook === 'gone') shown = shown.filter(function (c) { return c !== client; }); });
+        return;
+      }
+      // Of the rest only the offscreen document is listed. Another page is answered through the message's source.
       if (port.name !== LINK) return;
       pages.push(client);
       port.onDisconnect.addListener(function () { pages = pages.filter(function (c) { return c !== client; }); });
@@ -657,16 +669,17 @@
       var type = (options && options.type) || 'window';
       return matchAll.call(clients, options).then(function (found) {
         if (type !== 'window' && type !== 'all') return found;
-        if (pages.length) return found.concat(pages);
+        function all() { return found.concat(pages, shown); }
+        if (pages.length || !root.offscreen) return all();
         // A restarted worker has no link yet to a document that outlived the last one. Nook asks the document for it.
         return native('offscreen', 'link').then(function (exists) {
-          if (!exists || pages.length) return found.concat(pages);
-          return new Promise(function (done) { waiting.push(done); setTimeout(done, 2000); }).then(function () { return found.concat(pages); });
-        }, function () { return found; });
+          if (!exists || pages.length) return all();
+          return new Promise(function (done) { waiting.push(done); setTimeout(done, 2000); }).then(all);
+        }, all);
       });
     };
     clients.get = function (id) {
-      var mine = pages.filter(function (c) { return c.id === id; })[0];
+      var mine = pages.concat(shown).filter(function (c) { return c.id === id; })[0];
       return mine ? Promise.resolve(mine) : get.call(clients, id);
     };
   }
@@ -702,6 +715,50 @@
     try { open(); } catch (e) {}
   }
 
+  // Chrome counts an extension's open pages among its worker's clients. Here each top-level page holds a port to the
+  // worker for as long as it shows, and the worker lists it.
+  // ponytail: a page that outlives its worker is listed again only once it is next shown.
+  function shownPages(root) {
+    var event = root.runtime.onConnect, doc = g.document, port = null;
+    if (inBackground(root)) {
+      // With an offscreen document, windowlessTabs has already kept the shim's ports from the extension's listeners.
+      if (keep.indexOf(event) < 0) {
+        rewire(event, function (f, args) {
+          if (isLink(args[0])) return f.nookLink ? f.apply(this, args) : undefined;
+          if (!f.nookLink) return f.apply(this, args);
+          // Nobody but the shim listens, under either name of the namespace: the port closes, as with no listener at all.
+          if (!roots.some(function (r) { return r.runtime.onConnect.hasListeners(); })) { try { args[0].disconnect(); } catch (e) {} }
+          return undefined;
+        });
+      }
+      workerClients(root);
+      return;
+    }
+    // Given scripts as well as a worker, WebKit runs the scripts as a page, and a page has no clients (measured).
+    var background = root.runtime.getManifest().background || {}, worker = background.service_worker && !background.scripts && !background.page;
+    if (!BACKGROUND_SHIM || !worker || !doc || g.top !== g || keep.indexOf(doc) >= 0) return;
+    keep.push(doc);
+    // WebKit loads a popup before it shows it, and the worker may ask in between: a popup counts until it has shown.
+    var loading = false;
+    try { loading = root.extension.getViews({ type: 'popup' }).indexOf(g) >= 0; } catch (e) {}
+    function show(e) {
+      var leaving = !!e && e.type === 'pagehide', sw = g.navigator && g.navigator.serviceWorker;
+      if (leaving || doc.visibilityState === 'visible') loading = false;
+      var visible = !leaving && (loading || doc.visibilityState === 'visible');
+      if (visible === !!port) return;
+      try {
+        if (!visible) { port.postMessage({ nook: 'gone' }); port.disconnect(); port = null; return; }
+        port = root.runtime.connect({ name: SHOWN_LINK });
+        link(port, 'p', function (data, ports) { if (sw) sw.dispatchEvent(new MessageEvent('message', { data: data, ports: ports })); });
+        port.onDisconnect.addListener(function () { port = null; });
+      } catch (e) { port = null; }
+    }
+    doc.addEventListener('visibilitychange', show);
+    // A popup that closes is told so here, whether or not it ever counted as visible.
+    if (g.addEventListener) { g.addEventListener('pagehide', show); g.addEventListener('pageshow', show); }
+    show();
+  }
+
   // What Chrome defines and WebKit lacks in the namespaces both have, and the few namespaces whose absence stops a background script at startup.
   function tables() { return {"enums":{"contextMenus.ContextType":{"ALL":"all","PAGE":"page","FRAME":"frame","SELECTION":"selection","LINK":"link","EDITABLE":"editable","IMAGE":"image","VIDEO":"video","AUDIO":"audio","LAUNCHER":"launcher","ACTION":"action","TAB":"tab"},"contextMenus.ItemType":{"NORMAL":"normal","CHECKBOX":"checkbox","RADIO":"radio","SEPARATOR":"separator"},"cookies.OnChangedCause":{"EVICTED":"evicted","EXPIRED":"expired","EXPLICIT":"explicit","EXPIRED_OVERWRITE":"expired_overwrite","OVERWRITE":"overwrite"},"cookies.SameSiteStatus":{"NO_RESTRICTION":"no_restriction","LAX":"lax","STRICT":"strict","UNSPECIFIED":"unspecified"},"declarativeNetRequest.DomainType":{"FIRST_PARTY":"firstParty","THIRD_PARTY":"thirdParty"},"declarativeNetRequest.HeaderOperation":{"APPEND":"append","SET":"set","REMOVE":"remove"},"declarativeNetRequest.RequestMethod":{"CONNECT":"connect","DELETE":"delete","GET":"get","HEAD":"head","OPTIONS":"options","PATCH":"patch","POST":"post","PUT":"put","OTHER":"other"},"declarativeNetRequest.ResourceType":{"MAIN_FRAME":"main_frame","SUB_FRAME":"sub_frame","STYLESHEET":"stylesheet","SCRIPT":"script","IMAGE":"image","FONT":"font","OBJECT":"object","XMLHTTPREQUEST":"xmlhttprequest","PING":"ping","CSP_REPORT":"csp_report","MEDIA":"media","WEBSOCKET":"websocket","WEBTRANSPORT":"webtransport","WEBBUNDLE":"webbundle","OTHER":"other"},"declarativeNetRequest.RuleActionType":{"BLOCK":"block","REDIRECT":"redirect","ALLOW":"allow","UPGRADE_SCHEME":"upgradeScheme","MODIFY_HEADERS":"modifyHeaders","ALLOW_ALL_REQUESTS":"allowAllRequests"},"declarativeNetRequest.RuleConditionKeys":{"URL_FILTER":"urlFilter","REGEX_FILTER":"regexFilter","IS_URL_FILTER_CASE_SENSITIVE":"isUrlFilterCaseSensitive","INITIATOR_DOMAINS":"initiatorDomains","EXCLUDED_INITIATOR_DOMAINS":"excludedInitiatorDomains","REQUEST_DOMAINS":"requestDomains","EXCLUDED_REQUEST_DOMAINS":"excludedRequestDomains","TOP_DOMAINS":"topDomains","EXCLUDED_TOP_DOMAINS":"excludedTopDomains","DOMAINS":"domains","EXCLUDED_DOMAINS":"excludedDomains","RESOURCE_TYPES":"resourceTypes","EXCLUDED_RESOURCE_TYPES":"excludedResourceTypes","REQUEST_METHODS":"requestMethods","EXCLUDED_REQUEST_METHODS":"excludedRequestMethods","DOMAIN_TYPE":"domainType","TAB_IDS":"tabIds","EXCLUDED_TAB_IDS":"excludedTabIds","RESPONSE_HEADERS":"responseHeaders","EXCLUDED_RESPONSE_HEADERS":"excludedResponseHeaders"},"declarativeNetRequest.UnsupportedRegexReason":{"SYNTAX_ERROR":"syntaxError","MEMORY_LIMIT_EXCEEDED":"memoryLimitExceeded"},"extension.ViewType":{"TAB":"tab","POPUP":"popup"},"runtime.ContextType":{"TAB":"TAB","POPUP":"POPUP","BACKGROUND":"BACKGROUND","OFFSCREEN_DOCUMENT":"OFFSCREEN_DOCUMENT","SIDE_PANEL":"SIDE_PANEL","DEVELOPER_TOOLS":"DEVELOPER_TOOLS"},"runtime.OnInstalledReason":{"INSTALL":"install","UPDATE":"update","CHROME_UPDATE":"chrome_update","SHARED_MODULE_UPDATE":"shared_module_update"},"runtime.OnLoadedReason":{"INSTALL":"install","UPDATE":"update","BROWSER_UPDATE":"browser_update","ENABLE":"enable","STARTUP":"startup","RELOAD":"reload"},"runtime.OnRestartRequiredReason":{"APP_UPDATE":"app_update","OS_UPDATE":"os_update","PERIODIC":"periodic"},"runtime.PlatformArch":{"ARM":"arm","ARM64":"arm64","X86_32":"x86-32","X86_64":"x86-64","MIPS":"mips","MIPS64":"mips64","RISCV64":"riscv64"},"runtime.PlatformNaclArch":{"ARM":"arm","X86_32":"x86-32","X86_64":"x86-64","MIPS":"mips","MIPS64":"mips64"},"runtime.PlatformOs":{"MAC":"mac","WIN":"win","ANDROID":"android","CROS":"cros","LINUX":"linux","OPENBSD":"openbsd"},"runtime.RequestUpdateCheckStatus":{"THROTTLED":"throttled","NO_UPDATE":"no_update","UPDATE_AVAILABLE":"update_available"},"scripting.ExecutionWorld":{"ISOLATED":"ISOLATED","MAIN":"MAIN"},"scripting.StyleOrigin":{"AUTHOR":"AUTHOR","USER":"USER"},"storage.AccessLevel":{"TRUSTED_CONTEXTS":"TRUSTED_CONTEXTS","TRUSTED_AND_UNTRUSTED_CONTEXTS":"TRUSTED_AND_UNTRUSTED_CONTEXTS"},"tabs.MutedInfoReason":{"USER":"user","CAPTURE":"capture","EXTENSION":"extension"},"tabs.TabStatus":{"UNLOADED":"unloaded","LOADING":"loading","COMPLETE":"complete"},"tabs.WindowType":{"NORMAL":"normal","POPUP":"popup","PANEL":"panel","APP":"app","DEVTOOLS":"devtools"},"tabs.ZoomSettingsMode":{"AUTOMATIC":"automatic","MANUAL":"manual","DISABLED":"disabled"},"tabs.ZoomSettingsScope":{"PER_ORIGIN":"per-origin","PER_TAB":"per-tab"},"webNavigation.TransitionQualifier":{"CLIENT_REDIRECT":"client_redirect","SERVER_REDIRECT":"server_redirect","FORWARD_BACK":"forward_back","FROM_ADDRESS_BAR":"from_address_bar"},"webNavigation.TransitionType":{"LINK":"link","TYPED":"typed","AUTO_BOOKMARK":"auto_bookmark","AUTO_SUBFRAME":"auto_subframe","MANUAL_SUBFRAME":"manual_subframe","GENERATED":"generated","START_PAGE":"start_page","FORM_SUBMIT":"form_submit","RELOAD":"reload","KEYWORD":"keyword","KEYWORD_GENERATED":"keyword_generated"},"webRequest.IgnoredActionType":{"REDIRECT":"redirect","REQUEST_HEADERS":"request_headers","RESPONSE_HEADERS":"response_headers","AUTH_CREDENTIALS":"auth_credentials"},"webRequest.OnAuthRequiredOptions":{"RESPONSE_HEADERS":"responseHeaders","BLOCKING":"blocking","ASYNC_BLOCKING":"asyncBlocking","EXTRA_HEADERS":"extraHeaders"},"webRequest.OnBeforeRedirectOptions":{"RESPONSE_HEADERS":"responseHeaders","EXTRA_HEADERS":"extraHeaders"},"webRequest.OnBeforeRequestOptions":{"BLOCKING":"blocking","REQUEST_BODY":"requestBody","EXTRA_HEADERS":"extraHeaders"},"webRequest.OnBeforeSendHeadersOptions":{"REQUEST_HEADERS":"requestHeaders","BLOCKING":"blocking","EXTRA_HEADERS":"extraHeaders"},"webRequest.OnCompletedOptions":{"RESPONSE_HEADERS":"responseHeaders","EXTRA_HEADERS":"extraHeaders"},"webRequest.OnErrorOccurredOptions":{"EXTRA_HEADERS":"extraHeaders"},"webRequest.OnHeadersReceivedOptions":{"BLOCKING":"blocking","RESPONSE_HEADERS":"responseHeaders","EXTRA_HEADERS":"extraHeaders","SECURITY_INFO":"securityInfo","SECURITY_INFO_RAW_DER":"securityInfoRawDer"},"webRequest.OnResponseStartedOptions":{"RESPONSE_HEADERS":"responseHeaders","EXTRA_HEADERS":"extraHeaders"},"webRequest.OnSendHeadersOptions":{"REQUEST_HEADERS":"requestHeaders","EXTRA_HEADERS":"extraHeaders"},"webRequest.ResourceType":{"MAIN_FRAME":"main_frame","SUB_FRAME":"sub_frame","STYLESHEET":"stylesheet","SCRIPT":"script","IMAGE":"image","FONT":"font","OBJECT":"object","XMLHTTPREQUEST":"xmlhttprequest","PING":"ping","CSP_REPORT":"csp_report","MEDIA":"media","WEBSOCKET":"websocket","WEBBUNDLE":"webbundle","OTHER":"other"},"windows.CreateType":{"NORMAL":"normal","POPUP":"popup","PANEL":"panel"},"windows.WindowState":{"NORMAL":"normal","MINIMIZED":"minimized","MAXIMIZED":"maximized","FULLSCREEN":"fullscreen"},"windows.WindowType":{"NORMAL":"normal","POPUP":"popup","PANEL":"panel","APP":"app","DEVTOOLS":"devtools"}},"events":["action.onClicked","action.onUserSettingsChanged","alarms.onAlarm","commands.onCommand","contextMenus.onClicked","cookies.onChanged","declarativeNetRequest.onRuleMatchedDebug","permissions.onAdded","permissions.onRemoved","runtime.onBrowserUpdateAvailable","runtime.onConnect","runtime.onConnectExternal","runtime.onConnectNative","runtime.onEnabled","runtime.onExtensionLoaded","runtime.onInstalled","runtime.onMessage","runtime.onMessageExternal","runtime.onRestartRequired","runtime.onStartup","runtime.onSuspend","runtime.onSuspendCanceled","runtime.onUpdateAvailable","runtime.onUserScriptConnect","runtime.onUserScriptMessage","storage.onChanged","tabs.onActivated","tabs.onAttached","tabs.onCreated","tabs.onDetached","tabs.onHighlighted","tabs.onMoved","tabs.onRemoved","tabs.onReplaced","tabs.onUpdated","tabs.onZoomChange","webNavigation.onBeforeNavigate","webNavigation.onCommitted","webNavigation.onCompleted","webNavigation.onCreatedNavigationTarget","webNavigation.onDOMContentLoaded","webNavigation.onErrorOccurred","webNavigation.onHistoryStateUpdated","webNavigation.onReferenceFragmentUpdated","webNavigation.onTabReplaced","webRequest.onActionIgnored","webRequest.onAuthRequired","webRequest.onBeforeRedirect","webRequest.onBeforeRequest","webRequest.onBeforeSendHeaders","webRequest.onCompleted","webRequest.onErrorOccurred","webRequest.onHeadersReceived","webRequest.onResponseStarted","webRequest.onSendHeaders","windows.onBoundsChanged","windows.onCreated","windows.onFocusChanged","windows.onRemoved"],"functions":["action.disable","action.enable","action.getBadgeBackgroundColor","action.getBadgeText","action.getBadgeTextColor","action.getPopup","action.getTitle","action.getUserSettings","action.isEnabled","action.openPopup","action.setBadgeBackgroundColor","action.setBadgeText","action.setBadgeTextColor","action.setIcon","action.setPopup","action.setTitle","alarms.clear","alarms.clearAll","alarms.create","alarms.get","alarms.getAll","commands.getAll","contextMenus.create","contextMenus.remove","contextMenus.removeAll","contextMenus.update","cookies.get","cookies.getAll","cookies.getAllCookieStores","cookies.getPartitionKey","cookies.remove","cookies.set","declarativeNetRequest.getAvailableStaticRuleCount","declarativeNetRequest.getDisabledRuleIds","declarativeNetRequest.getDynamicRules","declarativeNetRequest.getEnabledRulesets","declarativeNetRequest.getMatchedRules","declarativeNetRequest.getSessionRules","declarativeNetRequest.isRegexSupported","declarativeNetRequest.setExtensionActionOptions","declarativeNetRequest.testMatchOutcome","declarativeNetRequest.updateDynamicRules","declarativeNetRequest.updateEnabledRulesets","declarativeNetRequest.updateSessionRules","declarativeNetRequest.updateStaticRules","dom.openOrClosedShadowRoot","extension.getBackgroundPage","extension.getViews","extension.isAllowedFileSchemeAccess","extension.isAllowedIncognitoAccess","extension.setUpdateUrlData","i18n.detectLanguage","i18n.getAcceptLanguages","i18n.getMessage","i18n.getUILanguage","permissions.addHostAccessRequest","permissions.contains","permissions.getAll","permissions.remove","permissions.removeHostAccessRequest","permissions.request","runtime.connect","runtime.connectNative","runtime.getBackgroundPage","runtime.getContexts","runtime.getManifest","runtime.getPackageDirectoryEntry","runtime.getPlatformInfo","runtime.getURL","runtime.getVersion","runtime.openOptionsPage","runtime.reload","runtime.requestUpdateCheck","runtime.restart","runtime.restartAfterDelay","runtime.sendMessage","runtime.sendNativeMessage","runtime.setUninstallURL","scripting.executeScript","scripting.getRegisteredContentScripts","scripting.insertCSS","scripting.registerContentScripts","scripting.removeCSS","scripting.unregisterContentScripts","scripting.updateContentScripts","tabs.captureVisibleTab","tabs.connect","tabs.create","tabs.createSplit","tabs.detectLanguage","tabs.discard","tabs.duplicate","tabs.get","tabs.getCurrent","tabs.getZoom","tabs.getZoomSettings","tabs.goBack","tabs.goForward","tabs.group","tabs.highlight","tabs.move","tabs.query","tabs.reload","tabs.remove","tabs.sendMessage","tabs.setZoom","tabs.setZoomSettings","tabs.ungroup","tabs.unsplit","tabs.update","webNavigation.getAllFrames","webNavigation.getFrame","webRequest.handlerBehaviorChanged","windows.create","windows.get","windows.getAll","windows.getCurrent","windows.getLastFocused","windows.remove","windows.update"],"stubs":{"management":{"functions":["createAppShortcut","generateAppForLink","get","getAll","getPermissionWarningsById","getPermissionWarningsByManifest","getSelf","installReplacementWebApp","launchApp","setEnabled","setLaunchType","uninstall","uninstallSelf"],"events":["onDisabled","onEnabled","onInstalled","onUninstalled"],"enums":{"ExtensionDisabledReason":{"UNKNOWN":"unknown","PERMISSIONS_INCREASE":"permissions_increase"},"ExtensionInstallType":{"ADMIN":"admin","DEVELOPMENT":"development","NORMAL":"normal","SIDELOAD":"sideload","OTHER":"other"},"ExtensionType":{"EXTENSION":"extension","HOSTED_APP":"hosted_app","PACKAGED_APP":"packaged_app","LEGACY_PACKAGED_APP":"legacy_packaged_app","THEME":"theme","LOGIN_SCREEN_EXTENSION":"login_screen_extension"},"LaunchType":{"OPEN_AS_REGULAR_TAB":"OPEN_AS_REGULAR_TAB","OPEN_AS_PINNED_TAB":"OPEN_AS_PINNED_TAB","OPEN_AS_WINDOW":"OPEN_AS_WINDOW","OPEN_FULL_SCREEN":"OPEN_FULL_SCREEN"}},"settings":{}},"notifications":{"functions":["clear","create","getAll","getPermissionLevel","update"],"events":["onButtonClicked","onClicked","onClosed","onPermissionLevelChanged","onShowSettings"],"enums":{"PermissionLevel":{"GRANTED":"granted","DENIED":"denied"},"TemplateType":{"BASIC":"basic","IMAGE":"image","LIST":"list","PROGRESS":"progress"}},"settings":{}},"privacy":{"functions":[],"events":[],"enums":{"AutofillBlockedType":{"CONTACT_INFO":"contact_info","PAYMENTS":"payments","IDENTITY_DOCS":"identity_docs","TRAVEL":"travel","ALL":"all"},"IPHandlingPolicy":{"DEFAULT":"default","DEFAULT_PUBLIC_AND_PRIVATE_INTERFACES":"default_public_and_private_interfaces","DEFAULT_PUBLIC_INTERFACE_ONLY":"default_public_interface_only","DISABLE_NON_PROXIED_UDP":"disable_non_proxied_udp"}},"settings":{"network":{"networkPredictionEnabled":false,"webRTCIPHandlingPolicy":"default"},"services":{"alternateErrorPagesEnabled":false,"autofillEnabled":false,"autofillAddressEnabled":false,"autofillCreditCardEnabled":false,"passwordSavingEnabled":false,"safeBrowsingEnabled":false,"safeBrowsingExtendedReportingEnabled":false,"searchSuggestEnabled":false,"spellingServiceEnabled":false,"translationServiceEnabled":false},"websites":{"thirdPartyCookiesAllowed":false,"topicsEnabled":false,"fledgeEnabled":false,"adMeasurementEnabled":false,"hyperlinkAuditingEnabled":false,"referrersEnabled":false,"doNotTrackEnabled":false,"protectedContentEnabled":false}}}},"bridged":{"offscreen":{"permission":"offscreen","functions":["closeDocument","createDocument","hasDocument"],"events":[],"enums":{"Reason":{"TESTING":"TESTING","AUDIO_PLAYBACK":"AUDIO_PLAYBACK","IFRAME_SCRIPTING":"IFRAME_SCRIPTING","DOM_SCRAPING":"DOM_SCRAPING","BLOBS":"BLOBS","DOM_PARSER":"DOM_PARSER","USER_MEDIA":"USER_MEDIA","DISPLAY_MEDIA":"DISPLAY_MEDIA","WEB_RTC":"WEB_RTC","CLIPBOARD":"CLIPBOARD","LOCAL_STORAGE":"LOCAL_STORAGE","WORKERS":"WORKERS","BATTERY_STATUS":"BATTERY_STATUS","MATCH_MEDIA":"MATCH_MEDIA","GEOLOCATION":"GEOLOCATION"}}},"idle":{"permission":"idle","functions":["getAutoLockDelay","queryState","setDetectionInterval"],"events":["onStateChanged"],"enums":{"IdleState":{"ACTIVE":"active","IDLE":"idle","LOCKED":"locked"}}},"notifications":{"permission":"notifications","functions":["clear","create","getAll","getPermissionLevel","update"],"events":["onButtonClicked","onClicked","onClosed","onPermissionLevelChanged","onShowSettings"],"enums":{"PermissionLevel":{"GRANTED":"granted","DENIED":"denied"},"TemplateType":{"BASIC":"basic","IMAGE":"image","LIST":"list","PROGRESS":"progress"}}},"management":{"permission":"management","functions":["createAppShortcut","generateAppForLink","get","getAll","getPermissionWarningsById","getPermissionWarningsByManifest","getSelf","installReplacementWebApp","launchApp","setEnabled","setLaunchType","uninstall","uninstallSelf"],"events":["onDisabled","onEnabled","onInstalled","onUninstalled"],"enums":{"ExtensionDisabledReason":{"UNKNOWN":"unknown","PERMISSIONS_INCREASE":"permissions_increase"},"ExtensionInstallType":{"ADMIN":"admin","DEVELOPMENT":"development","NORMAL":"normal","SIDELOAD":"sideload","OTHER":"other"},"ExtensionType":{"EXTENSION":"extension","HOSTED_APP":"hosted_app","PACKAGED_APP":"packaged_app","LEGACY_PACKAGED_APP":"legacy_packaged_app","THEME":"theme","LOGIN_SCREEN_EXTENSION":"login_screen_extension"},"LaunchType":{"OPEN_AS_REGULAR_TAB":"OPEN_AS_REGULAR_TAB","OPEN_AS_PINNED_TAB":"OPEN_AS_PINNED_TAB","OPEN_AS_WINDOW":"OPEN_AS_WINDOW","OPEN_FULL_SCREEN":"OPEN_FULL_SCREEN"}}},"identity":{"permission":"identity","functions":["clearAllCachedAuthTokens","getAccounts","getAuthToken","getProfileUserInfo","getRedirectURL","launchWebAuthFlow","removeCachedAuthToken"],"events":["onSignInChanged"],"enums":{"AccountStatus":{"SYNC":"SYNC","ANY":"ANY"}}},"sidePanel":{"permission":"sidePanel","functions":["close","getLayout","getOptions","getPanelBehavior","open","setOptions","setPanelBehavior"],"events":["onClosed","onOpened"],"enums":{"Side":{"LEFT":"left","RIGHT":"right"}}}},"bridgedEvents":{"webNavigation.onHistoryStateUpdated":"webNavigation","webNavigation.onReferenceFragmentUpdated":"webNavigation"}}; }
   function surface(root) {
@@ -718,6 +775,7 @@
     if (!inExtensionOrigin) return;
     var T = tables();
     bridged(root, T);
+    shownPages(root);
     Object.keys(T.enums).forEach(function (path) { add(root, path, function () { return T.enums[path]; }); });
     T.events.forEach(function (path) { add(root, path, inertEvent); });
     // A build told it runs in Chrome calls Chrome's functions without asking whether they exist.
