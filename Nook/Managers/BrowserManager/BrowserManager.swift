@@ -992,7 +992,7 @@ class BrowserManager: ObservableObject {
         guard !windowState.isIncognito else { return }
         windowSpaceChanged(windowState)
         applyStartupLoadMode(for: windowState)
-        restoreSavedWindows()
+        // restoreSavedWindows()  // Disabled: Don't restore saved windows on launch
         installPendingExtensionImports()
     }
 

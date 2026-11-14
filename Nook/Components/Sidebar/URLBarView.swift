@@ -169,17 +169,11 @@ struct URLBarView: View {
                                     .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
                                     .foregroundStyle(.secondary)
                             }
-                            // Two texts so a narrow sidebar cuts the path first and then the
-                            // host's head: `accounts.google.com.x.evil.tld` must keep `evil.tld`.
-                            HStack(spacing: 0) {
-                                Text(displayHost(for: session)).foregroundStyle(.primary)
-                                    .truncationMode(.head)
-                                    .layoutPriority(1)
-                                Text(displayPath(for: session)).foregroundStyle(.tertiary)
-                                    .truncationMode(.tail)
-                            }
-                            .font(NookDesign.Font.secondary)
-                            .lineLimit(1)
+                            // Show only the domain (like Arc)
+                            Text(displayHost(for: session))
+                                .foregroundStyle(.primary)
+                                .font(NookDesign.Font.secondary)
+                                .lineLimit(1)
                             if let errors = devErrorCount(for: session) {
                                 Button {
                                     browserManager.toggleDevPanel(.console)
@@ -216,16 +210,8 @@ struct URLBarView: View {
                     beginEditing(session?.url.absoluteString ?? "")
                 })
 
-                if !isEditing, !windowState.isIncognito, isHovering || showSiteSettings || confirmClearSiteData, let session {
-                    SiteSettingsButton(session: session, isPresented: $showSiteSettings, confirmClear: $confirmClearSiteData)
-                        .onChange(of: showSiteSettings || confirmClearSiteData) { _, open in
-                            hoverManager.setSiteSettingsOpen(open, in: windowState.id)
-                        }
-                        .onDisappear { hoverManager.setSiteSettingsOpen(false, in: windowState.id) }
-                }
-
-                // Copy link button (show on hover when tab is selected)
-                if !isEditing, isHovering, let session {
+                // Copy link button (always visible when tab is selected)
+                if !isEditing, let session {
                     Button("Copy Link", systemImage: showCheckmark ? "checkmark" : "link") {
                         copyURLToClipboard(session.url.absoluteString)
                     }
@@ -236,8 +222,8 @@ struct URLBarView: View {
                     .contentTransition(.symbolEffect(.replace))
                 }
 
-                // Pinned extension buttons + library button
-                if !isEditing, let extensionManager = browserManager.extensionManager {
+                // Extension library button (contains site settings, zoom, etc.)
+                if !isEditing, let session, session.url.absoluteString != "about:blank", let extensionManager = browserManager.extensionManager {
                     let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
                     let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
 
@@ -802,10 +788,12 @@ private struct SplitAddressSearchField: NSViewRepresentable {
 
 extension URL {
     /// The host as the address bar shows it, with a non-default port; nil when there is no host.
+    /// Strips "www." prefix like Arc does.
     var nookDisplayHost: String? {
         guard let host else { return nil }
+        let cleanHost = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
         let defaultPort = scheme == "https" ? 443 : (scheme == "http" ? 80 : nil)
-        guard let port, port != defaultPort else { return host }
-        return "\(host):\(port)"
+        guard let port, port != defaultPort else { return cleanHost }
+        return "\(cleanHost):\(port)"
     }
 }
