@@ -81,11 +81,13 @@ final class AuthenticationManager: NSObject {
                         if accepted {
                             completionHandler(.useCredential, URLCredential(trust: trust))
                         } else {
-                            completionHandler(.cancelAuthenticationChallenge, nil)
+                            completionHandler(.performDefaultHandling, nil)
                         }
                     }
                 } else {
-                    completionHandler(.cancelAuthenticationChallenge, nil)
+                    // Default handling rejects the trust as a certificate error, which lets WebKit
+                    // fall back to HTTP on an upgraded load. Cancelling (-999) leaves the tab stuck.
+                    completionHandler(.performDefaultHandling, nil)
                 }
             } else {
                 completionHandler(.performDefaultHandling, nil)
