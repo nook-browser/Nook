@@ -57,6 +57,8 @@ public final class PageSession: NSObject, Identifiable {
     public var favicon: SwiftUI.Image
     /// A page the ad blocker stopped from loading. The blocked-page card shows while it is set.
     public internal(set) var blockedURL: URL?
+    /// A main-frame load that failed before committing. The error page shows while it is set.
+    public internal(set) var loadError: PageLoadError?
     /// The site enhanced fingerprinting protection is off for until the tab leaves it.
     var enhancedFingerprintingProtectionOffHost: String?
 
@@ -632,6 +634,11 @@ public final class PageSession: NSObject, Identifiable {
     /// Back in `view`, one window's view of this page (the primary by default). With no page left
     /// to go back to, the tab closes and the tab that opened it shows.
     public func goBack(in view: WKWebView? = nil) {
+        // The failed page never entered WebKit's history: Back means the page under the error.
+        if loadError != nil, hasCommittedPage {
+            loadError = nil
+            return
+        }
         if let view = view ?? primaryWebView, view.canGoBack {
             view.goBack()
         } else if !canGoBack, let controller, let window = controller.window(for: self) {
@@ -648,6 +655,10 @@ public final class PageSession: NSObject, Identifiable {
     }
 
     public func refresh() {
+        if let loadError {
+            load(loadError.url)
+            return
+        }
         // An unloaded page has nothing to reload: recreate it, which loads the saved URL.
         guard primaryWebView != nil else {
             loadWebViewIfNeeded()
@@ -681,9 +692,21 @@ public final class PageSession: NSObject, Identifiable {
 
     /// Back to the page still showing under the card, or closes a page that has none.
     public func leaveBlockedPage() {
-        if hasCommittedPage {
-            blockedURL = nil
-        } else if isDetached {
+        if hasCommittedPage { blockedURL = nil } else { closeUncommittedPage() }
+    }
+
+    public func retryFailedLoad() {
+        guard let loadError else { return }
+        load(loadError.url)
+    }
+
+    /// Back to the page under the error page, or closes a page that has none.
+    public func leaveFailedLoad() {
+        if hasCommittedPage { loadError = nil } else { closeUncommittedPage() }
+    }
+
+    private func closeUncommittedPage() {
+        if isDetached {
             onClose?()
         } else {
             controller?.close(itemID, archive: false)
