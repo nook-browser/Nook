@@ -273,6 +273,8 @@ struct WebsiteView: View {
             }
 
             if !shouldShowSplit, let session = browserManager.tabs.controllableSession(in: windowState) {
+                LoadErrorView(session: session)
+                    .clipShape(webViewClipShape)
                 BlockedPageView(session: session)
             }
 

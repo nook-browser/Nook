@@ -21,6 +21,7 @@ extension PageSession: WKNavigationDelegate {
     ) {
         loadingState = .didStartProvisionalNavigation
         blockedURL = nil
+        loadError = nil
         controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
@@ -271,6 +272,10 @@ extension PageSession: WKNavigationDelegate {
             url = committed
             controller?.tabEvents?.tabPropertiesChanged(self, properties: [.URL])
             controller?.pageCommitted(itemID: itemID, url: committed)
+        }
+        // A newer load (WebKit's HTTP fallback, a typed address) still running owns the page.
+        if !webView.isLoading {
+            loadError = PageLoadError(error: error, attempted: attempted)
         }
 
         updateNavigationStateEnhanced(source: "didFailProvisional")

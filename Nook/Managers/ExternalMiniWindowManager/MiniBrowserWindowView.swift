@@ -15,6 +15,7 @@ struct MiniBrowserWindowView: View {
         ZStack(alignment: .top) {
             DetachedPageHost(page: page)
                 .underToolbar()
+            LoadErrorView(session: page)
             BlockedPageView(session: page)
             TranslationTaskHost(session: page)
             if let webView = page.webView {
