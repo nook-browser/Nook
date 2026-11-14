@@ -63,7 +63,7 @@ class AIConfigService {
 
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let nookDir = appSupport.appendingPathComponent("Nook")
+        let nookDir = appSupport.appendingPathComponent(SharedSupportFolder.name)
         self.configURL = nookDir.appendingPathComponent("ai_config.json")
 
         // Load or create default config

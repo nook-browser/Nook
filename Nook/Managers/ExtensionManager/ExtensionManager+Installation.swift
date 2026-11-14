@@ -1017,7 +1017,7 @@ extension ExtensionManager {
             for: .applicationSupportDirectory,
             in: .userDomainMask
         ).first!
-        return appSupport.appendingPathComponent("Nook").appendingPathComponent(
+        return appSupport.appendingPathComponent(SharedSupportFolder.name).appendingPathComponent(
             "Extensions"
         )
     }

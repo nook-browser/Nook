@@ -131,6 +131,7 @@ DerivedData/
 # Rust FFI build output
 Nook/ThirdParty/AdblockRustFFI/target/
 build-release/
+build-verify/
 build-release-signed/
 
 # Everything under docs/ stays local: designs, specs, reviews, handoffs, working
