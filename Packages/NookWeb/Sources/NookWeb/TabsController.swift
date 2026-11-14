@@ -422,6 +422,8 @@ public final class TabsController {
         window.spaceID.map(displayOrder(inSpace:)) ?? []
     }
 
+    /// The extension adapters keep this per space until Observation reports a change
+    /// (`ExtensionTabOrder.swift` in the app), so it must read only observed state.
     public func displayOrder(inSpace spaceID: UUID) -> [UUID] {
         guard let owner = owner(ofSpace: spaceID) else { return [] }
         let favorites = tree(owner).favorites(of: spaceID).map(\.id)

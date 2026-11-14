@@ -20,6 +20,11 @@ extension ExtensionManager {
     /// get one too: WebKit hides them from extensions without `hasAccessToPrivateData`.
     func adapter(for itemID: UUID) -> ExtensionTabAdapter? {
         if browserManagerRef?.tabs.isInAgentSpace(itemID) == true { return nil }
+        return adapter(outsideAgentSpace: itemID)
+    }
+
+    /// `adapter(for:)` for an item already known to be outside the Agent space.
+    private func adapter(outsideAgentSpace itemID: UUID) -> ExtensionTabAdapter? {
         if let existing = tabAdapters[itemID] { return existing }
         guard let bm = browserManagerRef, let item = bm.tabs.item(itemID), !item.isFolder else { return nil }
         // ponytail: adapters for items closed without ever loading stay cached (a few bytes each);
@@ -42,6 +47,24 @@ extension ExtensionManager {
         windowAdapters[window.id] = created
         extensionController?.didOpenWindow(created)
         return created
+    }
+
+    /// The window's tabs as `TabsController.displayOrder(in:)` lists them, kept per space until
+    /// the tab model changes. Everything that order reads is observed except
+    /// `WindowRegistry.windows`, which only matters for a private space, and a private space
+    /// lives only in its own window: `attach(window:)` makes its tree before anything can ask
+    /// for it, and `detach(window:)` clears that tree.
+    func tabOrder(in window: BrowserWindowState) -> ExtensionTabOrder {
+        guard let tabs = browserManagerRef?.tabs, let spaceID = window.spaceID else { return .empty }
+        return tabOrders.order(for: spaceID) { tabs.displayOrder(inSpace: spaceID) }
+    }
+
+    /// Adapters for the window's tabs, in `tabOrder(in:)` order. They all sit in the window's
+    /// space, so one Agent space check covers the list: WebKit lists a window's tabs once per
+    /// tab in a query, and each per-item check sorts every space.
+    func adapters(in window: BrowserWindowState) -> [ExtensionTabAdapter] {
+        guard let tabs = browserManagerRef?.tabs, window.spaceID != tabs.agentSpaceID else { return [] }
+        return tabOrder(in: window).ids.compactMap { adapter(outsideAgentSpace: $0) }
     }
 
     /// Every window, focused first.
