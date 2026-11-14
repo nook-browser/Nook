@@ -93,13 +93,13 @@ public struct DragVelocity {
 
 public enum SpaceSwitcher {
     public static let minItem: CGFloat = 8    // Arc's dock floor; past it the row scrolls
-    public static let maxItem: CGFloat = 34
+    public static let maxItem: CGFloat = 24
     public static let compactBelow: CGFloat = 22
 
     /// Space between items before the row has to squeeze them.
-    public static let gap: CGFloat = 8
+    public static let gap: CGFloat = 4
 
-    /// Arc's dock: `(available - spacing) / count` clamped to 8...34, spacing being the gaps.
+    /// Arc's dock: `(available - spacing) / count` clamped to 8...24, spacing being the gaps.
     public static func itemSize(available: CGFloat, count: Int) -> CGFloat {
         guard count > 0 else { return maxItem }
         let spacing = gap * CGFloat(count - 1)

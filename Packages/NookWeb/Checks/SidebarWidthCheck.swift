@@ -18,9 +18,9 @@ struct SidebarWidthCheck {
         precondition(SidebarWidth.snapped(proposed: 272) && !SidebarWidth.snapped(proposed: 275))
 
         precondition(SpaceSwitcher.itemSize(available: 160, count: 20) == 8, "floor")
-        precondition(SpaceSwitcher.itemSize(available: 160, count: 3) == 34, "ceiling")
-        precondition(SpaceSwitcher.itemSize(available: 160, count: 5) == 25.6)
-        precondition(SpaceSwitcher.itemSize(available: 160, count: 0) == 34, "no spaces")
+        precondition(SpaceSwitcher.itemSize(available: 160, count: 3) == 24, "ceiling")
+        precondition(SpaceSwitcher.itemSize(available: 160, count: 8) == 16.5)
+        precondition(SpaceSwitcher.itemSize(available: 160, count: 0) == 24, "no spaces")
         precondition(SpaceSwitcher.isCompact(itemSize: 21))
         precondition(!SpaceSwitcher.isCompact(itemSize: 22))
 
@@ -41,7 +41,7 @@ struct SidebarWidthCheck {
         let size = SpaceSwitcher.itemSize(available: 148, count: 8)
         let gap = SpaceSwitcher.gap(available: 148, count: 8, size: size)
         precondition(size * 8 + gap * 7 <= 148 && gap >= 0)
-        precondition(SpaceSwitcher.gap(available: 400, count: 3, size: 34) == SpaceSwitcher.gap, "roomy rows keep the full gap")
+        precondition(SpaceSwitcher.gap(available: 400, count: 3, size: 24) == SpaceSwitcher.gap, "roomy rows keep the full gap")
 
         var v = DragVelocity(startTime: 0)
         _ = v.add(dx: 1, time: 0.01)
