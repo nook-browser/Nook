@@ -43,6 +43,20 @@ final class SplitPaneView: NSView {
         content.autoresizingMask = [.width, .height]
         addSubview(content)
 
+        // The error page and the blocked-page card: over the page, under the controls.
+        let cover = SplitCoverHostingView(rootView: SplitPaneCover(itemID: itemID)
+            .environment(browserManager.tabs)
+            .environmentObject(browserManager.gradientColorManager))
+        cover.covers = { [weak browserManager] in
+            guard let page = browserManager?.tabs.session(for: itemID) else { return false }
+            return page.loadError != nil || page.blockedURL != nil
+        }
+        cover.sizingOptions = []
+        cover.safeAreaRegions = []
+        cover.frame = bounds
+        cover.autoresizingMask = [.width, .height]
+        addSubview(cover)
+
         // Each control is its own hosting view sized to its content, so the rest of the pane
         // passes clicks to the page.
         func host(_ view: some View, textCursor: Bool = false) -> NSView {
@@ -101,6 +115,31 @@ final class SplitPaneView: NSView {
             bottomTrailingRadius: side == .right ? outer : radius,
             topTrailingRadius: side == .right ? 0 : radius
         )
+    }
+}
+
+/// What a tab shows over a page that failed to load or that the ad blocker stopped.
+private struct SplitPaneCover: View {
+    let itemID: UUID
+
+    @Environment(TabsController.self) private var tabs
+
+    var body: some View {
+        if let session = tabs.session(for: itemID) {
+            ZStack {
+                LoadErrorView(session: session)
+                BlockedPageView(session: session)
+            }
+        }
+    }
+}
+
+/// Fills the pane, and passes clicks to the page while it has nothing to show.
+private final class SplitCoverHostingView<Content: View>: NSHostingView<Content> {
+    var covers: () -> Bool = { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        covers() ? super.hitTest(point) : nil
     }
 }
 
