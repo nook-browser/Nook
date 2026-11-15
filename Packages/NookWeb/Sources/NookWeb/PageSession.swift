@@ -57,8 +57,14 @@ public final class PageSession: NSObject, Identifiable {
     public var favicon: SwiftUI.Image
     /// A page the ad blocker stopped from loading. The blocked-page card shows while it is set.
     public internal(set) var blockedURL: URL?
-    /// A main-frame load that failed before committing. The error page shows while it is set.
-    public internal(set) var loadError: PageLoadError?
+    /// A main-frame load that failed before committing. The error page shows while it is set,
+    /// and the page under it neither plays nor starts playing until it goes.
+    public internal(set) var loadError: PageLoadError? {
+        didSet {
+            guard (loadError == nil) != (oldValue == nil) else { return }
+            primaryWebView?.setAllMediaPlaybackSuspended(loadError != nil, completionHandler: nil)
+        }
+    }
     /// The site enhanced fingerprinting protection is off for until the tab leaves it.
     var enhancedFingerprintingProtectionOffHost: String?
 

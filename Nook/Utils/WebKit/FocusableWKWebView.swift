@@ -87,6 +87,15 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
     /// Never while hidden under the person's page as the agent's: it would take their typing.
     override var acceptsFirstResponder: Bool { !(superview is AgentPageHostView) }
 
+    // A page under the error page takes no keys: Space would start a video nobody can see.
+    override func keyDown(with event: NSEvent) {
+        if owningSession?.loadError == nil { super.keyDown(with: event) }
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        owningSession?.loadError == nil && super.performKeyEquivalent(with: event)
+    }
+
     /// WebKit throttles a page whose window it thinks is occluded (1 Hz timers, no rendering), and
     /// the agent's page usually sits under the person's. `_setWindowOcclusionDetectionEnabled:`
     /// opts it out, and only takes if set before the view enters an already occluded window.
