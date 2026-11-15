@@ -270,9 +270,8 @@ extension PlatformPageView: NSViewRepresentable {
                 return
             }
 
-            guard event.phase == .began, horizontal,
-                  NSEvent.isSwipeTrackingFromScrollEventsEnabled,
-                  beginDrag()
+            // Not gated on "Swipe between pages": that setting is back/forward, and this loop tracks the trackpad itself.
+            guard event.phase == .began, horizontal, beginDrag()
             else {
                 // The momentum that follows a swipe belongs to the swipe.
                 if horizontal, event.momentumPhase != [] { return }
