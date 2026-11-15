@@ -21,8 +21,8 @@ final class SplitDropCaptureView: NSView {
     private func commonInit() {
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
-        // Accept plain text drags (UUID string for a Tab)
-        registerForDraggedTypes([.nookTabItem, .string])
+        // Tab drags only; page text drags must fall through to the web view
+        registerForDraggedTypes([.nookTabItem])
         // Transparent to normal mouse events; only DnD uses these callbacks
         isHidden = false
     }
@@ -62,16 +62,15 @@ final class SplitDropCaptureView: NSView {
         NotificationCenter.default.post(name: .tabDragDidEnd, object: nil)
     }
 
+    // Every drag ends here, including rejected drops; a stuck flag makes hitTest swallow page clicks.
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        isDragActive = false
+    }
+
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         guard let bm = browserManager, let sm = splitManager, let windowId else { return false }
         let pb = sender.draggingPasteboard
-        // Try to read NookDragItem first, fall back to plain string UUID
-        let tabId: UUID? = {
-            if let item = NookDragItem.fromPasteboard(pb) { return item.tabId }
-            if let idString = pb.string(forType: .string) { return UUID(uuidString: idString) }
-            return nil
-        }()
-        guard let id = tabId else {
+        guard let id = NookDragItem.fromPasteboard(pb)?.tabId else {
             // Invalid payload; clear any lingering drag UI state
             sm.updateDragLocation(nil, for: windowId)
             sm.endPreview(cancel: false, for: windowId)
