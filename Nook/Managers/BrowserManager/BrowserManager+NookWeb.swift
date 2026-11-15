@@ -189,8 +189,8 @@ extension BrowserManager: TabEventObserver {
         exitSidebarPiP(showing: session.itemID)
         PiPManager.shared.leaveAutomatic(session)
 
-        guard nookSettings?.autoPictureInPicture == true,
-            let previous, previous.hasPlayingVideo, previous.hasPlayingAudio,
+        guard let previous, nookSettings?.autoPictureInPicture(for: previous.url.host) == true,
+            previous.hasPlayingVideo, previous.hasPlayingAudio,
             !previous.isPrivate, !previous.hasPiPActive,
             // Another window or the other split pane may still be showing it.
             !tabs.isVisibleInAnyWindow(previous.itemID),
