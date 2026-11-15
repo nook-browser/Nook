@@ -5,6 +5,7 @@
 //
 
 import WebKit
+import NookSettings
 
 extension PageSession {
     /// Enhanced fingerprinting protection unless it was turned off for the current site.
@@ -37,6 +38,8 @@ extension PageSession {
             enhancedFingerprinting: usesEnhancedFingerprintingProtection,
             linkFiltering: removesTrackingFromLinks
         )
+        // A site with no Auto-Play choice keeps the configuration's rule, which limits nothing.
+        if let policy = settings.autoplay(for: url.host).webKitPolicy { preferences.setAutoplayPolicy(policy) }
         // WebKit loads a blank page instead of its warning for loopback and private addresses.
         preferences.preferredHTTPSNavigationPolicy = settings.warnBeforeHTTP && !DevHosts.isDevHost(url)
             ? .userMediatedFallbackToHTTP
@@ -44,7 +47,25 @@ extension PageSession {
     }
 }
 
+extension SiteAutoplay {
+    /// `_WKWebsiteAutoplayPolicy`: 2 lets only silent media start, 3 lets none.
+    fileprivate var webKitPolicy: Int? {
+        switch self {
+        case .allowAll: return nil
+        case .stopMediaWithSound: return 2
+        case .never: return 3
+        }
+    }
+}
+
 extension WKWebpagePreferences {
+    fileprivate func setAutoplayPolicy(_ policy: Int) {
+        let setter = NSSelectorFromString("_setAutoplayPolicy:")
+        guard responds(to: setter) else { return }
+        typealias Setter = @convention(c) (AnyObject, Selector, Int) -> Void
+        unsafeBitCast(method(for: setter), to: Setter.self)(self, setter, policy)
+    }
+
     /// Safari's Advanced Tracking and Fingerprinting Protection, in two parts. WebKit names the
     /// option bits after unrelated features: `EnhancedTelemetry` is enhanced fingerprinting protection,
     /// `RequestValidation` enhanced network privacy and `SanitizeLookalikeCharacters` link filtering.
