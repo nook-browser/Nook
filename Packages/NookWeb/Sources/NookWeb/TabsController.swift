@@ -86,6 +86,10 @@ public final class TabsController {
     @ObservationIgnored public weak var alerts: AlertPresenter?
     /// Called with each tab that a move brought into a pinned section from the tabs section.
     @ObservationIgnored public var onTabsPinned: (([UUID]) -> Void)?
+    /// A profile's last space was deleted or moved out; its data store is being cleared.
+    @ObservationIgnored public var onProfileDeleted: ((UUID) -> Void)?
+    /// A space moved into a new profile of its own: the new store id, then the one it left.
+    @ObservationIgnored public var onProfileSplit: ((UUID, UUID) -> Void)?
 
     /// Launch argument that redirects tab state, e.g. `-NookStateDir /tmp/bench`.
     /// Read from the argument domain only, never from persisted defaults, so a stray written
@@ -513,6 +517,7 @@ public final class TabsController {
     /// Drops a cached data store no space uses any more.
     func forgetProfile(_ storeID: UUID) {
         spaceProfiles[storeID] = nil
+        onProfileDeleted?(storeID)
     }
 
     /// The data store a session's page uses: the private window's ephemeral one, else the store

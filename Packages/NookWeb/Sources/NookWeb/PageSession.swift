@@ -332,7 +332,8 @@ public final class PageSession: NSObject, Identifiable {
             configuration = ownersConfiguration
             viewExtensionOrigin = Self.extensionOrigin(of: url)
         } else if let resolvedProfile {
-            configuration = BrowserConfiguration.shared.webViewConfiguration(for: resolvedProfile)
+            configuration = BrowserConfiguration.shared.webViewConfiguration(
+                for: resolvedProfile, base: controller?.tabEvents?.baseConfiguration(for: self))
         } else {
             // Edge case: no profile yet. Delay creating WKWebView until one resolves.
             if profileAwaitCancellable == nil {
@@ -365,7 +366,7 @@ public final class PageSession: NSObject, Identifiable {
         if isAgentPage {
             configuration.webExtensionController = nil
         } else if configuration.webExtensionController == nil,
-                  let extensionController = controller?.tabEvents?.nativeController {
+                  let extensionController = controller?.tabEvents?.nativeController(for: self) {
             configuration.webExtensionController = extensionController
         }
 
@@ -428,7 +429,7 @@ public final class PageSession: NSObject, Identifiable {
     /// page only to a view built from it. Private, Agent, Peek and mini window pages get none.
     private func extensionConfiguration(for url: URL) -> WKWebViewConfiguration? {
         guard Self.extensionOrigin(of: url) != nil, !isPrivate, !isAgentPage, !isDetached else { return nil }
-        return controller?.tabEvents?.nativeController?.extensionContext(for: url)?.webViewConfiguration
+        return controller?.tabEvents?.nativeController(for: self)?.extensionContext(for: url)?.webViewConfiguration
     }
 
     /// Drops the view and loads `newURL` in a new one. Back and forward history does not carry over.
@@ -605,7 +606,7 @@ public final class PageSession: NSObject, Identifiable {
         loadingState = .didStartProvisionalNavigation
 
         // Grant extension access before loading so content scripts inject at document_start.
-        controller?.tabEvents?.grantAccess(to: newURL, private: isPrivate)
+        controller?.tabEvents?.grantAccess(to: newURL, for: self)
 
         // Reset audio tracking for the new page; the mute preference is preserved.
         hasAudioContent = false

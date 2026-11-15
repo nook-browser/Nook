@@ -1013,6 +1013,7 @@ extension ExtensionManager {
     }
 
     func getExtensionsDirectory() -> URL {
+        if !isDefaultSet { return Self.setDirectory(setID) }
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask

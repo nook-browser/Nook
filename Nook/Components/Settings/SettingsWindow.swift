@@ -289,8 +289,8 @@ private struct SettingsDetailPane: View {
         case .shortcuts:
             ShortcutsSettingsView()
         case .extensions:
-            if let extensionManager = browserManager.extensionManager {
-                ExtensionsSettingsView(extensionManager: extensionManager)
+            if browserManager.extensionManager != nil {
+                ExtensionSetsSettingsView()
             }
         case .developer:
             SettingsDeveloperTab()

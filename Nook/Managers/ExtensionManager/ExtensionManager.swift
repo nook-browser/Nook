@@ -13,22 +13,30 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
+import NookBlocker
 import NookWeb
 
 @MainActor
 final class ExtensionManager: NSObject, ObservableObject,
     WKWebExtensionControllerDelegate, NSPopoverDelegate
 {
-    static let shared = ExtensionManager()
+    /// The default extension set: today's controller, store and folder.
+    static let shared = ExtensionManager(setID: nil)
     nonisolated static let logger = Logger(subsystem: "com.nook.browser", category: "Extensions")
 
     @Published var installedExtensions: [InstalledExtension] = []
     @Published var isExtensionSupportAvailable: Bool = false
     @Published var isPopupActive: Bool = false
     @Published var extensionsLoaded: Bool = false
-    // Scope: extensions are global. One controller, one install/enabled state, and one
-    // storage namespace shared by every space. Private windows run only extensions the person
-    // allowed there (`hasAccessToPrivateData`).
+    // Scope: one instance per extension set (`ExtensionSetRegistry`). Each has its own controller,
+    // installs and storage; a profile's pages use its set's controller. Private windows run only
+    // extensions the person allowed there (`hasAccessToPrivateData`).
+
+    /// The set this instance runs. The default set's id is its controller identifier.
+    let setID: UUID
+    let isDefaultSet: Bool
+    /// The configuration this set's pages copy. The default set's is the shared one.
+    let baseWebViewConfiguration: WKWebViewConfiguration
 
     internal var extensionController: WKWebExtensionController?
     internal var extensionContexts: [String: WKWebExtensionContext] = [:]
@@ -55,6 +63,8 @@ final class ExtensionManager: NSObject, ObservableObject,
     var popupClipboardHandler: PopupClipboardHandler?
 
     let context: ModelContext
+    /// The install store of a set other than the default, which uses `Persistence.shared`.
+    private let setStore: ModelContainer?
 
     // Native messaging hosts known to be missing (no manifest found for this extension).
     // Prevents repeated manifest lookups and log spam from extensions polling.
@@ -71,18 +81,49 @@ final class ExtensionManager: NSObject, ObservableObject,
     let compatBridge = ExtensionCompatBridge()
     lazy var compatWebNavigation = ExtensionCompatWebNavigation(bridge: compatBridge)
     lazy var compatManagement = ExtensionCompatManagement(bridge: compatBridge)
-    let compatSidePanel = ExtensionCompatSidePanel()
+    lazy var compatSidePanel = ExtensionCompatSidePanel(set: isDefaultSet ? nil : setID)
     /// The app's one notification delegate. The center holds it weakly.
-    let notificationCenter = ExtensionNotificationCenter()
+    var notificationCenter: ExtensionNotificationCenter { .shared }
 
     /// Last automatic store update check, persisted so relaunches do not re-check.
-    static let lastUpdateCheckKey = "Nook.Extensions.LastUpdateCheck"
+    var lastUpdateCheckKey: String {
+        "Nook.Extensions.LastUpdateCheck" + (isDefaultSet ? "" : ".\(setID.uuidString)")
+    }
+    static let controllerIdentifierKey = "Nook.WKWebExtensionController.Identifier"
     var isCheckingForUpdates = false
     /// Ids with an install in flight.
     var installingIDs: Set<String> = []
 
-    private override init() {
-        self.context = Persistence.shared.container.mainContext
+    /// `nil` is the default set. Use `ExtensionSetRegistry` for any other.
+    init(setID: UUID?) {
+        if let setID {
+            self.setID = setID
+            self.isDefaultSet = false
+            // A context does not keep its container alive, so the instance does.
+            let container = Self.setContainer(Self.setDirectory(setID))
+            self.setStore = container
+            self.context = container.mainContext
+            let base = BrowserConfiguration.shared.webViewConfiguration.copy() as! WKWebViewConfiguration
+            // Extension pages run in this configuration's store. In a shared store two sets with
+            // the same extension have one origin and one service worker, and only one set answers.
+            base.websiteDataStore = WKWebsiteDataStore(forIdentifier: setID)
+            // A copy shares its user content controller, and two controllers would both add
+            // their content scripts to it. No rule lists: extension pages are not ad-blocked.
+            let scripts = base.userContentController.userScripts.nookOwned
+            base.userContentController = WKUserContentController()
+            scripts.forEach(base.userContentController.addUserScript)
+            self.baseWebViewConfiguration = base
+        } else {
+            let defaults = UserDefaults.standard
+            let stored = defaults.string(forKey: Self.controllerIdentifierKey).flatMap(UUID.init(uuidString:))
+            let id = stored ?? UUID()
+            if stored == nil { defaults.set(id.uuidString, forKey: Self.controllerIdentifierKey) }
+            self.setID = id
+            self.isDefaultSet = true
+            self.setStore = nil
+            self.context = Persistence.shared.container.mainContext
+            self.baseWebViewConfiguration = BrowserConfiguration.shared.webViewConfiguration
+        }
         self.isExtensionSupportAvailable =
             ExtensionUtils.isExtensionSupportAvailable
         super.init()
@@ -106,39 +147,37 @@ final class ExtensionManager: NSObject, ObservableObject,
 
     private func setupExtensionController() {
         // Persistent controller identity: extension storage lives under this identifier.
-        let config: WKWebExtensionController.Configuration
-        if let idString = UserDefaults.standard.string(
-            forKey: "Nook.WKWebExtensionController.Identifier"
-        ),
-            let uuid = UUID(uuidString: idString)
-        {
-            config = WKWebExtensionController.Configuration(identifier: uuid)
-        } else {
-            let uuid = UUID()
-            UserDefaults.standard.set(
-                uuid.uuidString,
-                forKey: "Nook.WKWebExtensionController.Identifier"
-            )
-            config = WKWebExtensionController.Configuration(identifier: uuid)
-        }
-
-        let sharedWebConfig = BrowserConfiguration.shared.webViewConfiguration
-
-        // Extension pages (background, popup, options) use one persistent store keyed by the
-        // controller identifier. `controller.configuration` returns a copy, so this cannot be
-        // changed after init; everything must be set on `config` before creating the controller.
-        config.defaultWebsiteDataStore = WKWebsiteDataStore(forIdentifier: config.identifier!)
+        let config = WKWebExtensionController.Configuration(identifier: setID)
+        // `controller.configuration` returns a copy, so everything is set on `config` before the
+        // controller exists.
+        config.defaultWebsiteDataStore = WKWebsiteDataStore(forIdentifier: setID)
         // Background pages must share the page webviews' configuration for runtime messaging.
-        config.webViewConfiguration = sharedWebConfig
+        // Extension pages (background, popup, options) also run in this configuration's store,
+        // whatever `defaultWebsiteDataStore` says (measured on macOS 27).
+        config.webViewConfiguration = baseWebViewConfiguration
 
         let controller = WKWebExtensionController(configuration: config)
         controller.delegate = self
         self.extensionController = controller
 
         // Associate browsing webviews with this controller so content scripts inject.
-        sharedWebConfig.webExtensionController = controller
+        baseWebViewConfiguration.webExtensionController = controller
 
-        Self.logger.info("WKWebExtensionController initialized (storage ID \(config.identifier?.uuidString ?? "none", privacy: .public))")
+        Self.logger.info("WKWebExtensionController initialized (storage ID \(self.setID.uuidString, privacy: .public), default \(self.isDefaultSet))")
+    }
+
+    /// Packages and the install store of a set other than the default.
+    static func setDirectory(_ setID: UUID) -> URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("\(SharedSupportFolder.name)/Extensions/Sets/\(setID.uuidString)")
+    }
+
+    private static func setContainer(_ directory: URL) -> ModelContainer {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let stored = ModelConfiguration(url: directory.appendingPathComponent("extensions.store"))
+        if let container = try? ModelContainer(for: ExtensionEntity.self, configurations: stored) { return container }
+        logger.error("Extension set store at \(directory.path, privacy: .public) failed to open; using memory")
+        return try! ModelContainer(for: ExtensionEntity.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     }
 
     /// Register internal native port handlers for Safari extensions that expect
@@ -224,7 +263,9 @@ final class ExtensionManager: NSObject, ObservableObject,
         // report themselves through notifyTabOpened when their view is created; registering
         // a tab with a nil web view caches stale state and breaks chrome.runtime messaging.
         let windows = openWindowAdapters
-        let sessions = browserManager.tabs.sessions.filter { !$0.isUnloaded }
+        let sessions = browserManager.tabs.sessions.filter {
+            !$0.isUnloaded && ExtensionSetRegistry.shared.setID(for: $0) == setID
+        }
         for session in sessions { notifyTabOpened(session) }
 
         if let focused = browserManager.windowRegistry?.activeWindow,
@@ -236,6 +277,19 @@ final class ExtensionManager: NSObject, ObservableObject,
         }
 
         Self.logger.info("Attached to browser manager with \(windows.count) windows, \(sessions.count) open pages")
+    }
+
+    /// Unloads every extension of a set that is being deleted.
+    func tearDown() {
+        guard let controller = extensionController else { return }
+        for adapter in windowAdapters.values { controller.didCloseWindow(adapter) }
+        for context in controller.extensionContexts { try? controller.unload(context) }
+        windowAdapters = [:]
+        tabAdapters = [:]
+        openedTabIDs = []
+        extensionContexts = [:]
+        installedExtensions = []
+        extensionController = nil
     }
 
     // MARK: - NSPopoverDelegate

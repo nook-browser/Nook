@@ -237,7 +237,7 @@ struct URLBarView: View {
                 }
 
                 // Pinned extension buttons + library button
-                if !isEditing, let extensionManager = browserManager.extensionManager {
+                if !isEditing, let extensionManager = browserManager.extensionManager(for: windowState) {
                     let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
                     let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
 

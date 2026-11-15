@@ -110,7 +110,7 @@ struct ExtensionLibraryView: View {
             Text("Extensions")
                 .font(NookDesign.Font.title)
 
-            let extensions = browserManager.extensionManager?.installedExtensions.filter { $0.isEnabled } ?? []
+            let extensions = browserManager.extensionManager(for: windowState)?.installedExtensions.filter { $0.isEnabled } ?? []
             LazyVGrid(columns: columns, spacing: NookDesign.Spacing.sm) {
                 ForEach(extensions, id: \.id) { ext in
                     ExtensionGridItem(
@@ -430,7 +430,7 @@ private struct ExtensionGridItem: View {
     }
 
     private func triggerExtensionAction() {
-        guard let ctx = ExtensionManager.shared.getExtensionContext(for: ext.id) else { return }
+        guard let ctx = ExtensionSetRegistry.shared.manager(for: windowState).getExtensionContext(for: ext.id) else { return }
 
         if ctx.webExtension.hasBackgroundContent {
             ctx.loadBackgroundContent { error in
@@ -438,16 +438,16 @@ private struct ExtensionGridItem: View {
             }
         }
 
-        let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
-        ExtensionManager.shared.performAction(ctx, for: adapter)
+        let adapter = ExtensionSetRegistry.shared.manager(for: windowState).actionAdapter(in: windowState)
+        ExtensionSetRegistry.shared.manager(for: windowState).performAction(ctx, for: adapter)
     }
 
     private func refreshBadge() {
-        guard let ctx = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
+        guard let ctx = ExtensionSetRegistry.shared.manager(for: windowState).getExtensionContext(for: ext.id) else {
             badgeText = nil
             return
         }
-        let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
+        let adapter = ExtensionSetRegistry.shared.manager(for: windowState).actionAdapter(in: windowState)
         badgeText = ctx.action(for: adapter)?.badgeText
     }
 }

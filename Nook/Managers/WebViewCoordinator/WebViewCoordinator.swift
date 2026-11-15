@@ -108,7 +108,8 @@ class WebViewCoordinator {
         if let sourceWebView = source ?? session.webView {
             configuration = sourceWebView.configuration
         } else if let profile = session.profile {
-            configuration = BrowserConfiguration.shared.webViewConfiguration(for: profile)
+            configuration = BrowserConfiguration.shared.webViewConfiguration(
+                for: profile, base: ExtensionSetRegistry.shared.manager(for: session)?.baseWebViewConfiguration)
         } else {
             configuration = BrowserConfiguration.shared.webViewConfiguration.copy() as! WKWebViewConfiguration
         }

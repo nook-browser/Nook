@@ -78,6 +78,18 @@ final class ExtensionCompatNotifications: ExtensionCompatAPI {
         return (String(parts[1]), String(parts[2]))
     }
 
+    /// What sets one extension set's identifiers apart: "" for the default set, else its id and
+    /// a slash, which no extension id holds. The same extension may be installed in several sets.
+    var scope = ""
+
+    /// The parts of an identifier this set posted; nil for another set's.
+    private func own(_ identifier: String) -> (contextID: String, id: String)? {
+        guard let (key, id) = Self.parse(identifier), key.hasPrefix(scope), !scope.isEmpty || !key.contains("/") else { return nil }
+        return (String(key.dropFirst(scope.count)), id)
+    }
+
+    func owns(_ identifier: String) -> Bool { own(identifier) != nil }
+
     /// Chrome's options as what the Mac can show, laid over `old` for an update. Nil when a new
     /// notification lacks a title or a message.
     static func notification(_ options: [String: Any], identifier: String, extensionName: String,
@@ -110,7 +122,7 @@ final class ExtensionCompatNotifications: ExtensionCompatAPI {
               reply: @escaping (Result<Any?, ExtensionCompatError>) -> Void) {
         guard let center else { return reply(.failure(ExtensionCompatError("notifications.\(method) is not available"))) }
         let contextID = context.uniqueIdentifier
-        func full(_ id: String) -> String { Self.identifier(id, in: contextID) }
+        func full(_ id: String) -> String { Self.identifier(id, in: scope + contextID) }
         switch method {
         case "create":
             // The id is optional and comes first.
@@ -147,7 +159,8 @@ final class ExtensionCompatNotifications: ExtensionCompatAPI {
             }
         case "getAll":
             center.delivered { [weak self] delivered in
-                let mine = (delivered + Array((self?.shown ?? [:]).keys)).compactMap(Self.parse).filter { $0.contextID == contextID }
+                guard let self else { return reply(.success([String: Bool]())) }
+                let mine = (delivered + Array(self.shown.keys)).compactMap(self.own).filter { $0.contextID == contextID }
                 reply(.success(Dictionary(mine.map { ($0.id, true) }, uniquingKeysWith: { first, _ in first })))
             }
         case "getPermissionLevel":
@@ -170,11 +183,11 @@ final class ExtensionCompatNotifications: ExtensionCompatAPI {
             self.posts += 1
             self.shown[notification.identifier] = (notification, self.posts)
             // Past the limit the oldest come down, and the extension is told as for any it cleared.
-            let mine = self.shown.filter { Self.parse($0.key)?.contextID == contextID }.map { ($0.key, $0.value.order) }
+            let mine = self.shown.filter { self.own($0.key)?.contextID == contextID }.map { ($0.key, $0.value.order) }
             let dropped = Self.overflow(mine, limit: self.liveLimit)
             dropped.forEach { self.shown[$0] = nil }
             if !dropped.isEmpty { center.remove(dropped) }
-            for old in dropped.compactMap(Self.parse) {
+            for old in dropped.compactMap(self.own) {
                 if let context { self.bridge?.emit("notifications.onClosed", [old.id, false], to: context) }
             }
             center.show(notification) { _ in reply(.success(answer())) }
@@ -185,15 +198,16 @@ final class ExtensionCompatNotifications: ExtensionCompatAPI {
     func contextUnloaded(_ context: WKWebExtensionContext) {
         let contextID = context.uniqueIdentifier
         posted[contextID] = nil
-        shown = shown.filter { Self.parse($0.key)?.contextID != contextID }
+        shown = shown.filter { own($0.key)?.contextID != contextID }
         center?.delivered { [weak self] delivered in
-            self?.center?.remove(delivered.filter { Self.parse($0)?.contextID == contextID })
+            guard let self else { return }
+            self.center?.remove(delivered.filter { self.own($0)?.contextID == contextID })
         }
     }
 
     /// The person clicked, dismissed or pressed a button of a notification.
     func responded(to identifier: String, _ response: Response) {
-        guard let (contextID, id) = Self.parse(identifier), let context = context?(contextID),
+        guard let (contextID, id) = own(identifier), let context = context?(contextID),
               ExtensionCompatBridge.declares("notifications", in: context) else { return }
         // The Mac takes a notification away once it is answered.
         shown[identifier] = nil

@@ -9,10 +9,16 @@
 import AppKit
 import SwiftUI
 import NookDesign
+import NookWeb
+import NookSettings
 
 struct ExtensionsSettingsView: View {
     @EnvironmentObject var browserManager: BrowserManager
+    @Environment(TabsController.self) private var tabs
     @ObservedObject var extensionManager: ExtensionManager
+    /// The extension sets in use and the one shown, for the picker once there is more than one.
+    var sets: [ExtensionSetChoice] = []
+    var shownSet: Binding<UUID>?
     @State private var showingInstallDialog = false
     @State private var safariExtensions: [ExtensionManager.SafariExtensionInfo] = []
     @State private var isScanningSafari = false
@@ -20,9 +26,20 @@ struct ExtensionsSettingsView: View {
 
     var body: some View {
         Form {
+            if sets.count > 1, let shownSet {
+                Section {
+                    Picker("Profiles", selection: shownSet) {
+                        ForEach(sets, id: \.set) { choice in
+                            Text(choice.members.compactMap { id in tabs.profiles.first { $0.id == id }?.name }.joined(separator: ", "))
+                                .tag(choice.set)
+                        }
+                    }
+                }
+            }
+
             Section {
                 Button("Install Extension...") {
-                    browserManager.showExtensionInstallDialog()
+                    extensionManager.showExtensionInstallDialog()
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -44,7 +61,7 @@ struct ExtensionsSettingsView: View {
             } else {
                 Section("Installed Extensions") {
                     ForEach(extensionManager.installedExtensions, id: \.id) { ext in
-                        ExtensionRowView(extension: ext)
+                        ExtensionRowView(extension: ext, extensionManager: extensionManager)
                             .environmentObject(browserManager)
                     }
                 }
@@ -176,6 +193,8 @@ private struct SafariExtensionRowView: View {
 
 private struct ExtensionRowView: View {
     let `extension`: InstalledExtension
+    /// The extension set this row's extension is installed in.
+    let extensionManager: ExtensionManager
     @EnvironmentObject var browserManager: BrowserManager
 
     var body: some View {
@@ -225,7 +244,7 @@ private struct ExtensionRowView: View {
                     "Allow in Private Browsing",
                     isOn: Binding(
                         get: { `extension`.allowsPrivateBrowsing },
-                        set: { browserManager.extensionManager?.setAllowsPrivateBrowsing(`extension`.id, allowed: $0) }
+                        set: { extensionManager.setAllowsPrivateBrowsing(`extension`.id, allowed: $0) }
                     )
                 )
                 .toggleStyle(.checkbox)
@@ -242,9 +261,9 @@ private struct ExtensionRowView: View {
                         get: { `extension`.isEnabled },
                         set: { isEnabled in
                             if isEnabled {
-                                browserManager.enableExtension(`extension`.id)
+                                extensionManager.enableExtension(`extension`.id)
                             } else {
-                                browserManager.disableExtension(`extension`.id)
+                                extensionManager.disableExtension(`extension`.id)
                             }
                         }
                     )
@@ -252,11 +271,34 @@ private struct ExtensionRowView: View {
                 .labelsHidden()
 
                 Button("Remove") {
-                    browserManager.uninstallExtension(`extension`.id)
+                    extensionManager.uninstallExtension(`extension`.id)
                 }
                 .buttonStyle(.bordered)
                 .foregroundStyle(.red)
             }
         }
+    }
+}
+
+/// Settings > Extensions for one extension set, the active window's until another is picked.
+struct ExtensionSetsSettingsView: View {
+    @EnvironmentObject var browserManager: BrowserManager
+    @Environment(TabsController.self) private var tabs
+    @Environment(\.nookSettings) private var settings
+    @State private var picked: UUID?
+
+    var body: some View {
+        let registry = ExtensionSetRegistry.shared
+        let sets = settings.extensionSets.choices(profiles: tabs.profiles.map(\.id), defaultSet: registry.defaultSetID)
+        let active = browserManager.windowRegistry?.activeWindow.map(registry.setID(for:))
+        // Only a set a profile uses is shown: asking for any other id would create it.
+        let set = [picked, active].compactMap { $0 }.first { id in sets.contains { $0.set == id } }
+            ?? sets.first?.set ?? registry.defaultSetID
+        ExtensionsSettingsView(
+            extensionManager: registry.manager(forSet: set),
+            sets: sets,
+            shownSet: Binding(get: { set }, set: { picked = $0 })
+        )
+        .id(set)
     }
 }

@@ -67,6 +67,8 @@ extension ExtensionManager {
     /// Installs each legacy copy that names a store listing again from that listing, without the
     /// person: a copy whose listing asks for more than it has is left for them.
     func migrateLegacyInstalls() async {
+        // Legacy rows predate extension sets, so only the default set has any.
+        guard isDefaultSet else { return }
         // A file install made after this first ran is the person's choice of that package, and stays.
         let defaults = UserDefaults.standard
         let cutoff = defaults.object(forKey: Self.migrationCutoffKey) as? Date ?? Date()

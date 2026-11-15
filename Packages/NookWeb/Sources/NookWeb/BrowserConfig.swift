@@ -116,8 +116,9 @@ public class BrowserConfiguration {
     // MARK: - Profile-Aware Configurations
     // Derive from the shared config so extension controller + process pool are inherited
     @MainActor
-    public func webViewConfiguration(for profile: Profile) -> WKWebViewConfiguration {
-        let config = webViewConfiguration.copy() as! WKWebViewConfiguration
+    /// `base` is the configuration of the page's extension set; nil is the shared one.
+    public func webViewConfiguration(for profile: Profile, base: WKWebViewConfiguration? = nil) -> WKWebViewConfiguration {
+        let config = (base ?? webViewConfiguration).copy() as! WKWebViewConfiguration
 
         // Fresh UCC per tab to avoid cross-tab handler conflicts (preserves shared scripts)
         config.userContentController = freshUserContentController()

@@ -21,10 +21,10 @@ extension ExtensionManager {
     /// request new permissions are skipped until the user reinstalls from the store.
     func checkForExtensionUpdatesIfDue() {
         let defaults = UserDefaults.standard
-        let lastCheck = defaults.double(forKey: Self.lastUpdateCheckKey)
+        let lastCheck = defaults.double(forKey: lastUpdateCheckKey)
         let entities = (try? context.fetch(FetchDescriptor<ExtensionEntity>())) ?? []
         // The first launch that can migrate does not wait out the day.
-        let legacyWaiting = !defaults.bool(forKey: Self.migrationTriedKey)
+        let legacyWaiting = isDefaultSet && !defaults.bool(forKey: Self.migrationTriedKey)
             && entities.contains { Self.isLegacy(id: $0.id, sourceStore: $0.sourceStore) }
         guard !isCheckingForUpdates,
               legacyWaiting || Date().timeIntervalSince1970 - lastCheck > Self.updateInterval
@@ -38,12 +38,13 @@ extension ExtensionManager {
         guard !entities.isEmpty else { return }
 
         isCheckingForUpdates = true
+        let checkKey = lastUpdateCheckKey
 
         Task(priority: .utility) { @MainActor [weak self] in
             // Stay clear of launch and activation work.
             try? await Task.sleep(for: .seconds(30))
             // Marked once the pass starts, so a quit during the wait leaves it due.
-            defaults.set(Date().timeIntervalSince1970, forKey: Self.lastUpdateCheckKey)
+            defaults.set(Date().timeIntervalSince1970, forKey: checkKey)
             defaults.set(true, forKey: Self.migrationTriedKey)
             await self?.migrateLegacyInstalls()
             await self?.refreshSafariImports()

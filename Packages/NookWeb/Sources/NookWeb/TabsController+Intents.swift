@@ -710,6 +710,7 @@ extension TabsController {
         guard case .main? = owner(ofSpace: spaceID), let old = profile(forSpace: spaceID),
               perform(.main, "setProfile", { try $0.setProfile(spaceID, to: storeID, name: name) }) != nil
         else { return }
+        if storeID == nil, let new = tree.dataStoreID(for: spaceID), new != old.id { onProfileSplit?(new, old.id) }
         unloadPagesOnWrongDataStore(items(inSpace: spaceID).map(\.id))
         if let agent = agentSpaceID { unloadPagesOnWrongDataStore(items(inSpace: agent).map(\.id)) }
         for window in regularWindows where window.spaceID == spaceID { sessionDelegate?.windowSpaceChanged(window) }

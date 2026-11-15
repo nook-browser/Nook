@@ -37,6 +37,9 @@ struct ExtensionActionButton: View {
     @State private var badgeText: String?
     @State private var badgeRefreshId: UUID = UUID()
 
+    /// The extension set of the space this window shows.
+    private var extensionSet: ExtensionManager { ExtensionSetRegistry.shared.manager(for: windowState) }
+
     private var currentSession: PageSession? {
         browserManager.tabs.selectedSession(in: windowState)
     }
@@ -74,7 +77,7 @@ struct ExtensionActionButton: View {
             }
             .frame(width: NookDesign.Size.iconButton, height: NookDesign.Size.iconButton)
             .background(isHovering ? NookDesign.Surface.fillPressed : .clear)
-            .background(ActionAnchorView(extensionId: ext.id))
+            .background(ActionAnchorView(extensionId: ext.id, extensionSet: extensionSet))
             .clipShape(NookDesign.Radius.shape(NookDesign.Radius.sm))
         }
         .buttonStyle(.plain)
@@ -109,7 +112,7 @@ struct ExtensionActionButton: View {
     /// Wake background workers then refresh the badge after a short delay.
     /// Called on app reactivation; MV3 workers may have terminated while Nook was in the background.
     private func wakeAndRefreshBadge() {
-        ExtensionManager.shared.wakeBackgroundWorkers()
+        extensionSet.wakeBackgroundWorkers()
         // Give the worker time to process the current tab and update badge text
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             refreshBadge()
@@ -117,11 +120,11 @@ struct ExtensionActionButton: View {
     }
 
     private func refreshBadge() {
-        guard let ctx = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
+        guard let ctx = extensionSet.getExtensionContext(for: ext.id) else {
             badgeText = nil
             return
         }
-        let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
+        let adapter = extensionSet.actionAdapter(in: windowState)
         let action = ctx.action(for: adapter)
         badgeText = action?.badgeText
     }
@@ -131,20 +134,20 @@ struct ExtensionActionButton: View {
     private func showExtensionPopup() {
         Self.logger.notice("Action tapped for '\(self.ext.name, privacy: .public)' id=\(self.ext.id, privacy: .public)")
 
-        guard let extensionContext = ExtensionManager.shared.getExtensionContext(for: ext.id) else {
-            Self.logger.error("No extension context for id=\(self.ext.id, privacy: .public). Available: \(ExtensionManager.shared.loadedContextIDs.joined(separator: ", "), privacy: .public)")
+        guard let extensionContext = extensionSet.getExtensionContext(for: ext.id) else {
+            Self.logger.error("No extension context for id=\(self.ext.id, privacy: .public). Available: \(extensionSet.loadedContextIDs.joined(separator: ", "), privacy: .public)")
             return
         }
 
         let session = currentSession
-        let adapter = ExtensionManager.shared.actionAdapter(in: windowState)
+        let adapter = extensionSet.actionAdapter(in: windowState)
 
         // No permission grants here: required permissions were granted at load, site access
         // follows the extension's approved patterns, and activeTab is granted by WebKit on click.
 
         let perform = {
             Self.logger.notice("Calling performAction (tab=\(session?.title ?? "nil", privacy: .public), adapter=\(adapter != nil ? "yes" : "nil", privacy: .public))")
-            ExtensionManager.shared.performAction(extensionContext, for: adapter)
+            extensionSet.performAction(extensionContext, for: adapter)
         }
         guard extensionContext.webExtension.hasBackgroundContent else { return perform() }
 
@@ -172,14 +175,15 @@ struct ExtensionActionButton: View {
 // MARK: - Anchor View for Popover Positioning
 private struct ActionAnchorView: NSViewRepresentable {
     let extensionId: String
+    let extensionSet: ExtensionManager
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
-        ExtensionManager.shared.setActionAnchor(for: extensionId, anchorView: view)
+        extensionSet.setActionAnchor(for: extensionId, anchorView: view)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        ExtensionManager.shared.setActionAnchor(for: extensionId, anchorView: nsView)
+        extensionSet.setActionAnchor(for: extensionId, anchorView: nsView)
     }
 }

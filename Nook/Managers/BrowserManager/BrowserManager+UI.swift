@@ -16,6 +16,16 @@ import NookUI
 import NookWeb
 
 extension BrowserManager: TabActions {
+    func setExtensionSet(ofProfile profile: UUID, to set: UUID?) {
+        let profiles = tabs.profiles.map(\.id)
+        ExtensionSetRegistry.shared.update({ sets, defaultSet in
+            if let set { return sets.sync(profile, with: set, profiles: profiles, defaultSet: defaultSet) }
+            return sets.separate(profile, profiles: profiles, defaultSet: defaultSet).garbage
+        }, profile: profile)
+    }
+
+    var defaultExtensionSetID: UUID? { ExtensionSetRegistry.shared.defaultSetID }
+
     func enterSplit(with itemID: UUID, placeOnRight: Bool, in window: BrowserWindowState) {
         splitManager.enterSplit(with: itemID, placeOn: placeOnRight ? .right : .left, in: window)
     }

@@ -32,11 +32,13 @@ public struct SpacesSettingsView: View {
             Section {
                 ForEach(tabs.profiles) { profile in
                     profileRow(profile)
+                    // A row of its own: beside the name it squeezed the field into a column.
+                    if tabs.profiles.count > 1 { ExtensionSetPicker(profile: profile.id) }
                 }
             } header: {
                 Text("Profiles")
             } footer: {
-                Text("A profile keeps its own logins, cookies and history. Spaces in the same profile share them. Extensions and settings are shared by all profiles.")
+                Text("A profile keeps its own logins, cookies and history. Spaces in the same profile share them. Synced profiles share their extensions and extension data, and a Separate profile has its own. Settings are shared by all profiles.")
             }
 
             Section {

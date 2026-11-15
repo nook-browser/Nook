@@ -30,6 +30,7 @@ extension ExtensionManager {
         _ = window.flatMap { windowAdapter(for: $0) }
         openedTabIDs.insert(session.itemID)
         controller.didOpenTab(adapter)
+        Self.logger.info("Tab \(session.itemID.uuidString, privacy: .public) opened in extension set \(self.setID.uuidString, privacy: .public), view on it: \(session.webView?.configuration.webExtensionController === controller)")
         // Peek and mini window pages open in front, so they become the active tab.
         if adapter.detached != nil {
             notifyTabActivated(new: session, previous: window.flatMap { browserManagerRef?.tabs.selectedSession(in: $0) })
@@ -40,7 +41,7 @@ extension ExtensionManager {
     /// can reach the background page and the popup fills the page in front.
     private func detachedAdapter(for session: PageSession) -> ExtensionTabAdapter? {
         guard let bm = browserManagerRef else { return nil }
-        let created = ExtensionTabAdapter(itemID: session.itemID, browserManager: bm, detachedPage: session)
+        let created = ExtensionTabAdapter(itemID: session.itemID, browserManager: bm, manager: self, detachedPage: session)
         tabAdapters[session.itemID] = created
         return created
     }
@@ -96,6 +97,30 @@ extension ExtensionManager {
         // Background workers re-evaluate the page (autofill detection, badge text,
         // declarativeContent rules).
         controller.didChangeTabProperties([.URL, .title], for: newAdapter)
+    }
+
+    /// The active tab moved to a page in another set.
+    func notifyTabDeselected(_ session: PageSession) {
+        guard let controller = extensionController, let adapter = openedAdapter(for: session.itemID) else { return }
+        controller.didDeselectTabs([adapter])
+    }
+
+    /// Tabs that now belong to another set are forgotten, and closed to this set's extensions
+    /// when they had been announced.
+    func closeTabsOfOtherSets() {
+        for (id, adapter) in tabAdapters
+        where adapter.detached == nil && ExtensionSetRegistry.shared.setID(forItem: id) != setID {
+            tabAdapters[id] = nil
+            if openedTabIDs.remove(id) != nil { extensionController?.didCloseTab(adapter, windowIsClosing: false) }
+        }
+    }
+
+    /// Closes the Peek and mini window pages of profiles that are moving to another set.
+    func closeDetachedPages(ofProfiles profiles: Set<UUID>) {
+        for page in openedTabIDs.compactMap({ tabAdapters[$0]?.detached }) {
+            guard let profile = page.detachedProfile, !profile.isEphemeral, profiles.contains(profile.id) else { continue }
+            page.onClose?()
+        }
     }
 
     /// The item's page ended (item closed, pinned page closed, private window closed).
