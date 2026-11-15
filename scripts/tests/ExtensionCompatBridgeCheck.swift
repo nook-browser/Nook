@@ -106,6 +106,13 @@ struct ExtensionCompatBridgeCheck {
         }
         precondition(N.parse("focusable-webview-1") == nil && N.parse("nook.ext\n\nx") == nil && N.parse("other\nabc\nx") == nil)
 
+        // The same extension in two extension sets: each set answers only for what it posted.
+        let plain = N(bridge: ExtensionCompatBridge()), scoped = N(bridge: ExtensionCompatBridge())
+        scoped.scope = "SET/"
+        let fromPlain = N.identifier("n1", in: plain.scope + "abcdef"), fromScoped = N.identifier("n1", in: scoped.scope + "abcdef")
+        precondition(plain.owns(fromPlain) && !plain.owns(fromScoped))
+        precondition(scoped.owns(fromScoped) && !scoped.owns(fromPlain))
+
         let made = N.notification(["type": "list", "title": "T", "message": "M", "contextMessage": "C",
                                    "items": [["title": "a", "message": "one"], ["title": "b"]],
                                    "buttons": [["title": "Yes"], ["title": "No"], ["title": "Third"], ["icon": "x"]]],

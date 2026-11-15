@@ -152,6 +152,8 @@ public class BrowserWindowState {
     /// The ephemeral, non-persistent data store this incognito window's pages use.
     /// Only set when isIncognito is true.
     public var ephemeralProfile: Profile?
+    /// A private window's extension set, that of the window it was opened from. Nil is the default.
+    @ObservationIgnored public var privateExtensionSetID: UUID?
 
     /// Whether the download warning has been shown in this incognito session
     var hasShownDownloadWarning: Bool = false

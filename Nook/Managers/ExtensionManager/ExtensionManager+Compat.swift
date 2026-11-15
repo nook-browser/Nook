@@ -37,7 +37,8 @@ extension ExtensionManager {
         compatBridge.register(idle)
 
         let notifications = ExtensionCompatNotifications(bridge: compatBridge)
-        notificationCenter.api = notifications
+        if !isDefaultSet { notifications.scope = setID.uuidString + "/" }
+        notificationCenter.add(notifications)
         notifications.center = notificationCenter
         notifications.context = { [weak self] in self?.extensionContexts[$0] }
         UNUserNotificationCenter.current().delegate = notificationCenter
@@ -106,12 +107,17 @@ extension ExtensionManager {
             from: old, to: session.url, in: adapter, isPrivate: session.isPrivate, contexts: extensionContexts.values)
     }
 
-    /// The space in front, whose cookies a sign-in flow uses.
+    /// The space whose cookies a sign-in flow uses: the one in front when it runs this set, else
+    /// another window's that does, else the set's first space. Never a profile of another set.
     private func authFlowSpace() -> (profile: Profile, window: BrowserWindowState?)? {
         guard let browserManager = browserManagerRef else { return nil }
-        let window = browserManager.windowRegistry?.mostRecentRegularWindow
-        let profile = window?.spaceID.flatMap { browserManager.tabs.profile(forSpace: $0) } ?? browserManager.currentProfile
-        return profile.map { ($0, window) }
+        let registry = ExtensionSetRegistry.shared
+        let front = browserManager.windowRegistry?.mostRecentRegularWindow
+        let window = ((front.map { [$0] } ?? []) + browserManager.tabs.regularWindows)
+            .first { $0.spaceID != nil && registry.setID(for: $0) == setID }
+        let space = window?.spaceID ?? browserManager.tabs.orderedSpaces
+            .first { !$0.isAgent && registry.setID(forSpace: $0.id) == setID }?.id
+        return space.flatMap { browserManager.tabs.profile(forSpace: $0) }.map { ($0, window) }
     }
 
     /// A sign-in page for `identity.launchWebAuthFlow`, in a mini window with the cookies of the space in front.

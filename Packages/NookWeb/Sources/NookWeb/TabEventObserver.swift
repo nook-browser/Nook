@@ -20,11 +20,13 @@ public protocol TabEventObserver: AnyObject {
     func sameDocumentNavigation(_ session: PageSession, from old: URL)
 
     /// Lets extensions with host permissions for this URL inject before the load starts.
-    func grantAccess(to url: URL, private: Bool)
+    func grantAccess(to url: URL, for session: PageSession)
     /// MV3 service workers die after about five minutes idle; a page load wakes them.
-    func wakeBackgroundWorkers()
-    /// The controller new web view configurations are attached to, nil when extensions are off.
-    var nativeController: WKWebExtensionController? { get }
+    func wakeBackgroundWorkers(for session: PageSession)
+    /// The controller of the page's extension set, nil when it gets no extensions.
+    func nativeController(for session: PageSession) -> WKWebExtensionController?
+    /// The configuration the page's web view copies, the one its controller was set up with.
+    func baseConfiguration(for session: PageSession) -> WKWebViewConfiguration?
     /// Debug-build reporting of content script and messaging state.
     func diagnose(for webView: WKWebView, url: URL)
 }

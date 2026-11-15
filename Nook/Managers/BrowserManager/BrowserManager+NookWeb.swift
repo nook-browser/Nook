@@ -127,12 +127,18 @@ extension BrowserManager: PageSessionDelegate {
 
 extension BrowserManager: TabEventObserver {
     func tabOpened(_ session: PageSession) {
-        ExtensionManager.shared.notifyTabOpened(session)
+        ExtensionSetRegistry.shared.closeStrayTabs()
+        ExtensionSetRegistry.shared.manager(for: session)?.notifyTabOpened(session)
     }
 
     func tabActivated(new session: PageSession, previous: PageSession?) {
         zoomManager.showZoomLevel(for: session.webView)
-        ExtensionManager.shared.notifyTabActivated(new: session, previous: previous)
+        let extensions = ExtensionSetRegistry.shared.manager(for: session)
+        extensions?.notifyTabActivated(new: session, previous: previous)
+        // The tab left behind belongs to another set: that set sees it deselected.
+        if let previous, let old = ExtensionSetRegistry.shared.manager(for: previous), old !== extensions {
+            old.notifyTabDeselected(previous)
+        }
         // Private pages report activation for extensions and the zoom readout only.
         guard !session.isPrivate else { return }
         // The loaded-page budget was only ever reached from startup warming and split view, so
@@ -142,29 +148,31 @@ extension BrowserManager: TabEventObserver {
     }
 
     func tabClosed(itemID: UUID) {
-        ExtensionManager.shared.notifyTabClosed(itemID: itemID)
+        ExtensionSetRegistry.shared.loadedManagers.forEach { $0.notifyTabClosed(itemID: itemID) }
         exitSidebarPiP(showing: itemID)
     }
 
     func tabMoved(itemID: UUID, from oldIndex: Int?, in oldWindow: BrowserWindowState?, pinnedChanged: Bool) {
-        ExtensionManager.shared.notifyTabMoved(
-            itemID: itemID, from: oldIndex, in: oldWindow, pinnedChanged: pinnedChanged)
+        ExtensionSetRegistry.shared.closeStrayTabs()
+        for manager in ExtensionSetRegistry.shared.loadedManagers {
+            manager.notifyTabMoved(itemID: itemID, from: oldIndex, in: oldWindow, pinnedChanged: pinnedChanged)
+        }
     }
 
     func tabPropertiesChanged(_ session: PageSession, properties: WKWebExtension.TabChangedProperties) {
-        ExtensionManager.shared.notifyTabPropertiesChanged(session, properties: properties)
+        ExtensionSetRegistry.shared.manager(for: session)?.notifyTabPropertiesChanged(session, properties: properties)
     }
 
     func sameDocumentNavigation(_ session: PageSession, from old: URL) {
-        ExtensionManager.shared.notifySameDocumentNavigation(session, from: old)
+        ExtensionSetRegistry.shared.manager(for: session)?.notifySameDocumentNavigation(session, from: old)
     }
 
-    func grantAccess(to url: URL, private: Bool) {
-        ExtensionManager.shared.grantExtensionAccessToURL(url, private: `private`)
+    func grantAccess(to url: URL, for session: PageSession) {
+        ExtensionSetRegistry.shared.manager(for: session)?.grantExtensionAccessToURL(url, private: session.isPrivate)
     }
 
-    func wakeBackgroundWorkers() {
-        ExtensionManager.shared.wakeBackgroundWorkers()
+    func wakeBackgroundWorkers(for session: PageSession) {
+        ExtensionSetRegistry.shared.manager(for: session)?.wakeBackgroundWorkers()
     }
 
     /// Leaving a playing video moves it into the sidebar panel; coming back puts it inline again.
@@ -244,13 +252,17 @@ extension BrowserManager: TabEventObserver {
         }
     }
 
-    var nativeController: WKWebExtensionController? {
-        ExtensionManager.shared.nativeController
+    func nativeController(for session: PageSession) -> WKWebExtensionController? {
+        ExtensionSetRegistry.shared.manager(for: session)?.nativeController
+    }
+
+    func baseConfiguration(for session: PageSession) -> WKWebViewConfiguration? {
+        ExtensionSetRegistry.shared.manager(for: session)?.baseWebViewConfiguration
     }
 
     func diagnose(for webView: WKWebView, url: URL) {
         #if DEBUG
-        ExtensionManager.shared.diagnoseExtensionState(for: webView, url: url)
+        ExtensionSetRegistry.shared.loadedManagers.forEach { $0.diagnoseExtensionState(for: webView, url: url) }
         #endif
     }
 }

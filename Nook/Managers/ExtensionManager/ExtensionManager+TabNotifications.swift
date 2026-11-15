@@ -20,16 +20,21 @@ extension ExtensionManager {
     /// get one too: WebKit hides them from extensions without `hasAccessToPrivateData`.
     func adapter(for itemID: UUID) -> ExtensionTabAdapter? {
         if browserManagerRef?.tabs.isInAgentSpace(itemID) == true { return nil }
-        return adapter(outsideAgentSpace: itemID)
+        // A kept adapter is this set's: `closeTabsOfOtherSets` drops one when its tab leaves,
+        // and a closing tab is already out of the tree, so it cannot be asked for its set.
+        if let existing = tabAdapters[itemID] { return existing }
+        // A tab of another set's profile does not exist to this set's extensions.
+        guard ExtensionSetRegistry.shared.setID(forItem: itemID) == setID else { return nil }
+        return adapter(inThisSet: itemID)
     }
 
-    /// `adapter(for:)` for an item already known to be outside the Agent space.
-    private func adapter(outsideAgentSpace itemID: UUID) -> ExtensionTabAdapter? {
+    /// `adapter(for:)` for an item already known to be in this set and outside the Agent space.
+    private func adapter(inThisSet itemID: UUID) -> ExtensionTabAdapter? {
         if let existing = tabAdapters[itemID] { return existing }
         guard let bm = browserManagerRef, let item = bm.tabs.item(itemID), !item.isFolder else { return nil }
         // ponytail: adapters for items closed without ever loading stay cached (a few bytes each);
         // prune against the tree if that ever shows up.
-        let created = ExtensionTabAdapter(itemID: itemID, browserManager: bm)
+        let created = ExtensionTabAdapter(itemID: itemID, browserManager: bm, manager: self)
         tabAdapters[itemID] = created
         return created
     }
@@ -39,11 +44,13 @@ extension ExtensionManager {
         openedTabIDs.contains(itemID) ? adapter(for: itemID) : nil
     }
 
-    /// Adapter for a window, created (and announced to the controller) on first use.
+    /// Adapter for a window, created (and announced to the controller) on first use. Nil while
+    /// the window shows a space in another set.
     func windowAdapter(for window: BrowserWindowState) -> ExtensionWindowAdapter? {
+        guard ExtensionSetRegistry.shared.setID(for: window) == setID else { return nil }
         if let existing = windowAdapters[window.id] { return existing }
         guard let bm = browserManagerRef else { return nil }
-        let created = ExtensionWindowAdapter(window: window, browserManager: bm)
+        let created = ExtensionWindowAdapter(window: window, browserManager: bm, manager: self)
         windowAdapters[window.id] = created
         extensionController?.didOpenWindow(created)
         return created
@@ -60,11 +67,12 @@ extension ExtensionManager {
     }
 
     /// Adapters for the window's tabs, in `tabOrder(in:)` order. They all sit in the window's
-    /// space, so one Agent space check covers the list: WebKit lists a window's tabs once per
-    /// tab in a query, and each per-item check sorts every space.
+    /// space, so one Agent space check and one set check cover the list: WebKit lists a window's
+    /// tabs once per tab in a query, and each per-item check sorts every space.
     func adapters(in window: BrowserWindowState) -> [ExtensionTabAdapter] {
-        guard let tabs = browserManagerRef?.tabs, window.spaceID != tabs.agentSpaceID else { return [] }
-        return tabOrder(in: window).ids.compactMap { adapter(outsideAgentSpace: $0) }
+        guard let tabs = browserManagerRef?.tabs, window.spaceID != tabs.agentSpaceID,
+              ExtensionSetRegistry.shared.setID(for: window) == setID else { return [] }
+        return tabOrder(in: window).ids.compactMap { adapter(inThisSet: $0) }
     }
 
     /// Every window, focused first.
@@ -73,6 +81,22 @@ extension ExtensionManager {
         let active = registry.activeWindow
         let ordered = (active.map { [$0] } ?? []) + registry.allWindows.filter { $0 !== active }
         return ordered.compactMap { windowAdapter(for: $0) }
+    }
+
+    /// A window that switched to another set's space is closed to this set; one that switched to
+    /// this set's space is announced, focused if it is the active window, with its selected tab.
+    func windowSetMayHaveChanged(_ window: BrowserWindowState) {
+        guard let controller = extensionController else { return }
+        let runsHere = ExtensionSetRegistry.shared.setID(for: window) == setID
+        if !runsHere, let adapter = windowAdapters.removeValue(forKey: window.id) {
+            controller.didCloseWindow(adapter)
+        } else if runsHere, windowAdapters[window.id] == nil, let adapter = windowAdapter(for: window),
+                  browserManagerRef?.windowRegistry?.activeWindow === window {
+            controller.didFocusWindow(adapter)
+            if let session = browserManagerRef?.tabs.selectedSession(in: window), !session.isUnloaded {
+                notifyTabActivated(new: session, previous: nil)
+            }
+        }
     }
 
     // MARK: - Window Events

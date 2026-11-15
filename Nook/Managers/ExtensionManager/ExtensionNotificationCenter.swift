@@ -11,8 +11,20 @@ import Foundation
 
 @MainActor
 final class ExtensionNotificationCenter: NSObject, ExtensionCompatNotificationCenter, UNUserNotificationCenterDelegate {
-    weak var api: ExtensionCompatNotifications?
+    /// The app has one notification delegate, shared by every extension set.
+    static let shared = ExtensionNotificationCenter()
+    private var apis: [WeakNotifications] = []
     private let center = UNUserNotificationCenter.current()
+    func add(_ api: ExtensionCompatNotifications) {
+        apis.removeAll { $0.api == nil }
+        apis.append(WeakNotifications(api: api))
+    }
+
+    /// The set that posted `identifier`, by the set written into it.
+    private func api(for identifier: String) -> ExtensionCompatNotifications? {
+        apis.compactMap(\.api).first { $0.owns(identifier) }
+    }
+
     /// One category per set of button titles: the Mac takes buttons from a category, not from a notification.
     private var categories: [String: UNNotificationCategory] = [:]
 
@@ -81,16 +93,21 @@ final class ExtensionNotificationCenter: NSObject, ExtensionCompatNotificationCe
         let identifier = response.notification.request.identifier, action = response.actionIdentifier
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
+                let api = self.api(for: identifier)
                 switch action {
-                case UNNotificationDefaultActionIdentifier: self.api?.responded(to: identifier, .clicked)
-                case UNNotificationDismissActionIdentifier: self.api?.responded(to: identifier, .dismissed)
+                case UNNotificationDefaultActionIdentifier: api?.responded(to: identifier, .clicked)
+                case UNNotificationDismissActionIdentifier: api?.responded(to: identifier, .dismissed)
                 default:
                     if action.hasPrefix("button."), let index = Int(action.dropFirst(7)) {
-                        self.api?.responded(to: identifier, .button(index))
+                        api?.responded(to: identifier, .button(index))
                     }
                 }
             }
             completionHandler()
         }
     }
+}
+
+private struct WeakNotifications {
+    weak var api: ExtensionCompatNotifications?
 }

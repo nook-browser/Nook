@@ -57,7 +57,10 @@ final class WebStoreScriptHandler: NSObject, WKScriptMessageHandler {
               store == .firefox ? Self.isValidAMOSlug(extensionId) : ExtensionStore.isValidExtensionID(extensionId)
         else { return }
 
-        guard let extensionManager = browserManager?.extensionManager else {
+        // The store page's own set, so a Separate profile installs into its own extensions.
+        let session = (message.webView as? FocusableWKWebView)?.owningSession
+        guard let extensionManager = session.flatMap({ ExtensionSetRegistry.shared.manager(for: $0) })
+                ?? browserManager?.extensionManager(for: nil) else {
             showErrorNotification(error: ExtensionError.unsupportedOS)
             return
         }

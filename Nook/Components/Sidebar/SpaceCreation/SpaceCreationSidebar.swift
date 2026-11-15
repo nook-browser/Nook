@@ -9,6 +9,7 @@
 
 import SwiftUI
 import NookDesign
+import NookSettings
 import NookTabsCore
 import NookWeb
 import NookUI
@@ -16,12 +17,16 @@ import NookUI
 struct SpaceCreationSidebar: View {
     @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
+    @Environment(\.nookSettings) private var settings
+    @Environment(\.tabActions) private var actions
 
     @State private var name = ""
     @State private var icon = ""
     @State private var showIconPicker = false
     /// The space whose logins the new one shares; nil is a new profile.
     @State private var loginsFrom: UUID?
+    /// For a new profile: the extension set it syncs with; nil is Separate.
+    @State private var extensionsFrom: UUID?
     @State private var showThemeEditor = false
     @FocusState private var nameFocused: Bool
 
@@ -41,6 +46,7 @@ struct SpaceCreationSidebar: View {
 
             nameField
             profileRow
+            if loginsFrom == nil, tabs.profiles.count > 0 { extensionsRow }
             themeRow
 
             Spacer(minLength: 0)
@@ -67,6 +73,7 @@ struct SpaceCreationSidebar: View {
         .padding(.bottom, NookDesign.Spacing.lg)
         .onAppear {
             loginsFrom = windowState.spaceID.flatMap { tabs.space($0) }.flatMap { $0.isAgent ? nil : $0.id }
+            extensionsFrom = ExtensionSetRegistry.shared.setID(for: windowState)
             nameFocused = true
         }
         .onExitCommand(perform: cancel)
@@ -153,6 +160,34 @@ struct SpaceCreationSidebar: View {
         .nookControlSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
     }
 
+    private var extensionOptions: [ExtensionSetOption] {
+        ExtensionSetOptions.options(for: nil, profiles: tabs.profiles, sets: settings.extensionSets,
+                                    defaultSet: ExtensionSetRegistry.shared.defaultSetID)
+    }
+
+    private var extensionsRow: some View {
+        HStack(spacing: NookDesign.Spacing.sm) {
+            Image(systemName: "puzzlepiece.extension")
+                .foregroundStyle(.secondary)
+            Text("Extensions")
+            Spacer(minLength: 0)
+            Menu {
+                ForEach(extensionOptions) { option in
+                    Button(option.label) { extensionsFrom = option.set }
+                }
+            } label: {
+                Text(extensionOptions.first { $0.set == extensionsFrom }?.label ?? "Separate")
+            }
+            .menuStyle(.button)
+            .buttonStyle(RectNavButtonStyle())
+            .fixedSize()
+        }
+        .font(NookDesign.Font.body)
+        .padding(.horizontal, NookDesign.Spacing.rowPadding)
+        .frame(height: NookDesign.Size.row + NookDesign.Spacing.xs)
+        .nookControlSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
+    }
+
     private var profileName: String {
         guard let loginsFrom else { return "New Profile" }
         return tabs.profiles.first { $0.spaceIDs.contains(loginsFrom) }?.name ?? "New Profile"
@@ -199,6 +234,10 @@ struct SpaceCreationSidebar: View {
             sharingLoginsWith: loginsFrom
         ) else { return }
         tabs.setTheme(theme, forSpace: spaceID)
+        if loginsFrom == nil, let profile = tabs.tree.dataStoreID(for: spaceID),
+           extensionsFrom != ExtensionSetRegistry.shared.defaultSetID {
+            actions?.setExtensionSet(ofProfile: profile, to: extensionsFrom)
+        }
         withAnimation(NookDesign.Motion.standard) {
             windowState.spaceDraftTheme = nil
             tabs.setSpace(spaceID, in: windowState)

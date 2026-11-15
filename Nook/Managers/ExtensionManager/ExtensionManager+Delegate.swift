@@ -274,12 +274,21 @@ extension ExtensionManager {
     // MARK: - Opening tabs/windows requested by extensions
 
     /// The window an extension request targets: the window it names, else the focused regular
-    /// window, else any regular window.
+    /// window, else any regular window. Only a window showing a space of this set counts.
     private func targetWindow(_ requested: (any WKWebExtensionWindow)?) -> BrowserWindowState? {
         if let adapter = requested as? ExtensionWindowAdapter, let state = adapter.state { return state }
         guard let registry = browserManagerRef?.windowRegistry else { return nil }
-        if let active = registry.activeWindow, active.privateTree == nil { return active }
-        return registry.allWindows.first { $0.privateTree == nil }
+        let mine = registry.allWindows.filter { $0.privateTree == nil && ExtensionSetRegistry.shared.setID(for: $0) == setID }
+        if let active = registry.activeWindow, mine.contains(where: { $0 === active }) { return active }
+        return mine.first
+    }
+
+    /// No window shows this set: the tab waits, unloaded, in the first space that runs it.
+    private func openTabOutOfSight(_ url: URL) -> UUID? {
+        guard let bm = browserManagerRef, let window = bm.tabs.regularWindows.first,
+              let space = bm.tabs.orderedSpaces.first(where: { !$0.isAgent && ExtensionSetRegistry.shared.setID(forSpace: $0.id) == setID })
+        else { return nil }
+        return bm.tabs.open(url: url, in: window, placement: .background, parent: .tabs(spaceID: space.id))
     }
 
     private static func noWindowError() -> NSError {
@@ -315,15 +324,19 @@ extension ExtensionManager {
         completionHandler:
             @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void
     ) {
-        guard let bm = browserManagerRef, let window = targetWindow(configuration.window),
-              let spaceID = window.spaceID
-        else {
-            completionHandler(nil, Self.noWindowError())
-            return
-        }
         let url = configuration.url ?? TabsController.homeURL
         guard Self.extensionMayOpen(url, for: extensionContext) else {
             completionHandler(nil, Self.disallowedURLError(url))
+            return
+        }
+        guard let bm = browserManagerRef, let window = targetWindow(configuration.window),
+              let spaceID = window.spaceID
+        else {
+            if let itemID = openTabOutOfSight(url) {
+                completionHandler(adapter(for: itemID), nil)
+            } else {
+                completionHandler(nil, Self.noWindowError())
+            }
             return
         }
         let parent: Parent? = configuration.shouldBePinned ? .pinned(spaceID: spaceID) : nil

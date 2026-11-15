@@ -35,9 +35,15 @@ final class ExtensionCompatSidePanel: ExtensionCompatAPI {
     private var states: [String: State] = [:]
     /// Extensions whose toolbar button opens the panel. An extension often sets this once, when it is installed.
     private let defaults: UserDefaults
-    private static let behaviorKey = "ExtensionSidePanelOpensOnAction"
+    /// Kept per extension set: the same extension may be installed in several.
+    private let behaviorKey: String
+    static func behaviorKey(set: UUID?) -> String { "ExtensionSidePanelOpensOnAction" + (set.map { ".\($0.uuidString)" } ?? "") }
 
-    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+    /// `set` is nil for the default extension set.
+    init(defaults: UserDefaults = .standard, set: UUID? = nil) {
+        self.defaults = defaults
+        behaviorKey = Self.behaviorKey(set: set)
+    }
 
     // MARK: - Rules
 
@@ -107,13 +113,13 @@ final class ExtensionCompatSidePanel: ExtensionCompatAPI {
     /// Whether a click on the toolbar button should open the panel. The app asks when the button has no popup.
     func opensOnActionClick(_ context: WKWebExtensionContext) -> Bool {
         ExtensionCompatBridge.declares("sidePanel", in: context)
-            && (defaults.dictionary(forKey: Self.behaviorKey)?[context.uniqueIdentifier] as? Bool) == true
+            && (defaults.dictionary(forKey: behaviorKey)?[context.uniqueIdentifier] as? Bool) == true
     }
 
     private func setOpensOnActionClick(_ opens: Bool, for id: String) {
-        var all = defaults.dictionary(forKey: Self.behaviorKey) ?? [:]
+        var all = defaults.dictionary(forKey: behaviorKey) ?? [:]
         all[id] = opens ? true : nil
-        defaults.set(all, forKey: Self.behaviorKey)
+        defaults.set(all, forKey: behaviorKey)
     }
 
     /// The extension was removed: nothing of it is kept.

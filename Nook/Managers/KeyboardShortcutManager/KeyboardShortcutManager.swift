@@ -675,7 +675,7 @@ class KeyboardShortcutManager {
 
             // Forward unhandled key events to extension commands (chrome.commands API).
             // This enables extension keyboard shortcuts like Bitwarden's Ctrl+Shift+L.
-            if ExtensionManager.shared.tryPerformExtensionCommand(for: event) {
+            if ExtensionSetRegistry.shared.browserManager?.extensionManager(for: nil)?.tryPerformExtensionCommand(for: event) == true {
                 return nil
             }
 

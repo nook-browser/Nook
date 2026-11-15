@@ -490,8 +490,12 @@ class BrowserManager: ObservableObject {
             TabsController.presentReadOnlyAlert(reason: reason, directory: tabs.directory)
         }
         if let mgr = self.extensionManager {
+            ExtensionSetRegistry.shared.browserManager = self
+            tabs.onProfileDeleted = { ExtensionSetRegistry.shared.profileDeleted($0) }
+            tabs.onProfileSplit = { ExtensionSetRegistry.shared.profileSplit($0, from: $1) }
             // Attach extension manager BEFORE any WKWebView is created so content scripts can inject
             mgr.attach(browserManager: self)
+            ExtensionSetRegistry.shared.loadSetsInUse()
             
             // Bind popup active state
             mgr.$isPopupActive
@@ -608,6 +612,7 @@ class BrowserManager: ObservableObject {
     /// A window changed space. A space owns its login context, so cookies, cache and history
     /// follow it. Only the active window's space sets the app-wide managers.
     func windowSpaceChanged(_ windowState: BrowserWindowState) {
+        ExtensionSetRegistry.shared.windowSpaceChanged(windowState)
         guard !windowState.isIncognito else { return }
         guard windowRegistry?.activeWindow == nil || windowRegistry?.activeWindow?.id == windowState.id else { return }
         guard let spaceID = windowState.spaceID, let profile = tabs.profile(forSpace: spaceID),
@@ -938,20 +943,27 @@ class BrowserManager: ObservableObject {
 
     // MARK: - Extension Management
 
+    /// The extension set of `window`, else of the active window.
+    func extensionManager(for window: BrowserWindowState?) -> ExtensionManager? {
+        guard extensionManager != nil else { return nil }
+        guard let window = window ?? windowRegistry?.activeWindow else { return extensionManager }
+        return ExtensionSetRegistry.shared.manager(for: window)
+    }
+
     func showExtensionInstallDialog() {
-        extensionManager?.showExtensionInstallDialog()
+        extensionManager(for: nil)?.showExtensionInstallDialog()
     }
 
     func enableExtension(_ extensionId: String) {
-        extensionManager?.enableExtension(extensionId)
+        extensionManager(for: nil)?.enableExtension(extensionId)
     }
 
     func disableExtension(_ extensionId: String) {
-        extensionManager?.disableExtension(extensionId)
+        extensionManager(for: nil)?.disableExtension(extensionId)
     }
 
     func uninstallExtension(_ extensionId: String) {
-        extensionManager?.uninstallExtension(extensionId)
+        extensionManager(for: nil)?.uninstallExtension(extensionId)
     }
 
     /// Routing rules take precedence over the default presentation for links from other apps.
@@ -1151,6 +1163,7 @@ class BrowserManager: ObservableObject {
         let windowState = BrowserWindowState()
         windowState.isIncognito = true
         windowState.ephemeralProfile = Profile.createEphemeral()
+        windowState.privateExtensionSetID = windowRegistry.activeWindow.map(ExtensionSetRegistry.shared.setID(for:))
 
         // Registration gives the window its private tree (TabsController.attach). It must happen
         // before the hosting view exists: the sidebar's first render otherwise sees no private

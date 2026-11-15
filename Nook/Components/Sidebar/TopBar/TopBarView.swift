@@ -189,7 +189,7 @@ struct TopBarView: View {
                     }
 
                 // Pinned extension buttons + library button (not covered by tap gesture)
-                if let extensionManager = browserManager.extensionManager {
+                if let extensionManager = browserManager.extensionManager(for: windowState) {
                     let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
                     let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
 

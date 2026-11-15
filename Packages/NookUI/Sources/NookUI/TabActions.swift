@@ -33,6 +33,10 @@ import NookWeb
     var accentColor: Color { get }
     func copyToPasteboard(_ string: String)
     func share(_ url: URL)
+    /// Moves a profile's pages to another profile's extension set, or nil for a set of its own.
+    func setExtensionSet(ofProfile profile: UUID, to set: UUID?)
+    /// The extension set every profile without a choice uses; nil where there are no extensions.
+    var defaultExtensionSetID: UUID? { get }
     /// False on iOS, where there is one scene and no split view. Menus hide the
     /// items that would call into either.
     var supportsMultipleWindows: Bool { get }
@@ -42,6 +46,9 @@ extension TabActions {
     /// macOS keeps this default; iOS overrides it. A default rather than a
     /// `#if os` so the shared protocol file stays platform-free.
     public var supportsMultipleWindows: Bool { true }
+    /// iOS has no extensions and keeps these.
+    public func setExtensionSet(ofProfile profile: UUID, to set: UUID?) {}
+    public var defaultExtensionSetID: UUID? { nil }
 }
 
 // MARK: - Environment

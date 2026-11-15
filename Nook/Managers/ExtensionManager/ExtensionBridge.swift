@@ -18,12 +18,15 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     let windowID: UUID
     weak var state: BrowserWindowState?
     private unowned let browserManager: BrowserManager
+    /// The extension set that announced this window.
+    private weak var manager: ExtensionManager?
 
-    init(window: BrowserWindowState, browserManager: BrowserManager) {
+    init(window: BrowserWindowState, browserManager: BrowserManager, manager: ExtensionManager) {
         self.windowID = window.id
         self.isPrivate = window.isIncognito || window.privateTree != nil
         self.state = window
         self.browserManager = browserManager
+        self.manager = manager
         super.init()
     }
 
@@ -41,8 +44,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     // several times per tab, and Observation drops it when the trees, open folders or device
     // state change.
     func activeTab(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
-        guard let state else { return nil }
-        let manager = ExtensionManager.shared
+        guard let state, let manager else { return nil }
         if let front = manager.detachedAdapters(in: state).first(where: { $0.isInFront }) {
             return front
         }
@@ -51,8 +53,7 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
     }
 
     func tabs(for extensionContext: WKWebExtensionContext) -> [any WKWebExtensionTab] {
-        guard let state else { return [] }
-        let manager = ExtensionManager.shared
+        guard let state, let manager else { return [] }
         return manager.adapters(in: state) + manager.detachedAdapters(in: state)
     }
 
@@ -149,13 +150,16 @@ final class ExtensionWindowAdapter: NSObject, WKWebExtensionWindow {
 final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     let itemID: UUID
     private unowned let browserManager: BrowserManager
+    /// The extension set this tab belongs to.
+    private weak var manager: ExtensionManager?
 
     /// Set for a Peek or mini window page, which has no item until it is adopted.
     private weak var detachedPage: PageSession?
 
-    init(itemID: UUID, browserManager: BrowserManager, detachedPage: PageSession? = nil) {
+    init(itemID: UUID, browserManager: BrowserManager, manager: ExtensionManager, detachedPage: PageSession? = nil) {
         self.itemID = itemID
         self.browserManager = browserManager
+        self.manager = manager
         self.detachedPage = detachedPage
         super.init()
     }
@@ -202,7 +206,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
             return page.detachedWindow.flatMap { $0.privateTree == nil ? $0 : nil } ?? active ?? regular.first
         }
         let candidates = (active.map { [$0] } ?? []) + regular.filter { $0 !== active }
-        return candidates.first { ExtensionManager.shared.tabOrder(in: $0).contains(itemID) } ?? active ?? regular.first
+        return candidates.first { manager?.tabOrder(in: $0).contains(itemID) == true } ?? active ?? regular.first
     }
 
     private func error(_ code: Int, _ message: String) -> NSError {
@@ -228,7 +232,7 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
 
     func indexInWindow(for extensionContext: WKWebExtensionContext) -> Int {
         guard let window = hostWindow else { return 0 }
-        let order = ExtensionManager.shared.tabOrder(in: window)
+        let order = manager?.tabOrder(in: window) ?? .empty
         return order.index(of: itemID) ?? (detached != nil ? order.count : 0)
     }
 
@@ -338,6 +342,6 @@ final class ExtensionTabAdapter: NSObject, WKWebExtensionTab {
     }
 
     func window(for extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        hostWindow.flatMap { ExtensionManager.shared.windowAdapter(for: $0) }
+        hostWindow.flatMap { manager?.windowAdapter(for: $0) }
     }
 }

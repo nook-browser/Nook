@@ -70,6 +70,7 @@ public final class NookSettingsService {
     private let sponsorBlockCategoryOptionsKey = "settings.sponsorBlockCategoryOptions"
     private let externalLinksInMiniWindowKey = "settings.externalLinksInMiniWindow"
     private let siteRoutingRulesKey = "settings.siteRoutingRules"
+    private let extensionSetsKey = "settings.extensionSets"
     private let boostsKey = "settings.boosts"
     private let sitePermissionsKey = "settings.sitePermissions"
     private let youTubeHideShortsKey = "settings.youTubeHideShorts"
@@ -163,6 +164,15 @@ public final class NookSettingsService {
         didSet {
             if let data = try? JSONEncoder().encode(siteRoutingRules) {
                 userDefaults.set(data, forKey: siteRoutingRulesKey)
+            }
+        }
+    }
+
+    /// Which extension set each profile runs; see `ExtensionSets`.
+    public var extensionSets = ExtensionSets() {
+        didSet {
+            if let data = try? JSONEncoder().encode(extensionSets) {
+                userDefaults.set(data, forKey: extensionSetsKey)
             }
         }
     }
@@ -659,6 +669,10 @@ public final class NookSettingsService {
             self.siteRoutingRules = decoded
         } else {
             self.siteRoutingRules = []
+        }
+        if let data = userDefaults.data(forKey: extensionSetsKey),
+           let decoded = try? JSONDecoder().decode(ExtensionSets.self, from: data) {
+            self.extensionSets = decoded
         }
 
         // Initialize tab management mode (with migration from old timeout)
