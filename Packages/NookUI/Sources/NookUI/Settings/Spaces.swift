@@ -164,14 +164,19 @@ public struct SpacesSettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                // No label: a grouped form puts it beside the field, and here it wrapped a letter a line.
                 TextField("Space name", text: Binding(
                     get: { space.name },
                     set: { tabs.updateSpace(space.id, name: $0, icon: nil, accentHex: nil) }
                 ))
                 .textFieldStyle(.plain)
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Spacer()
+            // The picker's own label stretched across the row and left the name a few letters wide.
+            Text("Profile")
             profilePicker(space)
+                .labelsHidden()
             if spaces.count > 1 {
                 Menu {
                     Button("Delete Space…", systemImage: "trash", role: .destructive) {
