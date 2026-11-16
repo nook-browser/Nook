@@ -14,7 +14,7 @@ import NookSettings
 import NookWeb
 import NookUI
 
-/// What a key does with the typed text, at the trailing edge of the field: a label and a keycap.
+/// What a key does with the typed text, at the trailing edge of the field or a row: a label and a keycap.
 private struct PaletteKeyHint: View {
     let label: String
     let key: String
@@ -64,6 +64,9 @@ struct CommandPaletteView: View {
     @State private var activeSiteSearch: SiteSearchEntry? = nil
     /// Set by a deletion, so backspacing out of a completion does not bring it straight back.
     @State private var completionSuppressed: Bool = false
+    /// Shift held a beat, which moves the highlight to the Look It Up row.
+    @State private var shiftHeld: Bool = false
+    @State private var shiftHold: Task<Void, Never>?
 
     private var siteSearchMatch: SiteSearchEntry? {
         guard activeSiteSearch == nil else { return nil }
@@ -96,7 +99,8 @@ struct CommandPaletteView: View {
             case .url, .search: return row.text.caseInsensitiveCompare(primary.text) != .orderedSame
             }
         }
-        return [primary] + rest.prefix(4)
+        // The Look It Up row stands in the list as the typed search again; `lookupRowIndex` marks it.
+        return lookupRowIndex == nil ? [primary] + rest.prefix(4) : [primary, primary] + rest.prefix(3)
     }
 
     /// What Shift-Return looks up: the highlighted search row, else the typed text when Return
@@ -110,6 +114,22 @@ struct CommandPaletteView: View {
         return request.isEmpty ? nil : request
     }
 
+    /// The Look It Up row's place, right under the Return row, when Return would search. Judged
+    /// on the typed text, not the field's, so the rows hold still while the arrows move.
+    private var lookupRowIndex: Int? {
+        guard activeSiteSearch == nil,
+              SiteSearchEntry.match(for: userTypedText, in: nookSettings.siteSearchEntries) == nil,
+              browserManager.lookupManager.isAvailable(in: windowState),
+              let primary = primarySuggestion, case .search = primary.type else { return nil }
+        return 1
+    }
+
+    /// The row drawn selected. With Shift down on the Return row, that is the Look It Up row.
+    private var highlightedIndex: Int {
+        if shiftHeld, selectedSuggestionIndex <= 0, let lookupRowIndex { return lookupRowIndex }
+        return max(selectedSuggestionIndex, 0)
+    }
+
     /// What Return does with what was typed: the completed host, the address, or a search.
     private var primarySuggestion: SearchManager.SearchSuggestion? {
         let typed = userTypedText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -117,6 +137,8 @@ struct CommandPaletteView: View {
         if let host = completionHost { return SearchManager.SearchSuggestion(text: host, type: .url) }
         return SearchManager.SearchSuggestion(text: typed, type: activeSiteSearch == nil && isLikelyURL(typed) ? .url : .search)
     }
+
+    private static let shiftHoldDelay: Duration = .milliseconds(180)
 
     let commandPaletteWidth: CGFloat = 765
     let commandPaletteHorizontalPadding: CGFloat = 10
@@ -211,15 +233,17 @@ struct CommandPaletteView: View {
                                             return .handled
                                         }
                                         if acceptInlineCompletion() { return .handled }
-                                        // With nothing selected, Tab moves to the first row under the Return row.
-                                        if selectedSuggestionIndex < 0 && visibleSuggestions.count > 1 {
+                                        // With nothing selected, Tab moves to the first suggestion. It passes the
+                                        // Look It Up row, so Tab twice still opens that suggestion.
+                                        let firstSuggestion = lookupRowIndex == nil ? 1 : 2
+                                        if selectedSuggestionIndex < 0 && visibleSuggestions.count > firstSuggestion {
                                             navigateSuggestions(direction: 1)
+                                            if selectedSuggestionIndex < firstSuggestion { navigateSuggestions(direction: 1) }
                                             return .handled
                                         }
                                         // Tab with a selected suggestion = accept it (same as Enter)
                                         if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count {
-                                            let suggestion = visibleSuggestions[selectedSuggestionIndex]
-                                            selectSuggestion(suggestion)
+                                            selectRow(selectedSuggestionIndex)
                                             return .handled
                                         }
                                         return .ignored
@@ -228,10 +252,7 @@ struct CommandPaletteView: View {
                                         if isComposing { return .ignored }
                                         // Shift-Return looks a search up. On an address it is Return.
                                         if press.modifiers.contains(.shift), let request = lookupText {
-                                            browserManager.lookupManager.start(request, in: windowState)
-                                            text = ""
-                                            selectedSuggestionIndex = -1
-                                            commandPalette.close()
+                                            startLookup(request)
                                             return .handled
                                         }
                                         handleReturn()
@@ -289,6 +310,8 @@ struct CommandPaletteView: View {
                                             isNavigatingSuggestion = false
                                             return
                                         }
+                                        // Shift for a capital letter is not Shift for the second row until it stays down.
+                                        holdShift(NSEvent.modifierFlags.contains(.shift))
                                         completionSuppressed = newValue.count < userTypedText.count
                                         userTypedText = newValue
                                         searchManager.searchSuggestions(
@@ -296,9 +319,8 @@ struct CommandPaletteView: View {
                                         )
                                         selectedSuggestionIndex = -1
                                     }
-
-                                    if lookupText != nil {
-                                        PaletteKeyHint(label: "Look It Up", key: "⇧⏎")
+                                    .onModifierKeysChanged(mask: .shift) { _, new in
+                                        holdShift(new.contains(.shift))
                                     }
 
                                     if activeSiteSearch == nil, let match = siteSearchMatch {
@@ -320,10 +342,11 @@ struct CommandPaletteView: View {
                             if !visibleSuggestions.isEmpty {
                                 CommandPaletteSuggestionsListView(
                                     suggestions: visibleSuggestions,
-                                    selectedIndex: max(selectedSuggestionIndex, 0),
+                                    selectedIndex: highlightedIndex,
+                                    lookupIndex: lookupRowIndex,
                                     hoveredIndex: $hoveredSuggestionIndex,
-                                    onSelect: { suggestion in
-                                        selectSuggestion(suggestion)
+                                    onSelect: { index in
+                                        selectRow(index)
                                     }
                                 )
                             }
@@ -359,6 +382,8 @@ struct CommandPaletteView: View {
 
                 text = commandPalette.prefilledText
                 userTypedText = commandPalette.prefilledText
+                // A Shift let go while another app was in front never reported its release.
+                shiftHeld = NSEvent.modifierFlags.contains(.shift)
 
                 DispatchQueue.main.async {
                     isSearchFocused = true
@@ -390,7 +415,8 @@ struct CommandPaletteView: View {
             if count == 0 {
                 selectedSuggestionIndex = -1
             } else if selectedSuggestionIndex >= count {
-                selectedSuggestionIndex = count - 1
+                // Never onto the Look It Up row, where Return would start a lookup nobody chose.
+                selectedSuggestionIndex = count - 1 == lookupRowIndex ? -1 : count - 1
             }
         }
         .onChange(of: commandPalette.prefilledText) { _, newValue in
@@ -408,8 +434,10 @@ struct CommandPaletteView: View {
     private struct CommandPaletteSuggestionsListView: View {
         let suggestions: [SearchManager.SearchSuggestion]
         let selectedIndex: Int
+        /// The row that is Look It Up for the typed text, when there is one.
+        let lookupIndex: Int?
         @Binding var hoveredIndex: Int?
-        let onSelect: (SearchManager.SearchSuggestion) -> Void
+        let onSelect: (Int) -> Void
 
         var body: some View {
             LazyVStack(spacing: 5) {
@@ -417,7 +445,7 @@ struct CommandPaletteView: View {
                     let suggestion = suggestions[index]
                     let isHovered = hoveredIndex == index
                     // Rows keep the text roles on a neutral fill, so the chosen row reads on any accent.
-                    row(for: suggestion, isSelected: false)
+                    row(for: suggestion, isSelected: false, isLookup: index == lookupIndex)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 11)
                         .background(
@@ -442,7 +470,7 @@ struct CommandPaletteView: View {
                                 }
                             }
                         }
-                        .onTapGesture { onSelect(suggestion) }
+                        .onTapGesture { onSelect(index) }
                 }
             }
         }
@@ -450,9 +478,19 @@ struct CommandPaletteView: View {
         @ViewBuilder
         private func row(
             for suggestion: SearchManager.SearchSuggestion,
-            isSelected: Bool
+            isSelected: Bool,
+            isLookup: Bool
         ) -> some View {
             switch suggestion.type {
+            case .search where isLookup:
+                HStack(spacing: NookDesign.Spacing.md) {
+                    GenericSuggestionItem(
+                        icon: Image(systemName: "sparkle.magnifyingglass"),
+                        text: suggestion.text,
+                        isSelected: isSelected
+                    )
+                    PaletteKeyHint(label: "Look It Up", key: "⇧⏎")
+                }
             case .tab(let tab):
                 TabSuggestionItem(tab: tab, isSelected: isSelected)
             case .history(let entry):
@@ -502,11 +540,39 @@ struct CommandPaletteView: View {
         if selectedSuggestionIndex >= 0
             && selectedSuggestionIndex < visibleSuggestions.count
         {
-            let suggestion = visibleSuggestions[selectedSuggestionIndex]
-            selectSuggestion(suggestion)
+            selectRow(selectedSuggestionIndex)
         } else if let primary = primarySuggestion {
             selectSuggestion(primary)
         }
+    }
+
+    /// Return, Tab or a click on a row: the Look It Up row starts a lookup, any other opens.
+    private func selectRow(_ index: Int) {
+        guard visibleSuggestions.indices.contains(index) else { return }
+        let suggestion = visibleSuggestions[index]
+        if index == lookupRowIndex {
+            startLookup(suggestion.text)
+        } else {
+            selectSuggestion(suggestion)
+        }
+    }
+
+    /// Draws the Look It Up row selected once Shift has stayed down a beat, so a capital does not flash it.
+    private func holdShift(_ down: Bool) {
+        shiftHold?.cancel()
+        shiftHeld = false
+        guard down else { return }
+        shiftHold = Task { @MainActor in
+            try? await Task.sleep(for: Self.shiftHoldDelay)
+            if !Task.isCancelled { shiftHeld = true }
+        }
+    }
+
+    private func startLookup(_ request: String) {
+        browserManager.lookupManager.start(request, in: windowState)
+        text = ""
+        selectedSuggestionIndex = -1
+        commandPalette.close()
     }
 
     private func selectSuggestion(_ suggestion: SearchManager.SearchSuggestion)
@@ -566,13 +632,14 @@ struct CommandPaletteView: View {
             selectedSuggestionIndex = selectedSuggestionIndex <= 1 ? -1 : selectedSuggestionIndex - 1
         }
 
-        // Update text field to show selected suggestion's info
+        // The field shows the selected row, and keeps the typed text on the Return and Look It Up rows.
+        let shown = selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count
+            && selectedSuggestionIndex != lookupRowIndex
+            ? displayTextForSuggestion(visibleSuggestions[selectedSuggestionIndex]) : userTypedText
+        // onChange clears the flag, and it runs only when the text changes.
+        guard shown != text else { return }
         isNavigatingSuggestion = true
-        if selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count {
-            text = displayTextForSuggestion(visibleSuggestions[selectedSuggestionIndex])
-        } else {
-            text = userTypedText
-        }
+        text = shown
     }
 
     private func stripScheme(_ urlString: String) -> String {

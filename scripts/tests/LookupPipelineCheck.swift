@@ -17,36 +17,59 @@ import Foundation
 
 struct Refused: Error {}
 
+/// Shaped like the system model's errors: the case name is all the pipeline reads.
+enum ModelSaid: Error {
+    case refusal(String)
+    case guardrailViolation(String)
+}
+
+/// What happened in what order, across the model and the reader.
+final class Timeline: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events: [String] = []
+    func add(_ event: String) { lock.withLock { events.append(event) } }
+    var all: [String] { lock.withLock { events } }
+    func index(_ event: String) -> Int { all.firstIndex(of: event) ?? .max }
+}
+
 final class StubModel: LookupModel, @unchecked Sendable {
     var budget = LookupBudget(pageCharacters: 40, pages: 3)
     var plan: LookupPlan? = LookupPlan(searches: ["q"], kind: .explain)
+    var planDelay: Duration = .zero
     var answerFailures = 0
+    var answerError: Error = Refused()
     var calls: [String] = []
     var noteTexts: [String] = []
     var noteTitles: [String] = []
     var notesFail = false
     var answerKinds: [LookupKind] = []
+    var answerInputs: [(notes: [String], fromPages: Bool)] = []
+    var timeline = Timeline()
 
     func plan(for request: String) async throws -> LookupPlan {
         calls.append("plan")
+        try? await Task.sleep(for: planDelay)
+        timeline.add("planned")
         guard let plan else { throw Refused() }
         return plan
     }
 
     func notes(on text: String, title: String, request: String, search: String) async throws -> String {
         calls.append("notes")
+        timeline.add("notes \(title)")
         noteTexts.append(text)
         noteTitles.append(title)
         if notesFail { throw Refused() }
         return title == "Silent" ? "NONE" : "- Opened in 1956 says \(title)"
     }
 
-    func answer(request: String, kind: LookupKind, notes: [String], smaller: Bool) async throws -> LookupAnswer {
+    func answer(request: String, kind: LookupKind, notes: [String], fromPages: Bool, smaller: Bool) async throws -> LookupAnswer {
         calls.append(smaller ? "answer-smaller" : "answer")
         answerKinds.append(kind)
+        answerInputs.append((notes, fromPages))
         if answerFailures > 0 {
             answerFailures -= 1
-            throw Refused()
+            throw answerError
         }
         let points = [LookupPoint(label: "When", sentence: "Opened in 1956.", source: 1), LookupPoint(label: "Made Up", sentence: "Closed in 1987.", source: 1)]
         return kind == .explain
@@ -79,9 +102,11 @@ final class StubReader: LookupReading {
     var log: [String] = []
     var ended = 0
     var fetchDelay: Duration = .zero
+    var pageDelay: Duration = .zero
     /// Addresses whose download never finishes on its own.
     var hanging: Set<URL> = []
     var onSearch: () -> Void = {}
+    var timeline = Timeline()
 
     func search(_ query: String) async -> [LookupHit] {
         log.append("search \(query)")
@@ -92,11 +117,15 @@ final class StubReader: LookupReading {
     func fetch(_ url: URL) async -> (title: String?, image: URL?, text: String)? {
         log.append("fetch \(url.host ?? "")")
         try? await Task.sleep(for: fetchDelay)
+        timeline.add("fetched \(url.host ?? "")")
         return fetched[url]
     }
 
     func readInPage(_ url: URL, booking: Bool) async -> LookupReadPage? {
         log.append("page \(url.host ?? "")\(booking ? " booking \(url.query ?? "")" : "")")
+        timeline.add("page \(url.host ?? "")")
+        try? await Task.sleep(for: pageDelay)
+        timeline.add("paged \(url.host ?? "")")
         return pages[url]
     }
 
@@ -131,7 +160,9 @@ struct LookupPipelineCheck {
             reader.pages[url("b.com")] = LookupReadPage(title: "Beta Page", text: long)
             reader.files[URL(string: "https://a.com/photo.jpg")!] = Data(repeating: 1, count: 10)
             reader.files[URL(string: "https://b.com/huge.png")!] = Data(repeating: 1, count: 3_000_001)
-            return (StubModel(), reader)
+            let model = StubModel()
+            model.timeline = reader.timeline
+            return (model, reader)
         }
         func run(_ model: StubModel, _ reader: StubReader, request: String = "when did it open", stages: inout [LookupStage]) async -> LookupRecord {
             var seen: [LookupStage] = []
@@ -173,6 +204,111 @@ struct LookupPipelineCheck {
         precondition(reader.ended == 1)
         precondition(model.calls == ["plan", "notes", "notes", "answer"], "an unread page's snippet is its note: \(model.calls)")
 
+        // MARK: the request's own search and its fetches start beside the plan
+        (model, reader) = world()
+        model.planDelay = .milliseconds(200)
+        record = await run(model, reader, stages: &stages)
+        var order = model.timeline
+        precondition(order.index("fetched a.com") < order.index("planned"), "the plan call does not hold the reading: \(order.all)")
+        precondition(reader.log.filter { $0.hasPrefix("search ") } == ["search when did it open"] && record.outcome == .done)
+        precondition(stages == [.searching, .reading(hosts: ["a.com", "b.com", "c.com"]), .writing])
+        // a reader page is the costly kind of reading: it waits for the plan
+        precondition(order.index("page b.com") > order.index("planned") && record.sources[1].usedReaderPage)
+
+        // an act plan runs its own search; what the early one fetched is dropped
+        (model, reader) = world()
+        model.plan = LookupPlan(searches: ["q"], kind: .act)
+        reader.hits["q"] = [hit("e.com", "Echo")]
+        reader.fetched[url("e.com")] = ("Echo Page", nil, long)
+        record = await run(model, reader, stages: &stages)
+        precondition(reader.log.filter { $0.hasPrefix("search ") } == ["search when did it open", "search q"])
+        precondition(record.sources.map { $0.hit.url.host } == ["e.com"] && record.outcome == .done && stages[1] == .reading(hosts: ["e.com"]))
+
+        // an act plan whose search is the request takes the early one: one search, each page fetched once
+        (model, reader) = world()
+        model.plan = LookupPlan(searches: ["When Did It Open"], kind: .act)
+        record = await run(model, reader, stages: &stages)
+        precondition(reader.log.filter { $0.hasPrefix("search ") } == ["search when did it open"], "\(reader.log)")
+        precondition(reader.log.filter { $0 == "fetch a.com" }.count == 1 && record.outcome == .done && model.answerKinds == [.choose], "\(reader.log)")
+
+        // a request that lists things is searched in the plan's words, so nothing starts early
+        (model, reader) = world()
+        model.planDelay = .milliseconds(100)
+        model.plan = LookupPlan(searches: ["first", "second"], kind: .choose)
+        reader.hits["first"] = [hit("a.com", "Alpha")]
+        record = await run(model, reader, request: "the first, or the second", stages: &stages)
+        precondition(model.timeline.all.first == "planned" && reader.log.filter { $0.hasPrefix("search ") } == ["search first", "search second"])
+
+        // MARK: one answer call from the pages themselves, where the model has room for them
+        (model, reader) = world()
+        model.budget = LookupBudget(pageCharacters: 40, pages: 3, answerCharacters: 90)
+        record = await run(model, reader, stages: &stages)
+        precondition(model.calls == ["plan", "answer"] && record.outcome == .done && record.sources.allSatisfy { $0.notes.isEmpty }, "\(model.calls)")
+        precondition(stages == [.searching, .reading(hosts: ["a.com", "b.com", "c.com"]), .writing])
+        precondition(model.answerInputs.count == 1 && model.answerInputs[0].fromPages)
+        // every page found is given, the unread one as its snippet, and they share the budget
+        var given = model.answerInputs[0].notes
+        precondition(given.count == 3 && given[0].hasPrefix("Alpha Page (a.com):\n") && given[1].hasPrefix("Beta Page (b.com):\n") && given[2].contains("Snippet of Gamma"))
+        precondition(given.map { $0.split(separator: "\n", maxSplits: 1).last?.count ?? 0 } == [33, 33, 24], "\(given)")
+        precondition(record.answer?.points.map(\.sentence) == ["Opened in 1956."], "the answer is verified against the pages")
+
+        // the one call fails: notes on each page and the answer from them, as where there is no room
+        (model, reader) = world()
+        model.budget = LookupBudget(pageCharacters: 40, pages: 3, answerCharacters: 90)
+        model.answerFailures = 1
+        model.answerError = ModelSaid.refusal("no")
+        record = await run(model, reader, stages: &stages)
+        precondition(model.calls == ["plan", "answer", "notes", "notes", "answer"] && record.outcome == .done, "\(model.calls)")
+        precondition(model.answerInputs.map(\.fromPages) == [true, false] && record.sources[0].notes.contains("1956"))
+        precondition(stages == [.searching, .reading(hosts: ["a.com", "b.com", "c.com"]), .writing], "the cover never steps back")
+
+        // four pages read by fetch fill the one call: the thin ones get no reader page
+        (model, reader) = world()
+        model.budget = LookupBudget(pageCharacters: 40, pages: 6, answerCharacters: 160)
+        reader.hits["when did it open"]! += [hit("e.com", "Echo"), hit("f.com", "Foxtrot")]
+        for host in ["c.com", "d.com", "e.com"] { reader.fetched[url(host)] = ("\(host) Page", nil, long) }
+        record = await run(model, reader, stages: &stages)
+        precondition(!reader.log.contains { $0.hasPrefix("page ") }, "\(reader.log)")
+        // and are left off the page: nobody tried them, so they are not listed as pages that would not load
+        precondition(record.sources.map { $0.hit.url.host } == ["a.com", "c.com", "d.com", "e.com"] && record.sources.allSatisfy(\.wasRead) && record.outcome == .done,
+                     "\(record.sources.map { ($0.hit.url.host ?? "", $0.wasRead) })")
+        given = model.answerInputs[0].notes
+        precondition(given.count == 4 && !given.contains { $0.contains("Snippet of") })
+        let filledPage = (try? String(contentsOf: LookupStore.pageURL(for: record.id, in: support), encoding: .utf8)) ?? ""
+        precondition(!filledPage.isEmpty && !filledPage.contains("would not load"))
+        // three are not enough: the thin pages are read in reader pages first
+        (model, reader) = world()
+        model.budget = LookupBudget(pageCharacters: 40, pages: 6, answerCharacters: 120)
+        for host in ["c.com", "d.com"] { reader.fetched[url(host)] = ("\(host) Page", nil, long) }
+        record = await run(model, reader, stages: &stages)
+        precondition(reader.log.contains("page b.com") && record.sources[1].usedReaderPage && model.calls == ["plan", "answer"])
+
+        // no page could be read: the snippets are the notes, as before, and nothing is called pages
+        (model, reader) = world()
+        model.budget = LookupBudget(pageCharacters: 40, pages: 3, answerCharacters: 90)
+        reader.fetched = [:]
+        reader.pages = [:]
+        record = await run(model, reader, stages: &stages)
+        precondition(model.calls == ["plan", "answer"] && model.answerInputs.map(\.fromPages) == [false], "\(model.calls)")
+        precondition(record.sources.allSatisfy { !$0.wasRead && $0.notes.hasPrefix("Snippet of") } && stages.last == .writing)
+
+        // MARK: where the answer is written from notes, they start while reader pages still load
+        (model, reader) = world()
+        reader.pageDelay = .milliseconds(300)
+        record = await run(model, reader, stages: &stages)
+        order = model.timeline
+        precondition(order.index("notes Alpha Page") < order.index("paged b.com"), "a slow reader page does not leave the model idle: \(order.all)")
+        precondition(record.outcome == .done && record.sources[1].notes.contains("Beta Page") && model.calls == ["plan", "notes", "notes", "answer"])
+
+        // MARK: a refusal gets no second try
+        for refusal in [ModelSaid.refusal("no"), ModelSaid.guardrailViolation("no")] {
+            (model, reader) = world()
+            model.answerFailures = 2
+            model.answerError = refusal
+            record = await run(model, reader, stages: &stages)
+            precondition(record.outcome == .failed && model.calls == ["plan", "notes", "notes", "answer"], "\(model.calls)")
+        }
+
         // MARK: the answer fails once, then twice
         (model, reader) = world()
         model.answerFailures = 1
@@ -202,7 +338,7 @@ struct LookupPipelineCheck {
         (model, reader) = world()
         model.plan = nil
         record = await run(model, reader, stages: &stages)
-        precondition(record.outcome == .done && reader.log.first == "search when did it open" && record.plan?.kind == .explain)
+        precondition(record.outcome == .done && reader.log.filter { $0.hasPrefix("search ") } == ["search when did it open"] && record.plan?.kind == .explain)
 
         // MARK: an act request is written as choices
         (model, reader) = world()
@@ -350,7 +486,7 @@ struct LookupPipelineCheck {
         reader.hits["lion king tickets"] = reader.hits["when did it open"]
         record = await LookupPipeline(model: model, reader: reader, support: support, notesTogether: false, today: sunday)
             .run(LookupRecord(request: "buy 2 tickets for the lion king next saturday")) { _ in }
-        precondition(reader.log.filter { $0.hasPrefix("search ") } == ["search lion king tickets"], "\(reader.log)")
+        precondition(reader.log.filter { $0.hasPrefix("search ") } == ["search buy 2 tickets for the lion king next saturday", "search lion king tickets"], "\(reader.log)")
 
         // details but no booking page in the results: laid out as choices, like any other act request
         (model, reader) = world()
@@ -359,6 +495,33 @@ struct LookupPipelineCheck {
         reader.hits["x"] = reader.hits["when did it open"]
         record = await run(model, reader, stages: &stages)
         precondition(record.outcome == .done && model.answerKinds == [.choose] && record.sources.allSatisfy { $0.prefilledURL == nil })
+
+        // MARK: a streamed answer keeps what it held when its stream failed or went quiet
+        typealias Report = @Sendable (Int) -> Void
+        var kept = try? await LookupStream.last(stall: .seconds(5)) { (report: @escaping Report) in report(1); report(2); throw Refused() }
+        precondition(kept?.value == 2 && kept?.failure is Refused && kept?.wentQuiet == false)
+        kept = try? await LookupStream.last(stall: .milliseconds(100)) { (report: @escaping Report) in report(7); try await Task.sleep(for: .seconds(30)) }
+        precondition(kept?.value == 7 && kept?.failure == nil && kept?.wentQuiet == true)
+        // the same value again is not progress: blank tokens do not keep a stream alive
+        kept = try? await LookupStream.last(stall: .milliseconds(100)) { (report: @escaping Report) in
+            for _ in 0..<100 { report(7); try await Task.sleep(for: .milliseconds(20)) }
+        }
+        precondition(kept?.value == 7 && kept?.wentQuiet == true)
+        // before its first value a stream is waiting on the model, however long
+        kept = try? await LookupStream.last(stall: .milliseconds(50)) { (report: @escaping Report) in try await Task.sleep(for: .milliseconds(400)); report(3) }
+        precondition(kept?.value == 3 && kept?.wentQuiet == false)
+        // a refusal and a stop are thrown, whatever was written
+        do {
+            _ = try await LookupStream.last(stall: .seconds(5), fatal: LookupModelError.isRefusal) { (report: @escaping Report) in report(1); throw ModelSaid.refusal("no") }
+            preconditionFailure("a refusal is not an answer")
+        } catch {
+            precondition(error is ModelSaid)
+        }
+        let streaming = Task { try await LookupStream.last(stall: .seconds(5)) { (report: @escaping Report) in report(1); try await Task.sleep(for: .seconds(30)) } }
+        try? await Task.sleep(for: .milliseconds(50))
+        streaming.cancel()
+        let stopped = try? await streaming.value
+        precondition(stopped == nil, "a stopped lookup keeps nothing")
 
         // MARK: stopped mid-read
         (model, reader) = world()

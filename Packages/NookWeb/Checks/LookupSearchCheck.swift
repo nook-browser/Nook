@@ -61,6 +61,10 @@ struct LookupSearchCheck {
         precondition(LookupSearch.normalized([], request: "table for 2 at lilia", kind: .act) == ["table for 2 at lilia"])
         precondition(LookupSearch.normalized(["franklin barbecue", "la barbecue"], request: "franklin barbecue or la barbecue").count == 2)
         precondition(LookupSearch.normalized([], request: "  x  ") == ["x"])
+        // the search a request will get unless the plan says act, known before any plan
+        precondition(LookupSearch.ownSearch(for: " why is the sky blue ") == "why is the sky blue")
+        precondition(LookupSearch.ownSearch(for: "ramen, pho or udon") == nil && LookupSearch.ownSearch(for: "franklin barbecue or la barbecue") == nil)
+        precondition(LookupSearch.ownSearch(for: long) == nil && LookupSearch.ownSearch(for: "   ") == nil)
         precondition(LookupSearch.normalized(["  ", ""], request: "x") == ["x"])
         precondition(LookupSearch.normalized([String(repeating: "a", count: 2000)], request: long)[0].count == 200)
         precondition(LookupSearch.normalized([], request: String(repeating: "a", count: 2000))[0].count == 200)

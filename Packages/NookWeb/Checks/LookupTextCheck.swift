@@ -46,6 +46,18 @@ struct LookupTextCheck {
         precondition(LookupText.excerpt("short", characters: 6000) == "short")
         precondition(LookupText.thin == 800)
 
+        // excerpts share one budget: a short text whole, what it leaves split between the long ones
+        let shared = LookupText.excerpts([String(repeating: "b", count: 5000), String(repeating: "a", count: 100), String(repeating: "c", count: 9000)], characters: 6100)
+        precondition(shared.map(\.count) == [3000, 100, 3000] && shared[0].hasPrefix("b") && shared[2].hasPrefix("c"))
+        precondition(LookupText.excerpts(["abc", "de"], characters: 100) == ["abc", "de"])
+        precondition(LookupText.excerpts(["abc", "de"], characters: 0) == ["", ""] && LookupText.excerpts([], characters: 100).isEmpty)
+
+        // no straight double quote reaches a model that answers in JSON: an inch mark closes, a quotation opens and closes
+        precondition(LookupText.curlyQuotes("a 48\" TV, \"so called\" (\"x\")\n\"y\"") == "a 48\u{201D} TV, \u{201C}so called\u{201D} (\u{201C}x\u{201D})\n\u{201C}y\u{201D}")
+        precondition(LookupText.curlyQuotes("it's plain") == "it's plain")
+        // the answer's quotes go back, so a command copied from it still runs
+        precondition(LookupText.straightQuotes("user.name \u{201C}Your Name\u{201D}, a 48\u{201D} TV") == "user.name \"Your Name\", a 48\" TV")
+
         // a tag that never closes costs nothing extra: these took 5 s and 23 s as regular expressions
         func seconds(_ body: () -> Void) -> Double {
             let start = Date()
