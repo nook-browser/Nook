@@ -357,7 +357,7 @@ public final class ContentBlockerManager: NSObject {
         let all = ucc.userScripts
         // Only Nook's own scripts are re-added; see WKUserScript+NookOwned.
         let others = all.nookOwned.filter { !$0.source.hasPrefix(marker) }
-        let current = all.first { $0.source.hasPrefix(marker) }?.source
+        let current = all.first { $0.source.hasPrefix(marker) }.map { $0.source as NSString }
 
         // Nothing changed, so leave the list alone. WKUserContentController has no
         // remove-one API, so any edit costs one addUserScript IPC per surviving
@@ -365,7 +365,12 @@ public final class ContentBlockerManager: NSObject {
         // test was always true and this rewrote the whole list on every
         // navigation, which froze redirect-heavy sites. The tweak managers have
         // always compared content here; this one did not.
-        guard current != script?.source else { return }
+        // Compared as NSString: Swift's `!=` on the bridged source normalizes every character.
+        switch (current, script?.source) {
+        case (nil, nil): return
+        case let (current?, source?) where current.isSameSource(as: source): return
+        default: break
+        }
 
         ucc.resetUserScripts(to: (script.map { [$0] } ?? []) + others)
     }
