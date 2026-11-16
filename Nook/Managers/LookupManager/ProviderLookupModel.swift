@@ -74,7 +74,9 @@ struct ProviderLookupModel: LookupModel {
 
     // MARK: - Answer
 
-    func answer(request: String, kind: LookupKind, notes: [String], smaller: Bool) async throws -> LookupAnswer {
+    // `fromPages` changes nothing here: this model's budget asks for notes, and the tags below
+    // mark whatever it is given as content.
+    func answer(request: String, kind: LookupKind, notes: [String], fromPages: Bool, smaller: Bool) async throws -> LookupAnswer {
         let numbered = notes.enumerated().map { "Note \($0 + 1): \($1)" }.joined(separator: "\n\n")
         let shape = kind == .explain
             ? """

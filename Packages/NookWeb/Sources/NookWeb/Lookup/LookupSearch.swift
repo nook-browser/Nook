@@ -97,23 +97,33 @@ public enum LookupSearch {
         return (1..<match.numberOfRanges).map { Range(match.range(at: $0), in: text).map { String(text[$0]) } ?? "" }
     }
 
+    private static func clean(_ text: String) -> String {
+        String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxSearchLength))
+    }
+
+    private static func lists(_ request: String) -> Bool {
+        listMarks.contains { request.lowercased().contains($0) }
+    }
+
+    /// The request as its own search: short and listing nothing. It is what gets searched unless
+    /// the plan says act, so it can start before the plan is back.
+    public static func ownSearch(for request: String) -> String? {
+        let own = clean(request)
+        return !lists(request) && !own.isEmpty && own.split(whereSeparator: \.isWhitespace).count <= maxOwnWords ? own : nil
+    }
+
     /// The model's searches made safe to run: trimmed, no repeats, at most four, and only one
     /// unless the request itself lists things.
     public static func normalized(_ searches: [String], request: String, kind: LookupKind = .explain) -> [String] {
-        func clean(_ text: String) -> String {
-            String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxSearchLength))
-        }
         var seen = Set<String>()
         var out = searches.map(clean).filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
         // The request itself is the search when the model gave none.
         if out.isEmpty { out = [clean(request)].filter { !$0.isEmpty } }
-        let lists = listMarks.contains { request.lowercased().contains($0) }
         // One search for a short request is the person's own words: a search engine reads them
         // better than the model's rewrite, which drops half of a comparison. Something to get done
         // is the exception: the model's search names the place, and finds its booking page first.
-        let own = clean(request)
-        if !lists, kind != .act, !own.isEmpty, own.split(whereSeparator: \.isWhitespace).count <= maxOwnWords { return [own] }
-        return Array(out.prefix(lists ? maxSearches : 1))
+        if kind != .act, let own = ownSearch(for: request) { return [own] }
+        return Array(out.prefix(lists(request) ? maxSearches : 1))
     }
 
     /// Which rows to read: `limit` shared evenly between the searches, a URL once, one page a

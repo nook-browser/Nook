@@ -78,6 +78,38 @@ public enum LookupText {
         String(text.prefix(characters))
     }
 
+    /// `texts` cut to fit `characters` between them: a short one whole, and what it leaves
+    /// shared evenly by the longer ones.
+    public static func excerpts(_ texts: [String], characters: Int) -> [String] {
+        var left = max(0, characters)
+        var cut = texts
+        let lengths = texts.map(\.count)
+        for (done, index) in texts.indices.sorted(by: { lengths[$0] < lengths[$1] }).enumerated() {
+            cut[index] = String(texts[index].prefix(left / (texts.count - done)))
+            left -= cut[index].count
+        }
+        return cut
+    }
+
+    /// `text` with every straight double quote made a curly one. The system model, writing JSON,
+    /// copied an inch mark (48" TV) unescaped: that ended its string and the whole answer.
+    public static func curlyQuotes(_ text: String) -> String {
+        guard text.contains("\"") else { return text }
+        var out = ""
+        var previous: Character = " "
+        for character in text {
+            let opens = previous.isWhitespace || "([{".contains(previous)
+            out.append(character == "\"" ? (opens ? "\u{201C}" : "\u{201D}") : character)
+            previous = character
+        }
+        return out
+    }
+
+    /// `text` with curly double quotes made straight, undoing `curlyQuotes` on what the model wrote.
+    public static func straightQuotes(_ text: String) -> String {
+        text.replacingOccurrences(of: "\u{201C}", with: "\"").replacingOccurrences(of: "\u{201D}", with: "\"")
+    }
+
     // MARK: - Scanning
 
     /// Where `needle` next occurs at or after `from`, case-insensitive.
