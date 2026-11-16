@@ -85,7 +85,7 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
     }
 
     /// Never while hidden under the person's page as the agent's: it would take their typing.
-    override var acceptsFirstResponder: Bool { !(superview is AgentPageHostView) }
+    override var acceptsFirstResponder: Bool { !(superview is AgentPageHostView || superview is LookupReaderHostView) }
 
     // A page under the error page takes no keys: Space would start a video nobody can see.
     override func keyDown(with event: NSEvent) {
@@ -112,7 +112,7 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
     /// their page, once the compositor has finished moving views.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard window == nil, let session = owningSession, session.isAgentPage else { return }
+        guard window == nil, let session = owningSession, session.isAgentPage, !session.isQuiet else { return }
         DispatchQueue.main.async { [weak session] in
             guard let session else { return }
             session.controller?.onAgentPage?(session)

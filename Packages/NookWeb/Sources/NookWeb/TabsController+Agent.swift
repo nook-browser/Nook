@@ -61,6 +61,7 @@ extension TabsController {
 }
 
 extension PageSession {
-    /// A page in the Agent space: it opens no window, sheet or panel and records no history.
-    public var isAgentPage: Bool { controller?.isInAgentSpace(itemID) == true }
+    /// A page in the Agent space, or a quiet reader page: it opens no window, sheet or panel and
+    /// records no history.
+    public var isAgentPage: Bool { isQuiet || controller?.isInAgentSpace(itemID) == true }
 }

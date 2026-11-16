@@ -276,6 +276,9 @@ struct WebsiteView: View {
                 LoadErrorView(session: session)
                     .clipShape(webViewClipShape)
                 BlockedPageView(session: session)
+                LookupProgressView(session: session)
+                    .clipShape(webViewClipShape)
+                    .environment(browserManager.lookupManager)
             }
 
             // Link Previews: Shift held over a link in the page.

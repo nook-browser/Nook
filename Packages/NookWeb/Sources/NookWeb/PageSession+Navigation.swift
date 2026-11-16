@@ -329,6 +329,20 @@ extension PageSession: WKNavigationDelegate {
             decisionHandler(.cancel)
             return
         }
+        // A quiet page asks its gate first, in every frame, so nothing it reads can send it to
+        // this network. A passed address comes back through here once and goes on.
+        if isQuiet, let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
+           scheme == "http" || scheme == "https", gatePassedURL != url
+        {
+            guard let gate = navigationGate else { return decisionHandler(.cancel) }
+            Task { @MainActor [weak self] in
+                guard let self, await gate(url) else { return decisionHandler(.cancel) }
+                self.gatePassedURL = url
+                self.webView(webView, decidePolicyFor: navigationAction, decisionHandler: decisionHandler)
+                self.gatePassedURL = nil
+            }
+            return
+        }
         // The main frame, or no frame yet: a provider may finish in a window it opens.
         if navigationAction.targetFrame?.isMainFrame != false, let url = navigationAction.request.url,
            navigationInterceptor?(url) == true {
@@ -504,6 +518,7 @@ extension PageSession: WKNavigationDelegate {
     /// A clicked download goes, and so does a page's first. Further ones nobody clicked ask once per
     /// page, so an ad frame or script cannot fill the Downloads folder.
     func allowDownload(clicked: Bool, in webView: WKWebView, _ decide: @escaping (Bool) -> Void) {
+        if isQuiet { return decide(false) }
         downloadsThisPage += 1
         if clicked || downloadsThisPage == 1 || moreDownloadsAllowed == true { return decide(true) }
         guard moreDownloadsAllowed == nil, !isAgentPage, let alerts = controller?.alerts else { return decide(false) }

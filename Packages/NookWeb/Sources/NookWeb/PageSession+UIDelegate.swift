@@ -32,11 +32,18 @@ extension PageSession {
 
     // MARK: - Peek Detection
 
-    /// Option always peeks. Otherwise only a favorite or pinned tab peeks, for a link to another
-    /// site, so the page it keeps in the sidebar stays put; a regular tab opens a new tab.
+    /// Option always peeks, and so does any web link on one of Look It Up's pages. Otherwise only a
+    /// favorite or pinned tab peeks, for a link to another site, so the page it keeps in the
+    /// sidebar stays put; a regular tab opens a new tab.
     func shouldRedirectToPeek(url: URL) -> Bool {
         if isAgentPage { return false }
         if isOptionKeyDown { return true }
+        // A link on one of Look It Up's pages opens over it, so the answer stays where it is.
+        if let support = controller?.lookupSupport, let lookup = LookupStore.lookupID(ofPage: self.url, in: support) {
+            // The ordinary search an unanswered lookup offers loads in the tab: there is no answer to keep.
+            if LookupStore.record(for: lookup, in: support)?.searchURL == url { return false }
+            return url.scheme?.lowercased() == "http" || url.scheme?.lowercased() == "https"
+        }
         guard controller?.isSynced(itemID) == true, let from = self.url.host, let to = Self.destinationHost(of: url)
         else { return false }
         return !Self.isSameSite(from, to)
@@ -76,7 +83,7 @@ extension PageSession: WKUIDelegate {
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        guard let delegate = controller?.sessionDelegate else { return nil }
+        guard let delegate = controller?.sessionDelegate, !isQuiet else { return nil }
         let url = navigationAction.request.url
         if url?.scheme?.lowercased() == "nook" { return nil }
         // Extensions manage their own auth flows, and never get Peek.
@@ -297,6 +304,9 @@ extension PageSession: WKUIDelegate {
         initiatedByFrame frame: WKFrameInfo,
         decisionHandler: @escaping (WKPermissionDecision) -> Void
     ) {
+        // A reader page is one nobody sees. It gets no camera or microphone, whatever the person
+        // allowed the same site in a tab.
+        if isQuiet { return decisionHandler(.deny) }
 
         // A stored answer for this host short-circuits the prompt; otherwise WebKit asks, and a
         // page never gets capture on its own say-so.

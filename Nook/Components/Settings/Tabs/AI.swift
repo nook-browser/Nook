@@ -42,6 +42,15 @@ struct SettingsAITab: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                Toggle(isOn: $settings.lookupEnabled) {
+                    VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+                        Text("Look It Up")
+                            .font(NookDesign.Font.body)
+                        Text("Shift-Return in the address bar searches DuckDuckGo, reads the top pages and writes one page from them.")
+                            .font(NookDesign.Font.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             // MARK: - Tab Organizer

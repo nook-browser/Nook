@@ -423,7 +423,7 @@ struct TopBarView: View {
     {
         if isHovering {
             guard let host = url.host else {
-                return (AttributedString(url.absoluteString), "")
+                return (AttributedString(browserManager.lookupRequest(for: url) ?? url.absoluteString), "")
             }
 
             let cleanHost =
@@ -447,7 +447,7 @@ struct TopBarView: View {
         }
 
         guard let host = url.host else {
-            return (AttributedString(url.absoluteString), "")
+            return (AttributedString(browserManager.lookupRequest(for: url) ?? url.absoluteString), "")
         }
 
         let cleanHost =

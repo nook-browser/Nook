@@ -14,6 +14,39 @@ import NookSettings
 import NookWeb
 import NookUI
 
+/// What a key does with the typed text, at the trailing edge of the field: a label and a keycap.
+private struct PaletteKeyHint: View {
+    let label: String
+    let key: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(NookDesign.Font.body)
+                .foregroundStyle(Color.secondary)
+
+            Text(key)
+                .font(NookDesign.Font.caption)
+                .foregroundStyle(Color.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    NookDesign.Radius.shape(NookDesign.Radius.xs)
+                        .fill(NookDesign.Surface.fill)
+                )
+                .overlay(
+                    NookDesign.Radius.shape(NookDesign.Radius.xs)
+                        .stroke(NookDesign.Surface.hairline, lineWidth: 0.5)
+                )
+        }
+        .allowsHitTesting(false)
+        .transition(
+            .blur(intensity: 4, scale: 0.92)
+            .animation(NookDesign.Motion.standard)
+        )
+    }
+}
+
 struct CommandPaletteView: View {
     @EnvironmentObject var browserManager: BrowserManager
     @Environment(BrowserWindowState.self) private var windowState
@@ -64,6 +97,17 @@ struct CommandPaletteView: View {
             }
         }
         return [primary] + rest.prefix(4)
+    }
+
+    /// What Shift-Return looks up: the highlighted search row, else the typed text when Return
+    /// would search it. Nil for an address, a site search, or with Look It Up unavailable.
+    private var lookupText: String? {
+        guard activeSiteSearch == nil, siteSearchMatch == nil, browserManager.lookupManager.isAvailable(in: windowState) else { return nil }
+        let row = selectedSuggestionIndex >= 0 && selectedSuggestionIndex < visibleSuggestions.count
+            ? visibleSuggestions[selectedSuggestionIndex] : primarySuggestion
+        guard let row, case .search = row.type else { return nil }
+        let request = row.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return request.isEmpty ? nil : request
     }
 
     /// What Return does with what was typed: the completed host, the address, or a search.
@@ -180,8 +224,16 @@ struct CommandPaletteView: View {
                                         }
                                         return .ignored
                                     }
-                                    .onKeyPress(.return) {
+                                    .onKeyPress(keys: [.return]) { press in
                                         if isComposing { return .ignored }
+                                        // Shift-Return looks a search up. On an address it is Return.
+                                        if press.modifiers.contains(.shift), let request = lookupText {
+                                            browserManager.lookupManager.start(request, in: windowState)
+                                            text = ""
+                                            selectedSuggestionIndex = -1
+                                            commandPalette.close()
+                                            return .handled
+                                        }
                                         handleReturn()
                                         return .handled
                                     }
@@ -245,31 +297,12 @@ struct CommandPaletteView: View {
                                         selectedSuggestionIndex = -1
                                     }
 
-                                    if activeSiteSearch == nil, let match = siteSearchMatch {
-                                        HStack(spacing: 6) {
-                                            Text("Search \(match.name)")
-                                                .font(NookDesign.Font.body)
-                                                .foregroundStyle(Color.secondary)
+                                    if lookupText != nil {
+                                        PaletteKeyHint(label: "Look It Up", key: "⇧⏎")
+                                    }
 
-                                            Text("Tab")
-                                                .font(NookDesign.Font.caption)
-                                                .foregroundStyle(Color.secondary)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(
-                                                    NookDesign.Radius.shape(NookDesign.Radius.xs)
-                                                        .fill(NookDesign.Surface.fill)
-                                                )
-                                                .overlay(
-                                                    NookDesign.Radius.shape(NookDesign.Radius.xs)
-                                                        .stroke(NookDesign.Surface.hairline, lineWidth: 0.5)
-                                                )
-                                        }
-                                        .allowsHitTesting(false)
-                                        .transition(
-                                            .blur(intensity: 4, scale: 0.92)
-                                            .animation(NookDesign.Motion.standard)
-                                        )
+                                    if activeSiteSearch == nil, let match = siteSearchMatch {
+                                        PaletteKeyHint(label: "Search \(match.name)", key: "Tab")
                                     }
                                 }
                             }

@@ -144,10 +144,10 @@ struct URLBarView: View {
                 .pointerStyle(.horizontalText)
                 .onTapGesture {
                     guard !isEditing else { return }
-                    beginEditing(session?.url.absoluteString ?? item.url?.absoluteString ?? "")
+                    beginEditing(addressText(for: session) ?? item.url?.absoluteString ?? "")
                 }
                 .modifier(AddressActivationAccessibility(enabled: !isEditing) {
-                    beginEditing(session?.url.absoluteString ?? item.url?.absoluteString ?? "")
+                    beginEditing(addressText(for: session) ?? item.url?.absoluteString ?? "")
                 })
                 .help("Search or Enter URL...")
                 .nookFloatingSurface(in: NookDesign.Radius.shape(NookDesign.Radius.md))
@@ -210,10 +210,10 @@ struct URLBarView: View {
                 .pointerStyle(.horizontalText)
                 .onTapGesture {
                     guard !isEditing else { return }
-                    beginEditing(session?.url.absoluteString ?? "")
+                    beginEditing(addressText(for: session) ?? "")
                 }
                 .modifier(AddressActivationAccessibility(enabled: !isEditing) {
-                    beginEditing(session?.url.absoluteString ?? "")
+                    beginEditing(addressText(for: session) ?? "")
                 })
 
                 if !isEditing, !windowState.isIncognito, isHovering || showSiteSettings || confirmClearSiteData, let session {
@@ -500,7 +500,13 @@ struct URLBarView: View {
     
     private func displayURL(for session: PageSession?) -> String {
         guard let session else { return "" }
-        return formatURL(session.url)
+        // One of Look It Up's pages shows what was asked, not the file it is kept in.
+        return browserManager.lookupRequest(for: session.url) ?? formatURL(session.url)
+    }
+
+    /// What editing the address starts from: the request for one of Look It Up's pages.
+    private func addressText(for session: PageSession?) -> String? {
+        browserManager.lookupRequest(for: session?.url) ?? session?.url.absoluteString
     }
 
     private func isInsecure(for session: PageSession?) -> Bool { session?.url.scheme == "http" }
