@@ -20,6 +20,11 @@ struct LookupPageCheck {
         return re.matches(in: html, range: NSRange(html.startIndex..., in: html)).map { String(html[Range($0.range(at: 1), in: html)!]) }
     }
 
+    /// Nothing the page could run or fetch: no script, no CSS `url(`, no `data:` address.
+    static func inert(_ html: String) -> Bool {
+        !html.contains("<script") && !html.contains("url(") && !html.contains("data:")
+    }
+
     static func main() {
         let evil = "<script>alert(1)</script>\"'><img src=x onerror=1>"
         func source(_ url: String, title: String = "A Page", read: Bool = true, image: String? = nil, notes: String = "") -> LookupSource {
@@ -36,6 +41,7 @@ struct LookupPageCheck {
             source("http://insecure.example/b", title: "Insecure"),
             source("https://www.example.org/c", title: "Unread", read: false, image: "../../etc/passwd"),
             source("https://example.net/d", title: "Odd image", image: "https://evil.example/x.png"),
+            source("https://example.net/e", title: "Inline image", image: "data:image/png;base64,AAAA"),
         ]
         record.answer = LookupAnswer(
             title: evil + String(repeating: "x", count: 50_000),
@@ -55,6 +61,20 @@ struct LookupPageCheck {
         precondition(html.contains("This site would not load in the background."))
         precondition(!html.contains(String(repeating: "x", count: 201)), "a title is cut to 200 characters")
         precondition(!html.contains("Nothing came back") && !html.contains("What Each Page Says"))
+        precondition(inert(html), "an image named as a data: address is refused like any other")
+        precondition(attributes("style", in: html).allSatisfy { $0.hasPrefix("--i:") && Int($0.dropFirst(4)) != nil }, "a style attribute holds a number Nook wrote")
+
+        // MARK: glyphs: one a label, the same every launch, and nothing of the label itself
+        precondition(LookupPageRenderer.glyph(for: "History") == "📜" && LookupPageRenderer.glyph(for: "Ticket Prices") == "🎟️")
+        precondition(LookupPageRenderer.glyph(for: "Zxqv") == "✨", "a label the table does not know still gets the same glyph each time")
+        // a glyph that passes judgment is for a label that does
+        for neutral in ["Café con leche", "iPhone 17 Pro", "Limited Edition", "Recording Studio"] {
+            precondition(!["👍", "👎", "⚠️", "🏆"].contains(LookupPageRenderer.glyph(for: neutral)), neutral)
+        }
+        precondition(LookupPageRenderer.glyph(for: "Pros") == "👍" && LookupPageRenderer.glyph(for: "Cons") == "👎")
+        precondition(LookupPageRenderer.glyph(for: evil).unicodeScalars.allSatisfy { !$0.isASCII }, "a label never reaches its tile")
+        let several = LookupPageRenderer.glyphs(for: ["History", "History", "Early History", evil, ""])
+        precondition(Set(several).count == several.count && several.joined().unicodeScalars.allSatisfy { !$0.isASCII }, "no glyph twice in a list")
 
         // an accent that is not a color falls back
         record.accentHex = "red;}</style><script>"
@@ -70,7 +90,7 @@ struct LookupPageCheck {
         precondition(html.contains("White Bean") && html.contains("Takes an hour.") && html.contains("Open on example.com"))
         precondition(html.contains("Nowhere") && html.contains("Pages Read"))
         precondition(!html.contains("<script") && attributes("href", in: html).allSatisfy { $0.hasPrefix("https://") || $0.hasPrefix("do/") })
-        precondition(attributes("src", in: html).allSatisfy { !$0.contains("/") && !$0.contains(":") })
+        precondition(attributes("src", in: html).allSatisfy { !$0.contains("/") && !$0.contains(":") } && inert(html))
 
         // MARK: nothing found, and failed with nothing to show
         record.answer = nil
@@ -79,7 +99,7 @@ struct LookupPageCheck {
             record.outcome = outcome
             html = LookupPageRenderer.html(record)
             precondition(html.contains("Nothing came back for this.") && html.contains("Search the Web Instead"))
-            precondition(attributes("href", in: html) == ["https://search.example/?q=x"])
+            precondition(attributes("href", in: html) == ["https://search.example/?q=x"] && inert(html))
         }
         // the pages that were found are still listed when nothing could be written from them
         record.outcome = .failed
@@ -102,14 +122,14 @@ struct LookupPageCheck {
         record.sources = [source("https://example.com/a", title: "First", notes: "- Built in 1956 " + evil), source("https://example.com/b", title: "Second", notes: "NONE")]
         html = LookupPageRenderer.html(record)
         precondition(html.contains("What Each Page Says") && html.contains("Built in 1956") && html.contains("Search the Web Instead"))
-        precondition(!html.contains("NONE") && !html.contains("<script") && !html.contains("Nothing came back"))
+        precondition(!html.contains("NONE") && inert(html) && !html.contains("Nothing came back"))
 
         // MARK: running and stopped
         for outcome in [LookupOutcome.running, .stopped] {
             record.outcome = outcome
             html = LookupPageRenderer.html(record)
             precondition(html.contains("why &lt;script&gt;") && html.contains("Search the Web Instead"))
-            precondition(!html.contains("Pages Read") && !html.contains("Nothing came back") && !html.contains("Built in 1956"))
+            precondition(!html.contains("Pages Read") && !html.contains("Nothing came back") && !html.contains("Built in 1956") && inert(html))
         }
 
         // MARK: a booking: each place's page, the times read off it, and its own address opened on the party and day
@@ -137,7 +157,7 @@ struct LookupPageCheck {
         precondition(html.contains("href=\"https://resy.com/cities/new-york-ny/venues/lilia?seats=2&amp;date=2026-11-16\"") && html.contains("Open on resy.com"))
         precondition(html.contains("llama inn") && html.contains("This site would not load in the background."))
         precondition(html.contains("Llama Inn Blog") && html.contains("Peruvian cooking.") && html.contains("Open on llama.example") && html.contains("Pages Read"))
-        precondition(!html.contains("<script") && attributes("src", in: html) == ["shot1.jpg"])
+        precondition(inert(html) && attributes("src", in: html) == ["shot1.jpg"])
         precondition(attributes("href", in: html).allSatisfy { $0.hasPrefix("https://") || $0.hasPrefix("#do/") })
         precondition(!html.contains("Nothing came back"), "a booking page with no written answer is still a page")
         // the one thing Nook offers to press: the asked time, on the card whose page has it
