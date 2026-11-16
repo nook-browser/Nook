@@ -19,6 +19,9 @@ public struct DeviceState: Codable, Equatable, Sendable {
     public var collapsedPinned: Set<UUID>?
     /// When each tab was last selected or deselected, for auto-archive. Optional for older files.
     public var lastActive: [UUID: Date]?
+    /// Tabs Look It Up opened to act on, and tabs opened from those: the chat leaves anything
+    /// that signs in, pays or confirms there to the person. Optional for older files.
+    public var guarded: Set<UUID>?
 
     public init() {}
 
@@ -34,6 +37,12 @@ public struct DeviceState: Codable, Equatable, Sendable {
         liveDismissed = liveDismissed?.filter { tree.item($0.key)?.live != nil }
         collapsedPinned = collapsedPinned?.filter { tree.space($0) != nil }
         lastActive = lastActive?.filter { tree.item($0.key) != nil }
+        if let marked = guarded {
+            // A closed tab keeps its mark while Reopen Closed Tab can still bring it back.
+            let reopenable = Set(closed.flatMap { $0.items.map(\.id) })
+            let kept = marked.filter { tree.item($0) != nil || reopenable.contains($0) }
+            guarded = kept.isEmpty ? nil : kept
+        }
         for i in windows.indices {
             if let spaceID = windows[i].spaceID, tree.space(spaceID) == nil { windows[i].spaceID = nil }
             windows[i].selectedItemBySpace = windows[i].selectedItemBySpace.filter { tree.space($0.key) != nil && tree.item($0.value) != nil }

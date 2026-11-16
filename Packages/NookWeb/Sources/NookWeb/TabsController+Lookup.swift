@@ -46,14 +46,21 @@ extension TabsController {
         return session
     }
 
-    /// Marks a tab as one Look It Up opened to act on (`PageSession.guardsCommits`), for the run.
+    /// Marks a tab as one Look It Up opened to act on (`PageSession.guardsCommits`). The mark is
+    /// kept in device.json, so it outlives a relaunch, and goes when the tab is gone for good.
     public func markGuarded(_ itemID: UUID) {
-        guardedItems.insert(itemID)
+        guard !isGuarded(itemID) else { return }
+        device.guarded = (device.guarded ?? []).union([itemID])
+        save()
+    }
+
+    public func isGuarded(_ itemID: UUID) -> Bool {
+        device.guarded?.contains(itemID) == true
     }
 
     /// A tab opened from a guarded tab is guarded too, so a new tab is no way around the line.
     func inheritGuard(_ itemID: UUID, from opener: UUID?) {
-        if let opener, guardedItems.contains(opener) { guardedItems.insert(itemID) }
+        if let opener, isGuarded(opener) { markGuarded(itemID) }
     }
 
     // MARK: - Reader Rules
@@ -84,7 +91,7 @@ extension PageSession {
 
     /// True on a tab Look It Up opened to press a time, or one opened from it: the chat's tools
     /// leave any control there that signs in, pays or confirms to the person (`GuardedTools`).
-    public var guardsCommits: Bool { controller?.guardedItems.contains(itemID) == true }
+    public var guardsCommits: Bool { controller?.isGuarded(itemID) == true }
 
     /// The page's visible text, line breaks kept. A page too busy to answer within `seconds`
     /// reads as nothing.
