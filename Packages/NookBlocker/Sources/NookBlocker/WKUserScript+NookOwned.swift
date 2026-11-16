@@ -38,11 +38,30 @@ extension Array where Element == WKUserScript {
 extension WKUserContentController {
     /// Clears the scripts and re-adds `scripts`, skipping any WebKit kept. removeAllUserScripts() leaves
     /// extension content scripts in place, and some begin with `// Nook`, so re-adding them stacked a copy per call.
+    ///
+    /// Sources are matched as NSStrings, by length and then contents. A `[String: Int]` keyed by
+    /// source hashed every surviving extension script (bridged from WebKit, often hundreds of KB)
+    /// through Unicode normalization one character at a time: seconds of main thread on each
+    /// main-frame navigation, which stalled the swipe-back animation running on that thread.
     public func resetUserScripts(to scripts: [WKUserScript]) {
         removeAllUserScripts()
-        var kept = userScripts.reduce(into: [String: Int]()) { $0[$1.source, default: 0] += 1 }
+        var kept = userScripts.map { $0.source as NSString }
         for script in scripts {
-            if let n = kept[script.source], n > 0 { kept[script.source] = n - 1 } else { addUserScript(script) }
+            if let index = kept.firstIndex(where: { $0.isSameSource(as: script.source) }) {
+                kept.remove(at: index)
+            } else {
+                addUserScript(script)
+            }
         }
+    }
+}
+
+extension NSString {
+    /// Exact equality without Swift's normalizing compare: identity, then length, then contents.
+    func isSameSource(as source: String) -> Bool {
+        let other = source as NSString
+        if self === other { return true }
+        guard length == other.length else { return false }
+        return isEqual(to: source)
     }
 }
