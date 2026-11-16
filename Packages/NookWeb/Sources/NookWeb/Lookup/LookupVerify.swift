@@ -40,6 +40,18 @@ public enum LookupVerify {
         return out
     }
 
+    private static let gapPhrases = [
+        "not specified", "not provided", "not mentioned", "not given", "not stated", "not available", "not listed",
+        "does not mention", "does not say", "does not give", "unspecified", "is unknown", "are unknown", "n/a",
+    ]
+
+    /// True for a line that reports what its page left out ("rating not specified"), which a
+    /// small model writes where it should have written less. Whole words: not "Italian/American".
+    public static func admitsGap(_ line: String) -> Bool {
+        let spaced = " " + line.lowercased().map { $0.isLetter || $0.isNumber || $0 == "/" ? $0 : " " }.split(separator: " ").joined(separator: " ") + " "
+        return gapPhrases.contains { spaced.contains(" " + $0 + " ") }
+    }
+
     /// Every figure in `text`, commas removed: a run of digits with inner commas and an optional
     /// `.d` or `:mm` tail, holding at least two digits in all. Single digits are not checked.
     public static func figures(in text: String) -> [String] {

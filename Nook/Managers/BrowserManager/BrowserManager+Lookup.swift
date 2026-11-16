@@ -3,11 +3,13 @@
 //  BrowserManager+Lookup.swift
 //  Nook
 //
-//  Look It Up's seams into the window: where its reader pages sit while they load, and what
-//  the URL bar shows for one of its pages.
+//  Look It Up's seams into the window: where its reader pages sit while they load, what the
+//  URL bar shows for one of its pages, and the button on a booking card.
 //
 
 import AppKit
+import SwiftUI
+import NookDesign
 import NookWeb
 
 extension BrowserManager {
@@ -30,4 +32,22 @@ extension BrowserManager {
         content.addSubview(host, positioned: .below, relativeTo: nil)
         return host
     }
+
+    // MARK: - The Card Button
+
+    func lookupAction(card: Int, from session: PageSession) {
+        lookupManager.pick(card: card, from: session)
+    }
+
+    /// Puts `text` in the chat's compose box in `window` and shows the chat. Nothing is sent.
+    func showChatDraft(_ text: String, in window: BrowserWindowState) {
+        guard nookSettings?.showAIAssistant == true else { return }
+        window.agentDraft = text
+        withAnimation(NookDesign.Motion.standard) {
+            window.devPanelTab = .agent
+            window.isSidebarAIChatVisible = true
+            window.isSidebarMenuVisible = false
+        }
+    }
+
 }

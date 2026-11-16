@@ -15,7 +15,8 @@ public enum LookupSearch {
     /// Hosts whose pages are video or a feed, which give the model nothing to read.
     public static let skippedHosts = ["youtube.com", "instagram.com", "facebook.com", "tiktok.com", "x.com", "twitter.com", "pinterest.com"]
 
-    private static let maxSearches = 4
+    /// The most searches one lookup sends, whatever they are for.
+    public static let maxSearches = 4
     private static let maxSearchLength = 200
     private static let maxOwnWords = 12
     /// One row of a results page is a title, an address and a snippet: a few hundred characters.
@@ -24,12 +25,22 @@ public enum LookupSearch {
     /// join the two halves of one comparison more often than they separate two things.
     private static let listMarks = [",", " or "]
 
+    private static let maxTitle = 300
+    private static let maxSnippet = 500
+
     public static func url(for query: String) -> URL {
         var components = URLComponents(string: "https://html.duckduckgo.com/html/")!
         components.queryItems = [URLQueryItem(name: "q", value: query)]
         // URLComponents leaves "+" as written, and a form endpoint reads it as a space.
         components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         return components.url!
+    }
+
+    /// A row worth reading: https, and not a link through the search engine itself, which is an ad.
+    private static func hit(address: String, title: String, snippet: String) -> LookupHit? {
+        guard let url = URL(string: address), url.scheme?.lowercased() == "https",
+              let host = url.host?.lowercased(), host != "duckduckgo.com", !host.hasSuffix(".duckduckgo.com") else { return nil }
+        return LookupHit(url: url, title: String(title.prefix(maxTitle)), snippet: String(snippet.prefix(maxSnippet)))
     }
 
     /// The organic rows of a results page. Ads link through duckduckgo.com and are dropped, as is
@@ -49,11 +60,9 @@ public enum LookupSearch {
         return starts.enumerated().compactMap { index, start in
             let end = index + 1 < starts.count ? starts[index + 1] : text.length
             let row = text.substring(with: NSRange(location: start, length: min(end - start, maxRow)))
-            guard let link = groups(#"^class="result__a"[^>]*?href="([^"]+)"[^>]*>(.*?)</a>"#, in: row), link.count == 2,
-                  let url = URL(string: LookupText.plain(link[0])), url.scheme?.lowercased() == "https",
-                  let host = url.host?.lowercased(), host != "duckduckgo.com", !host.hasSuffix(".duckduckgo.com") else { return nil }
+            guard let link = groups(#"^class="result__a"[^>]*?href="([^"]+)"[^>]*>(.*?)</a>"#, in: row), link.count == 2 else { return nil }
             let snippet = groups(#"class="result__snippet"[^>]*>(.*?)</a>"#, in: row)?.first ?? ""
-            return LookupHit(url: url, title: LookupText.plain(link[1]), snippet: LookupText.plain(snippet))
+            return hit(address: LookupText.plain(link[0]), title: LookupText.plain(link[1]), snippet: LookupText.plain(snippet))
         }
     }
 
@@ -65,7 +74,7 @@ public enum LookupSearch {
 
     /// The model's searches made safe to run: trimmed, no repeats, at most four, and only one
     /// unless the request itself lists things.
-    public static func normalized(_ searches: [String], request: String) -> [String] {
+    public static func normalized(_ searches: [String], request: String, kind: LookupKind = .explain) -> [String] {
         func clean(_ text: String) -> String {
             String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxSearchLength))
         }
@@ -75,9 +84,10 @@ public enum LookupSearch {
         if out.isEmpty { out = [clean(request)].filter { !$0.isEmpty } }
         let lists = listMarks.contains { request.lowercased().contains($0) }
         // One search for a short request is the person's own words: a search engine reads them
-        // better than the model's rewrite, which drops half of a comparison.
+        // better than the model's rewrite, which drops half of a comparison. Something to get done
+        // is the exception: the model's search names the place, and finds its booking page first.
         let own = clean(request)
-        if !lists, !own.isEmpty, own.split(whereSeparator: \.isWhitespace).count <= maxOwnWords { return [own] }
+        if !lists, kind != .act, !own.isEmpty, own.split(whereSeparator: \.isWhitespace).count <= maxOwnWords { return [own] }
         return Array(out.prefix(lists ? maxSearches : 1))
     }
 

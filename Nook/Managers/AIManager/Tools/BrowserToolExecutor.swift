@@ -45,6 +45,12 @@ class BrowserToolExecutor {
             return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: "Browser not available", isError: true)
         }
 
+        // On a tab Look It Up opened to act on, no script runs at all, asked or not.
+        if toolCall.name == "executeJavaScript", let webView = getWebView(browserManager: browserManager, windowState: windowState),
+           let refusal = GuardedTools.refusal(tool: toolCall.name, label: nil, guarded: isGuarded(webView, browserManager)) {
+            return AIToolResult(toolCallId: toolCall.id, toolName: toolCall.name, content: refusal, isError: true)
+        }
+
         // SECURITY: executeJavaScript ALWAYS requires user confirmation regardless of execution mode,
         // because it can run arbitrary code on the current page.
         if toolCall.name == "executeJavaScript" {
@@ -69,6 +75,8 @@ class BrowserToolExecutor {
             result = try await executeReadPageContent(toolCall.arguments, browserManager: browserManager, windowState: windowState)
         case "clickElement":
             result = try await executeClickElement(toolCall.arguments, browserManager: browserManager, windowState: windowState)
+        case "fillField":
+            result = try await executeFillField(toolCall.arguments, browserManager: browserManager, windowState: windowState)
         case "getInteractiveElements":
             result = try await executeGetInteractiveElements(toolCall.arguments, browserManager: browserManager, windowState: windowState)
         case "extractStructuredData":
@@ -111,10 +119,14 @@ class BrowserToolExecutor {
         agentSpace.map(tabs.displayOrder(inSpace:)) ?? tabs.displayOrder(in: windowState)
     }
 
-    /// A new selected tab: in the Agent space when there is one, without showing it.
+    /// A new selected tab: in the Agent space when there is one, without showing it. Opened
+    /// while the tools' tab is guarded, it is guarded too.
     @discardableResult
     private func openTab(_ url: URL, _ tabs: TabsController, _ windowState: BrowserWindowState) -> UUID? {
-        tabs.open(url: url, in: windowState, placement: .newTab, parent: agentSpace.map { .tabs(spaceID: $0) })
+        let from = agentSpace != nil ? tabs.agentItem : windowState.selectedItemID
+        let opened = tabs.open(url: url, in: windowState, placement: .newTab, parent: agentSpace.map { .tabs(spaceID: $0) })
+        if let opened, let from, tabs.session(for: from)?.guardsCommits == true { tabs.markGuarded(opened) }
+        return opened
     }
 
     /// JSON-encodes a string for interpolation into a script. `JSONSerialization` raises an
@@ -156,7 +168,7 @@ class BrowserToolExecutor {
             return "Navigated to \(urlString)\(newTab ? " in new tab" : "")"
         }
 
-        guard browserManager.tabs.open(url: url, in: windowState, placement: newTab ? .newTab : .replaceCurrent) != nil else {
+        guard (newTab ? openTab(url, tabs, windowState) : tabs.open(url: url, in: windowState, placement: .replaceCurrent)) != nil else {
             return "No active tab"
         }
 
@@ -212,58 +224,130 @@ class BrowserToolExecutor {
         return "Failed to read page content"
     }
 
+    /// Whether a tool's page is one Look It Up opened to act on (`PageSession.guardsCommits`).
+    private func isGuarded(_ webView: WKWebView, _ browserManager: BrowserManager) -> Bool {
+        browserManager.tabs.session(for: webView)?.guardsCommits == true
+    }
+
+    /// Runs a click or fill script. On a guarded page the script first only names its target, and
+    /// acts on a second pass when that name commits the person to nothing and is still the same.
+    private func act(_ tool: String, in webView: WKWebView, guarded: Bool, script: (_ dryRun: Bool, _ expected: String?) -> String) async throws -> String {
+        var expected: String?
+        if guarded {
+            let found = try await webView.evaluateJavaScript(script(true, nil)) as? [String: Any]
+            if let message = found?["message"] as? String { return message }
+            let label = found?["secret"] as? Bool == true ? nil : found?["label"] as? String
+            if let refusal = GuardedTools.refusal(tool: tool, label: label, guarded: true) { return refusal }
+            expected = label
+        }
+        let done = try await webView.evaluateJavaScript(script(false, expected)) as? [String: Any]
+        if done?["changed"] as? Bool == true, let refusal = GuardedTools.refusal(tool: tool, label: nil, guarded: true) { return refusal }
+        return done?["message"] as? String ?? "Done"
+    }
+
     private func executeClickElement(_ args: [String: Any], browserManager: BrowserManager, windowState: BrowserWindowState) async throws -> String {
         guard let webView = getWebView(browserManager: browserManager, windowState: windowState) else {
             return "No active tab"
         }
-
         // Support clicking by CSS selector OR by visible text
-        if let selector = args["selector"] as? String, !selector.isEmpty {
-            let selectorJSON = jsLiteral(selector)
-            let script = """
+        let selector = (args["selector"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let text = (args["text"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        guard selector != nil || text != nil else {
+            return "Provide either 'selector' (CSS) or 'text' (visible text) to identify the element"
+        }
+        return try await act("clickElement", in: webView, guarded: isGuarded(webView, browserManager)) { dryRun, expected in
+            """
             (function() {
-                const sel = \(selectorJSON);
-                const el = document.querySelector(sel);
-                if (!el) return 'Element not found: ' + sel;
+                const sel = \(selector.map(jsLiteral) ?? "null");
+                const query = \(text.map { jsLiteral($0.lowercased()) } ?? "null");
+                const expected = \(expected.map(jsLiteral) ?? "null");
+                let el = null;
+                if (sel !== null) {
+                    el = document.querySelector(sel);
+                    if (!el) return { message: 'Element not found: ' + sel };
+                } else {
+                    const candidates = document.querySelectorAll('a, button, input[type="submit"], input[type="button"], [role="button"], [onclick], [tabindex]');
+                    let bestScore = Infinity;
+                    for (const candidate of candidates) {
+                        if (candidate.offsetParent === null && candidate.style.display !== 'contents') continue;
+                        const label = (candidate.textContent || candidate.value || candidate.getAttribute('aria-label') || candidate.getAttribute('title') || '').trim();
+                        const lower = label.toLowerCase();
+                        if (lower === query) {
+                            el = candidate;
+                            break;
+                        }
+                        if (lower.includes(query) && label.length < bestScore) {
+                            el = candidate;
+                            bestScore = label.length;
+                        }
+                    }
+                    if (!el) return { message: 'No clickable element found matching: ' + query };
+                }
+                // Everything the control could be called by, and the control it sits in: a click on
+                // the amount inside a Pay button presses Pay.
+                const owner = el.closest('a, button, input, select, label, [role="button"], [role="link"], [onclick]') || el;
+                const label = [owner, el].flatMap(part => [part.getAttribute('aria-label'), part.textContent, part.value, part.getAttribute('title')])
+                    .filter(part => typeof part === 'string' && part.trim()).join(' ').replace(/\\s+/g, ' ').trim().slice(0, 600);
+                if (\(dryRun)) return { label: label };
+                if (expected !== null && label !== expected) return { changed: true };
                 el.scrollIntoView({block: 'center'});
                 el.click();
-                return 'Clicked element: ' + (el.textContent || '').substring(0, 100).trim();
+                return { message: (sel !== null ? 'Clicked element: ' : 'Clicked: ') + (el.textContent || el.value || '').substring(0, 100).trim() };
             })();
             """
-            let result = try await webView.evaluateJavaScript(script)
-            return result as? String ?? "Click executed"
-        } else if let text = args["text"] as? String, !text.isEmpty {
-            let textJSON = jsLiteral(text)
-            let script = """
+        }
+    }
+
+    /// Types into the field whose label, placeholder or name holds `label`: the shortest match.
+    private func executeFillField(_ args: [String: Any], browserManager: BrowserManager, windowState: BrowserWindowState) async throws -> String {
+        guard let webView = getWebView(browserManager: browserManager, windowState: windowState) else {
+            return "No active tab"
+        }
+        guard let label = args["label"] as? String, !label.isEmpty, let text = args["text"] as? String else {
+            return "Provide the field's 'label' and the 'text' to type"
+        }
+        return try await act("fillField", in: webView, guarded: isGuarded(webView, browserManager)) { dryRun, expected in
+            """
             (function() {
-                const query = \(textJSON).toLowerCase();
-                const candidates = document.querySelectorAll('a, button, input[type="submit"], input[type="button"], [role="button"], [onclick], [tabindex]');
-                let best = null;
+                const query = \(jsLiteral(label.lowercased()));
+                const text = \(jsLiteral(text));
+                const expected = \(expected.map(jsLiteral) ?? "null");
+                const nameOf = field => [field.getAttribute('aria-label'), field.labels && field.labels[0] && field.labels[0].innerText,
+                                         field.getAttribute('placeholder'), field.getAttribute('name')]
+                    .filter(part => typeof part === 'string' && part.trim()).join(' ').replace(/\\s+/g, ' ').trim().slice(0, 300);
+                let el = null;
                 let bestScore = Infinity;
-                for (const el of candidates) {
-                    if (el.offsetParent === null && el.style.display !== 'contents') continue;
-                    const label = (el.textContent || el.value || el.getAttribute('aria-label') || el.getAttribute('title') || '').trim();
-                    const lower = label.toLowerCase();
-                    if (lower === query) {
-                        best = el;
-                        bestScore = 0;
-                        break;
-                    }
-                    if (lower.includes(query) && label.length < bestScore) {
-                        best = el;
-                        bestScore = label.length;
+                for (const field of document.querySelectorAll('input, textarea, select')) {
+                    if (['hidden', 'submit', 'button', 'reset', 'image', 'checkbox', 'radio', 'file'].includes(field.type)) continue;
+                    if (field.disabled || field.readOnly || field.offsetParent === null) continue;
+                    const name = nameOf(field);
+                    if (name.toLowerCase().includes(query) && name.length < bestScore) {
+                        el = field;
+                        bestScore = name.length;
                     }
                 }
-                if (!best) return 'No clickable element found matching: ' + query;
-                best.scrollIntoView({block: 'center'});
-                best.click();
-                return 'Clicked: ' + (best.textContent || best.value || '').substring(0, 100).trim();
+                if (!el) return { message: 'No field found matching: ' + query };
+                const name = nameOf(el);
+                const secret = el.type === 'password' || /cc-|password|one-time-code/.test(el.getAttribute('autocomplete') || '');
+                if (\(dryRun)) return { label: name, secret: secret };
+                if (expected !== null && name !== expected) return { changed: true };
+                el.scrollIntoView({block: 'center'});
+                el.focus();
+                if (el.tagName === 'SELECT') {
+                    const wanted = text.trim().toLowerCase();
+                    const option = [...el.options].find(o => o.text.trim().toLowerCase() === wanted || o.value.toLowerCase() === wanted);
+                    if (!option) return { message: 'No option matching: ' + text };
+                    el.value = option.value;
+                } else {
+                    // A framework watches the element's own setter, so the prototype's is called.
+                    const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+                    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, text);
+                }
+                el.dispatchEvent(new Event('input', {bubbles: true}));
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+                return { message: 'Filled: ' + name.substring(0, 100) };
             })();
             """
-            let result = try await webView.evaluateJavaScript(script)
-            return result as? String ?? "Click executed"
-        } else {
-            return "Provide either 'selector' (CSS) or 'text' (visible text) to identify the element"
         }
     }
 

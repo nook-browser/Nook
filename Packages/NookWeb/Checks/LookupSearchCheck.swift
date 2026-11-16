@@ -53,6 +53,12 @@ struct LookupSearchCheck {
         precondition(LookupSearch.normalized(["macbook air m4 vs programming"], request: " macbook air m4 vs macbook pro m4 for programming ") == ["macbook air m4 vs macbook pro m4 for programming"])
         precondition(LookupSearch.normalized(["winter soup recipe"], request: long) == ["winter soup recipe"])
         precondition(LookupSearch.normalized(["lilia"], request: "table at lilia, llama inn or kings co imperial") == ["lilia"], "a listed request keeps the model's searches")
+        // something to get done is searched in the model's words, which name the place: the person's
+        // own sentence put a venue's booking page sixth, the model's put it first
+        precondition(LookupSearch.normalized(["book reservation at lilia"], request: "table for 2 tomorrow at 7pm at lilia", kind: .act) == ["book reservation at lilia"])
+        precondition(LookupSearch.normalized(["book reservation at lilia", "lilia menu"], request: "table for 2 tomorrow at 7pm at lilia", kind: .act) == ["book reservation at lilia"])
+        precondition(LookupSearch.normalized(["book reservation at lilia"], request: "table for 2 tomorrow at 7pm at lilia", kind: .choose) == ["table for 2 tomorrow at 7pm at lilia"])
+        precondition(LookupSearch.normalized([], request: "table for 2 at lilia", kind: .act) == ["table for 2 at lilia"])
         precondition(LookupSearch.normalized(["franklin barbecue", "la barbecue"], request: "franklin barbecue or la barbecue").count == 2)
         precondition(LookupSearch.normalized([], request: "  x  ") == ["x"])
         precondition(LookupSearch.normalized(["  ", ""], request: "x") == ["x"])

@@ -52,5 +52,14 @@ struct LookupVerifyCheck {
         precondition(o.options.map(\.name) == ["B"])
         precondition(o.intro.isEmpty, "an intro with an unsupported figure is dropped")
         precondition(LookupVerify.cleaned(answer(intro: "Two places fit.", options: [LookupOption(name: "B", detail: "Fine.", source: 1)]), sourceCount: 1, corpus: corpus).intro == "Two places fit.")
+
+        // a line that says what its page does not say is no description of a place
+        precondition(LookupVerify.admitsGap("Kings Co Imperial offers Chinese food delivery with a rating not specified, price level not specified."))
+        precondition(LookupVerify.admitsGap("Rating: N/A.") && LookupVerify.admitsGap("The price level is unknown.") && LookupVerify.admitsGap("The page does not mention a rating."))
+        precondition(!LookupVerify.admitsGap("Lilia is an Italian restaurant with a 4.7 rating, $$$ price level, and located in Williamsburg, NY."))
+        precondition(!LookupVerify.admitsGap(""))
+        precondition(!LookupVerify.admitsGap("Lilia is an Italian/American restaurant in Williamsburg."), "n/a is a word, not three letters in a row")
+        precondition(!LookupVerify.admitsGap("Unknown Pleasures is a cocktail bar in Bushwick."))
+        precondition(LookupVerify.admitsGap("A restaurant; rating: n/a.") && LookupVerify.admitsGap("Its price level is unknown."))
     }
 }

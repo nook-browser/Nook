@@ -343,6 +343,17 @@ extension PageSession: WKNavigationDelegate {
             }
             return
         }
+        // The button on one of Look It Up's pages. Its address names a card and goes nowhere;
+        // only a person's click on that lookup's own page acts on it.
+        if let url = navigationAction.request.url, url.isFileURL, url.fragment != nil, let support = controller?.lookupSupport,
+           let card = LookupStore.action(of: url, fromPage: self.url, in: support) {
+            decisionHandler(.cancel)
+            let clicked = navigationAction.targetFrame?.isMainFrame == true && navigationAction.navigationType == .linkActivated
+                && navigationAction.nookIsUserInitiated
+            Self.log.info("Lookup card \(card): type \(navigationAction.navigationType.rawValue), gesture \(navigationAction.nookIsUserInitiated), acted \(clicked)")
+            if clicked { controller?.sessionDelegate?.lookupAction(card: card, from: self) }
+            return
+        }
         // The main frame, or no frame yet: a provider may finish in a window it opens.
         if navigationAction.targetFrame?.isMainFrame != false, let url = navigationAction.request.url,
            navigationInterceptor?(url) == true {

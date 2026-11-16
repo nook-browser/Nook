@@ -29,6 +29,8 @@ final class LookupManager {
     @ObservationIgnored private var requests: [UUID: String?] = [:]
     /// The tab each lookup in flight was started in.
     @ObservationIgnored private var tabs: [UUID: UUID] = [:]
+    /// Lookups whose card button is being acted on: a second press meanwhile does nothing.
+    @ObservationIgnored private var picking: Set<UUID> = []
     @ObservationIgnored private weak var browserManager: BrowserManager?
 
     /// The folder `Lookups/` lives in: the one that holds `Tabs/`, so a run against another
@@ -189,5 +191,43 @@ final class LookupManager {
     private func searchURL(for request: String) -> URL? {
         let template = browserManager?.nookSettings?.resolvedSearchEngineTemplate ?? SearchProvider.google.queryTemplate
         return URL(string: normalizeURL(request, queryTemplate: template))
+    }
+
+    // MARK: - The Card Button
+
+    private static let bookingLoadSeconds = 12.0
+    /// After the load, for the page to draw its time buttons.
+    private static let bookingSettleSeconds = 2.0
+
+    /// The button on a booking card. Opens the place's page on the party and day as a child tab,
+    /// selected, and presses the asked time there once. All of it comes from the saved record.
+    func pick(card: Int, from session: PageSession) {
+        guard let browserManager, let id = LookupStore.lookupID(ofPage: session.url, in: support), !picking.contains(id),
+              let record = LookupStore.record(for: id, in: support), record.sources.indices.contains(card - 1),
+              let url = record.sources[card - 1].prefilledURL, BookingSites.isVenuePage(url),
+              let booking = record.booking, let asked = booking.time.flatMap(LookupTimes.display),
+              // No window is active while the app sits in the background.
+              let window = browserManager.tabs.window(for: session) ?? browserManager.windowRegistry?.mostRecentRegularWindow,
+              let tab = browserManager.tabs.open(url: url, in: window, placement: .newTab, from: session.itemID)
+        else { return Self.log.info("Card button \(card) ignored: nothing in the record to act on") }
+        let tabs = browserManager.tabs
+        tabs.markGuarded(tab)
+        guard let page = tabs.session(for: tab), page.guardsCommits else { return }
+        picking.insert(id)
+        Task { @MainActor [weak self, weak window] in
+            defer { self?.picking.remove(id) }
+            await page.finishedLoading(within: Self.bookingLoadSeconds)
+            try? await Task.sleep(for: .seconds(Self.bookingSettleSeconds))
+            // Only on the page this opened, and only while the person is still looking at it.
+            guard let window, tabs.session(for: tab) === page, page.webView != nil,
+                  page.isAgentPage ? tabs.agentItem == tab : tabs.selectedSession(in: window) === page,
+                  PageSession.isSameSite(page.url.host, url.host), page.url.path == url.path else { return }
+            let labels = await page.readControlLabels()
+            if let index = CommitGuard.timeControl(in: labels, for: asked), await page.clickControl(at: index) { return }
+            // The page no longer shows that time: the task goes to the chat, unsent.
+            guard !page.isAgentPage, tabs.selectedSession(in: window) === page, let time = booking.time,
+                  let task = LookupTimes.chatDraft(people: booking.people, date: booking.date, time: time) else { return }
+            self?.browserManager?.showChatDraft(task, in: window)
+        }
     }
 }

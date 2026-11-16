@@ -19,12 +19,24 @@ import NookWeb
 protocol LookupReading: AnyObject {
     func search(_ query: String) async -> [LookupHit]
     func fetch(_ url: URL) async -> (title: String?, image: URL?, text: String)?
-    func readInPage(_ url: URL) async -> (title: String, text: String)?
+    /// Loads `url` in a reader page and returns what it shows. `booking` also asks for the
+    /// page's controls, heading and picture.
+    func readInPage(_ url: URL, booking: Bool) async -> LookupReadPage?
     /// A picture's bytes: nil unless it arrives whole, within `limit`, and is an image.
     func data(_ url: URL, limit: Int) async -> Data?
     /// The site's icon as image data, nil when it has none worth showing.
     func icon(for url: URL) async -> Data?
     func endAll()
+}
+
+/// What a reader page showed.
+struct LookupReadPage {
+    var title: String
+    var text: String
+    /// Booking pages only: the controls by label, the first heading, and a JPEG of the page's top.
+    var labels: [String] = []
+    var heading = ""
+    var shot: Data?
 }
 
 /// What the tab's cover shows while a lookup runs.
@@ -55,6 +67,9 @@ struct LookupPipeline {
     var imageWait: Duration = .seconds(3)
     /// Told when a model call fails, with the error's type and case.
     var log: @MainActor (String) -> Void = { _ in }
+    /// The day "tomorrow" is counted from.
+    var today = Date()
+    private static let maxAbout = 240
 
     /// File names saved so far, by source index. Filled as downloads finish, read at the deadline.
     private final class SavedImages {
@@ -88,24 +103,74 @@ struct LookupPipeline {
             planned = LookupPlan(searches: [], kind: .explain)
         }
         if Task.isCancelled { return finish(.stopped) }
-        let searches = LookupSearch.normalized(planned.searches, request: record.request)
+        let searches = LookupSearch.normalized(planned.searches, request: record.request, kind: planned.kind)
         record.plan = LookupPlan(searches: searches, kind: planned.kind)
         guard !searches.isEmpty else { return finish(.nothingFound) }
 
-        var hitsBySearch = [[LookupHit]](repeating: [], count: searches.count)
-        await withTaskGroup(of: (Int, [LookupHit]).self) { group in
-            for (index, search) in searches.enumerated() {
-                group.addTask { @MainActor in (index, await reader.search(search)) }
+        // What a booking asks for. The day is settled in code where the request says it in words.
+        var details: BookingDetails?
+        if planned.kind == .act {
+            do {
+                let said = try await model.booking(in: record.request, today: today)
+                let settled = BookingCalendar.corrected(said, request: record.request, today: today)
+                if settled.hasDetails { details = settled }
+            } catch {
+                if !(error is CancellationError) { log("booking failed: \(Self.describe(error))") }
             }
-            for await (index, hits) in group { hitsBySearch[index] = hits }
+        }
+        record.booking = details
+
+        // One at a time: the results endpoint answers a burst with a bot check, for the whole
+        // address and for a long while.
+        var hitsBySearch: [[LookupHit]] = []
+        for search in searches where !Task.isCancelled {
+            hitsBySearch.append(await reader.search(search))
         }
         if Task.isCancelled { return finish(.stopped) }
-        let picked = LookupSearch.pick(hitsBySearch, limit: model.budget.pages)
+        // A venue page counts as a place's own only when the person named that place.
+        let request = record.request
+        func isPlace(_ hit: LookupHit, _ search: Int) -> Bool {
+            searches.indices.contains(search) && BookingSites.isPlace(hit.url, request: request, search: searches[search])
+        }
+        // A place whose search held no such page gets one more search a booking site, within the
+        // lookup's four in all.
+        if details != nil {
+            var sent = searches.count
+            for (index, search) in searches.enumerated() where !hitsBySearch[index].contains(where: { isPlace($0, index) }) {
+                for word in BookingSites.searchWords(for: request) where sent < LookupSearch.maxSearches && !Task.isCancelled {
+                    sent += 1
+                    guard let venue = await reader.search("\(search) \(word)").first(where: { isPlace($0, index) }) else { continue }
+                    hitsBySearch[index].insert(venue, at: 0)
+                    break
+                }
+            }
+            if Task.isCancelled { return finish(.stopped) }
+        }
+        var picked = LookupSearch.pick(hitsBySearch, limit: model.budget.pages)
+        // A booking reads one page a place: the place's own booking page when the results hold
+        // one. With no such page anywhere it is laid out as choices, like any other act request.
+        var isBooking = false
+        if details != nil {
+            let placesFirst = hitsBySearch.enumerated().map { index, hits in
+                hits.filter { isPlace($0, index) } + hits.filter { !isPlace($0, index) }
+            }
+            let onePerPlace = LookupSearch.pick(placesFirst, limit: placesFirst.count)
+            if onePerPlace.contains(where: { isPlace($0.hit, $0.search) }) {
+                picked = onePerPlace
+                isBooking = true
+            }
+        }
         guard !picked.isEmpty else { return finish(.nothingFound) }
         record.sources = picked.map { LookupSource(hit: $0.hit, search: $0.search, title: String($0.hit.title.prefix(Self.maxTitle))) }
+        if isBooking, let details {
+            for index in record.sources.indices where isPlace(record.sources[index].hit, record.sources[index].search) {
+                let url = record.sources[index].hit.url
+                record.sources[index].prefilledURL = BookingSites.prefilled(url, details) ?? url
+            }
+        }
         onStage(.reading(hosts: record.sources.map { Self.host($0.hit.url) }))
 
-        let images = await read(&record)
+        let images = await read(&record, searches: searches)
         if Task.isCancelled { return finish(.stopped) }
         // Photos and icons come down while the model works; they are only waited for at the end.
         let read = record.sources
@@ -113,6 +178,17 @@ struct LookupPipeline {
         let saved = SavedImages()
         let saving = Task { @MainActor in await saveImages(for: read, images: images, lookup: id, into: saved) }
         defer { saving.cancel() }
+
+        if isBooking {
+            // The cards carry the page: its picture, its times read in code, one line about the
+            // place. Nothing is written across pages, so no notes and no answer.
+            onStage(.writing)
+            await describePlaces(&record)
+            if Task.isCancelled { return finish(.stopped) }
+            await Self.wait(for: saving, atMost: imageWait)
+            for (index, files) in saved.files where record.sources.indices.contains(index) { record.sources[index].iconFile = files.icon }
+            return finish(.done)
+        }
 
         await takeNotes(&record, searches: searches)
         if Task.isCancelled { return finish(.stopped) }
@@ -151,28 +227,31 @@ struct LookupPipeline {
 
     // MARK: - Reading
 
-    /// Fetches every source, then loads the thin ones in reader pages. Returns each source's lead
-    /// image address.
-    private func read(_ record: inout LookupRecord) async -> [URL?] {
+    /// Fetches every source, then loads the thin ones in reader pages. A booking page skips the
+    /// fetch: its prefilled address loads in a reader page, which also gives its controls,
+    /// heading and picture. Returns each source's lead image address.
+    private func read(_ record: inout LookupRecord, searches: [String]) async -> [URL?] {
         var images = [URL?](repeating: nil, count: record.sources.count)
         var fetched = [(title: String?, image: URL?, text: String)?](repeating: nil, count: record.sources.count)
-        let urls = record.sources.map(\.hit.url)
+        let urls = record.sources.map { $0.prefilledURL ?? $0.hit.url }
+        let venues = Set(record.sources.indices.filter { record.sources[$0].prefilledURL != nil })
         await withTaskGroup(of: (Int, (title: String?, image: URL?, text: String)?).self) { group in
-            for (index, url) in urls.enumerated() {
+            for (index, url) in urls.enumerated() where !venues.contains(index) {
                 group.addTask { @MainActor in (index, await reader.fetch(url)) }
             }
             for await (index, page) in group { fetched[index] = page }
         }
-        var pages = [(title: String, text: String)?](repeating: nil, count: record.sources.count)
-        let thin = urls.indices.filter { (fetched[$0]?.text.count ?? 0) < LookupText.thin }
+        var pages = [LookupReadPage?](repeating: nil, count: record.sources.count)
+        let thin = urls.indices.filter { venues.contains($0) || (fetched[$0]?.text.count ?? 0) < LookupText.thin }
         if !thin.isEmpty, !Task.isCancelled {
-            await withTaskGroup(of: (Int, (title: String, text: String)?).self) { group in
+            await withTaskGroup(of: (Int, LookupReadPage?).self) { group in
                 for index in thin {
-                    group.addTask { @MainActor in (index, await reader.readInPage(urls[index])) }
+                    group.addTask { @MainActor in (index, await reader.readInPage(urls[index], booking: venues.contains(index))) }
                 }
                 for await (index, page) in group { pages[index] = page }
             }
         }
+        let folder = LookupStore.folder(for: record.id, in: support)
         for index in record.sources.indices {
             let byFetch = fetched[index]?.text ?? ""
             let byPage = pages[index]?.text ?? ""
@@ -190,8 +269,55 @@ struct LookupPipeline {
             } else {
                 record.sources[index].text = record.sources[index].hit.title + ". " + record.sources[index].hit.snippet
             }
+            guard venues.contains(index) else { continue }
+            // A venue's card is named by its page's own heading, else by what was searched for.
+            let source = record.sources[index]
+            let searched = searches.indices.contains(source.search) ? searches[source.search] : source.title
+            let heading = pages[index]?.heading.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            record.sources[index].name = String((heading.isEmpty || !source.wasRead ? searched : heading).prefix(Self.maxTitle))
+            guard source.wasRead, let page = pages[index] else { continue }
+            record.sources[index].times = LookupTimes.times(inLabels: page.labels)
+            if let shot = page.shot {
+                let name = "shot\(index + 1).jpg"
+                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                if (try? shot.write(to: folder.appendingPathComponent(name))) != nil { record.sources[index].shotFile = name }
+            }
         }
         return images
+    }
+
+    // MARK: - Places
+
+    /// One line about each place that was read, from its own page. A line holding a figure the
+    /// page does not, or saying what the page left out, is dropped.
+    private func describePlaces(_ record: inout LookupRecord) async {
+        let model = model
+        let log = log
+        func about(_ source: LookupSource) async -> String {
+            guard source.wasRead else { return "" }
+            do {
+                let line = try await model.about(source.text, title: source.title).trimmingCharacters(in: .whitespacesAndNewlines)
+                let known = Set(LookupVerify.figures(in: source.text))
+                guard LookupVerify.figures(in: line).allSatisfy(known.contains), !LookupVerify.admitsGap(line) else { return "" }
+                return String(line.prefix(Self.maxAbout))
+            } catch {
+                if !(error is CancellationError) { log("about failed: \(Self.describe(error))") }
+                return ""
+            }
+        }
+        if notesTogether {
+            let sources = record.sources
+            await withTaskGroup(of: (Int, String).self) { group in
+                for (index, source) in sources.enumerated() {
+                    group.addTask { (index, await about(source)) }
+                }
+                for await (index, line) in group { record.sources[index].about = line }
+            }
+        } else {
+            for index in record.sources.indices where !Task.isCancelled {
+                record.sources[index].about = await about(record.sources[index])
+            }
+        }
     }
 
     // MARK: - Notes

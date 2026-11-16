@@ -7,7 +7,7 @@
 //  Hostile text from the web must come out inert.
 //
 //    L=Packages/NookWeb/Sources/NookWeb/Lookup
-//    swiftc $L/LookupModels.swift $L/LookupPageRenderer.swift $L/LookupStore.swift \
+//    swiftc $L/LookupModels.swift $L/LookupTimes.swift $L/LookupPageRenderer.swift $L/LookupStore.swift \
 //           Packages/NookWeb/Checks/LookupPageCheck.swift -o /tmp/lookup-page && /tmp/lookup-page
 //
 
@@ -112,6 +112,45 @@ struct LookupPageCheck {
             precondition(!html.contains("Pages Read") && !html.contains("Nothing came back") && !html.contains("Built in 1956"))
         }
 
+        // MARK: a booking: each place's page, the times read off it, and its own address opened on the party and day
+        record.outcome = .done
+        record.answer = nil
+        record.booking = BookingDetails(people: 2, date: "2026-11-16", time: "19:00")
+        var lilia = source("https://resy.com/cities/new-york-ny/venues/lilia", title: "Book Lilia")
+        lilia.prefilledURL = URL(string: "https://resy.com/cities/new-york-ny/venues/lilia?seats=2&date=2026-11-16")
+        lilia.name = "Lilia"
+        lilia.about = "Italian in Williamsburg " + evil
+        lilia.times = ["5:00 PM", "9:15 PM"]
+        lilia.shotFile = "shot1.jpg"
+        var kings = source("https://resy.com/cities/new-york-ny/venues/kings", title: "Book Kings")
+        kings.prefilledURL = URL(string: "https://resy.com/cities/new-york-ny/venues/kings?seats=2&date=2026-11-16")
+        kings.name = "Kings Co Imperial " + evil
+        kings.times = ["6:30 PM", "7:00 PM"]
+        var down = source("https://resy.com/cities/new-york-ny/venues/llama", title: "Book Llama", read: false)
+        down.prefilledURL = down.hit.url
+        down.name = "llama inn"
+        var plain = source("https://llama.example/p", title: "Llama Inn Blog")
+        plain.about = "Peruvian cooking."
+        record.sources = [lilia, kings, down, plain]
+        html = LookupPageRenderer.html(record)
+        precondition(html.contains("Lilia has no 7:00 PM. Open times: 5:00 PM, 9:15 PM.") && html.contains("has 7:00 PM.") && html.contains("Kings Co Imperial &lt;script&gt;"))
+        precondition(html.contains("href=\"https://resy.com/cities/new-york-ny/venues/lilia?seats=2&amp;date=2026-11-16\"") && html.contains("Open on resy.com"))
+        precondition(html.contains("llama inn") && html.contains("This site would not load in the background."))
+        precondition(html.contains("Llama Inn Blog") && html.contains("Peruvian cooking.") && html.contains("Open on llama.example") && html.contains("Pages Read"))
+        precondition(!html.contains("<script") && attributes("src", in: html) == ["shot1.jpg"])
+        precondition(attributes("href", in: html).allSatisfy { $0.hasPrefix("https://") || $0.hasPrefix("#do/") })
+        precondition(!html.contains("Nothing came back"), "a booking page with no written answer is still a page")
+        // the one thing Nook offers to press: the asked time, on the card whose page has it
+        precondition(attributes("href", in: html).filter { $0.hasPrefix("#") } == ["#do/2"] && html.contains(">Pick 7:00 PM for Me</a>"))
+        record.sources[1].wasRead = false
+        precondition(!LookupPageRenderer.html(record).contains("#do/"), "a page that was not read offers nothing to press")
+        record.sources[1].wasRead = true
+        // no time asked: nothing is said about times
+        record.booking = BookingDetails(people: 2)
+        html = LookupPageRenderer.html(record)
+        precondition(!html.contains("has no ") && !html.contains(" has 7:00") && html.contains("Open on resy.com"))
+        precondition(!html.contains("#do/") && !html.contains("for Me"))
+
         // MARK: the folder
         let support = FileManager.default.temporaryDirectory.appendingPathComponent("lookup-check-\(UUID().uuidString)").standardizedFileURL
         defer { try? FileManager.default.removeItem(at: support) }
@@ -132,6 +171,26 @@ struct LookupPageCheck {
             root.appendingPathComponent(record.id.uuidString).appendingPathComponent("sub/page.html"),
         ] {
             precondition(LookupStore.lookupID(ofPage: stranger, in: support) == nil, stranger.path)
+        }
+
+        // the card button's address is its own page with a card number after the "#", and means
+        // that card only from that page: a file that does not exist is never asked about by WebKit
+        func button(_ fragment: String, on page: URL) -> URL { URL(string: page.absoluteString + "#" + fragment)! }
+        precondition(LookupStore.action(of: button("do/2", on: page), fromPage: page, in: support) == 2)
+        precondition(LookupStore.action(of: URL(string: "#do/2", relativeTo: page)!.absoluteURL, fromPage: page, in: support) == 2)
+        let folder = LookupStore.folder(for: record.id, in: support)
+        let otherPage = LookupStore.pageURL(for: UUID(), in: support)
+        for (target, from) in [
+            (button("do/0", on: page), page), (button("do/x", on: page), page), (button("do/2/3", on: page), page),
+            (button("do", on: page), page), (button("2", on: page), page), (button("do/999", on: page), page),
+            (button("do/02", on: page), page), (button("", on: page), page), (page, page),
+            (button("do/2", on: otherPage), page), (button("do/2", on: page), otherPage),
+            (button("do/2", on: page), URL(string: "https://example.com/page.html")!),
+            (URL(string: "https://example.com/page.html#do/2")!, page),
+            (button("do/2", on: folder.appendingPathComponent("record.json")), page),
+            (folder.appendingPathComponent("do/2"), page),
+        ] {
+            precondition(LookupStore.action(of: target, fromPage: from, in: support) == nil, target.absoluteString)
         }
 
         precondition(LookupStore.hasLookups(in: support) && !LookupStore.hasLookups(in: support.appendingPathComponent("missing")))

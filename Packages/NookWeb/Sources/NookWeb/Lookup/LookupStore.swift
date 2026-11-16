@@ -37,6 +37,18 @@ public enum LookupStore {
         return UUID(uuidString: folder.lastPathComponent)
     }
 
+    private static let maxCards = 20
+
+    /// The card a `#do/<n>` address names, counted from 1, and only when that address is `page`,
+    /// a lookup's own page. A fragment: WebKit never asks about a file that does not exist.
+    public static func action(of url: URL, fromPage page: URL, in support: URL) -> Int? {
+        guard let id = lookupID(ofPage: page, in: support), lookupID(ofPage: url, in: support) == id,
+              let fragment = url.fragment, fragment.hasPrefix("do/") else { return nil }
+        let number = fragment.dropFirst(3)
+        guard let card = Int(number), String(card) == number, (1...maxCards).contains(card) else { return nil }
+        return card
+    }
+
     /// Saves the record, then the page rendered from it.
     public static func write(_ record: LookupRecord, in support: URL) throws {
         let folder = folder(for: record.id, in: support)

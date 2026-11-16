@@ -26,7 +26,9 @@ public enum LookupPageRenderer {
         case .failed:
             body = heading(record.request) + (notesBody(record) ?? nothing(record))
         case .done:
-            if let answer = record.answer, !answer.isEmpty {
+            if record.sources.contains(where: { $0.prefilledURL != nil }) {
+                body = heading(record.request) + placesBody(record)
+            } else if let answer = record.answer, !answer.isEmpty {
                 if !answerTitle.isEmpty { title = answerTitle }
                 body = "<p class=\"ask\">\(escaped(record.request))</p>" + answerBody(answer, title: title, record)
             } else {
@@ -71,6 +73,34 @@ public enum LookupPageRenderer {
         } ?? ""
         return "<article class=\"card\">\(source.flatMap { image($0.imageFile) } ?? "")<div><h3>\(escaped(option.name))</h3>"
             + "<p>\(escaped(option.detail))</p>\(open)</div></article>"
+    }
+
+    /// A booking: one card a place. Nothing here was written across pages.
+    private static func placesBody(_ record: LookupRecord) -> String {
+        "<div class=\"cards\">" + record.sources.enumerated().map { place($1, number: $0 + 1, record) }.joined() + "</div>" + sources(record)
+    }
+
+    /// A place's card: its booking page's picture, a line about it, what it offers at the asked time
+    /// and its address set to the party and day. `#do/<number>` asks Nook to press that time.
+    private static func place(_ source: LookupSource, number: Int, _ record: LookupRecord) -> String {
+        let target = source.prefilledURL ?? source.hit.url
+        let href = link(target)
+        let name = String((source.name.isEmpty ? (source.title.isEmpty ? source.hit.title : source.title) : source.name).prefix(maxTitle))
+        let shot = image(source.shotFile, class: "shot").map { picture in href.map { "<a href=\"\($0)\">\(picture)</a>" } ?? picture } ?? ""
+        let about = source.about.isEmpty ? "" : "<p>\(escaped(source.about))</p>"
+        let times: String
+        if source.prefilledURL != nil, !source.wasRead {
+            times = "<p>This site would not load in the background.</p>"
+        } else {
+            times = LookupTimes.line(place: name, asked: record.booking?.time, times: source.times).map { "<p class=\"times\">\(escaped($0))</p>" } ?? ""
+        }
+        let open = href.map { "<a class=\"open\" href=\"\($0)\">Open on \(escaped(host(target)))</a>" } ?? ""
+        var pick = ""
+        if source.prefilledURL != nil, source.wasRead, let asked = record.booking?.time, LookupTimes.offers(asked, in: source.times),
+           let shown = LookupTimes.display(asked) {
+            pick = "<a class=\"open pick\" href=\"#do/\(number)\">Pick \(escaped(shown)) for Me</a>"
+        }
+        return "<article class=\"card place\">\(shot)<div><h3>\(escaped(name))</h3>\(about)\(times)\(pick)\(open)</div></article>"
     }
 
     private static func sources(_ record: LookupRecord) -> String {
@@ -171,10 +201,13 @@ public enum LookupPageRenderer {
         .cite{font-size:11px;color:var(--dim);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:0 5px;vertical-align:2px}
         .cards{display:grid;gap:14px}
         .card{display:grid;grid-template-columns:200px 1fr;gap:18px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
-        .card:not(:has(img)){grid-template-columns:1fr}
+        .card:not(:has(img)),.card.place{grid-template-columns:1fr}
+        .card .shot{width:100%;height:auto;border:1px solid var(--line)}
+        .times{font-weight:600}
         .card img{width:200px;height:140px;object-fit:cover;border-radius:10px}
         .card h3{margin:2px 0 6px}.card p{margin:0 0 12px}
         .open{display:inline-block;text-decoration:none;font-weight:600;font-size:14px}
+        .pick{margin-right:18px}
         .sources{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px 14px 10px;margin:32px 0 0}
         .sources h2{font-size:12px;color:var(--dim);font-weight:500;margin:10px 0 4px}
         .row{display:flex;gap:12px;align-items:center;padding:8px 0;color:inherit;text-decoration:none;border-top:1px solid var(--line)}

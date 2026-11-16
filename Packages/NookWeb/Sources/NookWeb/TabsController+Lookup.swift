@@ -46,6 +46,16 @@ extension TabsController {
         return session
     }
 
+    /// Marks a tab as one Look It Up opened to act on (`PageSession.guardsCommits`), for the run.
+    public func markGuarded(_ itemID: UUID) {
+        guardedItems.insert(itemID)
+    }
+
+    /// A tab opened from a guarded tab is guarded too, so a new tab is no way around the line.
+    func inheritGuard(_ itemID: UUID, from opener: UUID?) {
+        if let opener, guardedItems.contains(opener) { guardedItems.insert(itemID) }
+    }
+
     // MARK: - Reader Rules
 
     private static var compiledReaderRules: WKContentRuleList?
@@ -72,23 +82,43 @@ extension TabsController {
 extension PageSession {
     private static let maxReadCharacters = 200_000
 
-    /// The page's visible text, line breaks kept. Read in an isolated world, so the page cannot
-    /// stand in for `innerText`. A page too busy to answer within `seconds` reads as nothing.
+    /// True on a tab Look It Up opened to press a time, or one opened from it: the chat's tools
+    /// leave any control there that signs in, pays or confirms to the person (`GuardedTools`).
+    public var guardsCommits: Bool { controller?.guardedItems.contains(itemID) == true }
+
+    /// The page's visible text, line breaks kept. A page too busy to answer within `seconds`
+    /// reads as nothing.
     public func readText(within seconds: Double = 3) async -> String {
-        guard let webView else { return "" }
         let script = "document.body ? document.body.innerText.slice(0, \(Self.maxReadCharacters)) : ''"
-        let text: String = await withCheckedContinuation { continuation in
+        return LookupText.tidy(innerText: await answer(to: script, within: seconds) as? String ?? "")
+    }
+
+    /// Returns when the load under way ends, well or badly, or after `seconds`.
+    /// ponytail: checks the load state every 150 ms, only while Look It Up waits on a page; an
+    /// observation of `loadingState` would do it without the loop.
+    public func finishedLoading(within seconds: Double) async {
+        let deadline = ContinuousClock.now + .seconds(seconds)
+        while ContinuousClock.now < deadline, !Task.isCancelled {
+            switch loadingState {
+            case .didFinish, .didFail, .didFailProvisionalNavigation: return
+            default: try? await Task.sleep(for: .milliseconds(150))
+            }
+        }
+    }
+
+    /// What `script` returns, or nil once `seconds` have passed. Runs in an isolated world, so
+    /// the page cannot stand in for what the script reads.
+    func answer(to script: String, within seconds: Double) async -> Any? {
+        guard let webView else { return nil }
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Any?, Never>) in
             var answered = false
-            func answer(_ text: String) {
+            func answer(_ value: Any?) {
                 guard !answered else { return }
                 answered = true
-                continuation.resume(returning: text)
+                continuation.resume(returning: value)
             }
-            webView.evaluateJavaScript(script, in: nil, in: .defaultClient) { result in
-                answer((try? result.get()) as? String ?? "")
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { answer("") }
+            webView.evaluateJavaScript(script, in: nil, in: .defaultClient) { answer(try? $0.get()) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { answer(nil) }
         }
-        return LookupText.tidy(innerText: text)
     }
 }

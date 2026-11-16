@@ -46,6 +46,19 @@ enum BrowserTools {
         ]
     )
 
+    static let fillField = AIToolDefinition(
+        name: "fillField",
+        description: "Type text into a field on the page, found by its label, placeholder or name",
+        parameters: [
+            "type": "object",
+            "properties": [
+                "label": ["type": "string", "description": "The field's label, placeholder or name"],
+                "text": ["type": "string", "description": "The text to type into the field"]
+            ],
+            "required": ["label", "text"]
+        ]
+    )
+
     static let getInteractiveElements = AIToolDefinition(
         name: "getInteractiveElements",
         description: "Get all interactive elements on the page (buttons, links, inputs, selects) with their text, type, selector, and attributes. Essential before clicking — use this to see what you can interact with.",
@@ -154,7 +167,7 @@ enum BrowserTools {
     )
 
     static let allTools: [AIToolDefinition] = [
-        navigateToURL, readPageContent, clickElement,
+        navigateToURL, readPageContent, clickElement, fillField,
         getInteractiveElements,
         extractStructuredData, summarizePage, searchInPage,
         getTabList, switchTab, createTab, getSelectedText,

@@ -57,7 +57,7 @@ class AIService {
 
     /// Mutating tools that always require explicit user approval in `.askBeforeExecuting` mode
     private static let mutatingTools: Set<String> = [
-        "executeJavaScript", "navigateToURL", "clickElement", "createTab", "switchTab"
+        "executeJavaScript", "navigateToURL", "clickElement", "fillField", "createTab", "switchTab"
     ]
 
     /// Size of the scrolling argument view in the approval dialog

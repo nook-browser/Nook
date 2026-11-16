@@ -8,8 +8,8 @@
 //  person stops it.
 //
 //    L=Packages/NookWeb/Sources/NookWeb/Lookup; M=Nook/Managers/LookupManager
-//    swiftc $L/LookupModels.swift $L/LookupText.swift $L/LookupSearch.swift $L/LookupVerify.swift \
-//           $L/LookupPageRenderer.swift $L/LookupStore.swift $M/LookupModel.swift $M/LookupPipeline.swift \
+//    swiftc $L/LookupModels.swift $L/LookupText.swift $L/LookupSearch.swift $L/LookupVerify.swift $L/LookupTimes.swift \
+//           $L/BookingSites.swift $L/LookupPageRenderer.swift $L/LookupStore.swift $M/LookupModel.swift $M/LookupPipeline.swift \
 //           scripts/tests/LookupPipelineCheck.swift -o /tmp/lookup-pipeline && /tmp/lookup-pipeline
 //
 
@@ -54,15 +54,27 @@ final class StubModel: LookupModel, @unchecked Sendable {
             : LookupAnswer(title: "The Options", intro: "Two.", options: [LookupOption(name: "One", detail: "Opened in 1956.", source: 1)])
     }
 
-    func booking(in request: String, today: Date) async throws -> BookingDetails { throw Refused() }
-    func about(_ text: String, title: String) async throws -> String { throw Refused() }
+    var bookingReply: BookingDetails?
+
+    func booking(in request: String, today: Date) async throws -> BookingDetails {
+        calls.append("booking")
+        guard let bookingReply else { throw Refused() }
+        return bookingReply
+    }
+
+    var aboutReply = "A fine place rated 4.7 by many."
+
+    func about(_ text: String, title: String) async throws -> String {
+        calls.append("about")
+        return aboutReply
+    }
 }
 
 @MainActor
 final class StubReader: LookupReading {
     var hits: [String: [LookupHit]] = [:]
     var fetched: [URL: (title: String?, image: URL?, text: String)] = [:]
-    var pages: [URL: (title: String, text: String)] = [:]
+    var pages: [URL: LookupReadPage] = [:]
     var files: [URL: Data] = [:]
     var log: [String] = []
     var ended = 0
@@ -83,8 +95,8 @@ final class StubReader: LookupReading {
         return fetched[url]
     }
 
-    func readInPage(_ url: URL) async -> (title: String, text: String)? {
-        log.append("page \(url.host ?? "")")
+    func readInPage(_ url: URL, booking: Bool) async -> LookupReadPage? {
+        log.append("page \(url.host ?? "")\(booking ? " booking \(url.query ?? "")" : "")")
         return pages[url]
     }
 
@@ -116,7 +128,7 @@ struct LookupPipelineCheck {
             reader.hits["when did it open"] = [hit("a.com", "Alpha"), hit("b.com", "Beta"), hit("c.com", "Gamma"), hit("d.com", "Delta")]
             reader.fetched[url("a.com")] = ("Alpha Page", URL(string: "https://a.com/photo.jpg"), long)
             reader.fetched[url("b.com")] = ("Beta", URL(string: "https://b.com/huge.png"), "thin")
-            reader.pages[url("b.com")] = ("Beta Page", long)
+            reader.pages[url("b.com")] = LookupReadPage(title: "Beta Page", text: long)
             reader.files[URL(string: "https://a.com/photo.jpg")!] = Data(repeating: 1, count: 10)
             reader.files[URL(string: "https://b.com/huge.png")!] = Data(repeating: 1, count: 3_000_001)
             return (StubModel(), reader)
@@ -195,8 +207,10 @@ struct LookupPipelineCheck {
         // MARK: an act request is written as choices
         (model, reader) = world()
         model.plan = LookupPlan(searches: ["q", "q", " "], kind: .act)
+        reader.hits["q"] = reader.hits["when did it open"]
         record = await run(model, reader, stages: &stages)
-        precondition(model.answerKinds == [.choose] && record.answer?.options.count == 1 && record.plan?.searches == ["when did it open"])
+        precondition(model.answerKinds == [.choose] && record.answer?.options.count == 1)
+        precondition(record.plan?.searches == ["q"], "something to get done is searched in the model's words")
 
         // MARK: a listed request runs the model's searches, each once
         (model, reader) = world()
@@ -243,6 +257,108 @@ struct LookupPipelineCheck {
             .run(LookupRecord(request: "when did it open")) { _ in }
         precondition(record.outcome == .done && Date().timeIntervalSince(waited) < 5)
         precondition(record.sources[0].imageFile == "photo1.jpg" && record.sources[1].imageFile == nil, "what arrived in time is kept")
+
+        // MARK: a booking: each place's own page, opened on the party and the day
+        (model, reader) = world()
+        let sunday = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 15, hour: 12))!
+        model.plan = LookupPlan(searches: ["lilia", "kings", "llama"], kind: .act)
+        model.bookingReply = BookingDetails(people: 2, date: "2026-11-19", time: "19:00")
+        func resy(_ slug: String) -> URL { URL(string: "https://resy.com/cities/new-york-ny/venues/\(slug)")! }
+        func set(_ slug: String) -> URL { URL(string: resy(slug).absoluteString + "?seats=2&date=2026-11-16")! }
+        reader.hits["lilia"] = [hit("blog.example", "How to Get In"), LookupHit(url: resy("lilia"), title: "Book Lilia", snippet: "")]
+        reader.hits["kings"] = [LookupHit(url: resy("kings-co-imperial"), title: "Book Kings", snippet: ""), hit("other.example", "Other")]
+        reader.hits["llama"] = [hit("llama.example", "Llama Inn"), hit("more.example", "More")]
+        reader.hits["llama resy"] = [LookupHit(url: resy("lilia"), title: "Book Lilia", snippet: ""), hit("more.example", "More")]
+        reader.pages[set("lilia")] = LookupReadPage(title: "Book Your Lilia Reservation", text: "Rated 4.7. " + long, labels: ["button 2 Guests", "button 5:00 PM Bar", "button 9:15 PM Bar"],
+                                                    heading: "Lilia", shot: Data(repeating: 7, count: 20))
+        reader.fetched[URL(string: "https://llama.example/p")!] = ("Llama Inn", nil, "Rated 4.7. " + long)
+        record = await LookupPipeline(model: model, reader: reader, support: support, notesTogether: false, today: sunday)
+            .run(LookupRecord(request: "table for 2 tomorrow at 7pm at lilia, kings co imperial or llama inn")) { _ in }
+        precondition(record.outcome == .done && record.answer == nil)
+        precondition(record.booking == BookingDetails(people: 2, date: "2026-11-16", time: "19:00"), "tomorrow is settled in code: \(String(describing: record.booking))")
+        precondition(record.sources.map { $0.hit.url.host } == ["resy.com", "resy.com", "llama.example"], "one page a place, its booking page first")
+        precondition(!reader.log.contains("fetch resy.com") && reader.log.contains("page resy.com booking seats=2&date=2026-11-16"))
+        precondition(record.sources[0].prefilledURL == set("lilia") && record.sources[0].times == ["5:00 PM", "9:15 PM"] && record.sources[0].name == "Lilia")
+        precondition(record.sources[0].shotFile == "shot1.jpg" && record.sources[0].about == "A fine place rated 4.7 by many.")
+        precondition(FileManager.default.fileExists(atPath: LookupStore.folder(for: record.id, in: support).appendingPathComponent("shot1.jpg").path))
+        // a venue page that would not load keeps its card and says nothing about times
+        precondition(record.sources[1].prefilledURL == set("kings-co-imperial") && !record.sources[1].wasRead && record.sources[1].times.isEmpty && record.sources[1].name == "kings")
+        // a place whose search held no booking page gets one more, aimed at the booking site;
+        // a page it brings back for some other place is not taken
+        precondition(reader.log.filter { $0.hasPrefix("search ") } == ["search lilia", "search kings", "search llama", "search llama resy"])
+        // a place with no booking page is an ordinary card
+        precondition(record.sources[2].prefilledURL == nil && record.sources[2].wasRead && record.sources[2].about.contains("4.7"))
+        precondition(!model.calls.contains("notes") && !model.calls.contains("answer") && model.calls.filter { $0 == "about" }.count == 2)
+        let booked = (try? String(contentsOf: LookupStore.pageURL(for: record.id, in: support), encoding: .utf8)) ?? ""
+        precondition(booked.contains("Lilia has no 7:00 PM. Open times: 5:00 PM, 9:15 PM.") && booked.contains("Open on resy.com"))
+        precondition(booked.contains("seats=2&amp;date=2026-11-16") && booked.contains("This site would not load in the background.") && booked.contains("shot1.jpg"))
+
+        // a line about a place whose figure its page does not hold is dropped
+        (model, reader) = world()
+        model.plan = LookupPlan(searches: ["lilia"], kind: .act)
+        model.bookingReply = BookingDetails(people: 2)
+        reader.hits["lilia"] = [LookupHit(url: resy("lilia"), title: "Book Lilia", snippet: "")]
+        reader.pages[URL(string: resy("lilia").absoluteString + "?seats=2")!] = LookupReadPage(title: "Lilia", text: long, labels: ["button 7:00 PM Bar"], heading: "Lilia")
+        record = await LookupPipeline(model: model, reader: reader, support: support, notesTogether: false, today: sunday)
+            .run(LookupRecord(request: "book a table for 2 at lilia some evening this month if they have room")) { _ in }
+        precondition(record.sources.count == 1 && record.sources[0].about.isEmpty && record.sources[0].times == ["7:00 PM"])
+        precondition(record.booking == BookingDetails(people: 2))
+
+        // nor is a line that says what the page left out
+        model.calls = []
+        model.aboutReply = "Lilia is a restaurant with a rating not specified and price level not specified."
+        record = await LookupPipeline(model: model, reader: reader, support: support, notesTogether: false, today: sunday)
+            .run(LookupRecord(request: "book a table for 2 at lilia some evening this month if they have room")) { _ in }
+        precondition(model.calls.contains("about") && record.sources[0].about.isEmpty && record.sources[0].times == ["7:00 PM"])
+
+        // the place's own page, found by the second search, is its card
+        (model, reader) = world()
+        model.plan = LookupPlan(searches: ["momofuku noodle bar nyc"], kind: .act)
+        model.bookingReply = BookingDetails(people: 2)
+        reader.hits["momofuku noodle bar nyc"] = [hit("momofuku.example", "Momofuku")]
+        reader.hits["momofuku noodle bar nyc resy"] = [
+            LookupHit(url: resy("momofuku-ko"), title: "Book Ko", snippet: ""), hit("momofuku.example", "Momofuku"),
+            LookupHit(url: resy("momofuku-noodle-bar"), title: "Book Noodle Bar", snippet: ""),
+        ]
+        record = await LookupPipeline(model: model, reader: reader, support: support, notesTogether: false, today: sunday)
+            .run(LookupRecord(request: "book a table for 2 at momofuku noodle bar some evening this month if they have room")) { _ in }
+        precondition(record.sources.count == 1 && record.sources[0].prefilledURL == URL(string: resy("momofuku-noodle-bar").absoluteString + "?seats=2"))
+
+        // a venue page the search brought back for some other place is no card of this one
+        (model, reader) = world()
+        model.plan = LookupPlan(searches: ["lilia brooklyn"], kind: .act)
+        model.bookingReply = BookingDetails(people: 2)
+        reader.hits["lilia brooklyn"] = [hit("review.example", "Review"), LookupHit(url: resy("misi"), title: "Book Misi", snippet: ""),
+                                         LookupHit(url: resy("lilia"), title: "Book Lilia", snippet: "")]
+        reader.pages[URL(string: resy("lilia").absoluteString + "?seats=2")!] = LookupReadPage(title: "Lilia", text: long, labels: ["button 7:00 PM Bar"], heading: "Lilia")
+        record = await LookupPipeline(model: model, reader: reader, support: support, notesTogether: false, today: sunday)
+            .run(LookupRecord(request: "book a table for 2 at lilia some evening this month if they have room")) { _ in }
+        precondition(record.sources.filter { $0.prefilledURL != nil }.map(\.hit.url) == [resy("lilia")], "\(record.sources.map(\.hit.url))")
+        precondition(!reader.log.contains { $0.hasSuffix(" resy") }, "its page was in the first results")
+
+        // four searches at most, the second kind included; and none of that kind for tickets
+        (model, reader) = world()
+        model.plan = LookupPlan(searches: ["aa", "bb", "cc"], kind: .act)
+        model.bookingReply = BookingDetails(people: 2)
+        for search in ["aa", "bb", "cc"] { reader.hits[search] = [hit("\(search).example", search)] }
+        record = await LookupPipeline(model: model, reader: reader, support: support, notesTogether: false, today: sunday)
+            .run(LookupRecord(request: "a table for 2 at aa, bb or cc")) { _ in }
+        precondition(reader.log.filter { $0.hasPrefix("search ") } == ["search aa", "search bb", "search cc", "search aa resy"], "\(reader.log)")
+        (model, reader) = world()
+        model.plan = LookupPlan(searches: ["lion king tickets"], kind: .act)
+        model.bookingReply = BookingDetails(people: 2, date: "2026-11-21")
+        reader.hits["lion king tickets"] = reader.hits["when did it open"]
+        record = await LookupPipeline(model: model, reader: reader, support: support, notesTogether: false, today: sunday)
+            .run(LookupRecord(request: "buy 2 tickets for the lion king next saturday")) { _ in }
+        precondition(reader.log.filter { $0.hasPrefix("search ") } == ["search lion king tickets"], "\(reader.log)")
+
+        // details but no booking page in the results: laid out as choices, like any other act request
+        (model, reader) = world()
+        model.plan = LookupPlan(searches: ["x"], kind: .act)
+        model.bookingReply = BookingDetails(people: 2, date: "2026-11-16")
+        reader.hits["x"] = reader.hits["when did it open"]
+        record = await run(model, reader, stages: &stages)
+        precondition(record.outcome == .done && model.answerKinds == [.choose] && record.sources.allSatisfy { $0.prefilledURL == nil })
 
         // MARK: stopped mid-read
         (model, reader) = world()

@@ -23,6 +23,7 @@ final class LookupReader {
     /// After the load, for a page that draws its text in script.
     private static let settleSeconds = 2.0
     private static let pageSize = NSSize(width: 1100, height: 1500)
+    private static let shotWidth: CGFloat = 900
     fileprivate nonisolated static let maxHTMLBytes = 1_500_000
 
     private let tabs: TabsController
@@ -67,9 +68,9 @@ final class LookupReader {
 
     // MARK: - Reader Pages
 
-    /// Loads `url` in a reader page and returns what it shows, ending the page once read. At most
-    /// three are open at a time; a fourth call waits its turn.
-    func readInPage(_ url: URL) async -> (title: String, text: String)? {
+    /// Loads `url` in a reader page and returns what it shows, ending the page once read. Three at
+    /// most are open; a fourth call waits. `booking` adds the page's controls, heading and picture.
+    func readInPage(_ url: URL, booking: Bool) async -> LookupReadPage? {
         guard await Self.mayLoad(url) else { return nil }
         let rules = await TabsController.readerRules()
         if rules == nil { Self.log.error("Reader rules did not compile; reader pages run on the gate alone") }
@@ -84,11 +85,18 @@ final class LookupReader {
         // Sized once, before it enters the window (see CLAUDE.md on resizing off-window views).
         view.frame = NSRect(origin: .zero, size: Self.pageSize)
         host.addSubview(view)
-        await finishedLoading(session)
+        await session.finishedLoading(within: Self.loadSeconds)
         try? await Task.sleep(for: .seconds(Self.settleSeconds))
         guard !ended, !Task.isCancelled else { return nil }
         let text = await session.readText()
-        return text.isEmpty ? nil : (session.title, text)
+        guard !text.isEmpty else { return nil }
+        var page = LookupReadPage(title: session.title, text: text)
+        if booking {
+            page.labels = await session.readControlLabels()
+            page.heading = await session.readHeading()
+            page.shot = await session.snapshotJPEG(width: Self.shotWidth)
+        }
+        return page
     }
 
     /// Ends every reader page, and makes any call still waiting return nothing.
@@ -129,18 +137,6 @@ final class LookupReader {
         return await LinkPreviewService.mayReach(url)
     }
 
-    // ponytail: checks the load state every 150 ms for at most 12 s while a lookup runs; an
-    // observation of `loadingState` would do it without the loop.
-    private func finishedLoading(_ session: PageSession) async {
-        let deadline = ContinuousClock.now + .seconds(Self.loadSeconds)
-        while ContinuousClock.now < deadline, !ended, !Task.isCancelled {
-            switch session.loadingState {
-            case .didFinish, .didFail, .didFailProvisionalNavigation: return
-            default: try? await Task.sleep(for: .milliseconds(150))
-            }
-        }
-    }
-
     private func takeSlot() async {
         if active < Self.maxOpen {
             active += 1
@@ -163,8 +159,17 @@ final class LookupReader {
 extension LookupReader: LookupReading {
     private static let maxIconBytes = 200_000
 
+    /// When any lookup last asked the results page. Two requests are kept a second apart: the
+    /// endpoint answers a burst by refusing the whole address for half an hour.
+    private static var lastSearch = ContinuousClock.now - searchSpacing
+    private static let searchSpacing: Duration = .seconds(1)
+
     /// One request to the results page; nothing comes back when it refuses.
     func search(_ query: String) async -> [LookupHit] {
+        let wait = Self.searchSpacing - (ContinuousClock.now - Self.lastSearch)
+        Self.lastSearch = ContinuousClock.now + max(wait, .zero)
+        if wait > .zero { try? await Task.sleep(for: wait) }
+        if Task.isCancelled { return [] }
         guard let (data, _) = await Self.within(Self.fetchSeconds, {
             await LinkPreviewService.gatedData(
                 LookupSearch.url(for: query), accept: "text/html", userAgent: PlatformUserAgent.custom, limit: Self.maxHTMLBytes)
