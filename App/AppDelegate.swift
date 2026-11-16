@@ -74,7 +74,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
                 window.setContentSize(NSSize(width: 1200, height: 720))
                 window.center()
                 NSApp.activate(ignoringOtherApps: true)
-                NSApp.hideOtherApplications(nil)
             }
         }
     }
