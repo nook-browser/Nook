@@ -239,9 +239,13 @@ struct CommandPaletteView: View {
                                         }
                                         completionSuppressed = newValue.count < userTypedText.count
                                         userTypedText = newValue
-                                        searchManager.searchSuggestions(
-                                            for: newValue
-                                        )
+                                        if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && activeSiteSearch == nil {
+                                            searchManager.showOpenTabs()
+                                        } else {
+                                            searchManager.searchSuggestions(
+                                                for: newValue
+                                            )
+                                        }
                                         selectedSuggestionIndex = -1
                                     }
 
@@ -326,6 +330,9 @@ struct CommandPaletteView: View {
 
                 text = commandPalette.prefilledText
                 userTypedText = commandPalette.prefilledText
+                if commandPalette.prefilledText.isEmpty {
+                    searchManager.showOpenTabs()
+                }
 
                 DispatchQueue.main.async {
                     isSearchFocused = true
@@ -473,6 +480,9 @@ struct CommandPaletteView: View {
             selectSuggestion(suggestion)
         } else if let primary = primarySuggestion {
             selectSuggestion(primary)
+        } else if let first = visibleSuggestions.first {
+            // Nothing typed: the highlighted first row is an open tab.
+            selectSuggestion(first)
         }
     }
 
