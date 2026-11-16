@@ -5,8 +5,8 @@
 //
 //  The search step of Look It Up: the request URL, the rows read from the results page, and
 //  which rows get read. Foundation only, so `Checks/LookupSearchCheck.swift` can compile it.
-//  ponytail: DuckDuckGo's HTML endpoint, read by regular expression. It has no contract; when
-//  the markup changes this returns nothing and the tab offers an ordinary search.
+//  ponytail: DuckDuckGo's HTML endpoint, read by regular expression, then its ordinary page.
+//  Neither has a contract; when both change the tab offers an ordinary search.
 //
 
 import Foundation
@@ -29,11 +29,36 @@ public enum LookupSearch {
     private static let maxSnippet = 500
 
     public static func url(for query: String) -> URL {
-        var components = URLComponents(string: "https://html.duckduckgo.com/html/")!
-        components.queryItems = [URLQueryItem(name: "q", value: query)]
+        address("https://html.duckduckgo.com/html/", [URLQueryItem(name: "q", value: query)])
+    }
+
+    /// The same search as the page a person sees. A reader page loads it when the plain endpoint
+    /// has nothing: that endpoint refuses a whole address for a long while, and this page does not.
+    public static func pageURL(for query: String) -> URL {
+        address("https://duckduckgo.com/", [URLQueryItem(name: "q", value: query), URLQueryItem(name: "ia", value: "web")])
+    }
+
+    /// True while a page that loaded `pageURL(for:)` is still that results page.
+    public static func isResultsPage(_ url: URL?) -> Bool {
+        url?.scheme?.lowercased() == "https" && url?.host?.lowercased() == "duckduckgo.com"
+    }
+
+    private static func address(_ base: String, _ items: [URLQueryItem]) -> URL {
+        var components = URLComponents(string: base)!
+        components.queryItems = items
         // URLComponents leaves "+" as written, and a form endpoint reads it as a space.
         components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         return components.url!
+    }
+
+    /// The rows a reader page read off the results page (`PageSession.readSearchRows`): a line a
+    /// row, its address, title and snippet tab-separated.
+    public static func hits(inRows rows: String) -> [LookupHit] {
+        rows.split(separator: "\n").compactMap { row in
+            let fields = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            guard fields.count >= 2 else { return nil }
+            return hit(address: fields[0], title: fields[1], snippet: fields.count > 2 ? fields[2] : "")
+        }
     }
 
     /// A row worth reading: https, and not a link through the search engine itself, which is an ad.

@@ -93,6 +93,24 @@ extension PageSession {
         return LookupText.tidy(innerText: await answer(to: script, within: seconds) as? String ?? "")
     }
 
+    // One line a result: address, title, snippet, tab-separated. The selectors are DuckDuckGo's.
+    private static let searchRowsScript = """
+        (() => {
+          const clean = t => (t || '').replace(/\\s+/g, ' ').trim();
+          return [...document.querySelectorAll('article')].map(row => {
+            const link = row.querySelector('a[data-testid="result-title-a"]');
+            if (!link) return null;
+            const snippet = row.querySelector('[data-result="snippet"]');
+            return [link.href, clean(link.innerText).slice(0, 300), clean(snippet && snippet.innerText).slice(0, 500)].join('\\t');
+          }).filter(Boolean).slice(0, 30).join('\\n');
+        })()
+        """
+
+    /// The results the ordinary search page shows, for `LookupSearch.hits(inRows:)`.
+    public func readSearchRows(within seconds: Double = 3) async -> String {
+        await answer(to: Self.searchRowsScript, within: seconds) as? String ?? ""
+    }
+
     /// Returns when the load under way ends, well or badly, or after `seconds`.
     /// ponytail: checks the load state every 150 ms, only while Look It Up waits on a page; an
     /// observation of `loadingState` would do it without the loop.

@@ -68,9 +68,25 @@ final class LookupReader {
 
     // MARK: - Reader Pages
 
-    /// Loads `url` in a reader page and returns what it shows, ending the page once read. Three at
-    /// most are open; a fourth call waits. `booking` adds the page's controls, heading and picture.
+    /// Loads `url` in a reader page and returns what it shows, ending the page once read.
+    /// `booking` adds the page's controls, heading and picture.
     func readInPage(_ url: URL, booking: Bool) async -> LookupReadPage? {
+        await withReaderPage(url) { session in
+            let text = await session.readText()
+            guard !text.isEmpty else { return nil }
+            var page = LookupReadPage(title: session.title, text: text)
+            if booking {
+                page.labels = await session.readControlLabels()
+                page.heading = await session.readHeading()
+                page.shot = await session.snapshotJPEG(width: Self.shotWidth)
+            }
+            return page
+        }
+    }
+
+    /// Loads `url` in a reader page, lets it settle, and returns what `read` makes of it. Three
+    /// at most are open; a fourth call waits.
+    private func withReaderPage<T>(_ url: URL, _ read: (PageSession) async -> T?) async -> T? {
         guard await Self.mayLoad(url) else { return nil }
         let rules = await TabsController.readerRules()
         if rules == nil { Self.log.error("Reader rules did not compile; reader pages run on the gate alone") }
@@ -88,15 +104,7 @@ final class LookupReader {
         await session.finishedLoading(within: Self.loadSeconds)
         try? await Task.sleep(for: .seconds(Self.settleSeconds))
         guard !ended, !Task.isCancelled else { return nil }
-        let text = await session.readText()
-        guard !text.isEmpty else { return nil }
-        var page = LookupReadPage(title: session.title, text: text)
-        if booking {
-            page.labels = await session.readControlLabels()
-            page.heading = await session.readHeading()
-            page.shot = await session.snapshotJPEG(width: Self.shotWidth)
-        }
-        return page
+        return await read(session)
     }
 
     /// Ends every reader page, and makes any call still waiting return nothing.
@@ -164,19 +172,29 @@ extension LookupReader: LookupReading {
     private static var lastSearch = ContinuousClock.now - searchSpacing
     private static let searchSpacing: Duration = .seconds(1)
 
-    /// One request to the results page; nothing comes back when it refuses.
+    /// One search: the plain results endpoint, then the ordinary results page when that has nothing.
     func search(_ query: String) async -> [LookupHit] {
         let wait = Self.searchSpacing - (ContinuousClock.now - Self.lastSearch)
         Self.lastSearch = ContinuousClock.now + max(wait, .zero)
         if wait > .zero { try? await Task.sleep(for: wait) }
         if Task.isCancelled { return [] }
-        guard let (data, _) = await Self.within(Self.fetchSeconds, {
+        let fetched = await Self.within(Self.fetchSeconds) {
             await LinkPreviewService.gatedData(
                 LookupSearch.url(for: query), accept: "text/html", userAgent: PlatformUserAgent.custom, limit: Self.maxHTMLBytes)
-        }) else { return [] }
-        return await Task.detached {
-            LookupSearch.hits(inHTML: String(decoding: data, as: UTF8.self))
-        }.value
+        }
+        if let data = fetched?.0 {
+            let hits = await Task.detached { LookupSearch.hits(inHTML: String(decoding: data, as: UTF8.self)) }.value
+            if !hits.isEmpty { return hits }
+        }
+        if Task.isCancelled || ended { return [] }
+        // The plain endpoint refused or had nothing: the page a person would see, in a reader page.
+        // Only the results page's own rows: a "!bang" in the request sends this address elsewhere.
+        let rows = await withReaderPage(LookupSearch.pageURL(for: query)) { page in
+            LookupSearch.isResultsPage(page.webView?.url) ? await page.readSearchRows() : nil
+        } ?? ""
+        let hits = LookupSearch.hits(inRows: rows)
+        Self.log.info("Search fell back to the results page: \(hits.count) rows")
+        return hits
     }
 
     /// The icon Nook already has for the site, else the site's own `favicon.ico`.

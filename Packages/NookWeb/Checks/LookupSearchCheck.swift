@@ -78,5 +78,29 @@ struct LookupSearchCheck {
         precondition(LookupSearch.pick([first], limit: 6).map(\.hit.url.absoluteString) == ["https://a.com/1", "https://b.com/1", "https://c.com/1"], "one page a host within a search")
         precondition(LookupSearch.pick([first, first, first, first], limit: 6).filter { $0.search == 0 }.count == 1)
         precondition(LookupSearch.pick([], limit: 6).isEmpty)
+
+        // the ordinary results page, read in a reader page when the plain endpoint refuses
+        precondition(LookupSearch.pageURL(for: "c++ vs rust & go").absoluteString == "https://duckduckgo.com/?q=c%2B%2B%20vs%20rust%20%26%20go&ia=web")
+        let rows = [
+            "https://resy.com/cities/new-york-ny/venues/lilia\tBook Lilia\tItalian in Williamsburg",
+            "https://duckduckgo.com/y.js?ad=1\tAn ad\t",
+            "http://plain.example/\tNot https\tx",
+            "javascript:alert(1)\tx\ty",
+            "https://lilia.example/\tNo snippet",
+            "", "only one field",
+            "https://long.example/\t" + String(repeating: "t", count: 900) + "\ts",
+        ].joined(separator: "\n")
+        let read = LookupSearch.hits(inRows: rows)
+        precondition(read.map(\.url.absoluteString) == ["https://resy.com/cities/new-york-ny/venues/lilia", "https://lilia.example/", "https://long.example/"])
+        precondition(read[0].title == "Book Lilia" && read[0].snippet == "Italian in Williamsburg" && read[1].snippet.isEmpty)
+        precondition(read[2].title.count == 300, "a title is cut, whatever the page sent")
+        precondition(LookupSearch.hits(inRows: "").isEmpty)
+        // rows are read only off that page: a "!w" in the request sends its address to another site
+        precondition(LookupSearch.isResultsPage(LookupSearch.pageURL(for: "x")))
+        for elsewhere in ["https://en.wikipedia.org/wiki/Swift", "https://duckduckgo.com.evil.example/?q=x", "http://duckduckgo.com/?q=x",
+                          "https://evil.example/duckduckgo.com/?q=x", "https://html.duckduckgo.com/html/?q=x"] {
+            precondition(!LookupSearch.isResultsPage(URL(string: elsewhere)), elsewhere)
+        }
+        precondition(!LookupSearch.isResultsPage(nil))
     }
 }
