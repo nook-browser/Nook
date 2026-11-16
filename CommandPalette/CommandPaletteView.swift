@@ -47,7 +47,8 @@ struct CommandPaletteView: View {
         (NSApp.keyWindow?.firstResponder as? NSTextInputClient)?.hasMarkedText() ?? false
     }
 
-    /// The Return row first, then what the search found. Index -1 means the Return row.
+    /// Open tabs that match first, then the row for what was typed, then the rest. Index -1 is
+    /// the top row, which Return takes: a matching tab is switched to rather than opened again.
     private var visibleSuggestions: [SearchManager.SearchSuggestion] {
         var found = searchManager.suggestions
         if activeSiteSearch != nil {
@@ -63,7 +64,14 @@ struct CommandPaletteView: View {
             case .url, .search: return row.text.caseInsensitiveCompare(primary.text) != .orderedSame
             }
         }
-        return [primary] + rest.prefix(4)
+        let openTabs = rest.filter(\.isOpenTab)
+        let others = rest.filter { !$0.isOpenTab }
+        return Array((openTabs + [primary] + others).prefix(5))
+    }
+
+    /// Whether a matching open tab heads the list, so Return switches to it.
+    private var topIsOpenTab: Bool {
+        activeSiteSearch == nil && searchManager.suggestions.first?.isOpenTab == true
     }
 
     /// What Return does with what was typed: the completed host, the address, or a search.
@@ -478,10 +486,9 @@ struct CommandPaletteView: View {
         {
             let suggestion = visibleSuggestions[selectedSuggestionIndex]
             selectSuggestion(suggestion)
-        } else if let primary = primarySuggestion {
-            selectSuggestion(primary)
         } else if let first = visibleSuggestions.first {
-            // Nothing typed: the highlighted first row is an open tab.
+            // The highlighted top row: a matching open tab, what was typed, or with nothing
+            // typed the most recent tab.
             selectSuggestion(first)
         }
     }
@@ -581,7 +588,8 @@ struct CommandPaletteView: View {
 
     /// Host that what was typed completes to, while it still prefixes it.
     private var completionHost: String? {
-        guard activeSiteSearch == nil,
+        // No completion under a matching open tab: Return switches to the tab.
+        guard activeSiteSearch == nil, !topIsOpenTab,
               !completionSuppressed,
               !userTypedText.isEmpty,
               let host = searchManager.autofillHost,
@@ -610,5 +618,12 @@ struct CommandPaletteView: View {
 
     private var inlineCompletionSuffix: String? {
         autofillTarget.map { String($0.dropFirst(text.count)) }
+    }
+}
+
+private extension SearchManager.SearchSuggestion {
+    var isOpenTab: Bool {
+        if case .tab = type { return true }
+        return false
     }
 }

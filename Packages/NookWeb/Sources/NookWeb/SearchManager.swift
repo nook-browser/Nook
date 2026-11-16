@@ -127,7 +127,7 @@ public class SearchManager {
             self.autofillHost = host
         }
 
-        let tabs = Array(searchTabs(for: query).prefix(2))
+        let tabs = Array(searchTabs(for: query).prefix(3))
         // Paint what is already known for this keystroke, carrying each leg's last rows. The
         // palette puts its own row for the typed text above these.
         compose(tabs: tabs)
