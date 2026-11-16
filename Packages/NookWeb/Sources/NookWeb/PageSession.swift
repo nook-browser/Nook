@@ -48,6 +48,15 @@ public final class PageSession: NSObject, Identifiable {
     /// an extension's sign-in flow stops at its redirect address, which is never loaded.
     @ObservationIgnored public var navigationInterceptor: ((URL) -> Bool)?
     public var isDetached: Bool { detachedProfile != nil }
+    /// A background reader page for Look It Up: quiet in every way an agent page is, and it
+    /// opens no popup and starts no download.
+    @ObservationIgnored public internal(set) var isQuiet = false
+    /// Asked before a quiet page loads an http(s) address in any frame; false stops the load.
+    @ObservationIgnored var navigationGate: (@Sendable (URL) async -> Bool)?
+    /// The address the gate just passed, so its second trip through the policy check goes on.
+    @ObservationIgnored var gatePassedURL: URL?
+    /// Rules a reader page's view gets before it loads anything: nothing on this network.
+    @ObservationIgnored var readerRules: WKContentRuleList?
 
     // MARK: - Page State
 
@@ -398,6 +407,12 @@ public final class PageSession: NSObject, Identifiable {
         setupThemeColorObserver(for: webView)
         setupNavigationStateObservers(for: webView)
         configure(webView)
+        if isQuiet {
+            // Nobody sees or hears a reader page: no sound, no playback, no request to this network.
+            webView.isMuted = true
+            webView.setAllMediaPlaybackSuspended(true, completionHandler: nil)
+            if let readerRules { webView.configuration.userContentController.add(readerRules) }
+        }
 
         // Inform extensions before loading so content scripts and messaging can resolve this
         // page during early document phases.
@@ -831,6 +846,8 @@ public final class PageSession: NSObject, Identifiable {
     }
 
     func fetchAndSetFavicon(for url: URL) async {
+        // A reader page shows no icon, and this fetch would follow redirects past its gate.
+        if isQuiet { return }
         let defaultFavicon = SwiftUI.Image(systemName: "globe")
         guard url.scheme == "http" || url.scheme == "https", url.host != nil else {
             favicon = defaultFavicon

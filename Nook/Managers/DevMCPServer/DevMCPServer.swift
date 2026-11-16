@@ -402,6 +402,11 @@ final class DevMCPServer {
             parameters: ["type": "object", "properties": [:] as [String: Any]]
         ),
         AIToolDefinition(
+            name: "lookup",
+            description: "Look It Up, hands-off. With request: starts a lookup and waits up to 25 s for it; open: true also opens its tab in the Agent space. With id: the record of one started earlier. Returns the lookup's record; outcome is running until it ends.",
+            parameters: ["type": "object", "properties": ["request": ["type": "string"], "id": ["type": "string"], "open": ["type": "boolean"]]]
+        ),
+        AIToolDefinition(
             name: "pages",
             description: "Every live page in every window: url, WebContent pid, loaded, on screen, in a window, document.visibilityState.",
             parameters: ["type": "object", "properties": [:] as [String: Any]]
@@ -423,7 +428,7 @@ final class DevMCPServer {
     /// About the person's own page, so they act on the active window's tab, not the Agent space.
     private static let humanTools: Set<String> = ["pick", "selection"]
     /// Need no Agent page, so they neither create the Agent space nor load its tab.
-    private static let readOnlyTools: Set<String> = ["pages", "clear_page_cache", "check_urls", "getTabList"]
+    private static let readOnlyTools: Set<String> = ["pages", "clear_page_cache", "check_urls", "getTabList", "lookup"]
 
     private var humanWindow: BrowserWindowState? {
         guard let registry = browserManager?.windowRegistry else { return nil }
@@ -434,7 +439,7 @@ final class DevMCPServer {
     private static let pageContentTools: Set<String> = [
         "evaluate", "executeJavaScript", "selection", "pick", "snapshot", "console", "network", "blocker_log",
         "pages", "getTabList", "readPageContent", "getInteractiveElements", "extractStructuredData",
-        "searchInPage", "summarizePage", "getSelectedText",
+        "searchInPage", "summarizePage", "getSelectedText", "lookup",
     ]
 
     private static func markPageContent(_ result: [String: Any]) -> [String: Any] {
@@ -779,6 +784,35 @@ final class DevMCPServer {
                     ]
                 }
                 return text(json(scripts))
+
+            case "lookup":
+                var id = (args["id"] as? String).flatMap(UUID.init(uuidString:))
+                if id == nil {
+                    guard let request = (args["request"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !request.isEmpty else {
+                        return text("lookup needs a request or an id", error: true)
+                    }
+                    if args["open"] as? Bool == true {
+                        // Through the same path as the palette, in the Agent space where DevMCP's own tabs go.
+                        guard let space = bm.tabs.ensureAgentSpace(loginsFrom: window) else { return text("No Agent space", error: true) }
+                        id = bm.lookupManager.start(request, in: window, space: space).flatMap { item in
+                            bm.tabs.item(item)?.url.flatMap { LookupStore.lookupID(ofPage: $0, in: bm.lookupManager.support) }
+                        }
+                    } else {
+                        id = bm.lookupManager.begin(request, accentHex: LookupRecord.defaultAccent)
+                    }
+                    // The call answers within the server's 30 s; a longer lookup is read back by id.
+                    let deadline = ContinuousClock.now + .seconds(25)
+                    while let id, bm.lookupManager.isRunning(id), ContinuousClock.now < deadline {
+                        try? await Task.sleep(for: .milliseconds(250))
+                    }
+                }
+                guard let id, var record = LookupStore.record(for: id, in: bm.lookupManager.support) else {
+                    return text("No such lookup", error: true)
+                }
+                for index in record.sources.indices { record.sources[index].text = String(record.sources[index].text.prefix(300)) }
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+                return text(String(decoding: (try? encoder.encode(record)) ?? Data(), as: UTF8.self))
 
             case "pages":
                 var pages: [[String: Any]] = []

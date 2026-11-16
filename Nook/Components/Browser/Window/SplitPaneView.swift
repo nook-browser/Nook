@@ -46,10 +46,11 @@ final class SplitPaneView: NSView {
         // The error page and the blocked-page card: over the page, under the controls.
         let cover = SplitCoverHostingView(rootView: SplitPaneCover(itemID: itemID)
             .environment(browserManager.tabs)
+            .environment(browserManager.lookupManager)
             .environmentObject(browserManager.gradientColorManager))
         cover.covers = { [weak browserManager] in
             guard let page = browserManager?.tabs.session(for: itemID) else { return false }
-            return page.loadError != nil || page.blockedURL != nil
+            return page.loadError != nil || page.blockedURL != nil || browserManager?.lookupManager.stage(forPage: page.url) != nil
         }
         cover.sizingOptions = []
         cover.safeAreaRegions = []
@@ -118,7 +119,8 @@ final class SplitPaneView: NSView {
     }
 }
 
-/// What a tab shows over a page that failed to load or that the ad blocker stopped.
+/// What a tab shows over a page that failed to load, that the ad blocker stopped, or that Look It
+/// Up is still writing.
 private struct SplitPaneCover: View {
     let itemID: UUID
 
@@ -129,6 +131,7 @@ private struct SplitPaneCover: View {
             ZStack {
                 LoadErrorView(session: session)
                 BlockedPageView(session: session)
+                LookupProgressView(session: session)
             }
         }
     }

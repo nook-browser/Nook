@@ -47,6 +47,11 @@ public protocol PageSessionDelegate: AnyObject {
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) -> Bool
 
+    // MARK: Look It Up
+
+    /// The person pressed the button on card `card` (counted from 1) of the lookup page `session` shows.
+    func lookupAction(card: Int, from session: PageSession)
+
     // MARK: Per-page chrome
 
     func loadZoom(for itemID: UUID)

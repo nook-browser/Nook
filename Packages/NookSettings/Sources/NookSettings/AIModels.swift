@@ -215,8 +215,14 @@ public enum BrowserToolExecutionMode: String, Codable, CaseIterable, Identifiabl
 public struct BrowserToolsConfig: Codable, Equatable {
     public var executionMode: BrowserToolExecutionMode
     public var enabledTools: Set<String>
+    /// Every tool that existed when this config was saved, so one added since starts on and one
+    /// the person turned off stays off.
+    public private(set) var knownToolNames = BrowserToolsConfig.allToolNames
 
-    public static let allToolNames: Set<String> = [
+    public static let allToolNames: Set<String> = originalToolNames.union(["fillField"])
+
+    /// What a config saved without `knownToolNames` knew of.
+    private static let originalToolNames: Set<String> = [
         "navigateToURL", "readPageContent", "clickElement",
         "getInteractiveElements",
         "extractStructuredData", "summarizePage", "searchInPage",
@@ -230,6 +236,13 @@ public struct BrowserToolsConfig: Codable, Equatable {
     ) {
         self.executionMode = executionMode
         self.enabledTools = enabledTools
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        executionMode = try container.decode(BrowserToolExecutionMode.self, forKey: .executionMode)
+        let known = try container.decodeIfPresent(Set<String>.self, forKey: .knownToolNames) ?? Self.originalToolNames
+        enabledTools = try container.decode(Set<String>.self, forKey: .enabledTools).union(Self.allToolNames.subtracting(known))
     }
 }
 

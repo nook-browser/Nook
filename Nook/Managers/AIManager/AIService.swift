@@ -57,7 +57,7 @@ class AIService {
 
     /// Mutating tools that always require explicit user approval in `.askBeforeExecuting` mode
     private static let mutatingTools: Set<String> = [
-        "executeJavaScript", "navigateToURL", "clickElement", "createTab", "switchTab"
+        "executeJavaScript", "navigateToURL", "clickElement", "fillField", "createTab", "switchTab"
     ]
 
     /// Size of the scrolling argument view in the approval dialog
@@ -100,6 +100,20 @@ class AIService {
                 customHeaders: providerConfig.customHeaders
             )
         }
+    }
+
+    /// The active provider for a call with no tools, no chat history and no page context, which
+    /// is how Look It Up uses a connected model. Nil for Apple Intelligence, which Look It Up
+    /// calls itself, and for a provider with no key or no model.
+    func plainProvider() -> (provider: AIProviderProtocol, model: String, config: AIGenerationConfig)? {
+        guard hasPlainProvider, let model = configService.config.activeModelId,
+              let provider = createProvider(contextTag: "", request: "", mcpToolsByFunctionName: [:]) else { return nil }
+        return (provider, model, configService.generationConfig)
+    }
+
+    /// Whether `plainProvider()` would return one, without building it.
+    var hasPlainProvider: Bool {
+        configService.activeProviderType != .appleIntelligence && hasApiKey && configService.config.activeModelId != nil
     }
 
     // MARK: - Has API Key

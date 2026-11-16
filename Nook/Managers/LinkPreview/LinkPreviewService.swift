@@ -131,22 +131,41 @@ final class LinkPreviewService {
     }
 
     /// The gate plus a DNS check: a public-looking name that resolves to a reserved address is refused.
-    private nonisolated static func mayReach(_ url: URL) async -> Bool {
+    nonisolated static func mayReach(_ url: URL) async -> Bool {
         guard LinkPreviewGate.mayFetch(url: url, isPrivate: false, isAgent: false, blocked: false),
               let host = url.host else { return false }
         return await LinkPreviewGate.resolvesToPublic(host)
     }
 
     /// Every preview request (page, image, icon) goes through here: gated, redirect-gated, cookie-free.
-    private nonisolated static func gatedData(_ url: URL, accept: String? = nil) async -> (Data, HTTPURLResponse)? {
+    /// Look It Up fetches through it too, as Safari, since a results page refuses anything else.
+    /// With `limit`, the body is read as it arrives and dropped once it passes that many bytes,
+    /// and `htmlOnly` refuses anything else at the headers, so a PDF or an endless stream is
+    /// never taken whole.
+    nonisolated static func gatedData(_ url: URL, accept: String? = nil, userAgent: String? = nil,
+                                      limit: Int? = nil, htmlOnly: Bool = false) async -> (Data, HTTPURLResponse)? {
         guard await mayReach(url) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 8)
         if let accept { request.setValue(accept, forHTTPHeaderField: "Accept") }
+        if let userAgent { request.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
         // No cookies: a preview never signs in as the person or changes anything server side.
         request.httpShouldHandleCookies = false
         do {
-            let (data, response) = try await URLSession.shared.data(for: request, delegate: RedirectGate())
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return nil }
+            guard let limit else {
+                let (data, response) = try await URLSession.shared.data(for: request, delegate: RedirectGate())
+                guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return nil }
+                return (data, http)
+            }
+            let (bytes, response) = try await URLSession.shared.bytes(for: request, delegate: RedirectGate())
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  !htmlOnly || http.mimeType?.contains("html") ?? true,
+                  http.expectedContentLength <= Int64(limit) else { return nil }
+            var data = Data()
+            data.reserveCapacity(min(limit, max(Int(http.expectedContentLength), 0)))
+            for try await byte in bytes {
+                guard data.count < limit else { return nil }
+                data.append(byte)
+            }
             return (data, http)
         } catch {
             Self.log.debug("Preview fetch failed: \(error.localizedDescription, privacy: .public)")

@@ -421,6 +421,8 @@ class BrowserManager: ObservableObject {
     var siteRoutingManager: SiteRoutingManager
     var externalMiniWindowManager = ExternalMiniWindowManager()
     let peekManager = PeekManager()
+    /// Look It Up. Made on first use: nothing of it runs until a lookup is asked for.
+    lazy var lookupManager = LookupManager(browserManager: self)
 
     // TEMPORARY: Will be removed when cross-window coordination is eliminated
     weak var webViewCoordinator: WebViewCoordinator?

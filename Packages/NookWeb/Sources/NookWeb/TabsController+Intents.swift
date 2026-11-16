@@ -34,6 +34,7 @@ extension TabsController {
             try $0.createTab(id: id, url: url, title: title ?? url.host ?? url.absoluteString, in: position.0, after: position.1)
         }
         guard created != nil else { return nil }
+        inheritGuard(id, from: opener)
         if opener != nil { revealTrail(position.0) }
         if placement != .background { select(id, in: window) }
         else if let opener { noteBackgroundOpen(id, opener: opener, in: window) }
@@ -175,6 +176,7 @@ extension TabsController {
         guard perform(owner(of: window), "popup", {
             try $0.createTab(id: id, url: pageURL, title: "New Tab", in: position.0, after: position.1)
         }) != nil else { return nil }
+        inheritGuard(id, from: opener.itemID)
         revealTrail(position.0)
         let session = PageSession(
             itemID: id, url: pageURL, title: "New Tab", isPrivate: window.privateTree != nil,

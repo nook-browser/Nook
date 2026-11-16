@@ -41,7 +41,7 @@ struct AppleIntelligenceProvider: AIProviderProtocol {
     /// Tools a small model can use in one step. The page is already in the prompt, so the page-reading
     /// tools would only overflow the context, and JavaScript stays with the larger models.
     private static let toolNames: Set<String> = [
-        "navigateToURL", "clickElement", "getInteractiveElements", "searchInPage",
+        "navigateToURL", "clickElement", "fillField", "getInteractiveElements", "searchInPage",
         "getSelectedText", "getTabList", "switchTab", "createTab",
     ]
 
@@ -68,6 +68,10 @@ struct AppleIntelligenceProvider: AIProviderProtocol {
             let words = Set(request.split { !$0.isLetter && !$0.isNumber }.map(String.init))
             return request.contains(site.joined(separator: ".")) || words.contains(name)
         case "clickElement":
+            guard let text = arguments["text"] as? String, !text.isEmpty else { return false }
+            return request.contains(text.lowercased())
+        case "fillField":
+            // What gets typed must be the person's own words, never something the page supplied.
             guard let text = arguments["text"] as? String, !text.isEmpty else { return false }
             return request.contains(text.lowercased())
         default:

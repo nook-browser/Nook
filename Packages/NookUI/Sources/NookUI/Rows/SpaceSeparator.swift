@@ -115,17 +115,22 @@ public struct SpaceSeparator: View {
 // MARK: - WaveLine
 
 /// A horizontal rule that bends into a travelling sine wave. Both ends stay pinned to the
-/// centre line, and at amplitude 0 it is a straight hairline.
-private struct WaveLine: Shape {
-    var amplitude: CGFloat
-    var phase: CGFloat
+/// centre line, and at amplitude 0 it is a straight hairline. Nook's sign that a model is working.
+public struct WaveLine: Shape {
+    public var amplitude: CGFloat
+    public var phase: CGFloat
 
-    var animatableData: CGFloat {
+    public init(amplitude: CGFloat, phase: CGFloat) {
+        self.amplitude = amplitude
+        self.phase = phase
+    }
+
+    public var animatableData: CGFloat {
         get { amplitude }
         set { amplitude = newValue }
     }
 
-    func path(in rect: CGRect) -> Path {
+    public func path(in rect: CGRect) -> Path {
         var path = Path()
         path.move(to: CGPoint(x: rect.minX, y: rect.midY))
         guard amplitude > 0, rect.width > 0 else {

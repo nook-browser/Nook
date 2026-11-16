@@ -58,6 +58,10 @@ public final class TabsController {
     public var agentCallsInFlight = 0
     /// The agent's page changed or lost its window; the app keeps it rendering.
     @ObservationIgnored public var onAgentPage: ((PageSession) -> Void)?
+    /// The app's support folder, set at startup. Look It Up's pages live under it (`LookupStore`).
+    @ObservationIgnored public var lookupSupport: URL?
+    /// Tabs Look It Up opened to act on, and tabs opened from those (`PageSession.guardsCommits`).
+    @ObservationIgnored var guardedItems: Set<UUID> = []
 
     /// One `Profile` (website data store) per space, made on first use and kept for the session.
     @ObservationIgnored private var spaceProfiles: [UUID: Profile] = [:]

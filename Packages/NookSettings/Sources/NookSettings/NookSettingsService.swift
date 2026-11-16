@@ -64,6 +64,7 @@ public final class NookSettingsService {
     private let tidyDownloadsKey = "settings.tidyDownloads"
     private let didImportFromArcKey = "settings.didImportFromArc"
     private let linkPreviewsKey = "settings.linkPreviews"
+    private let lookupEnabledKey = "settings.lookupEnabled"
     private let autoPictureInPictureKey = "settings.autoPictureInPicture"
     private let nestTabsFromLinksKey = "settings.nestTabsFromLinks"
     private let sponsorBlockEnabledKey = "settings.sponsorBlockEnabled"
@@ -506,6 +507,11 @@ public final class NookSettingsService {
 
     public static let linkPreviewsDidChange = Notification.Name("NookLinkPreviewsDidChange")
 
+    /// Shift-Return in the command palette looks the typed text up and writes a page from what it read.
+    public var lookupEnabled: Bool {
+        didSet { userDefaults.set(lookupEnabled, forKey: lookupEnabledKey) }
+    }
+
     /// Shift-hover over a link shows an on-device summary of the page it opens.
     public var linkPreviews: Bool {
         didSet {
@@ -643,6 +649,7 @@ public final class NookSettingsService {
             tidyDownloadsKey: false,
             didImportFromArcKey: false,
             linkPreviewsKey: false,
+            lookupEnabledKey: true,
             sponsorBlockEnabledKey: false,
             autoPictureInPictureKey: false,
             nestTabsFromLinksKey: true,
@@ -779,6 +786,7 @@ public final class NookSettingsService {
         self.tidyDownloads = userDefaults.bool(forKey: tidyDownloadsKey)
         self.didImportFromArc = userDefaults.bool(forKey: didImportFromArcKey)
         self.linkPreviews = userDefaults.bool(forKey: linkPreviewsKey)
+        self.lookupEnabled = userDefaults.bool(forKey: lookupEnabledKey)
         self.autoPictureInPicture = userDefaults.bool(forKey: autoPictureInPictureKey)
         self.nestTabsFromLinks = userDefaults.bool(forKey: nestTabsFromLinksKey)
         self.sponsorBlockEnabled = userDefaults.bool(forKey: sponsorBlockEnabledKey)
