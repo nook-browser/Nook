@@ -127,7 +127,7 @@ public class SearchManager {
             self.autofillHost = host
         }
 
-        let tabs = Array(searchTabs(for: query).prefix(2))
+        let tabs = Array(searchTabs(for: query).prefix(3))
         // Paint what is already known for this keystroke, carrying each leg's last rows. The
         // palette puts its own row for the typed text above these.
         compose(tabs: tabs)
@@ -213,7 +213,22 @@ public class SearchManager {
         query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
     }
 
-    @MainActor private func searchTabs(for query: String) -> [SearchSuggestion] {
+    /// The open tabs for an empty field, most recently used first.
+    @MainActor public func showOpenTabs(limit: Int = 5) {
+        searchTask?.cancel()
+        historyTask?.cancel()
+        autofillTask?.cancel()
+        searchGeneration = UUID()
+        isLoading = false
+        autofillHost = nil
+        historyRows = []
+        textRows = []
+        webRows = []
+        updateSpaceContext()
+        updateSuggestionsIfNeeded(searchTabs(for: "", limit: limit))
+    }
+
+    @MainActor private func searchTabs(for query: String, limit: Int = 3) -> [SearchSuggestion] {
         guard let tabs, let window, let spaceID = window.spaceID else { return [] }
         let words = Self.words(of: query)
         // This space's tabs first, then the other spaces'. The page being looked at is not a
@@ -234,6 +249,27 @@ public class SearchManager {
                 ?? SwiftUI.Image(systemName: "globe")
             return TabMatch(itemID: item.id, title: title, url: url, favicon: favicon)
         }
+        // Nothing typed: most recently used first, like Cmd-Tab, so the top row is the tab you
+        // were on before this one. This window's own recent list decides first (it also covers
+        // private windows, which are not stamped), then the device's last-active times; tabs
+        // never selected keep sidebar order at the end.
+        guard !words.isEmpty else {
+            let recent = Dictionary(tabs.recentItems(in: window).enumerated().map { ($1, $0) }, uniquingKeysWith: min)
+            let stamps = tabs.device.lastActive ?? [:]
+            let ranked = matches.enumerated().sorted { lhs, rhs in
+                let l = lhs.element.itemID, r = rhs.element.itemID
+                switch (recent[l], recent[r]) {
+                case let (li?, ri?): return li < ri
+                case (.some, nil): return true
+                case (nil, .some): return false
+                case (nil, nil): break
+                }
+                let ld = stamps[l] ?? .distantPast, rd = stamps[r] ?? .distantPast
+                if ld != rd { return ld > rd }
+                return lhs.offset < rhs.offset
+            }
+            return ranked.prefix(limit).map { SearchSuggestion(text: $0.element.title, type: .tab($0.element)) }
+        }
         // Title matches first, then shorter titles.
         let sorted = matches.sorted { lhs, rhs in
             let lhsTitle = words.allSatisfy(lhs.title.lowercased().contains)
@@ -243,7 +279,7 @@ public class SearchManager {
             if lhsHere != rhsHere { return lhsHere }
             return lhs.title.count < rhs.title.count
         }
-        return sorted.prefix(3).map { SearchSuggestion(text: $0.title, type: .tab($0)) }
+        return sorted.prefix(limit).map { SearchSuggestion(text: $0.title, type: .tab($0)) }
     }
 
     @MainActor private func searchHistory(for query: String) async -> [SearchSuggestion] {

@@ -77,3 +77,13 @@ public func isLikelyURL(_ text: String) -> Bool {
   // The same test normalizeURL navigates on, so the row shown is what Return does.
   return looksLikeHost(trimmed)
 }
+
+/// Whether what was typed starts a tab's host or title, the match that puts the tab above the
+/// typed row so Return switches to it.
+public func typedStartsTab(_ typed: String, title: String, url: URL) -> Bool {
+  func trimmedHost(_ host: String) -> String { host.hasPrefix("www.") ? String(host.dropFirst(4)) : host }
+  let typed = trimmedHost(typed.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+  guard !typed.isEmpty else { return false }
+  if trimmedHost(url.host?.lowercased() ?? "").hasPrefix(typed) { return true }
+  return title.range(of: typed, options: [.anchored, .caseInsensitive, .diacriticInsensitive]) != nil
+}

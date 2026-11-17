@@ -83,7 +83,8 @@ struct CommandPaletteView: View {
         (NSApp.keyWindow?.firstResponder as? NSTextInputClient)?.hasMarkedText() ?? false
     }
 
-    /// The Return row first, then what the search found. Index -1 means the Return row.
+    /// A leading tab, then the row for what was typed, then the rest. Index -1 is the top row,
+    /// which Return takes.
     private var visibleSuggestions: [SearchManager.SearchSuggestion] {
         var found = searchManager.suggestions
         if activeSiteSearch != nil {
@@ -99,9 +100,24 @@ struct CommandPaletteView: View {
             case .url, .search: return row.text.caseInsensitiveCompare(primary.text) != .orderedSame
             }
         }
-        // The Look It Up row stands in the list as the typed search again; `lookupRowIndex` marks it.
-        return lookupRowIndex == nil ? [primary] + rest.prefix(4) : [primary, primary] + rest.prefix(3)
+        // The Look It Up row stands under the typed row as the typed search again; `lookupRowIndex` marks it.
+        let others = rest.filter { $0.id != leadTab?.id }
+        let typed = lookupRowIndex == nil ? [primary] : [primary, primary]
+        return Array(((leadTab.map { [$0] } ?? []) + typed + others).prefix(5))
     }
+
+    /// The open tab that heads the list, so Return switches to it: the first whose host or title
+    /// starts with what was typed. None from the URL bar, where Return edits the current tab.
+    private var leadTab: SearchManager.SearchSuggestion? {
+        guard activeSiteSearch == nil, !commandPalette.shouldNavigateCurrentTab else { return nil }
+        return searchManager.suggestions.first {
+            guard case .tab(let match) = $0.type else { return false }
+            return typedStartsTab(userTypedText, title: match.title, url: match.url)
+        }
+    }
+
+    /// Where the row for what was typed sits: under a leading tab, else first.
+    private var typedRowIndex: Int { leadTab == nil ? 0 : 1 }
 
     /// What Shift-Return looks up: the highlighted search row, else the typed text when Return
     /// would search it. Nil for an address, a site search, or with Look It Up unavailable.
@@ -114,19 +130,19 @@ struct CommandPaletteView: View {
         return request.isEmpty ? nil : request
     }
 
-    /// The Look It Up row's place, right under the Return row, when Return would search. Judged
-    /// on the typed text, not the field's, so the rows hold still while the arrows move.
+    /// The Look It Up row's place, right under the typed row, when Return there would search.
+    /// Judged on the typed text, not the field's, so the rows hold still while the arrows move.
     private var lookupRowIndex: Int? {
         guard activeSiteSearch == nil,
               SiteSearchEntry.match(for: userTypedText, in: nookSettings.siteSearchEntries) == nil,
               browserManager.lookupManager.isAvailable(in: windowState),
               let primary = primarySuggestion, case .search = primary.type else { return nil }
-        return 1
+        return typedRowIndex + 1
     }
 
-    /// The row drawn selected. With Shift down on the Return row, that is the Look It Up row.
+    /// The row drawn selected. With Shift down on the top row or the typed row, that is the Look It Up row.
     private var highlightedIndex: Int {
-        if shiftHeld, selectedSuggestionIndex <= 0, let lookupRowIndex { return lookupRowIndex }
+        if shiftHeld, selectedSuggestionIndex <= typedRowIndex, let lookupRowIndex { return lookupRowIndex }
         return max(selectedSuggestionIndex, 0)
     }
 
@@ -235,7 +251,7 @@ struct CommandPaletteView: View {
                                         if acceptInlineCompletion() { return .handled }
                                         // With nothing selected, Tab moves to the first suggestion. It passes the
                                         // Look It Up row, so Tab twice still opens that suggestion.
-                                        let firstSuggestion = lookupRowIndex == nil ? 1 : 2
+                                        let firstSuggestion = lookupRowIndex == 1 ? 2 : 1
                                         if selectedSuggestionIndex < 0 && visibleSuggestions.count > firstSuggestion {
                                             navigateSuggestions(direction: 1)
                                             if selectedSuggestionIndex < firstSuggestion { navigateSuggestions(direction: 1) }
@@ -314,9 +330,13 @@ struct CommandPaletteView: View {
                                         holdShift(NSEvent.modifierFlags.contains(.shift))
                                         completionSuppressed = newValue.count < userTypedText.count
                                         userTypedText = newValue
-                                        searchManager.searchSuggestions(
-                                            for: newValue
-                                        )
+                                        if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && activeSiteSearch == nil {
+                                            searchManager.showOpenTabs()
+                                        } else {
+                                            searchManager.searchSuggestions(
+                                                for: newValue
+                                            )
+                                        }
                                         selectedSuggestionIndex = -1
                                     }
                                     .onModifierKeysChanged(mask: .shift) { _, new in
@@ -384,6 +404,9 @@ struct CommandPaletteView: View {
                 userTypedText = commandPalette.prefilledText
                 // A Shift let go while another app was in front never reported its release.
                 shiftHeld = NSEvent.modifierFlags.contains(.shift)
+                if commandPalette.prefilledText.isEmpty {
+                    searchManager.showOpenTabs()
+                }
 
                 DispatchQueue.main.async {
                     isSearchFocused = true
@@ -541,8 +564,9 @@ struct CommandPaletteView: View {
             && selectedSuggestionIndex < visibleSuggestions.count
         {
             selectRow(selectedSuggestionIndex)
-        } else if let primary = primarySuggestion {
-            selectSuggestion(primary)
+        } else if !visibleSuggestions.isEmpty {
+            // The top row: a leading tab, what was typed, or with nothing typed the most recent tab.
+            selectRow(0)
         }
     }
 
@@ -671,7 +695,8 @@ struct CommandPaletteView: View {
 
     /// Host that what was typed completes to, while it still prefixes it.
     private var completionHost: String? {
-        guard activeSiteSearch == nil,
+        // No completion under a leading tab: Return switches to the tab.
+        guard activeSiteSearch == nil, leadTab == nil,
               !completionSuppressed,
               !userTypedText.isEmpty,
               let host = searchManager.autofillHost,
