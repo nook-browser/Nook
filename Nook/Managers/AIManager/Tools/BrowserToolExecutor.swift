@@ -269,7 +269,7 @@ class BrowserToolExecutor {
                     const candidates = document.querySelectorAll('a, button, input[type="submit"], input[type="button"], [role="button"], [onclick], [tabindex]');
                     let bestScore = Infinity;
                     for (const candidate of candidates) {
-                        if (candidate.offsetParent === null && candidate.style.display !== 'contents') continue;
+                        if (candidate.getClientRects().length === 0 && candidate.style.display !== 'contents') continue;
                         const label = (candidate.textContent || candidate.value || candidate.getAttribute('aria-label') || candidate.getAttribute('title') || '').trim();
                         const lower = label.toLowerCase();
                         if (lower === query) {
@@ -319,7 +319,7 @@ class BrowserToolExecutor {
                 let bestScore = Infinity;
                 for (const field of document.querySelectorAll('input, textarea, select')) {
                     if (['hidden', 'submit', 'button', 'reset', 'image', 'checkbox', 'radio', 'file'].includes(field.type)) continue;
-                    if (field.disabled || field.readOnly || field.offsetParent === null) continue;
+                    if (field.disabled || field.readOnly || field.getClientRects().length === 0) continue;
                     const name = nameOf(field);
                     if (name.toLowerCase().includes(query) && name.length < bestScore) {
                         el = field;
@@ -370,7 +370,7 @@ class BrowserToolExecutor {
 
             for (const el of elements) {
                 if (results.length >= limit) break;
-                if (el.offsetParent === null && el.style.display !== 'contents' && !el.closest('label')) continue;
+                if (el.getClientRects().length === 0 && el.style.display !== 'contents' && !el.closest('label')) continue;
 
                 const tag = el.tagName.toLowerCase();
                 const type = el.getAttribute('type') || '';

@@ -44,6 +44,8 @@ fn resources() -> PathBuf {
 /// Every list, minus the lines Nook removes at load (`nook-filter-removals.list`), as the app reads them.
 fn bundled_filter_text() -> String {
     let removals = fs::read_to_string(resources().join("nook-filter-removals.list")).unwrap_or_default();
+    // Installed copies ignore a fetched removals file that does not open with a comment line.
+    assert!(removals.starts_with('!'), "nook-filter-removals.list must start with its ! header");
     let removed: HashSet<&str> = removals.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('!')).collect();
     let mut text = String::new();
     for entry in fs::read_dir(resources()).expect("readable") {

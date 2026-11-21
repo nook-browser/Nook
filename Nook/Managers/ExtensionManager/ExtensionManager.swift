@@ -79,6 +79,8 @@ final class ExtensionManager: NSObject, ObservableObject,
 
     /// Extension APIs WebKit lacks, answered natively for the compatibility shim.
     let compatBridge = ExtensionCompatBridge()
+    /// Notification observers of this manager, removed when its set is torn down.
+    var observers: [NSObjectProtocol] = []
     lazy var compatWebNavigation = ExtensionCompatWebNavigation(bridge: compatBridge)
     lazy var compatManagement = ExtensionCompatManagement(bridge: compatBridge)
     lazy var compatSidePanel = ExtensionCompatSidePanel(set: isDefaultSet ? nil : setID)
@@ -133,13 +135,13 @@ final class ExtensionManager: NSObject, ObservableObject,
             setupCompatBridge()
             loadInstalledExtensions()
             registerInternalNativePortHandlers()
-            NotificationCenter.default.addObserver(
+            observers.append(NotificationCenter.default.addObserver(
                 forName: NSApplication.didBecomeActiveNotification,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
                 MainActor.assumeIsolated { self?.checkForExtensionUpdatesIfDue() }
-            }
+            })
         }
     }
 
@@ -174,7 +176,7 @@ final class ExtensionManager: NSObject, ObservableObject,
 
     private static func setContainer(_ directory: URL) -> ModelContainer {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let stored = ModelConfiguration(url: directory.appendingPathComponent("extensions.store"))
+        let stored = ModelConfiguration(url: directory.appendingPathComponent("extensions.store"), cloudKitDatabase: .none)
         if let container = try? ModelContainer(for: ExtensionEntity.self, configurations: stored) { return container }
         logger.error("Extension set store at \(directory.path, privacy: .public) failed to open; using memory")
         return try! ModelContainer(for: ExtensionEntity.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
@@ -283,7 +285,13 @@ final class ExtensionManager: NSObject, ObservableObject,
     func tearDown() {
         guard let controller = extensionController else { return }
         for adapter in windowAdapters.values { controller.didCloseWindow(adapter) }
-        for context in controller.extensionContexts { try? controller.unload(context) }
+        for context in controller.extensionContexts {
+            // Stops the idle monitor and timers an extension left armed, as every other unload does.
+            compatBridge.contextUnloaded(context)
+            try? controller.unload(context)
+        }
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers = []
         windowAdapters = [:]
         tabAdapters = [:]
         openedTabIDs = []

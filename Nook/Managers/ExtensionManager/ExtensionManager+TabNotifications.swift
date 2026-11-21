@@ -104,14 +104,14 @@ extension ExtensionManager {
     /// Window focus and close come from AppKit notifications; the tab model has no window hooks.
     func observeWindowEvents() {
         let center = NotificationCenter.default
-        center.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { [weak self] note in
+        observers.append(center.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { [weak self] note in
             let nsWindow = note.object as? NSWindow
             MainActor.assumeIsolated { self?.windowBecameMain(nsWindow) }
-        }
-        center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { [weak self] note in
+        })
+        observers.append(center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { [weak self] note in
             let nsWindow = note.object as? NSWindow
             MainActor.assumeIsolated { self?.windowWillClose(nsWindow) }
-        }
+        })
     }
 
     private func windowBecameMain(_ nsWindow: NSWindow?) {
