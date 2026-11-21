@@ -49,20 +49,26 @@ extension ExtensionManager {
     /// Whether `copy`'s data goes to the install of `id` that replaces it. A matching name alone
     /// carries nothing: a look-alike must not inherit a password manager's storage.
     func legacyCarry(of copy: InstalledExtension, to id: String, in store: ExtensionStore?, from source: URL,
-                     manifest: [String: Any], migrating: Bool, interactive: Bool) -> LegacyCarry? {
+                     manifest: [String: Any], migrating: Bool) -> LegacyCarry? {
         guard storageRoot != nil else { return nil }
         let listing = Self.storeListing(packageAt: URL(fileURLWithPath: copy.packagePath))
         if migrating { return .proven }
         // A Firefox listing's id is Mozilla's number, which the package does not carry.
         if let listing, let store, store != .firefox, listing.store == store, listing.id == id { return .proven }
         let isSafariExtension = ["appex", "app"].contains(source.pathExtension.lowercased())
-        if interactive, isSafariExtension, listing == nil, copy.manifestVersion == manifest["manifest_version"] as? Int {
+        if isSafariExtension, listing == nil, copy.manifestVersion == manifest["manifest_version"] as? Int {
             return .chosen
         }
         return nil
     }
 
     // MARK: - The daily pass
+
+    /// For installs nobody is watching: one that needs consent is skipped.
+    static let skipsConsent: InstallConsentPresenter = { request in
+        logger.info("Skipping update of '\(request.name, privacy: .public)': new version requests additional permissions")
+        return false
+    }
 
     /// Installs each legacy copy that names a store listing again from that listing, without the
     /// person: a copy whose listing asks for more than it has is left for them.
@@ -81,7 +87,7 @@ extension ExtensionManager {
             // The real one is here already, beside the copy. Nothing is fetched for that.
             guard listing.store == .firefox || fetchEntity(id: listing.id) == nil else { continue }
             let result = await withCheckedContinuation { continuation in
-                installFromWebStore(extensionId: listing.id, store: listing.store, interactive: false, migrating: copy.id) {
+                installFromWebStore(extensionId: listing.id, store: listing.store, presenter: Self.skipsConsent, migrating: copy.id) {
                     continuation.resume(returning: $0)
                 }
             }
@@ -98,16 +104,17 @@ extension ExtensionManager {
             .filter { $0.sourceStore == nil && $0.id.contains(".") && UUID(uuidString: $0.id) == nil }
             .map { (id: $0.id, name: $0.name, version: $0.version) }
         guard !imports.isEmpty else { return }
-        let safari = await discoverSafariExtensions()
+        await refreshSafariExtensions()
         for copy in imports {
-            guard let info = safari.first(where: { $0.id == copy.id }),
-                  let manifest = try? ExtensionUtils.validateManifest(at: info.resourcesPath.appendingPathComponent("manifest.json")),
-                  let name = manifest["name"] as? String, (Self.resolveLocaleString(name, in: info.resourcesPath) ?? name) == copy.name,
-                  let version = manifest["version"] as? String, WebStoreDownloader.isVersion(version, newerThan: copy.version)
+            guard let info = safariExtension(id: copy.id) else { continue }
+            let resources = info.appexPath.appendingPathComponent("Contents/Resources")
+            guard let manifest = try? ExtensionUtils.validateManifest(at: resources.appendingPathComponent("manifest.json")),
+                  let name = manifest["name"] as? String, (Self.resolveLocaleString(name, in: resources) ?? name) == copy.name,
+                  let version = manifest["version"] as? String, ExtensionVersion.isNewer(version, than: copy.version)
             else { continue }
             Self.logger.info("Updating '\(copy.name, privacy: .public)' \(copy.version, privacy: .public) -> \(version, privacy: .public) from its app")
             let result = await withCheckedContinuation { continuation in
-                installExtension(from: info.appexPath, extensionId: info.id, interactive: false) { continuation.resume(returning: $0) }
+                installExtension(from: info.appexPath, extensionId: info.id, presenter: Self.skipsConsent) { continuation.resume(returning: $0) }
             }
             if case .failure(let error) = result, !error.isCancelled {
                 Self.logger.error("Update failed for '\(copy.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
@@ -149,7 +156,11 @@ extension ExtensionManager {
         let reload: () async -> Void = { [weak self] in
             guard wasLoaded, let self, let entity = self.fetchEntity(id: legacyID),
                   let webExtension = try? await WKWebExtension(resourceBaseURL: package) else { return }
-            self.registerContext(for: entity, webExtension: webExtension)
+            do {
+                try self.registerContext(for: entity, webExtension: webExtension)
+            } catch {
+                Self.logger.error("Failed to load extension '\(entity.name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+            }
         }
         let fm = FileManager.default
         guard fm.fileExists(atPath: from.path) else { return reload }
