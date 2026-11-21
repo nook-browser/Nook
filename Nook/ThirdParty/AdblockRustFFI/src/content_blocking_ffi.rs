@@ -129,7 +129,7 @@ pub(crate) struct Conversion {
 /// no need to match on the variant beyond the cancellation check. A network
 /// filter can yield more than one content blocking rule, which is what
 /// CbRuleEquivalent's iterator is for.
-fn convert_text(text: &str) -> Conversion {
+pub(crate) fn convert_text(text: &str) -> Conversion {
     let opts = ParseOptions::default();
     let mut c = Conversion::default();
     let mut parsed_lines = Vec::new();

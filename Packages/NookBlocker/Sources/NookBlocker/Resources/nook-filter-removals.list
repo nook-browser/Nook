@@ -1,0 +1,7 @@
+! Title: Nook filter removals
+! Expires: 6 hours
+!
+! A filter listed here is taken out of every filter list before Nook reads it.
+! One per line, written exactly as it appears in its list. Nothing here can add a rule.
+! Installed copies read this file from the main branch, so a line added there takes
+! effect without an app update.
