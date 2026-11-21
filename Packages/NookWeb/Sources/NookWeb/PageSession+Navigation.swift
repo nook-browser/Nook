@@ -21,7 +21,9 @@ extension PageSession: WKNavigationDelegate {
     ) {
         loadingState = .didStartProvisionalNavigation
         blockedURL = nil
-        loadError = nil
+        // A refresh or redirect the page under the error page starts leaves it up until that commits.
+        if nookBeganNavigation { loadError = nil }
+        nookBeganNavigation = false
         controller?.tabEvents?.tabPropertiesChanged(self, properties: [.loading])
 
         if let newURL = webView.url {
@@ -50,6 +52,8 @@ extension PageSession: WKNavigationDelegate {
         didCommit navigation: WKNavigation!
     ) {
         loadingState = .didCommit
+        loadError = nil
+        nookBeganNavigation = false
         navigationRewrites = 0
         linkPreview = nil
         pdfLoadStateChanged(webView)
@@ -274,11 +278,20 @@ extension PageSession: WKNavigationDelegate {
             controller?.pageCommitted(itemID: itemID, url: committed)
         }
         // A newer load (WebKit's HTTP fallback, a typed address) still running owns the page.
+        // A failure with no error page (a cancel) leaves one that is already up.
         if !webView.isLoading {
-            loadError = PageLoadError(error: error, attempted: attempted)
+            if let failure = PageLoadError(error: error, attempted: attempted) { loadError = failure }
+            nookBeganNavigation = false
         }
 
         updateNavigationStateEnhanced(source: "didFailProvisional")
+    }
+
+    /// A rewrite stands in for the navigation it cancelled, so it begins from the same side.
+    private func loadRewrite(_ url: URL, in webView: WKWebView) {
+        let nookBegan = nookBeganNavigation
+        webView.load(URLRequest(url: url))
+        nookBeganNavigation = nookBegan
     }
 
     /// WebKitErrorFrameLoadBlockedByContentBlocker, which WebKit keeps private.
@@ -422,14 +435,14 @@ extension PageSession: WKNavigationDelegate {
                 }
                 navigationRewrites += 1
                 decisionHandler(.cancel)
-                webView.load(URLRequest(url: replacement))
+                loadRewrite(replacement, in: webView)
                 return
             }
 
             if mayRewrite, let settings = controller?.settings, let hot = RedditTweaks.hotURL(for: url, settings: settings) {
                 navigationRewrites += 1
                 decisionHandler(.cancel)
-                webView.load(URLRequest(url: hot))
+                loadRewrite(hot, in: webView)
                 return
             }
 

@@ -29,7 +29,10 @@ final class ExtensionSetRegistry {
     }
 
     func manager(forSet id: UUID) -> ExtensionManager {
-        if id == defaultSetID { return .shared }
+        if id == defaultSetID {
+            ExtensionManager.shared.setIdle(false)
+            return .shared
+        }
         if let existing = managers[id] { return existing }
         let created = ExtensionManager(setID: id)
         managers[id] = created
@@ -46,6 +49,7 @@ final class ExtensionSetRegistry {
         if !pendingDeletion.isEmpty { pendingDeletion = [] }
         deleteSets(waiting)
         for id in Set(sets.membership.values) { _ = manager(forSet: id) }
+        idleDefaultSetIfUnused()
     }
 
     // MARK: - Resolving a set
@@ -166,6 +170,23 @@ final class ExtensionSetRegistry {
         guard let settings = browserManager?.nookSettings else { return }
         let running = Set(settings.extensionSets.membership.values).union(privateWindowSets)
         for id in Array(managers.keys) where !running.contains(id) { managers.removeValue(forKey: id)?.tearDown() }
+        idleDefaultSetIfUnused()
+    }
+
+    /// The default set loads extensions only while a profile or a private window runs it. Its
+    /// manager is a singleton, so it idles instead of going; `manager(forSet:)` wakes it.
+    private func idleDefaultSetIfUnused() {
+        guard let bm = browserManager, let sets = bm.nookSettings?.extensionSets else { return }
+        // With no Separate profile every profile is in the default set, so one-set users stop here.
+        let used = sets.membership.isEmpty
+            || sets.choices(profiles: bm.tabs.profiles.map(\.id), defaultSet: defaultSetID).contains { $0.set == defaultSetID }
+        ExtensionManager.shared.setIdle(!used && !privateWindowSets.contains(defaultSetID))
+    }
+
+    /// The pin list is shared by every set, so an id leaves it only when no loaded set still has the extension.
+    func unpinIfUninstalled(_ extensionID: String) {
+        guard !loadedManagers.contains(where: { $0.installedExtensions.contains { $0.id == extensionID } }) else { return }
+        browserManager?.nookSettings?.pinnedExtensionIDs.removeAll { $0 == extensionID }
     }
 
     private static let pendingDeletionKey = "Nook.Extensions.SetsToDelete"

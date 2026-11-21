@@ -91,8 +91,9 @@ struct ExtensionPermissionView: View {
         guard !requestedHostPermissions.isEmpty else { return nil }
         let hosts = requestedHostPermissions.map { pattern -> String in
             guard let range = pattern.range(of: "://") else { return pattern }
-            let rest = pattern[range.upperBound...]
-            return String(rest.prefix { $0 != "/" })
+            let host = String(pattern[range.upperBound...].prefix { $0 != "/" })
+            // `file:///*` has no host; the pattern itself says what it covers.
+            return host.isEmpty ? pattern : host
         }
         if requestedHostPermissions.contains("<all_urls>") || hosts.contains("*") {
             return "Read and change all your data on all websites"

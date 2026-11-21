@@ -76,6 +76,13 @@ public final class PageSession: NSObject, Identifiable {
             primaryWebView?.setAllMediaPlaybackSuspended(loadError != nil, completionHandler: nil)
         }
     }
+    /// Set while the error page shows when Nook starts a navigation (address bar, Back, Reload, Try
+    /// Again); the next provisional start takes it. Only such a start dismisses the error page, not
+    /// a load the page under it begins.
+    @ObservationIgnored var nookBeganNavigation = false
+
+    /// Called after Nook starts a navigation in one of this page's views.
+    public func nookStartedNavigation() { nookBeganNavigation = loadError != nil }
     /// The site enhanced fingerprinting protection is off for until the tab leaves it.
     var enhancedFingerprintingProtectionOffHost: String?
 
