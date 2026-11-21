@@ -49,6 +49,19 @@ jobs:
           path: Nook.zip
           retention-days: 1
 
+  checks:
+    name: Checks on macOS 26
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Run checks
+        run: scripts/run-checks.sh
+
   launch-sequoia:
     name: Launch on macOS 15
     needs: build

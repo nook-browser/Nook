@@ -1,3 +1,5 @@
+// Licensed under GPL-3.0. See LICENSE.
+// swiftc Nook/Managers/LinkPreview/LinkPreviewGate.swift scripts/tests/LinkPreviewGateCheck.swift -o /tmp/lpgate && /tmp/lpgate
 import Foundation
 
 @main

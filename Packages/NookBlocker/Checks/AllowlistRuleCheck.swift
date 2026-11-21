@@ -3,7 +3,7 @@
 //  AllowlistRuleCheck.swift
 //  Nook
 //
-//  swiftc Sources/NookBlocker/AllowlistRule.swift Checks/AllowlistRuleCheck.swift -o /tmp/allow && /tmp/allow
+//  swiftc Packages/NookBlocker/Sources/NookBlocker/AllowlistRule.swift Packages/NookBlocker/Checks/AllowlistRuleCheck.swift -o /tmp/allow && /tmp/allow
 //
 
 @main

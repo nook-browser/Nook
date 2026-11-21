@@ -1,6 +1,6 @@
 // Licensed under GPL-3.0. See LICENSE.
 //
-// swiftc $(rg --files Nook/ThirdParty/BigUIPaging -g '*.swift') scripts/tests/SpaceSwitchCheck.swift -o /tmp/space-switch-check && /tmp/space-switch-check
+// swiftc $(find Nook/ThirdParty/BigUIPaging -name '*.swift') scripts/tests/SpaceSwitchCheck.swift -o /tmp/space-switch-check && /tmp/space-switch-check
 //
 // The space pager against the Arc behavior in docs/research/arc-teardown/10-sidebar-spaces-paging.md:
 // the pure math, then real AppKit motion with deterministic gesture input. Feel still needs a trackpad.
