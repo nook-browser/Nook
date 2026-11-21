@@ -26,18 +26,8 @@ struct ExtensionTabOrder {
     func contains(_ id: UUID) -> Bool { positions[id] != nil }
 }
 
-/// Tab orders by space, each kept until a value it was read from changes.
-///
-/// WebKit asks every tab of a window for its index, its window and whether it is active, all
-/// within one `tabs.query`, and each answer needs the space's order. Built on every call, one
-/// query walked and sorted the whole tab tree several times per tab: with about 130 tabs in a
-/// space, an extension that queries on tab events (1Password) kept the main thread busy and
-/// the app stopped responding.
-///
-/// Observation drops an entry from inside the setter of anything `read` observed, so the first
-/// read after a change, even one in the same turn such as a tabs.onMoved report, builds the
-/// new order. The drop runs before the new value is stored: a read from inside another
-/// observer's onChange would keep the old order, and nothing reads it there.
+/// Tab orders by space, kept so one `tabs.query` builds each order once, not once per tab.
+/// An entry drops when anything `read` observed changes, before the new value is stored.
 @MainActor
 final class ExtensionTabOrderCache {
     private var orders: [UUID: ExtensionTabOrder] = [:]

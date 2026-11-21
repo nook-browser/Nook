@@ -106,6 +106,9 @@ extension BrowserModel: PageSessionDelegate {
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) -> Bool { false }
 
+    /// Look It Up is macOS only.
+    func lookupAction(card: Int, from session: PageSession) {}
+
     func loadZoom(for itemID: UUID) {}
     func cleanupZoom(for itemID: UUID) {}
     func setMuteState(_ muted: Bool, for itemID: UUID) {}

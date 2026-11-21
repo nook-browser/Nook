@@ -168,6 +168,7 @@ public enum NookDesign {
         public static let display = SwiftUI.Font.system(size: 28, weight: .semibold)     // empty-state titles
         public static let titleLarge = SwiftUI.Font.system(size: 20, weight: .semibold)  // panel titles
         public static let heading = SwiftUI.Font.system(size: 17, weight: .semibold)     // settings pane title, dialog title
+        public static let serifTitle = SwiftUI.Font.system(size: 22, weight: .semibold, design: .serif) // load error page title
         public static let title = SwiftUI.Font.system(size: 15, weight: .semibold)       // palette input, toast title
         public static let label = SwiftUI.Font.system(size: 13, weight: .semibold)       // space name, folder name
         public static let body = SwiftUI.Font.system(size: 13, weight: .medium)          // tab title, menu item, settings row
