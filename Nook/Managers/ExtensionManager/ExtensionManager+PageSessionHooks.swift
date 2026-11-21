@@ -30,7 +30,7 @@ extension ExtensionManager {
         _ = window.flatMap { windowAdapter(for: $0) }
         openedTabIDs.insert(session.itemID)
         controller.didOpenTab(adapter)
-        Self.logger.info("Tab \(session.itemID.uuidString, privacy: .public) opened in extension set \(self.setID.uuidString, privacy: .public), view on it: \(session.webView?.configuration.webExtensionController === controller)")
+        Self.logger.debug("Tab \(session.itemID.uuidString, privacy: .public) opened in extension set \(self.setID.uuidString, privacy: .public), view on it: \(session.webView?.configuration.webExtensionController === controller)")
         // Peek and mini window pages open in front, so they become the active tab.
         if adapter.detached != nil {
             notifyTabActivated(new: session, previous: window.flatMap { browserManagerRef?.tabs.selectedSession(in: $0) })
