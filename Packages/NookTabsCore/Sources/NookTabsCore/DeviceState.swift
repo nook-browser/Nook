@@ -38,9 +38,8 @@ public struct DeviceState: Codable, Equatable, Sendable {
         collapsedPinned = collapsedPinned?.filter { tree.space($0) != nil }
         lastActive = lastActive?.filter { tree.item($0.key) != nil }
         if let marked = guarded {
-            // A closed tab keeps its mark while Reopen Closed Tab can still bring it back.
-            let reopenable = Set(closed.flatMap { $0.items.map(\.id) })
-            let kept = marked.filter { tree.item($0) != nil || reopenable.contains($0) }
+            // A closed tab's mark travels with its closed and archive entries (`ClosedEntry.guarded`).
+            let kept = marked.filter { tree.item($0) != nil }
             guarded = kept.isEmpty ? nil : kept
         }
         for i in windows.indices {

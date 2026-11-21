@@ -39,6 +39,22 @@ struct CommitGuardCheck {
         }
         precondition(CommitGuard.timeControl(in: ["button 7:00 PM · Make a Reservation", "button 7:00 PM Patio"], for: "7:00 PM") == 1)
 
+        // the steps between a time and the charge: a go-ahead that names no action commits
+        for label in ["Continue", "Next", "Proceed", "Agree and continue", "Accept", "Send", "Apply", "Authorize", "Authorise", "Place hold", "Hold table",
+                      "Add card", "Credit card", "Join", "Save", "Next step", "Done", "OK", "Okay", "Yes", "I agree", "  next  step ", "Save!"] {
+            precondition(CommitGuard.commits(label), label)
+        }
+        // a button's label reaches the guard once for each attribute that holds it
+        for label in ["Continue Continue", "Next step Next step", "Save Save Save Save", "Next Next step"] {
+            precondition(CommitGuard.commits(label), label)
+        }
+        for label in ["Next month", "Next available", "Continue reading", "Save for later", "Done reading", "Yesterday", "Okay then", "Cardinal rules",
+                      "Holdings", "Application notes", "Joint venture info", "7:00 PM", "button 7:00 PM Bar"] {
+            precondition(!CommitGuard.commits(label), label)
+        }
+        precondition(CommitGuard.timeControl(in: ["button 7:00 PM", "button 7:00 PM Dining Room"], for: "7:00 PM") == 0)
+        precondition(CommitGuard.timeControl(in: ["button 7:00 PM Hold table", "button 7:00 PM Dining Room"], for: "7:00 PM") == 1)
+
         // what the chat's tools may do on a tab opened from an answer page
         let refused = "Left for the person: this control signs in, pays or confirms."
         precondition(GuardedTools.refusal(tool: "clickElement", label: "Reserve Now", guarded: true) == refused)
@@ -48,6 +64,8 @@ struct CommitGuardCheck {
         precondition(GuardedTools.refusal(tool: "clickElement", label: "", guarded: true) == refused && GuardedTools.refusal(tool: "fillField", label: " \n", guarded: true) == refused,
                      "nor is one with no name at all: an icon alone says nothing about what it does")
         precondition(GuardedTools.refusal(tool: "clickElement", label: "7:00 PM Dining Room", guarded: true) == nil)
+        precondition(GuardedTools.refusal(tool: "clickElement", label: "Continue Continue", guarded: true) == refused)
+        precondition(GuardedTools.refusal(tool: "clickElement", label: "Next month", guarded: true) == nil)
         precondition(GuardedTools.refusal(tool: "fillField", label: "Special requests", guarded: true) == nil)
         precondition(GuardedTools.refusal(tool: "readPageContent", label: nil, guarded: true) == nil)
         for tool in ["clickElement", "fillField", "executeJavaScript", "navigateToURL"] {

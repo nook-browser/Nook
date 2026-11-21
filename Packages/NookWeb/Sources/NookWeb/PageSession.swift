@@ -42,6 +42,8 @@ public final class PageSession: NSObject, Identifiable {
     /// it uses and the window it belongs to. Cleared when the page becomes a tab.
     @ObservationIgnored public internal(set) var detachedProfile: Profile?
     @ObservationIgnored public internal(set) weak var detachedWindow: BrowserWindowState?
+    /// The tab whose page opened this popup, so a guarded one passes its guard on when the popup becomes a tab.
+    @ObservationIgnored var popupOpenerID: UUID?
     /// Runs when the page calls `window.close()`, so Peek or the mini window can close.
     @ObservationIgnored public var onClose: (() -> Void)?
     /// Asked about each main-frame address before it loads. True ends the navigation there:

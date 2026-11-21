@@ -19,11 +19,14 @@ public struct ArchiveEntry: Codable, Hashable, Sendable, Identifiable {
     public var host: String?
     public var archivedAt: Date
     public var reason: ArchiveReason
+    /// Items that were guarded when archived; restoring marks them again. Optional for older files.
+    public var guarded: Set<UUID>?
 
     public init?(closed: ClosedEntry, reason: ArchiveReason, now: Date = Date()) {
         guard case .tabs(let spaceID) = closed.section, let root = closed.items.first else { return nil }
         id = root.id
         items = closed.items
+        guarded = closed.guarded
         self.spaceID = spaceID
         title = root.displayTitle
         url = root.url

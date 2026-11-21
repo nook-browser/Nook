@@ -59,8 +59,18 @@ extension TabsController {
     }
 
     /// A tab opened from a guarded tab is guarded too, so a new tab is no way around the line.
-    func inheritGuard(_ itemID: UUID, from opener: UUID?) {
+    public func inheritGuard(_ itemID: UUID, from opener: UUID?) {
         if let opener, isGuarded(opener) { markGuarded(itemID) }
+    }
+
+    /// The marks among `ids`. Read them before the edit that removes the tabs, which prunes them.
+    func guardedAmong(_ ids: [UUID]) -> Set<UUID> {
+        Set(ids.filter(isGuarded))
+    }
+
+    /// Marks again the tabs that come back from the reopen history or the Archive.
+    func restoreGuard(_ marked: Set<UUID>?) {
+        marked?.forEach(markGuarded)
     }
 
     // MARK: - Reader Rules
@@ -118,17 +128,31 @@ extension PageSession {
         await answer(to: Self.searchRowsScript, within: seconds) as? String ?? ""
     }
 
-    /// Returns when the load under way ends, well or badly, or after `seconds`.
-    /// ponytail: checks the load state every 150 ms, only while Look It Up waits on a page; an
-    /// observation of `loadingState` would do it without the loop.
+    /// Returns when the load under way ends, well or badly, after `seconds`, or when the task is cancelled.
     public func finishedLoading(within seconds: Double) async {
-        let deadline = ContinuousClock.now + .seconds(seconds)
-        while ContinuousClock.now < deadline, !Task.isCancelled {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { try? await Task.sleep(for: .seconds(seconds)) }
+            group.addTask { @MainActor in await self.loadEnded() }
+            await group.next()
+            group.cancelAll()
+        }
+    }
+
+    private func loadEnded() async {
+        while !Task.isCancelled {
             switch loadingState {
             case .didFinish, .didFail, .didFailProvisionalNavigation: return
-            default: try? await Task.sleep(for: .milliseconds(150))
+            default: await loadingStateChanged()
             }
         }
+    }
+
+    /// Suspends until `loadingState` changes; a cancelled task wakes at once.
+    private func loadingStateChanged() async {
+        var changes = AsyncStream<Void> { continuation in
+            withObservationTracking { _ = self.loadingState } onChange: { continuation.finish() }
+        }.makeAsyncIterator()
+        await changes.next()
     }
 
     /// What `script` returns, or nil once `seconds` have passed. Runs in an isolated world, so

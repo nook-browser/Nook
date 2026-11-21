@@ -116,6 +116,7 @@ extension TabsController {
             isPrivate: opener.isPrivate, controller: self)
         session.detachedProfile = profile
         session.detachedWindow = window(for: opener)
+        session.popupOpenerID = opener.itemID
         // A sign-in flow run for an extension may end in this window. It then closes too.
         if let ends = opener.navigationInterceptor {
             session.navigationInterceptor = { [weak session] url in
@@ -143,10 +144,12 @@ extension TabsController {
               }) != nil
         else {
             let id = open(url: session.url, in: window, placement: .newTab, from: opener)
+            if let id { inheritGuard(id, from: session.popupOpenerID) }
             endDetached(session)
             return id
         }
         revealTrail(position.0)
+        inheritGuard(session.itemID, from: opener ?? session.popupOpenerID)
         session.detachedProfile = nil
         session.detachedWindow = nil
         session.onClose = nil
@@ -396,13 +399,15 @@ extension TabsController {
         let ids = promotingChildren ? [itemID] : tree(owner).subtree(of: itemID)
         if let item = tree(owner).item(itemID) { dismissFromLiveFolder(item) }
         moveSelectionOff(Set(ids))
+        let marked = guardedAmong(ids)
         var closedEntry: ClosedEntry?
         let change = perform(owner, "remove") { tree in
             let result = try tree.close(itemID, promotingChildren: promotingChildren)
             closedEntry = result.closed
             return result.change
         }
-        guard change != nil, let closedEntry else { return }
+        guard change != nil, var closedEntry else { return }
+        closedEntry.carry(marked)
         for id in ids { endSession(id) }
         switch owner {
         case .main:
@@ -460,6 +465,7 @@ extension TabsController {
             return
         }
         guard perform(owner, "reopen", { try $0.reopen(entry, fallback: .tabs(spaceID: fallbackSpace)) }) != nil else { return }
+        restoreGuard(entry.guarded)
         if isPrivate {
             window.privateClosed.removeLast()
         } else {
@@ -601,6 +607,7 @@ extension TabsController {
             if let customTitle = item.customTitle { change.merge(try $0.rename(id, customTitle: customTitle)) }
             return change
         }) != nil else { return nil }
+        inheritGuard(id, from: itemID)
         select(id, in: window)
         return id
     }
@@ -749,6 +756,7 @@ extension TabsController {
         // person's space, so it is never cleared, and its tabs stay out of the reopen history.
         let isAgent = source.space(spaceID)?.isAgent == true
         let deleted = isAgent ? nil : profile(forSpace: spaceID)
+        let marked = guardedAmong(ids)
         var closed: [ClosedEntry] = []
         guard perform(owner, "deleteSpace", { tree in
             let result = try tree.deleteSpace(spaceID)
@@ -757,7 +765,10 @@ extension TabsController {
         }) != nil else { return }
         for id in ids { endSession(id) }
         if case .main = owner, !isAgent {
-            for entry in closed { recordClosed(entry) }
+            for var entry in closed {
+                entry.carry(marked)
+                recordClosed(entry)
+            }
         }
         if case .main = owner, archive.entries.contains(where: { $0.spaceID == spaceID }) {
             archive.entries.removeAll { $0.spaceID == spaceID }

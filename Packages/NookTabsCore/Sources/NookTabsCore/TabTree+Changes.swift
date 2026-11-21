@@ -395,11 +395,21 @@ public struct ClosedEntry: Codable, Hashable, Sendable {
     /// Set when only the page of a pinned tab or favorite closed and the item stayed. Reopening
     /// brings that page back; `items` holds the record in case the item is deleted later.
     public var endedPage: OpenPage?
+    /// Items that were guarded (`DeviceState.guarded`) when closed; reopening or restoring marks them again.
+    /// Optional because files written before guarded tabs have no such key.
+    public var guarded: Set<UUID>?
 
     public init(items: [Item], section: Parent, closedAt: Date, endedPage: OpenPage? = nil) {
         self.items = items
         self.section = section
         self.closedAt = closedAt
         self.endedPage = endedPage
+    }
+
+    /// Keeps the marks in `marks` that belong to this entry's items. Read them before the close,
+    /// which prunes them from `DeviceState`.
+    public mutating func carry(_ marks: Set<UUID>) {
+        let own = marks.intersection(items.map(\.id))
+        guarded = own.isEmpty ? nil : own
     }
 }

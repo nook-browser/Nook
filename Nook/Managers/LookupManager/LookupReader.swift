@@ -53,9 +53,10 @@ final class LookupReader {
                 limit: Self.maxHTMLBytes, htmlOnly: true)
         }) else { return nil }
         let base = http.url ?? url
+        let encoding = http.textEncodingName
         // Off the main actor: scanning a large page would stall the window.
         return await Task.detached {
-            LookupText.page(fromHTML: String(decoding: data, as: UTF8.self), baseURL: base)
+            LookupText.page(fromHTML: LookupText.text(of: data, encodingName: encoding), baseURL: base)
         }.value
     }
 
