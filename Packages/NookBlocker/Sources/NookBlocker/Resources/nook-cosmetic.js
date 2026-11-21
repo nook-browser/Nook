@@ -55,8 +55,9 @@
   function buildCss(config) {
     var chunks = [];
     var hide = config && config.css;
-    if (Array.isArray(hide) && hide.length) {
-      chunks.push(hide.join(',\n') + '{display:none !important;}');
+    if (Array.isArray(hide)) {
+      // One rule each: a selector WebKit rejects would void a comma-joined rule for all of them.
+      for (var h = 0; h < hide.length; h++) chunks.push(hide[h] + '{display:none !important;}');
     }
     var procedural = config && config.extendedCss;
     if (Array.isArray(procedural)) {
