@@ -1,0 +1,32 @@
+name: Filter Lists Check
+
+# The filter lists change every day and every install downloads them. This converts today's
+# lists the way the app does and fails when one would hide or block far more than it means to.
+# The fix for a failure is a line in nook-filter-removals.list on main, not a release.
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Convert the live lists
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Download the live lists
+        run: ./scripts/refresh-filter-lists.sh
+
+      - name: Run the converter guards
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cd Nook/ThirdParty/AdblockRustFFI
+          CARGO_TARGET_DIR="$GITHUB_WORKSPACE/build/AdblockRustFFI-target" cargo test --release --locked

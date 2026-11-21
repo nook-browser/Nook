@@ -83,6 +83,13 @@ void nook_adblock_string_free(char *s);
 /// Free the result with nook_adblock_string_free.
 char *nook_adblock_cosmetic_for_url(void *engine, const char *url);
 
+/// An engine holding only the plain hide rules a content rule list cannot scope
+/// to their sites (`google.*##.x`, `a.com,~b.a.com##.x`) and every cosmetic
+/// exception, built from filter text (UTF-8, not NUL-terminated). Look a URL up
+/// with nook_adblock_cosmetic_for_url and read hide_selectors.
+/// Returns NULL on a NULL or non-UTF-8 input. Free with nook_adblock_engine_free.
+void *nook_adblock_site_hide_engine(const char *rules_utf8, size_t rules_len);
+
 /// uBlock Origin `urlskip=` rules from filter text (UTF-8, not NUL-terminated).
 /// Only lines containing "urlskip=" are read. Writes the number of usable rules
 /// to *out_rule_count (may be NULL). Returns NULL on a NULL or non-UTF-8 input.

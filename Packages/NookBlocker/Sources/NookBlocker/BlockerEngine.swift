@@ -28,6 +28,8 @@ private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Nook", cate
 public final class BlockerEngine {
 
     private var engine: UnsafeMutableRawPointer?
+    /// Only the hide rules a rule list cannot scope to their sites (`google.*##.x`).
+    private var siteHides: UnsafeMutableRawPointer?
 
     public var isLoaded: Bool { engine != nil }
 
@@ -43,7 +45,7 @@ public final class BlockerEngine {
         }
         let start = CFAbsoluteTimeGetCurrent()
         let resources = ScriptletResources.json()
-        let (built, restored) = await Task.detached(priority: .userInitiated) { () -> (UnsafeMutableRawPointer?, Bool) in
+        let (built, hides, restored) = await Task.detached(priority: .userInitiated) { () -> (UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, Bool) in
             let key = Self.cacheKey(for: sources)
             var engine = Self.restore(matching: key)
             let restored = engine != nil
@@ -59,11 +61,12 @@ public final class BlockerEngine {
                 }
                 if !ok { log.error("Scriptlet resource set rejected by the engine") }
             }
-            return (engine, restored)
+            return (engine, Self.siteHideEngine(sources), restored)
         }.value
 
         clear()
         engine = built
+        siteHides = hides
         guard built != nil else {
             log.error("Failed to build the blocker engine")
             return
@@ -85,6 +88,14 @@ public final class BlockerEngine {
         return text.withUTF8 { buf in
             nook_adblock_engine_from_lists(
                 UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count)
+        }
+    }
+
+    /// Built at every launch, not saved: about 12 ms for the default lists.
+    nonisolated private static func siteHideEngine(_ sources: [FilterListManager.Source]) -> UnsafeMutableRawPointer? {
+        var text = sources.map(\.rules).joined(separator: "\n")
+        return text.withUTF8 { buf in
+            nook_adblock_site_hide_engine(UnsafeRawPointer(buf.baseAddress)?.assumingMemoryBound(to: CChar.self), buf.count)
         }
     }
 
@@ -137,7 +148,21 @@ public final class BlockerEngine {
 
     func clear() {
         if let engine { nook_adblock_engine_free(engine) }
+        if let siteHides { nook_adblock_engine_free(siteHides) }
         engine = nil
+        siteHides = nil
+    }
+
+    /// What `engine` holds for a URL, decoded, or nil when nothing applies.
+    private func lookup(_ engine: UnsafeMutableRawPointer?, _ pageUrl: URL) -> [String: Any]? {
+        guard let engine else { return nil }
+        let raw: String? = pageUrl.absoluteString.withCString { urlPtr in
+            guard let p = nook_adblock_cosmetic_for_url(engine, urlPtr) else { return nil }
+            defer { nook_adblock_string_free(p) }
+            return String(cString: p)
+        }
+        guard let raw, let data = raw.data(using: .utf8) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
     /// Cosmetic configuration for a frame, or nil when nothing applies.
@@ -151,28 +176,11 @@ public final class BlockerEngine {
     /// from the compiled rule list. What returns is what the rule list cannot
     /// express, chiefly procedural filters.
     func configuration(for pageUrl: URL, topUrl: URL?) -> [String: Any]? {
-        guard let engine else { return nil }
-        let raw: String? = pageUrl.absoluteString.withCString { urlPtr in
-            guard let p = nook_adblock_cosmetic_for_url(engine, urlPtr) else { return nil }
-            defer { nook_adblock_string_free(p) }
-            return String(cString: p)
-        }
-        guard let raw,
-              let data = raw.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }
+        let object = lookup(engine, pageUrl) ?? [:]
 
-        // `hide_selectors` is deliberately dropped. Every cosmetic filter with a
-        // plain CSS selector already compiled into the WKContentRuleList as a
-        // css-display-none entry, which WebKit applies natively and out of
-        // process. Re-sending them here injected 21KB of JSON into every page on
-        // every navigation (496 selectors on reuters.com), which fed the
-        // renderer until jetsam killed the app.
-        //
-        // Known gap: a cosmetic filter the converter rejected for a reason other
-        // than being procedural is in neither place. That is entity rules
-        // (`google.*##.x`) and non-ASCII selectors. Small, and worth fixing by
-        // teaching the converter those cases rather than by shipping 21KB a page.
+        // The main engine's `hide_selectors` are dropped: the rule list already applies them, and
+        // sending them again was 21KB a navigation (496 selectors on reuters.com). The few the
+        // rule list cannot scope to their sites come from the small second engine.
         //
         // Each procedural entry is itself a JSON document, so it needs a second decode.
         let procedural = (object["procedural_actions"] as? [String] ?? []).compactMap { entry -> [String: Any]? in
@@ -184,12 +192,13 @@ public final class BlockerEngine {
         if !scriptlets.isEmpty {
             log.info("Scriptlets for \(pageUrl.host ?? "?", privacy: .public): \(scriptlets.count, privacy: .public) bytes")
         }
+        let hides = lookup(siteHides, pageUrl)?["hide_selectors"] as? [String] ?? []
 
-        if procedural.isEmpty && scriptlets.isEmpty { return nil }
         var config: [String: Any] = [:]
         if !procedural.isEmpty { config["extendedCss"] = procedural }
         if !scriptlets.isEmpty { config["scriptlets"] = scriptlets }
-        return config
+        if !hides.isEmpty { config["css"] = hides }
+        return config.isEmpty ? nil : config
     }
 
     /// True when the request would be blocked. Used by the dev MCP `check_urls`

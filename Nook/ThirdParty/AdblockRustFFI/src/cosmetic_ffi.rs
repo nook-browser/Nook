@@ -19,7 +19,9 @@
 //! out.
 
 use crate::guard;
-use adblock::Engine;
+use adblock::filters::cosmetic::CosmeticFilterMask;
+use adblock::lists::{parse_filter, ParseOptions, ParsedLine};
+use adblock::{Engine, FilterSet};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
@@ -63,6 +65,164 @@ pub unsafe extern "C" fn nook_adblock_cosmetic_for_url(
         },
         ptr::null_mut(),
     )
+}
+
+/// True for a plain hide rule a content rule list cannot scope to all of its sites: it names
+/// an entity (`google.*`), or hostnames beside excluded ones. The rule list has no form for
+/// either, so those sites would go without the rule.
+fn needs_site_lookup(line: &str) -> bool {
+    let Ok(ParsedLine::Cosmetic(c)) = parse_filter(line, true, ParseOptions::default()) else {
+        return false;
+    };
+    let hides = !c.mask.intersects(CosmeticFilterMask::UNHIDE | CosmeticFilterMask::SCRIPT_INJECT)
+        && c.action.is_none()
+        && c.plain_css_selector().is_some();
+    // With no site the engine can match, only exclusions are left and the rule would hide everywhere.
+    let has_site = c.entities.is_some() || c.hostnames.is_some();
+    hides && has_site && (c.entities.is_some() || c.not_entities.is_some() || c.not_hostnames.is_some())
+}
+
+/// The lines `nook_adblock_site_hide_engine` keeps. Lines are tested as text first: parsing
+/// every line of every list costs a launch a few hundred milliseconds.
+fn site_hide_lines(text: &str) -> Vec<&str> {
+    text.lines()
+        .map(str::trim)
+        .filter(|line| {
+            if line.starts_with('!') {
+                return false;
+            }
+            let Some(sharp) = line.find('#') else { return false };
+            let (sites, rest) = line.split_at(sharp);
+            if rest.starts_with("#@#") {
+                return !rest.starts_with("#@#+js(");
+            }
+            rest.starts_with("##")
+                && !rest.starts_with("##+js(")
+                && (sites.contains(".*") || sites.contains('~'))
+                && needs_site_lookup(line)
+        })
+        .collect()
+}
+
+/// An engine of only the hide rules the content rule list cannot scope to their sites, plus
+/// every cosmetic exception. Returns NULL on a null or non-UTF-8 input.
+/// Free with nook_adblock_engine_free.
+#[no_mangle]
+pub unsafe extern "C" fn nook_adblock_site_hide_engine(
+    rules_utf8: *const c_char,
+    rules_len: usize,
+) -> *mut Engine {
+    if rules_utf8.is_null() {
+        return ptr::null_mut();
+    }
+    let bytes = std::slice::from_raw_parts(rules_utf8 as *const u8, rules_len);
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return ptr::null_mut();
+    };
+    guard(
+        || {
+            let mut set = FilterSet::new(false);
+            set.add_filter_list(site_hide_lines(text).join("\n"), ParseOptions::default());
+            Box::into_raw(Box::new(Engine::new_with_filter_set(set)))
+        },
+        ptr::null_mut(),
+    )
+}
+
+#[cfg(test)]
+mod site_hide_tests {
+    use super::*;
+    use crate::content_blocking_ffi::nook_adblock_string_free;
+    use crate::nook_adblock_engine_free;
+
+    /// hide_selectors the site-hide engine built from `rules` returns for `url`.
+    fn hides(rules: &str, url: &str) -> Vec<String> {
+        let c = CString::new(url).unwrap();
+        unsafe {
+            let engine = nook_adblock_site_hide_engine(rules.as_ptr() as *const c_char, rules.len());
+            assert!(!engine.is_null());
+            let p = nook_adblock_cosmetic_for_url(engine, c.as_ptr());
+            let out = if p.is_null() {
+                Vec::new()
+            } else {
+                let v: serde_json::Value = serde_json::from_str(CStr::from_ptr(p).to_str().unwrap()).unwrap();
+                nook_adblock_string_free(p);
+                v["hide_selectors"].as_array().unwrap().iter().map(|s| s.as_str().unwrap().to_string()).collect()
+            };
+            nook_adblock_engine_free(engine);
+            out
+        }
+    }
+
+    #[test]
+    fn entity_rule_applies_on_every_suffix_and_nowhere_else() {
+        let rules = "google.*##.ad\n";
+        assert_eq!(hides(rules, "https://www.google.co.uk/search?q=x"), [".ad"]);
+        assert_eq!(hides(rules, "https://google.com/"), [".ad"]);
+        assert!(hides(rules, "https://example.com/").is_empty());
+    }
+
+    /// The rule behind issue 430, applied where uBlock means it and only there.
+    #[test]
+    fn entity_rule_with_an_excluded_host() {
+        let rules = "~vipbox.pl,vipbox.*,vipboxtv.*##.position-absolute\n";
+        assert_eq!(hides(rules, "https://vipbox.lc/"), [".position-absolute"]);
+        assert!(hides(rules, "https://vipbox.pl/").is_empty());
+        assert!(hides(rules, "https://github.com/notifications").is_empty());
+    }
+
+    #[test]
+    fn hostnames_beside_an_excluded_subdomain() {
+        let rules = "wp.pl,~www.wp.pl##.x\n";
+        assert_eq!(hides(rules, "https://poczta.wp.pl/"), [".x"]);
+        assert!(hides(rules, "https://www.wp.pl/").is_empty());
+    }
+
+    #[test]
+    fn exception_cancels_the_rule_on_its_site() {
+        let rules = "google.*##.ad\ngoogle.de#@#.ad\n";
+        assert_eq!(hides(rules, "https://www.google.fr/"), [".ad"]);
+        assert!(hides(rules, "https://www.google.de/").is_empty());
+    }
+
+    /// What the rule list already covers, and what would hide everywhere, stays out.
+    #[test]
+    fn everything_else_is_left_out() {
+        let rules = "example.com##.plain\n##.generic\n~x.com##.everywhere-but\n/re/,~x.com##.regex\n\
+                     google.*##.a:has-text(x)\ngoogle.*##+js(nowoif)\ngoogle.*##.b:style(color: red)\n\
+                     ||ads.example.com^\n! google.*##.commented\n";
+        assert!(site_hide_lines(rules).is_empty(), "kept {:?}", site_hide_lines(rules));
+        for url in ["https://example.com/", "https://www.google.com/", "https://x.com/", "https://y.test/"] {
+            assert!(hides(rules, url).is_empty(), "{url}");
+        }
+    }
+
+    /// The real lists: enough rules to be worth it, and quick enough to build at every launch.
+    #[test]
+    fn bundled_lists_build_quickly() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../Packages/NookBlocker/Sources/NookBlocker/Resources");
+        let mut text = String::new();
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let p = entry.unwrap().path();
+            if p.extension().and_then(|e| e.to_str()) == Some("txt") {
+                text.push_str(&std::fs::read_to_string(&p).unwrap());
+                text.push('\n');
+            }
+        }
+        let start = std::time::Instant::now();
+        let lines = site_hide_lines(&text);
+        let rules = lines.iter().filter(|l| !l.contains("#@#")).count();
+        unsafe {
+            let engine = nook_adblock_site_hide_engine(text.as_ptr() as *const c_char, text.len());
+            assert!(!engine.is_null());
+            nook_adblock_engine_free(engine);
+        }
+        let took = start.elapsed();
+        eprintln!("site-hide engine: {rules} rules, {} exceptions, {took:?} for both passes", lines.len() - rules);
+        assert!(rules > 500, "only {rules} site-scoped hide rules found");
+        assert!(took.as_millis() < 2000, "took {took:?}");
+    }
 }
 
 #[cfg(test)]

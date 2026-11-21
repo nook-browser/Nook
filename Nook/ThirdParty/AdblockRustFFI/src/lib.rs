@@ -14,6 +14,9 @@ pub(crate) mod content_blocking_ffi;
 pub(crate) mod cosmetic_ffi;
 pub(crate) mod urlskip_ffi;
 
+#[cfg(test)]
+mod overbroad_tests;
+
 // panic = "abort" in release; catch_unwind still guards debug/test builds.
 pub(crate) fn guard<T>(f: impl FnOnce() -> T, fallback: T) -> T {
     catch_unwind(AssertUnwindSafe(f)).unwrap_or(fallback)

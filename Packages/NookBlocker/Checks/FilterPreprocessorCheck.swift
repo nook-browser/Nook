@@ -48,6 +48,10 @@ struct FilterPreprocessorCheck {
 
         let plain = "||a.example^\n||b.example^"
         precondition(FilterPreprocessor.apply(plain) == plain)
+
+        // AdGuard serves CRLF. A CR left on each line broke every `$removeparam` name after it.
+        let crlf = "! Title: x\r\n!#if env_firefox\r\n||firefox.example^\r\n!#endif\r\n||a.example^$removeparam=gclid\r\n"
+        precondition(FilterPreprocessor.apply(crlf) == "! Title: x\n||a.example^$removeparam=gclid\n", "CRLF: \(FilterPreprocessor.apply(crlf).debugDescription)")
         print("FilterPreprocessorCheck passed")
     }
 }
