@@ -24,6 +24,8 @@ struct InstallConsent: Identifiable {
     let permissions: [String]
     let hosts: [String]
     let isUpdate: Bool
+    /// The install replaces, updates or carries an installed extension.
+    let touchesInstalled: Bool
     let logo: NSImage
 }
 
@@ -361,13 +363,7 @@ extension ExtensionManager {
         // store install's manifest `key`, or another app reusing a Safari bundle identifier. As an
         // update it would take over that extension's storage without a word. Ask as for a fresh
         // install, listing everything it requests.
-        let takesOver = existing.map { previous in
-            switch (previous.source, source) {
-            case (.store, .store), (.file, _): false
-            case let (.safari(oldApp?), .safari(newApp?)): oldApp != newApp
-            default: true
-            }
-        } ?? false
+        let takesOver = existing.map { ExtensionSourceShape.takesOver(from: $0.source.shape, to: source.shape) } ?? false
         let consent = Self.consentItems(
             for: staged, comparedTo: takesOver ? nil : previous,
             hiding: ExtensionCompatPatcher.addedPermissions(packageAt: tempDir),
@@ -380,6 +376,7 @@ extension ExtensionManager {
                 name: name, version: version, source: source, replacing: replaced,
                 permissions: consent.permissions, hosts: consent.hosts,
                 isUpdate: predecessor != nil && !takesOver,
+                touchesInstalled: existing != nil || replaced != nil || legacyCopy != nil,
                 logo: staged.icon(for: .init(width: 64, height: 64)) ?? NSImage()
             )
             let granted = if let presenter {
@@ -417,7 +414,13 @@ extension ExtensionManager {
         func putBack() {
             extensionContexts[extensionId] = running
             if placedNewFiles { try? fm.removeItem(at: finalDir) }
-            if fm.fileExists(atPath: backupDir.path) { try? fm.moveItem(at: backupDir, to: finalDir) }
+            if fm.fileExists(atPath: backupDir.path) {
+                do {
+                    try fm.moveItem(at: backupDir, to: finalDir)
+                } catch {
+                    Self.logger.error("Could not put back the previous version of '\(name, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                }
+            }
             if let insertedRecord { context.delete(insertedRecord) }
             if let existing, let previousRecord { previousRecord.apply(to: existing) }
             try? context.save()
@@ -1059,17 +1062,22 @@ extension ExtensionManager {
         var isDone: Bool { finished == total }
     }
 
-    /// Installs extensions the person chose from a list, one at a time without asking again, then
-    /// lists any that failed in one alert.
+    /// Installs extensions the person chose from a list, one at a time, then lists any that failed
+    /// in one alert. A request its row did not show goes to the consent sheet.
     func install(_ offers: [ExtensionOffer]) {
         listInstallProgress = offers.isEmpty ? nil : ListInstallProgress(total: offers.count)
         Task { await installInOrder(offers) }
     }
 
     private func installInOrder(_ offers: [ExtensionOffer]) async {
-        let chosen: InstallConsentPresenter = { _ in true }
         var failures: [String] = []
         for offer in offers {
+            let chosen: InstallConsentPresenter = { [self] request in
+                let covered = ExtensionBatchApproval.approves(
+                    permissions: request.permissions, hosts: request.hosts,
+                    touchesInstalled: request.touchesInstalled, shown: offer.shown)
+                return covered ? true : await presentInBrowserWindow(request)
+            }
             let result: Result<InstalledExtension, ExtensionError> = await withCheckedContinuation { continuation in
                 let finish = { (result: Result<InstalledExtension, ExtensionError>) in continuation.resume(returning: result) }
                 switch offer.package {
@@ -1091,12 +1099,44 @@ extension ExtensionManager {
         }
     }
 
+    /// What the consent sheet would list for `offer`, read from a package already on this Mac.
+    /// Nil when there is none or it cannot be read.
+    func consentPreview(of offer: ExtensionOffer) async -> ExtensionConsentPreview? {
+        guard isExtensionSupportAvailable, let package = offer.localPackage else { return nil }
+        let fm = FileManager.default
+        let dir = getExtensionsDirectory().appendingPathComponent("temp_\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: dir) }
+        do {
+            try await Task.detached {
+                try FileManager.default.createDirectory(at: dir.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try FileManager.default.copyItem(at: package, to: dir)
+            }.value
+            try rejectSymbolicLinks(in: dir)
+            let manifestURL = dir.appendingPathComponent("manifest.json")
+            _ = try ExtensionUtils.validateManifest(at: manifestURL)
+            // The same steps as an install, so the lines match what its sheet would list.
+            ExtensionCompatPatcher.disown(packageAt: dir)
+            patchManifestForWebKit(at: manifestURL, extensionId: offer.id, store: offer.source.store)
+            let staged = try await WKWebExtension(resourceBaseURL: dir)
+            let items = Self.consentItems(
+                for: staged, comparedTo: nil,
+                hiding: ExtensionCompatPatcher.addedPermissions(packageAt: dir),
+                previouslyHiding: [],
+                bridged: compatBridge.gatedPermissions)
+            return ExtensionConsentPreview(permissions: items.permissions, hosts: items.hosts)
+        } catch {
+            return nil
+        }
+    }
+
     // MARK: - Persistence
 
     func loadInstalledExtensions() {
-        // A quit while an install waited for consent left its staged copy behind.
+        // A quit during an install left its staged or backup copy behind.
         let staged = (try? FileManager.default.contentsOfDirectory(at: getExtensionsDirectory(), includingPropertiesForKeys: nil)) ?? []
-        for url in staged where url.lastPathComponent.hasPrefix("temp_") { try? FileManager.default.removeItem(at: url) }
+        for url in staged where ["temp_", "backup_"].contains(where: { url.lastPathComponent.hasPrefix($0) }) {
+            try? FileManager.default.removeItem(at: url)
+        }
 
         let entities: [ExtensionEntity]
         do {

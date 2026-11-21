@@ -122,6 +122,14 @@ enum ExtensionSource {
         return false
     }
 
+    var shape: ExtensionSourceShape {
+        switch self {
+        case .store: .store
+        case .safari(let appPath): .safari(appPath: appPath)
+        case .file: .file
+        }
+    }
+
     var appName: String? {
         appPath.map { URL(fileURLWithPath: $0).lastPathComponent }
     }
@@ -181,6 +189,10 @@ struct ExtensionOffer: Identifiable {
     let version: String
     let icon: NSImage?
     let package: Package
+    /// An unpacked copy of the package on this Mac, read to show what it asks for.
+    var localPackage: URL?
+    /// What the offer's row showed, set when the person chooses it.
+    var shown: ExtensionConsentPreview?
 
     var source: ExtensionSource {
         switch package {
@@ -204,7 +216,8 @@ extension ExtensionOffer {
     init(_ info: ExtensionManager.SafariExtensionInfo) {
         self.init(
             id: info.id, name: info.name, version: info.version,
-            icon: NSWorkspace.shared.icon(forFile: info.appPath.path), package: .safari(info)
+            icon: NSWorkspace.shared.icon(forFile: info.appPath.path), package: .safari(info),
+            localPackage: info.appexPath.appendingPathComponent("Contents/Resources")
         )
     }
 }

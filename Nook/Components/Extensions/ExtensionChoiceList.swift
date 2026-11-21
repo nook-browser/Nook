@@ -8,13 +8,24 @@ import AppKit
 import NookDesign
 import SwiftUI
 
-/// Which choices are checked, and which version is picked where there are two.
+/// Which choices are checked, which version is picked where there are two, and what each row
+/// has shown of what its extension asks for.
 struct ExtensionSelection {
     private(set) var included: Set<String>
     private var picked: [String: String] = [:]
+    private var previews: [String: ExtensionConsentPreview] = [:]
 
+    /// Extensions from the browser being imported start checked; apps found on this Mac do not.
     init(_ choices: [ExtensionChoice]) {
-        included = Set(choices.map(\.id))
+        included = Set(choices.filter { !$0.versions[0].isSafari }.map(\.id))
+    }
+
+    func shown(for offer: ExtensionOffer) -> ExtensionConsentPreview? {
+        previews[offer.id]
+    }
+
+    mutating func show(_ preview: ExtensionConsentPreview, for offer: ExtensionOffer) {
+        previews[offer.id] = preview
     }
 
     var count: Int { included.count }
@@ -32,7 +43,11 @@ struct ExtensionSelection {
     }
 
     func chosen(from choices: [ExtensionChoice]) -> [ExtensionOffer] {
-        choices.filter { included.contains($0.id) }.map(version(of:))
+        choices.filter { included.contains($0.id) }.map { choice in
+            var offer = version(of: choice)
+            offer.shown = previews[offer.id]
+            return offer
+        }
     }
 
     mutating func set(_ choice: ExtensionChoice, included isIncluded: Bool) {
@@ -51,6 +66,8 @@ struct ExtensionSelection {
 struct ExtensionChoiceList: View {
     let choices: [ExtensionChoice]
     @Binding var selection: ExtensionSelection
+    /// What an offer's extension asks for, read from a package on this Mac; nil when there is none.
+    let preview: @MainActor (ExtensionOffer) async -> ExtensionConsentPreview?
     @State private var hasMoreBelow = false
 
     static func subtitle(for choices: [ExtensionChoice]) -> String {
@@ -83,6 +100,18 @@ struct ExtensionChoiceList: View {
             }
         }
         .frame(maxHeight: 440)
+        .task { await loadPreviews() }
+    }
+
+    private func loadPreviews() async {
+        await withTaskGroup(of: (ExtensionOffer, ExtensionConsentPreview?).self) { group in
+            for offer in choices.flatMap(\.versions) {
+                group.addTask { @MainActor in (offer, await preview(offer)) }
+            }
+            for await (offer, lines) in group {
+                if let lines { selection.show(lines, for: offer) }
+            }
+        }
     }
 
     private var rows: some View {
@@ -142,6 +171,13 @@ struct ExtensionChoiceList: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .onTapGesture(perform: toggle)
+                if let lines = selection.shown(for: version) {
+                    ExtensionConsentLines(
+                        permissions: lines.permissions, hosts: lines.hosts,
+                        font: NookDesign.Font.caption, spacing: NookDesign.Spacing.xxs
+                    )
+                    .onTapGesture(perform: toggle)
+                }
             }
         }
     }

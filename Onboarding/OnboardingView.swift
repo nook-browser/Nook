@@ -93,7 +93,11 @@ struct OnboardingView: View {
             switch currentStage {
             case 0: HelloStage()
             case 1: ImportStage(selectedBrowser: $selectedBrowser)
-            case 2: ExtensionsStage(choices: extensionChoices, onDone: finishExtensions)
+            case 2: ExtensionsStage(
+                choices: extensionChoices,
+                preview: { await extensionManager.consentPreview(of: $0) },
+                onDone: finishExtensions
+            )
             case 3: FinalStage(extensionManager: extensionManager)
             default: EmptyView()
             }

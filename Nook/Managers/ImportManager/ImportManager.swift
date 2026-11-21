@@ -65,7 +65,8 @@ class ImportManager: ObservableObject {
                 name: ExtensionManager.resolveLocaleString(name, in: root) ?? name,
                 version: manifest["version"] as? String ?? "",
                 icon: ExtensionManager.findExtensionIcon(in: root, manifest: manifest).flatMap(NSImage.init(contentsOfFile:)),
-                package: .store(.chrome)
+                package: .store(.chrome),
+                localPackage: root
             )
         }
         return nil

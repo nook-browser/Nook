@@ -58,17 +58,15 @@ struct ExtensionPermissionView: View {
             }
 
             if requestedPermissions.isEmpty && requestedHostPermissions.isEmpty {
-                Text("It does not request any special permissions.")
-                    .font(NookDesign.Font.label)
-                    .foregroundColor(.secondary)
+                lines
             } else {
                 Text("It can:")
                     .font(NookDesign.Font.label)
                     .foregroundColor(.secondary)
                 ViewThatFits(in: .vertical) {
-                    permissionList
+                    lines
                     ScrollView {
-                        permissionList
+                        lines
                     }
                     .scrollIndicators(.visible)
                 }
@@ -88,20 +86,8 @@ struct ExtensionPermissionView: View {
         .padding(20)
     }
 
-    private var permissionList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let hostLine {
-                Text("•  \(hostLine)")
-                    .font(NookDesign.Font.label)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(requestedPermissions, id: \.self) { permission in
-                Text("•  \(getPermissionDescription(permission))")
-                    .font(NookDesign.Font.label)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private var lines: ExtensionConsentLines {
+        ExtensionConsentLines(permissions: requestedPermissions, hosts: requestedHostPermissions)
     }
 
     private func switchDetails(from old: InstalledExtension, to new: ExtensionSource) -> some View {
@@ -137,25 +123,56 @@ struct ExtensionPermissionView: View {
         if isUpdate { return "The new version of \"\(extensionName)\" needs more permissions" }
         return "Add the \"\(extensionName)\" extension to Nook?"
     }
+}
+
+/// The permission and site-access lines of the consent sheet. An import list shows the same
+/// lines under each row.
+struct ExtensionConsentLines: View {
+    let permissions: [String]
+    let hosts: [String]
+    var font: SwiftUI.Font = NookDesign.Font.label
+    var spacing: CGFloat = 12
+
+    var body: some View {
+        if permissions.isEmpty && hosts.isEmpty {
+            Text("It does not request any special permissions.")
+                .font(font)
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: spacing) {
+                if let hostLine {
+                    Text("•  \(hostLine)")
+                        .font(font)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(permissions, id: \.self) { permission in
+                    Text("•  \(Self.description(of: permission))")
+                        .font(font)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
     /// One line summarizing site access, Chrome-style.
     private var hostLine: String? {
-        guard !requestedHostPermissions.isEmpty else { return nil }
-        let hosts = requestedHostPermissions.map { pattern -> String in
+        guard !hosts.isEmpty else { return nil }
+        let names = hosts.map { pattern -> String in
             guard let range = pattern.range(of: "://") else { return pattern }
             let rest = pattern[range.upperBound...]
             return String(rest.prefix { $0 != "/" })
         }
-        if requestedHostPermissions.contains("<all_urls>") || hosts.contains("*") {
+        if hosts.contains("<all_urls>") || names.contains("*") {
             return "Read and change all your data on all websites"
         }
-        let unique = Array(Set(hosts)).sorted()
+        let unique = Array(Set(names)).sorted()
         let shown = unique.prefix(5).joined(separator: ", ")
         let more = unique.count > 5 ? " and \(unique.count - 5) more" : ""
         return "Read and change your data on \(shown)\(more)"
     }
 
-    private func getPermissionDescription(_ permission: String) -> String {
+    static func description(of permission: String) -> String {
         switch permission {
         case "storage":
             return "Store and retrieve data locally"

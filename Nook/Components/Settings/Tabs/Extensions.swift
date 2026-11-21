@@ -117,6 +117,7 @@ struct ExtensionsSettingsView: View {
             Button("Remove", role: .destructive) {
                 extensionManager.uninstallExtension(ext.id)
             }
+            Button("Cancel", role: .cancel) {}
         } message: { _ in
             Text("Its data in Nook, such as sign-ins and settings, is deleted.")
         }
