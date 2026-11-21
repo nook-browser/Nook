@@ -70,7 +70,9 @@ struct ExtensionPermissionView: View {
                     }
                     .scrollIndicators(.visible)
                 }
+                // Without fixedSize the frame takes all 240 pt it is offered and a short list floats in it.
                 .frame(maxHeight: 240)
+                .fixedSize(horizontal: false, vertical: true)
             }
             HStack{
                 Button("Cancel") {
@@ -160,8 +162,9 @@ struct ExtensionConsentLines: View {
         guard !hosts.isEmpty else { return nil }
         let names = hosts.map { pattern -> String in
             guard let range = pattern.range(of: "://") else { return pattern }
-            let rest = pattern[range.upperBound...]
-            return String(rest.prefix { $0 != "/" })
+            let host = String(pattern[range.upperBound...].prefix { $0 != "/" })
+            // `file:///*` has no host; the pattern itself says what it covers.
+            return host.isEmpty ? pattern : host
         }
         if hosts.contains("<all_urls>") || names.contains("*") {
             return "Read and change all your data on all websites"
