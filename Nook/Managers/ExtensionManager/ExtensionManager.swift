@@ -283,6 +283,16 @@ final class ExtensionManager: NSObject, ObservableObject,
 
     /// Unloads every extension of a set that is being deleted.
     func tearDown() {
+        guard extensionController != nil else { return }
+        unloadContexts()
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers = []
+        installedExtensions = []
+        extensionController = nil
+    }
+
+    /// Unloads every extension and forgets the windows and tabs it knew; the controller stays.
+    private func unloadContexts() {
         guard let controller = extensionController else { return }
         for adapter in windowAdapters.values { controller.didCloseWindow(adapter) }
         for context in controller.extensionContexts {
@@ -290,14 +300,21 @@ final class ExtensionManager: NSObject, ObservableObject,
             compatBridge.contextUnloaded(context)
             try? controller.unload(context)
         }
-        observers.forEach { NotificationCenter.default.removeObserver($0) }
-        observers = []
         windowAdapters = [:]
         tabAdapters = [:]
         openedTabIDs = []
         extensionContexts = [:]
-        installedExtensions = []
-        extensionController = nil
+    }
+
+    /// True while no profile or private window runs this set: its installs stay and none loads.
+    /// The default set's manager is a singleton, so it idles where another set is torn down.
+    private(set) var isIdle = false
+
+    /// A view body can wake it, so the load runs after the update, which it publishes from.
+    func setIdle(_ idle: Bool) {
+        guard idle != isIdle, isExtensionSupportAvailable else { return }
+        isIdle = idle
+        if idle { unloadContexts() } else { Task { @MainActor in self.loadInstalledExtensions() } }
     }
 
     // MARK: - NSPopoverDelegate
