@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.1
+
+### Fixed
+
+- Ad blocker hiding buttons and links on some sites
+- Dragging text within a page
+- Space swipe with Swipe between pages off
+
 ## 1.6.0
 
 ### Added
