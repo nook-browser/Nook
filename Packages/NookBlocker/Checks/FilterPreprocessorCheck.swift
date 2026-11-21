@@ -4,7 +4,7 @@
 //  Nook
 //
 //  uBO's `!#if` blocks load only for the environment Nook reports.
-//  swiftc Sources/NookBlocker/FilterPreprocessor.swift Checks/FilterPreprocessorCheck.swift -o /tmp/pp && /tmp/pp
+//  swiftc Packages/NookBlocker/Sources/NookBlocker/FilterPreprocessor.swift Packages/NookBlocker/Checks/FilterPreprocessorCheck.swift -o /tmp/pp && /tmp/pp
 //
 
 import Foundation

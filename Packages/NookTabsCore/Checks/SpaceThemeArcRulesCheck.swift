@@ -1,3 +1,5 @@
+// Licensed under GPL-3.0. See LICENSE.
+// swiftc Packages/NookTabsCore/Sources/NookTabsCore/*.swift Packages/NookTabsCore/Checks/SpaceThemeArcRulesCheck.swift -o /tmp/theme-arc && /tmp/theme-arc
 import Foundation
 
 @main

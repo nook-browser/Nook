@@ -4,7 +4,7 @@
 //  Nook
 //
 //  Ordinary links must not look like sign-in popups, or they open in the mini window.
-//  swiftc Sources/NookBlocker/OAuthDetector.swift Checks/OAuthDetectorCheck.swift -o /tmp/oauth && /tmp/oauth
+//  swiftc Packages/NookBlocker/Sources/NookBlocker/OAuthDetector.swift Packages/NookBlocker/Checks/OAuthDetectorCheck.swift -o /tmp/oauth && /tmp/oauth
 //
 
 import Foundation
