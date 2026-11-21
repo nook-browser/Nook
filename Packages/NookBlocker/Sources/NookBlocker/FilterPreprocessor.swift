@@ -17,6 +17,11 @@ enum FilterPreprocessor {
     static let environment: Set<String> = ["env_safari", "ext_ublock"]
 
     static func apply(_ text: String) -> String {
+        // AdGuard serves CRLF, and a CR left on a line breaks whatever reads its last option.
+        var text = text
+        if text.withUTF8({ memchr($0.baseAddress, 0x0D, $0.count) != nil }) {
+            text = text.replacingOccurrences(of: "\r\n", with: "\n")
+        }
         guard text.contains("!#if") else { return text }
         var branches: [Bool] = []
         var kept: [Substring] = []
