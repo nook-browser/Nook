@@ -395,8 +395,12 @@ extension ExtensionManager {
         // STEP 4: Swap files into place and load them from there, so resource URLs resolve to real
         // files. The previous version's files, record and context come back if its replacement fails.
         let finalDir = extensionsDir.appendingPathComponent(extensionId)
-        let backupDir = extensionsDir.appendingPathComponent("backup_\(UUID().uuidString)")
-        defer { try? fm.removeItem(at: backupDir) }
+        // Named for the extension, so a launch after a quit in here can put it back (`restoreBackups`).
+        // It is dropped only while a version is in place: a backup with nothing beside it is the only copy.
+        let backupDir = extensionsDir.appendingPathComponent("backup_\(extensionId)")
+        let dropBackup = { if fm.fileExists(atPath: finalDir.path) { try? fm.removeItem(at: backupDir) } }
+        dropBackup()
+        defer { dropBackup() }
         let running = extensionContexts.removeValue(forKey: extensionId)
         let wasRunning = running?.isLoaded == true
         if let running {
@@ -1131,9 +1135,33 @@ extension ExtensionManager {
 
     // MARK: - Persistence
 
+    /// A quit in the middle of an update left the previous version in `backup_<id>`. It goes back
+    /// unless the record already names its replacement; without this the launch prunes the extension.
+    private func restoreBackups(in leftovers: [URL]) {
+        let fm = FileManager.default
+        func version(at dir: URL) -> String? {
+            (try? ExtensionUtils.validateManifest(at: dir.appendingPathComponent("manifest.json")))?["version"] as? String
+        }
+        for backup in leftovers where backup.lastPathComponent.hasPrefix("backup_") {
+            let id = String(backup.lastPathComponent.dropFirst("backup_".count))
+            let current = getExtensionsDirectory().appendingPathComponent(id)
+            guard ExtensionBackup.restores(
+                currentVersion: version(at: current), backupVersion: version(at: backup),
+                recordVersion: fetchEntity(id: id)?.version) else { continue }
+            try? fm.removeItem(at: current)
+            do {
+                try fm.moveItem(at: backup, to: current)
+                Self.logger.notice("Put back the previous version of \(id, privacy: .public) after an update that did not finish")
+            } catch {
+                Self.logger.error("Could not put back \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
     func loadInstalledExtensions() {
         // A quit during an install left its staged or backup copy behind.
         let staged = (try? FileManager.default.contentsOfDirectory(at: getExtensionsDirectory(), includingPropertiesForKeys: nil)) ?? []
+        restoreBackups(in: staged)
         for url in staged where ["temp_", "backup_"].contains(where: { url.lastPathComponent.hasPrefix($0) }) {
             try? FileManager.default.removeItem(at: url)
         }

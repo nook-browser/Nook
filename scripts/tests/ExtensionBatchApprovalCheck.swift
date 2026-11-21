@@ -69,6 +69,17 @@ struct ExtensionBatchApprovalCheck {
         precondition(ExtensionSourceShape.takesOver(from: .safari(appPath: nil), to: .store))
         precondition(ExtensionSourceShape.takesOver(from: .safari(appPath: nil), to: .file))
 
+        // A previous version left in its backup folder by a quit in the middle of an update.
+        // Nothing arrived in its place: it goes back.
+        precondition(ExtensionBackup.restores(currentVersion: nil, backupVersion: "4.0", recordVersion: "4.0"))
+        precondition(ExtensionBackup.restores(currentVersion: nil, backupVersion: nil, recordVersion: nil))
+        // The new files arrived but the record still names the old version: the old files go back.
+        precondition(ExtensionBackup.restores(currentVersion: "5.0", backupVersion: "4.0", recordVersion: "4.0"))
+        // The record names the new version: the update finished, and the backup is only leftovers.
+        precondition(!ExtensionBackup.restores(currentVersion: "5.0", backupVersion: "4.0", recordVersion: "5.0"))
+        // No record, or a backup that cannot be read, beside files that are there: leave them.
+        precondition(!ExtensionBackup.restores(currentVersion: "5.0", backupVersion: "4.0", recordVersion: nil))
+        precondition(!ExtensionBackup.restores(currentVersion: "5.0", backupVersion: nil, recordVersion: "4.0"))
         print("ok")
     }
 }

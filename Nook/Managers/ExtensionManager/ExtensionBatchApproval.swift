@@ -45,3 +45,15 @@ enum ExtensionSourceShape: Equatable {
         }
     }
 }
+
+/// The previous version's files, left in `backup_<id>` by a quit in the middle of an update.
+enum ExtensionBackup {
+    /// True when they go back in place at launch: nothing replaced them, or the replacement arrived
+    /// but the record still names the backup's version. A record that names the new version means
+    /// the update finished and the backup is leftovers.
+    static func restores(currentVersion: String?, backupVersion: String?, recordVersion: String?) -> Bool {
+        guard let currentVersion else { return true }
+        guard let backupVersion, let recordVersion else { return false }
+        return recordVersion == backupVersion && recordVersion != currentVersion
+    }
+}
