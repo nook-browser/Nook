@@ -75,6 +75,23 @@ final class FocusableWKWebView: WKWebView, SessionWebView {
         }
     }
 
+    // Every navigation Nook starts goes through here, so the session can tell it from one the page starts.
+    @discardableResult override func load(_ request: URLRequest) -> WKNavigation? { began(super.load(request)) }
+    @discardableResult override func loadFileURL(_ url: URL, allowingReadAccessTo readAccessURL: URL) -> WKNavigation? {
+        began(super.loadFileURL(url, allowingReadAccessTo: readAccessURL))
+    }
+    @discardableResult override func goBack() -> WKNavigation? { began(super.goBack()) }
+    @discardableResult override func goForward() -> WKNavigation? { began(super.goForward()) }
+    @discardableResult override func reload() -> WKNavigation? { began(super.reload()) }
+    @discardableResult override func reloadFromOrigin() -> WKNavigation? { began(super.reloadFromOrigin()) }
+    @discardableResult override func go(to item: WKBackForwardListItem) -> WKNavigation? { began(super.go(to: item)) }
+
+    /// A nil navigation began nothing (no history to go to).
+    private func began(_ navigation: WKNavigation?) -> WKNavigation? {
+        if navigation != nil { owningSession?.nookStartedNavigation() }
+        return navigation
+    }
+
     override func rightMouseDown(with event: NSEvent) {
         owningSession?.activate()
         // Ensure this webview becomes first responder so willOpenMenu gets called

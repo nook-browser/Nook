@@ -820,6 +820,8 @@ extension TabsController {
         for id in before where tree.item(id) == nil { endSession(id) }
         // Items the change brought back must not also reopen from the history.
         let restored = Set(change.items.keys.filter { !before.contains($0) && tree.item($0) != nil })
+        // A tab comes back with the guard it closed with; the entries that carry it go next.
+        for marks in device.closed.map(\.guarded) + archive.entries.map(\.guarded) { restoreGuard(marks?.intersection(restored)) }
         dropClosed(containing: restored)
         dropArchived(containing: restored)
         for window in regularWindows { window.refreshCompositor() }

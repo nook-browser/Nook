@@ -837,6 +837,7 @@ extension ExtensionManager {
             }
         }
         installedExtensions.removeAll { $0.id == extensionId }
+        ExtensionSetRegistry.shared.unpinIfUninstalled(extensionId)
         compatManagement.changed(.uninstalled(extensionId))
         compatSidePanel.forget(extensionId)
     }
@@ -1262,6 +1263,8 @@ extension ExtensionManager {
 
         // Load enabled extensions — parse manifests in parallel, then register sequentially
         Task { @MainActor in
+            // An idle set loads nothing; it loads when something joins it.
+            guard !self.isIdle else { self.extensionsLoaded = true; return }
             // Phase 1: Parse all extensions in parallel (I/O-bound)
             // Extract Sendable values from PersistentModel entities before crossing actor boundary
             let entityIndex = Dictionary(enabledEntities.map { ($0.0.packagePath, $0.0) }, uniquingKeysWith: { _, latest in latest })
@@ -1292,7 +1295,7 @@ extension ExtensionManager {
             }
 
             // Phase 2: Register contexts sequentially (must be on MainActor)
-            for (entity, webExtension) in parsed {
+            for (entity, webExtension) in parsed where !self.isIdle && self.extensionContexts[entity.id] == nil {
                 do {
                     try self.registerContext(for: entity, webExtension: webExtension)
                 } catch {

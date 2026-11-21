@@ -84,6 +84,16 @@ struct ExtensionSetsCheck {
         precondition(kept.separate(p1, profiles: trio, defaultSet: d) == (b, []))
         precondition(Set(kept.profileDeleted(p1, defaultSet: d)) == [a, b])
 
+        // The registry idles the default set while `choices` lists no profile in it, and wakes it when one joins.
+        var idle = ExtensionSets()
+        let duo = [p1, p2]
+        let x = idle.separate(p1, profiles: duo, defaultSet: d).set
+        precondition(idle.choices(profiles: duo, defaultSet: d).contains { $0.set == d }, "p2 still runs the default set")
+        let y = idle.separate(p2, profiles: duo, defaultSet: d).set
+        precondition(!idle.choices(profiles: duo, defaultSet: d).contains { $0.set == d }, "every profile Separate")
+        precondition(idle.sync(p2, with: d, profiles: duo, defaultSet: d).isEmpty && x != y)
+        precondition(idle.choices(profiles: duo, defaultSet: d).contains { $0.set == d }, "a profile joined it again")
+
         // Survives a round trip through JSON, the way settings store it.
         var stored = ExtensionSets()
         _ = stored.separate(p4, profiles: all, defaultSet: d)

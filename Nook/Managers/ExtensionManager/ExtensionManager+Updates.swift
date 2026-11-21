@@ -26,7 +26,7 @@ extension ExtensionManager {
         // The first launch that can migrate does not wait out the day.
         let legacyWaiting = isDefaultSet && !defaults.bool(forKey: Self.migrationTriedKey)
             && entities.contains { Self.isLegacy(id: $0.id, sourceStore: $0.sourceStore) }
-        guard !isCheckingForUpdates,
+        guard !isIdle, !isCheckingForUpdates,
               legacyWaiting || Date().timeIntervalSince1970 - lastCheck > Self.updateInterval
         else { return }
 
