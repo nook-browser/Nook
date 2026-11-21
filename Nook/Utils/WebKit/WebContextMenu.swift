@@ -297,7 +297,9 @@ extension FocusableWKWebView {
         }
 
         browserManager.tabs.setSpace(spaceID, in: window)
-        browserManager.tabs.open(url: url, in: window, placement: .newTab)
+        if let id = browserManager.tabs.open(url: url, in: window, placement: .newTab), let opener = owningSession?.itemID {
+            browserManager.tabs.inheritGuard(id, from: opener)
+        }
     }
 
     /// Opens `url` as a trail child and pairs it with the window's selection.

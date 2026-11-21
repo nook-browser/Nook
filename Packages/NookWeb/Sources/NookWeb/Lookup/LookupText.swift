@@ -58,6 +58,32 @@ public enum LookupText {
         return nil
     }
 
+    /// A fetched page's bytes as text: in the encoding its response named, else the one its own
+    /// `<meta>` names, else UTF-8, with bytes that fit none replaced rather than the page lost.
+    public static func text(of data: Data, encodingName: String?) -> String {
+        if let name = encodingName, let text = decode(data, as: name) { return text }
+        if let name = metaCharset(in: data), let text = decode(data, as: name) { return text }
+        return String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+    }
+
+    private static func decode(_ data: Data, as name: String) -> String? {
+        let known = CFStringConvertIANACharSetNameToEncoding(name as CFString)
+        guard known != kCFStringEncodingInvalidId else { return nil }
+        let encoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(known))
+        // The web reads a Latin-1 label as windows-1252, which leaves a few bytes undefined.
+        if encoding == .isoLatin1 { return String(data: data, encoding: .windowsCP1252) ?? String(data: data, encoding: .isoLatin1) }
+        return String(data: data, encoding: encoding)
+    }
+
+    /// The charset a page declares in its first 2 KB.
+    private static func metaCharset(in data: Data) -> String? {
+        let head = String(decoding: data.prefix(2048), as: UTF8.self)
+        guard let re = try? NSRegularExpression(pattern: #"<meta[^>]*charset\s*=\s*["']?([A-Za-z0-9_:.\-]+)"#, options: .caseInsensitive),
+              let match = re.firstMatch(in: head, range: NSRange(head.startIndex..., in: head)),
+              let name = Range(match.range(at: 1), in: head) else { return nil }
+        return String(head[name])
+    }
+
     // MARK: - Fragments
 
     /// A title or snippet as one line of plain text.
@@ -145,15 +171,24 @@ public enum LookupText {
         return out
     }
 
-    /// What sits inside each closed element named in `names`, in page order.
+    /// What sits inside each closed element named in `names`, in page order. An element ends at
+    /// its own closing tag, and one left open is skipped. A name with nothing left ahead is never searched for again.
     private static func elements(_ names: [String], in text: NSString, first: Bool) -> [String] {
         var found: [String] = []
         var cursor = 0
+        var ahead: [String: Range<Int>] = [:]
+        var live = names
         while cursor < text.length {
-            let opens = names.compactMap { opening($0, in: text, from: cursor) }
-            guard let open = opens.min(by: { $0.lowerBound < $1.lowerBound }), let start = find(">", in: text, from: open.upperBound) else { break }
-            let closes = names.compactMap { find("</\($0)>", in: text, from: start.upperBound) }
-            guard let close = closes.min(by: { $0.lowerBound < $1.lowerBound }) else { break }
+            for name in live where ahead[name].map({ $0.lowerBound < cursor }) ?? true {
+                ahead[name] = opening(name, in: text, from: cursor)
+            }
+            live.removeAll { ahead[$0] == nil }
+            guard let (name, open) = live.compactMap({ name in ahead[name].map { (name, $0) } }).min(by: { $0.1.lowerBound < $1.1.lowerBound }),
+                  let start = find(">", in: text, from: open.upperBound) else { break }
+            guard let close = find("</\(name)>", in: text, from: start.upperBound) else {
+                live.removeAll { $0 == name }
+                continue
+            }
             found.append(text.substring(with: NSRange(location: start.upperBound, length: close.lowerBound - start.upperBound)))
             if first { break }
             cursor = close.upperBound

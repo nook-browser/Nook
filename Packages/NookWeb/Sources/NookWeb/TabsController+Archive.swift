@@ -43,6 +43,7 @@ extension TabsController {
         guard window.privateTree == nil, let entry = archive.entries.first(where: { $0.id == id }),
               let spaceID = tree.space(entry.spaceID)?.id ?? fallbackSpaceID(for: window),
               perform(.main, "restoreArchived", { try $0.restore(entry.items, toTopOf: spaceID) }) != nil else { return }
+        restoreGuard(entry.guarded)
         dropArchived(containing: Set(entry.items.map(\.id)))
         dropClosed(containing: Set(entry.items.map(\.id)))
         for host in entry.items where host.isFolder || entry.items.contains(where: { $0.parent == .folder(itemID: host.id) }) {

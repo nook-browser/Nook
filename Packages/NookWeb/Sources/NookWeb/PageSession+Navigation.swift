@@ -335,8 +335,13 @@ extension PageSession: WKNavigationDelegate {
            scheme == "http" || scheme == "https", gatePassedURL != url
         {
             guard let gate = navigationGate else { return decisionHandler(.cancel) }
+            let isMainFrame = navigationAction.targetFrame?.isMainFrame == true
             Task { @MainActor [weak self] in
-                guard let self, await gate(url) else { return decisionHandler(.cancel) }
+                guard let self, await gate(url) else {
+                    // WebKit reports no failure for a cancelled policy decision; say so, so a reader waiting on the load stops.
+                    if isMainFrame { self?.loadingState = .didFailProvisionalNavigation(URLError(.cancelled)) }
+                    return decisionHandler(.cancel)
+                }
                 self.gatePassedURL = url
                 self.webView(webView, decidePolicyFor: navigationAction, decisionHandler: decisionHandler)
                 self.gatePassedURL = nil

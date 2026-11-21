@@ -36,6 +36,31 @@ struct LookupTextCheck {
         let empty = LookupText.page(fromHTML: "", baseURL: e)
         precondition(empty.text.isEmpty && empty.title == nil && empty.image == nil)
 
+        // a page is read in the encoding it names: the response's first, then its own meta tag, then UTF-8
+        let latin = Data("<p>caf".utf8) + Data([0xE9, 0x20, 0x92]) + Data("</p>".utf8)
+        precondition(LookupText.text(of: latin, encodingName: "iso-8859-1") == "<p>caf\u{E9} \u{2019}</p>", "a Latin-1 label reads as windows-1252")
+        precondition(LookupText.text(of: Data("caf".utf8) + Data([0xE9, 0x81]), encodingName: "ISO-8859-1") == "caf\u{E9}\u{81}", "bytes windows-1252 leaves undefined still read")
+        precondition(LookupText.text(of: latin, encodingName: "windows-1252") == "<p>caf\u{E9} \u{2019}</p>")
+        let japanese = "<p>\u{65E5}\u{672C}\u{8A9E}</p>"
+        let sjis = japanese.data(using: .shiftJIS)!
+        precondition(String(decoding: sjis, as: UTF8.self).contains("\u{FFFD}"), "as UTF-8 these bytes are lost")
+        for name in ["Shift_JIS", "shift_jis", "x-sjis"] { precondition(LookupText.text(of: sjis, encodingName: name) == japanese, name) }
+        let tagged = Data("<html><head><meta charset=\"shift_jis\"></head>".utf8) + sjis
+        precondition(LookupText.text(of: tagged, encodingName: nil).hasSuffix(japanese), "the page's own meta tag")
+        let httpEquiv = Data("<META http-equiv=Content-Type content='text/html; charset=windows-1252'>".utf8) + Data([0x93, 0x94])
+        precondition(LookupText.text(of: httpEquiv, encodingName: nil).hasSuffix("\u{201C}\u{201D}"))
+        let utf8Page = "<meta charset=\"shift_jis\"><p>caf\u{E9} \u{65E5}</p>"
+        precondition(LookupText.text(of: Data(utf8Page.utf8), encodingName: "utf-8") == utf8Page, "the response outranks the meta tag")
+        precondition(LookupText.text(of: Data("plain \u{E9}".utf8), encodingName: "no-such-charset") == "plain \u{E9}", "a name it does not know falls back to UTF-8")
+        precondition(LookupText.text(of: Data("plain \u{E9}".utf8), encodingName: nil) == "plain \u{E9}")
+        let broken = LookupText.text(of: Data("kept ".utf8) + Data([0xFF, 0xFE]) + Data(" text".utf8), encodingName: "utf-8")
+        precondition(broken.hasPrefix("kept ") && broken.hasSuffix(" text") && broken.contains("\u{FFFD}"), "bad bytes are replaced, the page stays")
+        precondition(LookupText.text(of: Data(), encodingName: nil).isEmpty)
+        // a fetched Shift-JIS page reads whole
+        let article = "<html><head><title>\u{65E5}\u{672C}</title></head><body><p>" + String(repeating: "\u{65E5}\u{672C}\u{8A9E}", count: 400) + "</p></body></html>"
+        let read = LookupText.page(fromHTML: LookupText.text(of: article.data(using: .shiftJIS)!, encodingName: "Shift_JIS"), baseURL: e)
+        precondition(read.title == "\u{65E5}\u{672C}" && read.text.count >= LookupText.thin && !read.text.contains("\u{FFFD}"))
+
         // titles and snippets: tags out, entities decoded, one line
         precondition(LookupText.plain("I came across <b>Vision</b> <b>Pro</b>\n glasses") == "I came across Vision Pro glasses")
         precondition(LookupText.plain("Here&#x27;s &amp; &quot;that&quot;") == "Here's & \"that\"")
@@ -72,6 +97,20 @@ struct LookupTextCheck {
             precondition(took < 2, "\(hostile.prefix(12)) took \(took) s")
             _ = text
         }
+        // a main holding several articles reads back whole, not as its first article
+        let story = { (k: Int) in "<article><h2>Story \(k)</h2>" + String(repeating: "<p>Body of the story, some words.</p>", count: 60) + "</article>" }
+        let stories = LookupText.page(fromHTML: "<body><nav>Menu</nav><main>" + (1...5).map(story).joined() + "</main></body>", baseURL: e).text
+        for k in 1...5 { precondition(stories.contains("Story \(k)"), "Story \(k) missing") }
+        precondition(!stories.contains("Menu"))
+        // a main that never closes is read as text around its article
+        precondition(LookupText.page(fromHTML: "<body><main>Intro " + story(1) + "</body>", baseURL: e).text.contains("Story 1"))
+        // many articles: each is paired with its own closing tag in one pass, not one pass to the end per article
+        let long = "<body><main>" + (1...600).map(story).joined() + "</main></body>"
+        precondition(long.utf8.count > 1_300_000)
+        let tookLong = seconds { _ = LookupText.page(fromHTML: long, baseURL: e) }
+        precondition(tookLong < 1, "600 articles took \(tookLong) s")
+        let tookMany = seconds { _ = LookupText.page(fromHTML: "<body>" + String(repeating: story(0), count: 600) + "</body>", baseURL: e) }
+        precondition(tookMany < 1, "600 sibling articles took \(tookMany) s")
         // an element left open is read as text, as before
         precondition(LookupText.page(fromHTML: "<body><nav>Menu<p>Kept text</p>", baseURL: e).text == "Menu\nKept text")
         precondition(LookupText.page(fromHTML: "<title>Never closed", baseURL: e).title == nil)

@@ -16,7 +16,6 @@ struct LoadErrorView: View {
 
     // The scene and the text keep a reading width however wide the page is.
     private static let sceneWidth: CGFloat = 480, textWidth: CGFloat = 420, margin: CGFloat = 32
-    private static let titleFont = Font.system(size: 22, weight: .semibold, design: .serif)
 
     var body: some View {
         if let error = session.loadError {
@@ -27,10 +26,10 @@ struct LoadErrorView: View {
                     .frame(maxWidth: Self.sceneWidth)
                 VStack(spacing: NookDesign.Spacing.md) {
                     Text(copy.title)
-                        .font(Self.titleFont)
+                        .font(NookDesign.Font.serifTitle)
                         .accessibilityAddTraits(.isHeader)
                     Text(copy.body)
-                        .font(.body)
+                        .font(NookDesign.Font.bodyRegular)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }

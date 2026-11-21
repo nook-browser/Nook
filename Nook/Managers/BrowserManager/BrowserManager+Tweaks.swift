@@ -46,7 +46,8 @@ extension BrowserManager: SiteRoutingHost {
 
         // Deferred: callers are WebKit policy callbacks. Selecting the new tab shows its space.
         Task { @MainActor [tabs] in
-            tabs.open(url: url, in: window, placement: .newTab, parent: .tabs(spaceID: spaceID))
+            guard let id = tabs.open(url: url, in: window, placement: .newTab, parent: .tabs(spaceID: spaceID)) else { return }
+            tabs.inheritGuard(id, from: session?.itemID)
         }
         return true
     }
