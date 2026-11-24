@@ -16,13 +16,15 @@ import NookDesign
 class DialogManager {
     var isVisible: Bool = false
     var activeDialog: AnyView?
+    var closesOnBackdropClick = true
 
     private var tabKeyMonitor: Any?
 
     // MARK: - Presentation
 
-    func showDialog<Content: View>(_ dialog: Content) {
+    func showDialog<Content: View>(_ dialog: Content, closesOnBackdropClick: Bool = true) {
         activeDialog = AnyView(dialog)
+        self.closesOnBackdropClick = closesOnBackdropClick
         isVisible = true
         installTabKeyMonitor()
     }
