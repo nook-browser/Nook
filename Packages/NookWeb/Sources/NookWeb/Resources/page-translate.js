@@ -7,6 +7,7 @@
     const SKIP = 'script, style, noscript, template, code, pre, kbd, samp, textarea, input, select, svg, math, '
         + '[contenteditable]:not([contenteditable="false"]), [translate="no"], .notranslate';
     const SAMPLE_LIMIT = 2048;
+    const SAMPLE_NODES = 4000;
     const FLUSH_DELAY = 300;
 
     let originals = new Map(); // id -> { node, text }
@@ -81,14 +82,17 @@
     }
 
     window.__nookTranslate = {
-        // About 2 KB of the page's text and its declared language, for detection.
+        // About 2 KB of the text the page shows and its declared language, for detection. Hidden
+        // menus and language pickers are left out: they are not what the reader sees.
         sample() {
             let text = '';
+            let seen = 0;
             if (document.body) {
                 walk(document.body, (node) => {
                     const trimmed = node.nodeValue.trim();
-                    if (trimmed) { text += trimmed + ' '; }
-                    return text.length < SAMPLE_LIMIT;
+                    if (!trimmed) { return true; }
+                    if (node.parentElement.checkVisibility({ visibilityProperty: true })) { text += trimmed + ' '; }
+                    return text.length < SAMPLE_LIMIT && ++seen < SAMPLE_NODES;
                 });
             }
             return { text: text.slice(0, SAMPLE_LIMIT), lang: document.documentElement.lang || '' };

@@ -63,20 +63,27 @@ extension PageSession {
 
     // MARK: - Offer
 
-    /// After a main-frame load: reads a 2 KB sample and offers translation when the page is
-    /// in another language the system can translate.
+    /// After a main-frame load: reads a 2 KB sample of what the page shows and offers translation
+    /// when it is in another language the system can translate.
     func offerTranslationIfNeeded() {
         guard canTranslate, !isTranslated,
               let host = url.host?.lowercased(), !Self.declinedTranslationHosts.contains(host)
         else { return }
         let generation = translationGeneration
         Task {
-            guard let source = await detectSourceLanguage(minimumLength: Self.minimumTextForOffer),
-                  generation == translationGeneration,
+            var detected = await detectSourceLanguage(minimumLength: Self.minimumTextForOffer)
+            if detected == nil {
+                // One page in fifteen shows its text only after the load finishes: look once more.
+                try? await Task.sleep(for: .seconds(2))
+                guard generation == translationGeneration else { return }
+                detected = await detectSourceLanguage(minimumLength: Self.minimumTextForOffer)
+            }
+            guard let source = detected, generation == translationGeneration,
                   PageLanguage.needsTranslation(source, into: PageLanguage.reader)
             else { return }
             let status = await LanguageAvailability().status(from: source, to: PageLanguage.reader)
             guard status != .unsupported, generation == translationGeneration, !isTranslated else { return }
+            Self.log.notice("Offering translation from \(source.minimalIdentifier, privacy: .public)")
             translationSource = source
             translationOffer = source
         }
@@ -154,7 +161,9 @@ extension PageSession {
         guard let sample = await callTranslateScript("sample()") as? [String: Any],
               let text = sample["text"] as? String, text.count >= minimumLength
         else { return nil }
-        return PageLanguage.detect(sample: text, declared: sample["lang"] as? String)
+        let declared = sample["lang"] as? String
+        // About 15 ms for a full sample, so not on the main actor.
+        return await Task.detached(priority: .utility) { PageLanguage.detect(sample: text, declared: declared) }.value
     }
 
     /// Installs the script in the main frame's NookTranslate world if needed, then runs `call`.
