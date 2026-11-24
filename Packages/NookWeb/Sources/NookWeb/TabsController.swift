@@ -52,6 +52,8 @@ public final class TabsController {
     public internal(set) var liveStatus: [UUID: LiveFolderStatus] = [:]
     @ObservationIgnored var liveRefreshed: [UUID: Date] = [:]
     @ObservationIgnored var liveRefreshing: Set<UUID> = []
+    /// Tabs Air Traffic Control opened from a page, and that page's tab: Back returns there.
+    public var routedFrom: [UUID: UUID] = [:]
     /// The tab DevMCP page tools act on, in the Agent space (see `TabsController+Agent.swift`).
     public internal(set) var agentItemID: UUID?
     /// DevMCP tool calls running now; the sidebar's agent row pulses while it is above zero.

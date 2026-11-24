@@ -48,6 +48,7 @@ extension BrowserManager: SiteRoutingHost {
         Task { @MainActor [tabs] in
             guard let id = tabs.open(url: url, in: window, placement: .newTab, parent: .tabs(spaceID: spaceID)) else { return }
             tabs.inheritGuard(id, from: session?.itemID)
+            if let source = session?.itemID { tabs.routedFrom[id] = source }
         }
         return true
     }

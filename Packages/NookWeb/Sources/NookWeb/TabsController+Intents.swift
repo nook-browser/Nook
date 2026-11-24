@@ -435,6 +435,7 @@ extension TabsController {
     /// The tab whose page opened `itemID`, which Back returns to once the page has no history.
     public func opener(of itemID: UUID) -> UUID? {
         owner(ofItem: itemID).flatMap { tree($0).trailParent(of: itemID) }
+            ?? routedFrom[itemID].flatMap { tree.item($0) != nil ? $0 : nil }
     }
 
     /// Back with no page left: shows the tab that opened `itemID` and closes it, as Safari and
