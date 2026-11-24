@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.7.0
+
+### Added
+
+- Look It Up, early alpha. Inspired by Arc Search and some of TBC's initial demo videos
+- Cmd-T lists open tabs and finds them as you type (#429)
+- Error page when a site fails to load
+- Extensions per profile, shared or separate (#420)
+- Auto-Play and sidebar video per site (#384)
+- Extensions step in import, Web Store or Safari version (#417)
+
+### Ad Blocker
+
+- Hide rules for specific sites work
+- Bad rules fixed without an app update
+- Faster navigation (#428)
+
+### Fixed
+
+- Back on tabs opened by Air Traffic Control
+- Translate picks the right language more often
+- First launch hiding other apps (#425)
+- HTTP fallback when HTTPS has a bad certificate (#424)
+- Failed extension updates keep the old version
+- 1Password extension (#419)
+- Extensions freezing large spaces (#423)
+- Bugs
+
+### Thanks
+
+- @autaut03, @MyroslavRepin, @HelloAlexPan
+
 ## 1.6.1
 
 ### Fixed
