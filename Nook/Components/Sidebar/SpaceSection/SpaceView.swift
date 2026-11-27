@@ -187,14 +187,6 @@ struct SpaceView: View {
                 }
             }
             .contentShape(Rectangle())
-            // Rows have their own menus; this one covers the gaps and the tail of the section.
-            .contextMenu {
-                Button {
-                    tabs.createFolderForRename(in: section, after: tabs.children(of: section).last?.id)
-                } label: {
-                    Label("New Folder", systemImage: "folder.badge.plus")
-                }
-            }
         }
     }
 

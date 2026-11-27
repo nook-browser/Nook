@@ -15,7 +15,7 @@ struct SettingsWindow: View {
     @EnvironmentObject var gradientColorManager: GradientColorManager
     @Environment(\.nookSettings) var nookSettings
 
-    private let windowSize = CGSize(width: 780, height: 540)
+    private let windowSize = CGSize(width: 820, height: 560)
     @State private var query = ""
 
     // Back/forward walk every place visited, sidebar picks and sub-pane pushes alike.
@@ -37,10 +37,12 @@ struct SettingsWindow: View {
             get: { navigation.currentSettingsTab },
             set: { paths[$0] = []; navigation.currentSettingsTab = $0 }
         )
-        // A fixed sidebar beside the page, not a NavigationSplitView, whose sidebar is glass.
-        HStack(spacing: 0) {
+        // Native NavigationSplitView gives macOS Liquid Glass sidebar and proper toolbar alignment.
+        NavigationSplitView {
             SettingsSidebar(selection: selection, query: $query)
-            Divider()
+                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
+                .toolbar(removing: .sidebarToggle)
+        } detail: {
             SettingsDetailPane(
                 tab: tab,
                 path: Binding(get: { paths[tab] ?? [] }, set: { paths[tab] = $0 }),
@@ -150,26 +152,26 @@ private struct SettingsSidebar: View {
     @Binding var query: String
     @EnvironmentObject var browserManager: BrowserManager
 
-    private let sidebarWidth: CGFloat = 230
+    private let sidebarWidth: CGFloat = 220
 
     var body: some View {
         VStack(spacing: NookDesign.Spacing.md) {
             SidebarMenuSearchField(prompt: "Search", text: $query)
             ScrollView {
                 VStack(alignment: .leading, spacing: NookDesign.Spacing.rowGap) {
-                    ForEach(Array(SettingsTabs.sidebarGroups.enumerated()), id: \.offset) { _, group in
+                    ForEach(Array(SettingsTabs.sidebarGroups.enumerated()), id: \.offset) { index, group in
                         let tabs = group.tabs.filter { tab in
                             guard tab.matches(query) else { return false }
                             return tab != .extensions || browserManager.extensionManager != nil
                         }
                         if !tabs.isEmpty {
-                            // A group header reads as a filter label while searching, so it goes.
                             if let title = group.title, query.isEmpty {
                                 Text(title)
                                     .font(NookDesign.Font.captionStrong)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.tertiary)
                                     .padding(.horizontal, NookDesign.Spacing.rowPadding)
-                                    .padding(.top, NookDesign.Spacing.sectionGap)
+                                    .padding(.top, index == 0 ? 0 : NookDesign.Spacing.lg)
+                                    .padding(.bottom, NookDesign.Spacing.xxs)
                             }
                             ForEach(tabs, id: \.self) { tab in
                                 SettingsSidebarRow(tab: tab, isSelected: selection == tab) {
@@ -182,12 +184,13 @@ private struct SettingsSidebar: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(NookDesign.Spacing.sidebarInset)
-        .frame(width: sidebarWidth)
+        .padding(.horizontal, NookDesign.Spacing.md)
+        .padding(.top, NookDesign.Spacing.xs)
+        .padding(.bottom, NookDesign.Spacing.md)
     }
 }
 
-/// A settings tab in the sidebar, drawn like a sidebar tab row.
+/// A settings tab in the sidebar, styled cleanly with accent selection.
 private struct SettingsSidebarRow: View {
     let tab: SettingsTabs
     let isSelected: Bool
@@ -198,22 +201,22 @@ private struct SettingsSidebarRow: View {
         Button(action: action) {
             HStack(spacing: NookDesign.Spacing.md) {
                 Image(systemName: tab.icon)
-                    .imageScale(.small)
-                    .foregroundStyle(.white)
-                    .frame(width: NookDesign.Size.settingsChip, height: NookDesign.Size.settingsChip)
-                    .background(NookDesign.Radius.shape(NookDesign.Radius.sm).fill(tab.iconColor.gradient))
+                    .font(.system(size: NookDesign.Size.rowGlyph, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .frame(width: NookDesign.Size.favicon)
                 Text(tab.name)
-                    .font(NookDesign.Font.body)
-                    .foregroundStyle(.primary)
+                    .font(isSelected ? NookDesign.Font.label : NookDesign.Font.body)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, NookDesign.Spacing.rowPadding)
             .frame(height: NookDesign.Size.row)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.14) : (isHovering ? NookDesign.Surface.fill : .clear),
+                in: NookDesign.Radius.shape(NookDesign.Radius.md)
+            )
             .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
-            .background(!isSelected && isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
-            .nookRowSelection(isSelected)
-            .nookElevation(isSelected ? .raised : .flat)
         }
         .buttonStyle(.plain)
         .animation(NookDesign.Motion.hover(isHovering), value: isHovering)

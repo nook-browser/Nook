@@ -73,11 +73,13 @@ public struct SpacesSettingsView: View {
     private func profileRow(_ profile: ProfileSummary) -> some View {
         HStack(spacing: NookDesign.Spacing.md) {
             VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
-                TextField("Profile name", text: Binding(
+                TextField("", text: Binding(
                     get: { profile.name },
                     set: { tabs.renameProfile(profile.id, to: $0) }
-                ))
+                ), prompt: Text("Profile name"))
+                .labelsHidden()
                 .textFieldStyle(.plain)
+                .font(NookDesign.Font.label)
                 Text(([profile.spaceIDs.compactMap { tabs.space($0)?.name }.joined(separator: ", ")]
                       + [stats[profile.id] ?? "Checking…"]).joined(separator: " · "))
                     .font(NookDesign.Font.secondary)
@@ -161,15 +163,17 @@ public struct SpacesSettingsView: View {
                 ), onSelect: { showIconPickerFor = nil })
             }
 
-            VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
-                TextField("Space name", text: Binding(
-                    get: { space.name },
-                    set: { tabs.updateSpace(space.id, name: $0, icon: nil, accentHex: nil) }
-                ))
-                .textFieldStyle(.plain)
-            }
-            Spacer()
+            TextField("", text: Binding(
+                get: { space.name },
+                set: { tabs.updateSpace(space.id, name: $0, icon: nil, accentHex: nil) }
+            ), prompt: Text("Space name"))
+            .labelsHidden()
+            .textFieldStyle(.plain)
+            .font(NookDesign.Font.body)
+            .frame(minWidth: 100, maxWidth: .infinity, alignment: .leading)
+
             profilePicker(space)
+                .labelsHidden()
             if spaces.count > 1 {
                 Menu {
                     Button("Delete Space…", systemImage: "trash", role: .destructive) {

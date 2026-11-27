@@ -27,8 +27,11 @@ public struct EmptyWebsiteView: View {
                 let isActive = windowRegistry.activeWindowId == windowState.id
 
                 let theme = windowState.isIncognito ? nil : windowState.spaceDraftTheme ?? windowState.spaceID.flatMap { tabs.space($0)?.theme }
+                let shape = NookDesign.Radius.shape(NookDesign.Radius.page)
                 SpaceChromeBackground(theme: theme, accent: accent, isActive: isActive)
-                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.lg))
+                    .overlay(shape.fill(colorScheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.45)))
+                    .overlay(shape.strokeBorder(NookDesign.Surface.hairline, lineWidth: NookDesign.Size.hairlineWidth))
+                    .clipShape(shape)
                     .nookElevation(.raised)
                     .animation(NookDesign.Motion.standard, value: isActive)
 

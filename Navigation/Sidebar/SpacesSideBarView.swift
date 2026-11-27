@@ -24,6 +24,7 @@ struct SpacesSideBarView: View {
     @Environment(\.nookBaseColorScheme) private var baseColorScheme
     @Environment(WindowRegistry.self) private var windowRegistry
     @Environment(\.nookSettings) var nookSettings
+    @Environment(\.openSettings) private var openSettings
     @Environment(CommandPalette.self) var commandPalette
     @Environment(TabOrganizerManager.self) var tabOrganizerManager
 
@@ -34,6 +35,9 @@ struct SpacesSideBarView: View {
     @State private var showDownloadsMenu = false
     @State private var animateDownloadsMenu: Bool = false
     @State private var showThemeEditor = false
+    @State private var showIconPicker = false
+    @State private var showRenameAlert = false
+    @State private var renameDraft = ""
 
     var body: some View {
         sidebarContent
@@ -61,6 +65,30 @@ struct SpacesSideBarView: View {
                     SpaceThemeEditor(space: space)
                         .environment(tabs)
                 }
+            }
+            .popover(
+                isPresented: $showIconPicker,
+                attachmentAnchor: .point(UnitPoint(x: nookSettings.sidebarPosition == .left ? 1 : 0, y: 0.5)),
+                arrowEdge: nookSettings.sidebarPosition == .left ? .trailing : .leading
+            ) {
+                if let space = themeableSpace {
+                    SpaceIconPicker(icon: Binding(
+                        get: { tabs.space(space.id)?.icon ?? space.icon },
+                        set: { tabs.updateSpace(space.id, name: nil, icon: $0, accentHex: nil) }
+                    ), onSelect: { showIconPicker = false })
+                }
+            }
+            .alert("Rename Space", isPresented: $showRenameAlert) {
+                TextField("Space name", text: $renameDraft)
+                Button("Save") {
+                    if let space = themeableSpace {
+                        let trimmed = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmed.isEmpty {
+                            tabs.updateSpace(space.id, name: trimmed, icon: nil, accentHex: nil)
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
             }
     }
 
@@ -303,10 +331,48 @@ struct SpacesSideBarView: View {
 
     private var sidebarContextMenu: some View {
         Group {
-            Button {
-                commandPalette.open()
-            } label: {
-                Label("New Tab", systemImage: "plus")
+            if let space = themeableSpace {
+                Button {
+                    showIconPicker = true
+                } label: {
+                    Label("Change Space Icon…", systemImage: "face.smiling")
+                }
+
+                Button {
+                    renameDraft = space.name
+                    showRenameAlert = true
+                } label: {
+                    Label("Rename Space…", systemImage: "pencil")
+                }
+
+                Button {
+                    showThemeEditor = true
+                } label: {
+                    Label("Edit Theme Color…", systemImage: "paintpalette")
+                }
+
+                Menu {
+                    let current = tabs.profiles.first { $0.spaceIDs.contains(space.id) }
+                    ForEach(tabs.profiles) { profile in
+                        Button {
+                            tabs.setProfile(space.id, to: profile.id)
+                        } label: {
+                            if profile.id == current?.id {
+                                Label(profile.name, systemImage: "checkmark")
+                            } else {
+                                Text(profile.name)
+                            }
+                        }
+                    }
+                    Divider()
+                    Button("New Profile", systemImage: "plus") {
+                        tabs.setProfile(space.id, to: nil)
+                    }
+                } label: {
+                    Label("Set Profile", systemImage: "person.crop.circle")
+                }
+
+                Divider()
             }
 
             Button {
@@ -318,31 +384,25 @@ struct SpacesSideBarView: View {
             }
 
             if !windowState.isIncognito {
-                ForEach(LiveFolderMenuItem.all, id: \.title) { entry in
+                Menu {
+                    ForEach(LiveFolderMenuItem.all, id: \.title) { entry in
+                        Button {
+                            if let spaceID = windowState.spaceID {
+                                tabs.createLiveFolder(entry.source, in: spaceID)
+                            }
+                        } label: {
+                            Label(entry.title, systemImage: entry.symbol)
+                        }
+                    }
                     Button {
                         if let spaceID = windowState.spaceID {
-                            tabs.createLiveFolder(entry.source, in: spaceID)
+                            browserManager.presentFeedFolderPrompt(in: spaceID)
                         }
                     } label: {
-                        Label(entry.title, systemImage: entry.symbol)
-                    }
-                }
-                Button {
-                    if let spaceID = windowState.spaceID {
-                        browserManager.presentFeedFolderPrompt(in: spaceID)
+                        Label("New Feed Folder…", systemImage: "dot.radiowaves.up.forward")
                     }
                 } label: {
-                    Label("New Feed Folder…", systemImage: "dot.radiowaves.up.forward")
-                }
-            }
-
-            if themeableSpace != nil {
-                Divider()
-
-                Button {
-                    showThemeEditor = true
-                } label: {
-                    Label("Edit Theme Color…", systemImage: "paintpalette")
+                    Label("Live Folders", systemImage: "folder.badge.gearshape")
                 }
             }
 
@@ -359,6 +419,30 @@ struct SpacesSideBarView: View {
                 }
             } label: {
                 Label("Position", systemImage: nookSettings.sidebarPosition.icon)
+            }
+
+            if !windowState.isIncognito {
+                Button {
+                    SettingsNavigation.shared.currentSettingsTab = .spaces
+                    openSettings()
+                } label: {
+                    Label("Manage Spaces…", systemImage: "gearshape")
+                }
+
+                if let space = themeableSpace, tabs.switchableSpaces(for: windowState).count > 1 {
+                    Divider()
+
+                    Button(role: .destructive) {
+                        browserManager.confirmSpaceDeletion(
+                            spaceName: space.name,
+                            tabCount: tabs.tabCount(inSpace: space.id),
+                            isLastSpace: false,
+                            onDelete: { tabs.deleteSpace(space.id) }
+                        )
+                    } label: {
+                        Label("Delete Space", systemImage: "trash")
+                    }
+                }
             }
         }
     }

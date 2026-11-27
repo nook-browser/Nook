@@ -712,10 +712,6 @@ public final class TabsController {
             window.spaceID = tree.orderedSpaces.first?.id
         }
         refreshLiveFolders()
-        if let spaceID = window.spaceID, window.selectedItemBySpace[spaceID] == nil,
-           let first = displayOrder(in: window).first {
-            window.selectedItemBySpace[spaceID] = first
-        }
         mirror(window)
         archiveIdleTabs()
     }
