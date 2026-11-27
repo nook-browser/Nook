@@ -93,7 +93,7 @@ public struct DragVelocity {
 
 public enum SpaceSwitcher {
     public static let minItem: CGFloat = 8    // Arc's dock floor; past it the row scrolls
-    public static let maxItem: CGFloat = 34
+    public static let maxItem: CGFloat = 26
     public static let compactBelow: CGFloat = 22
 
     /// Space between items before the row has to squeeze them.

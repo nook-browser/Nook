@@ -75,6 +75,11 @@ struct SpaceSwitcherTitle: View {
                 .nookTabSurface(selected: false, hovered: isHovering || isDropTarget)
                 .contentShape(NookDesign.Radius.shape(NookDesign.Tab.radius))
                 .onHoverTracking { isHovering = $0 }
+                .contextMenu {
+                    if windowState.privateTree == nil {
+                        menuContent(current: space)
+                    }
+                }
             }
         }
     }
@@ -137,6 +142,10 @@ struct SpaceSwitcherTitle: View {
             }
         }
         Divider()
+        Button("New Folder", systemImage: "folder.badge.plus") {
+            tabs.setPinnedCollapsed(false, space: current.id)
+            tabs.createFolderForRename(in: .pinned(spaceID: current.id), after: tabs.children(of: .pinned(spaceID: current.id)).last?.id)
+        }
         Button("New Space…", systemImage: "plus", action: onNewSpace)
         Button("Space Settings", systemImage: "gearshape") {
             SettingsNavigation.shared.currentSettingsTab = .spaces

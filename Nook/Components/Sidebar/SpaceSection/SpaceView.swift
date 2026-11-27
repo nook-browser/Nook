@@ -291,7 +291,6 @@ struct SpaceView: View {
                 tabCount: looseTabs.count,
                 clearCount: clearable.count
             )
-            .padding(.horizontal, NookDesign.Spacing.md)
 
             if tabs.rows(space: spaceID).allSatisfy({ $0.section != .pinned }), dragSession.isDragging {
                 // Reuse the New Tab slot, so revealing an empty pin target cannot push the

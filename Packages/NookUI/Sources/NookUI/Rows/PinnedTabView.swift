@@ -71,20 +71,14 @@ public struct PinnedTabView<Icon: View>: View {
                         .allowsHitTesting(false)
                 }
                 if isActive, let colors {
-                    if let glow, !isDimmed {
-                        glowImage(glow)
-                            .mask(NookDesign.Radius.shape(NookDesign.Radius.lg)
-                                .strokeBorder(Color.black, lineWidth: NookDesign.Size.favoriteBorder))
-                            .allowsHitTesting(false)
-                    } else {
-                        NookDesign.Radius.shape(NookDesign.Radius.lg)
-                            .strokeBorder(Color(colors.selectedBorder).opacity(isDimmed ? NookDesign.Surface.favoriteDimmedBorderOpacity : 1),
-                                          lineWidth: NookDesign.Size.favoriteBorder)
-                    }
+                    NookDesign.Radius.shape(NookDesign.Radius.lg)
+                        .strokeBorder(Color(colors.selectedBorder).opacity(isDimmed ? NookDesign.Surface.favoriteDimmedBorderOpacity : 1),
+                                      lineWidth: NookDesign.Size.favoriteBorder)
                 }
 
                 tabIcon
-                    .frame(height: NookDesign.Size.essentialsFavicon)
+                    .frame(width: NookDesign.Size.essentialsFavicon, height: NookDesign.Size.essentialsFavicon)
+                    .clipShape(NookDesign.Radius.shape(NookDesign.Radius.xs))
                     .opacity(isUnloaded ? NookDesign.Surface.unloadedOpacity : 1)
             }
             .overlay(alignment: .topTrailing) {

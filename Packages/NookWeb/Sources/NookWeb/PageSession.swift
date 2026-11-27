@@ -845,8 +845,14 @@ public final class PageSession: NSObject, Identifiable {
 
     private static func fetchFaviconImage(for url: URL) async -> PlatformImage? {
         do {
-            let favicon = try await FaviconFinder(url: url)
-                .fetchFaviconURLs()
+            let urls = try await FaviconFinder(url: url).fetchFaviconURLs()
+            let standard = urls.filter {
+                $0.format != .appleTouchIcon &&
+                $0.format != .appleTouchIconPrecomposed &&
+                $0.format != .metaOpenGraphImage &&
+                $0.format != .metaThumbnail
+            }
+            let favicon = try await (standard.isEmpty ? urls : standard)
                 .download()
                 .largest()
             return favicon.image?.image

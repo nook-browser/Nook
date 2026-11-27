@@ -21,9 +21,9 @@ public struct SpaceIcon: View {
         if Self.isDot(value) {
             Circle().frame(width: NookDesign.Spacing.sm, height: NookDesign.Spacing.sm)
         } else if Self.isEmoji(value) {
-            Text(value).font(NookDesign.Font.heading)
+            Text(value).font(NookDesign.Font.body)
         } else {
-            Image(systemName: value).font(.system(size: 15, weight: .medium))
+            Image(systemName: value).font(.system(size: NookDesign.Size.spaceIcon, weight: .medium))
         }
     }
 }

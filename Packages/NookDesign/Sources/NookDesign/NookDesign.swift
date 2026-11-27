@@ -49,7 +49,7 @@ public enum NookDesign {
         public static let sidebarInset: CGFloat = 8
         public static let favoriteGap: CGFloat = 8     // between favorite tiles
         public static let rowGap: CGFloat = 2
-        public static let sectionGap: CGFloat = 10
+        public static let sectionGap: CGFloat = 8
         public static let rowPadding: CGFloat = 8
         #if os(iOS)
         // Depth 5 at 20 would eat 100 of a 390pt phone row.
@@ -79,14 +79,14 @@ public enum NookDesign {
         public static let row: CGFloat = 32
         #endif
         public static let iconButton: CGFloat = 28
-        public static let favoriteTile: CGFloat = 48   // a favorite tile's height; at the default sidebar width tiles are 55 pt wide
+        public static let favoriteTile: CGFloat = 44   // a favorite tile's height, matching Arc
         public static let favoriteBorder: CGFloat = 2  // the selected favorite's edge
         public static let favoriteGlowScale: CGFloat = 2   // pixels per point of the blurred favicon behind a tile
         public static let favoriteGlowBlur: CGFloat = 0.25 // its blur radius as a fraction of the tile
         public static let themeKnob: CGFloat = 56      // the theme editor's noise knob
         public static let favicon: CGFloat = 16
         public static let essentialsTile: CGFloat = 44
-        public static let essentialsFavicon: CGFloat = 20
+        public static let essentialsFavicon: CGFloat = 18
         public static let navRow: CGFloat = 28
         #if os(iOS)
         // The floating bar's control row. 50 clears the 44pt touch minimum with
@@ -95,7 +95,7 @@ public enum NookDesign {
         #else
         public static let bottomBar: CGFloat = 40
         #endif
-        public static let spaceIcon: CGFloat = 14      // switcher and header symbol
+        public static let spaceIcon: CGFloat = 13      // switcher and header symbol
         public static let rowGlyph: CGFloat = 13       // inline glyphs in a row: audio, lock, chevron
         public static let rowButton: CGFloat = 20      // hover-only close/unload button in a row
         public static let cornerButton: CGFloat = 14   // button tucked into a tile corner, kept off the tile's centre
@@ -145,10 +145,10 @@ public enum NookDesign {
 
     /// Sidebar tab cards. Keep these separate from general chrome/control sizing.
     public enum Tab {
-        public static let height: CGFloat = 36
+        public static let height: CGFloat = 34
         public static let verticalInset: CGFloat = 2
         public static let stride: CGFloat = height + verticalInset * 2
-        public static let radius: CGFloat = 12
+        public static let radius: CGFloat = 10
         public static let font = NookDesign.Font.body   // tab title, as before the Arc work
         public static let pressScale: CGFloat = 0.985
         public static let dragScale: CGFloat = 1.025
@@ -217,12 +217,12 @@ public enum NookDesign {
         public static let unloadedOpacity: Double = 0.55
         /// A selected favorite tile's fill, as Arc draws it: white, halved in an inactive window.
         public static func favoriteSelectedFill(dark: Bool, dimmed: Bool) -> Color {
-            Color.white.opacity((dark ? 0.45 : 0.8) * (dimmed ? 0.5 : 1))
+            Color.white.opacity((dark ? 0.18 : 0.8) * (dimmed ? 0.5 : 1))
         }
-        /// Opacity of the blurred favicon behind a favorite tile.
+        /// Opacity of the blurred favicon behind a favorite tile (hover-only so idle tiles stay clean).
         public static func favoriteGlowOpacity(dark: Bool, hovered: Bool, dimmed: Bool) -> Double {
-            if dimmed { return 0 }
-            return dark ? (hovered ? 0.3 : 0.2) : (hovered ? 0.1 : 0)
+            if dimmed || !hovered { return 0 }
+            return dark ? 0.25 : 0.1
         }
         public static let favoriteDimmedBorderOpacity: Double = 0.2
         public static let dropBorderIdle = Color.secondary.opacity(0.3)    // dashed empty-state drop target

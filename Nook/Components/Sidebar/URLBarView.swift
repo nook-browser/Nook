@@ -85,12 +85,12 @@ struct URLBarView: View {
         .overlay(alignment: .bottom) {
             if splitItemID == nil { PageLoadingProgressBar(session: session) }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(NookDesign.Radius.shape(NookDesign.Tab.radius))
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            NookDesign.Radius.shape(NookDesign.Tab.radius)
                 .fill(colorScheme == .dark
-                      ? Color.white.opacity(splitItemID == nil ? (isHovering ? 0.10 : 0.15) : 0)
-                      : Color.black.opacity(splitItemID == nil ? 0.08 : 0))
+                      ? Color.white.opacity(splitItemID == nil ? (isHovering ? 0.13 : 0.08) : 0)
+                      : Color.black.opacity(splitItemID == nil ? (isHovering ? 0.10 : 0.06) : 0))
         }
         // Report the frame in the window space so we can overlay the mini palette above all content
         .background {
@@ -171,7 +171,7 @@ struct URLBarView: View {
                             }
                             // Show only the domain (like Arc)
                             Text(displayHost(for: session))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(isHovering ? .primary : .secondary)
                                 .font(NookDesign.Font.secondary)
                                 .lineLimit(1)
                             if let errors = devErrorCount(for: session) {
@@ -210,8 +210,8 @@ struct URLBarView: View {
                     beginEditing(session?.url.absoluteString ?? "")
                 })
 
-                // Copy link button (always visible when tab is selected)
-                if !isEditing, let session {
+                // Copy link button (shown on hover like Arc)
+                if !isEditing, (isHovering || showCheckmark), let session {
                     Button("Copy Link", systemImage: showCheckmark ? "checkmark" : "link") {
                         copyURLToClipboard(session.url.absoluteString)
                     }
@@ -222,8 +222,8 @@ struct URLBarView: View {
                     .contentTransition(.symbolEffect(.replace))
                 }
 
-                // Extension library button (contains site settings, zoom, etc.)
-                if !isEditing, let session, session.url.absoluteString != "about:blank", let extensionManager = browserManager.extensionManager {
+                // Extension library button (shown on hover to keep the URL bar clean at rest)
+                if !isEditing, isHovering, let session, session.url.absoluteString != "about:blank", let extensionManager = browserManager.extensionManager {
                     let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
                     let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
 

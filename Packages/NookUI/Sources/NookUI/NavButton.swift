@@ -30,7 +30,7 @@ public struct NookIconButtonStyle: ButtonStyle {
                 .fill(fill(isPressed: configuration.isPressed))
                 .frame(width: size, height: size)
             configuration.label
-                .foregroundStyle(.primary)
+                .foregroundStyle(isHovering ? .primary : .secondary)
         }
         .frame(width: size, height: size)
         .opacity(isEnabled ? 1.0 : 0.3)
