@@ -231,17 +231,16 @@ struct SpacesSideBarView: View {
         .pageViewStyle(.scroll)
         // While the library is out the swipe is its own; the spaces under it stay put.
         .pageSwipeEnabled(!windowState.isSidebarMenuVisible)
-        // Pulling past the first space draws the library out on its Spaces page, as in Arc.
+        // Pulling past the first space draws the library out on its last selected tab.
         .onPageOverscrollLeading { pull in
             guard !windowState.isIncognito else { return }
             switch pull {
             case .changed(let distance):
-                if windowState.libraryDrag == nil, distance > 0 { windowState.sidebarMenuSelectedTab = .spaces }
                 // Nil, not zero, once the pull is back home: a held zero would pin the library shut.
                 windowState.libraryDrag = distance > 0 ? distance : nil
             case .ended(let distance, let velocity):
                 LibraryMotion.release(windowState, distance: distance, velocity: velocity, width: LibraryMotion.width(
-                    for: .spaces,
+                    for: windowState.sidebarMenuSelectedTab,
                     windowWidth: windowState.window?.contentView?.bounds.width ?? .greatestFiniteMagnitude
                 ))
             }

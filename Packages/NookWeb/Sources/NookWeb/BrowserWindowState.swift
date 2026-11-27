@@ -65,8 +65,14 @@ public class BrowserWindowState {
     /// Whether the full History page covers the web content (Cmd-Y), as Arc's history tab does.
     public var isHistoryPageVisible: Bool = false
 
-    /// The selected tab in the sidebar menu (history or downloads)
-    public var sidebarMenuSelectedTab: SidebarMenuTab = .history
+    private static let libraryTabDefaultsKey = "nook.librarySelectedTab"
+
+    /// The selected tab in the sidebar menu (persisted across closes and launches)
+    public var sidebarMenuSelectedTab: SidebarMenuTab = UserDefaults.standard
+        .string(forKey: "nook.librarySelectedTab")
+        .flatMap(SidebarMenuTab.init(rawValue:)) ?? .history {
+        didSet { UserDefaults.standard.set(sidebarMenuSelectedTab.rawValue, forKey: Self.libraryTabDefaultsKey) }
+    }
 
     /// Whether the AI chat panel is visible in this window
     public var isSidebarAIChatVisible: Bool = false
@@ -220,7 +226,7 @@ public class BrowserWindowState {
 }
 
 /// The sidebar menu's two tabs. The app aliases its own `Tabs` to this.
-public enum SidebarMenuTab: Hashable, Sendable {
+public enum SidebarMenuTab: String, Hashable, Sendable {
     case history
     case downloads
     case spaces

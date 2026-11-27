@@ -36,7 +36,8 @@ enum LibraryMotion {
         let opens = LibrarySwipeDecision.opens(distance: distance, velocity: velocity, width: width, wasOpen: wasOpen)
         log.debug("Library release: distance \(distance, format: .fixed(precision: 0)) velocity \(velocity, format: .fixed(precision: 0)) wasOpen \(wasOpen) opens \(opens)")
         let remaining = (opens ? width : 0) - min(max(distance, 0), width)
-        let relativeVelocity = abs(remaining) > 1 ? velocity / remaining : 0
+        let rawVelocity = abs(remaining) > 1 ? velocity / remaining : 0
+        let relativeVelocity = min(max(rawVelocity, -10), 10)
         withAnimation(.interpolatingSpring(NookDesign.Motion.librarySpring, initialVelocity: relativeVelocity)) {
             windowState.libraryDrag = nil
             windowState.isSidebarMenuVisible = opens

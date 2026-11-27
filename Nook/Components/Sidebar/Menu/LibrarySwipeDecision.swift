@@ -10,10 +10,10 @@
 import Foundation
 
 enum LibrarySwipeDecision {
-    /// Faster than this (points a second) at lift, the direction alone decides. Nook's own value.
-    static let flick: Double = 150
-    /// A slow drag commits this far past where it started. Nook's own value.
-    static let commit: Double = 40
+    /// Faster than this (points a second) at lift, the direction alone decides.
+    static let flick: Double = 120
+    /// A slow drag commits this far past where it started.
+    static let commit: Double = 36
 
     /// The library's width: `max(417, min(preferred, windowWidth - 56))`, Arc's rule.
     static func width(preferred: Double, windowWidth: Double, minimum: Double = 417, edgeGap: Double = 56) -> Double {

@@ -351,6 +351,48 @@ public class DownloadManager: NSObject {
             }
             self.restoreFinished = true
             if self.persistAfterRestore { self.persist() }
+            self.refreshSystemDownloads()
+        }
+    }
+
+    /// Scans `~/Downloads` off the main thread so files downloaded by other apps appear alongside Nook's.
+    func refreshSystemDownloads() {
+        guard let downloadsDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
+        DispatchQueue.global(qos: .utility).async {
+            let keys: [URLResourceKey] = [.isDirectoryKey, .isPackageKey, .addedToDirectoryDateKey, .contentModificationDateKey, .creationDateKey, .fileSizeKey]
+            guard let urls = try? FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else { return }
+
+            var scanned: [(url: URL, date: Date, size: Int64?)] = []
+            for fileURL in urls {
+                let ext = fileURL.pathExtension.lowercased()
+                if ext == "crdownload" || ext == "download" || ext == "part" { continue }
+                let values = try? fileURL.resourceValues(forKeys: Set(keys))
+                if values?.isDirectory == true && values?.isPackage != true { continue }
+                let date = values?.addedToDirectoryDate ?? values?.contentModificationDate ?? values?.creationDate ?? Date.distantPast
+                let size = values?.fileSize.map(Int64.init)
+                scanned.append((fileURL, date, size))
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let knownPaths = Set(self.downloads.values.compactMap { $0.destinationURL?.standardizedFileURL.path })
+                for entry in scanned {
+                    let path = entry.url.standardizedFileURL.path
+                    guard !knownPaths.contains(path) else { continue }
+                    let item = Download(
+                        download: nil,
+                        originalURL: entry.url,
+                        suggestedFilename: entry.url.lastPathComponent,
+                        origin: DownloadOrigin(isPrivate: false, profileID: nil, pageTitle: nil),
+                        state: .completed
+                    )
+                    item.destinationURL = entry.url
+                    item.startDate = entry.date
+                    item.fileSize = entry.size
+                    item.downloadedBytes = entry.size ?? 0
+                    self.downloads[item.id] = item
+                }
+            }
         }
     }
 
@@ -359,7 +401,7 @@ public class DownloadManager: NSObject {
         // Saving before the old history is in would overwrite it with this launch's downloads alone.
         guard restoreFinished else { persistAfterRestore = true; return }
         DownloadHistoryStore.save(downloads.values.compactMap { item in
-            guard item.state == .completed, let url = item.destinationURL else { return nil }
+            guard item.state == .completed, item.originalURL.scheme != "file", let url = item.destinationURL else { return nil }
             return DownloadSnapshot(originalURL: item.originalURL, path: url.path, date: item.startDate,
                                     size: item.fileSize ?? item.downloadedBytes, renamedFrom: item.renamedFrom,
                                     profileID: item.origin.profileID, isCompleted: true, isPrivate: item.origin.isPrivate)

@@ -73,20 +73,39 @@ struct SidebarBottomBar: View {
 
     private var menuButton: some View {
         ZStack {
-            Button("Menu", systemImage: "archivebox") {
+            Button {
                 onMenuTap()
+            } label: {
+                ZStack {
+                    Image(systemName: isMenuButtonHovered ? "archivebox.fill" : "archivebox")
+                        .shadow(color: Color.white.opacity(isMenuButtonHovered ? 0.5 : 0), radius: 6)
+                    if isMenuButtonHovered {
+                        Image(systemName: "sparkle")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .offset(y: -8)
+                            .shadow(color: .white.opacity(0.8), radius: 3)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
             }
+            .accessibilityLabel("View Library")
             // A finished download bounces the button its icon flew into.
             .symbolEffect(.bounce, value: browserManager.downloadManager.completedCount)
             .nookSidebarIconButtons()
+            .background(
+                NookDesign.Radius.shape(NookDesign.Radius.md)
+                    .fill(isMenuButtonHovered ? NookDesign.Surface.fillPressed : .clear)
+            )
             .anchorPreference(key: DownloadsButtonAnchorKey.self, value: .bounds) { $0 }
             .onHoverTracking { isHovered in
                 isMenuButtonHovered = isHovered
+                if isHovered { browserManager.downloadManager.refreshSystemDownloads() }
                 onMenuHover(isHovered)
             }
-            // Arc's hint beside the button: where it leads.
+            // Arc's hint beside the button when no recent downloads peek is shown.
             .overlay(alignment: .leading) {
-                if isMenuButtonHovered {
+                if isMenuButtonHovered, browserManager.downloadManager.recentDownloads.isEmpty {
                     Text("View Library")
                         .font(NookDesign.Font.label)
                         .foregroundStyle(.white)
