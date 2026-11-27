@@ -106,15 +106,14 @@ struct LibraryPushContainer<Content: View>: View {
             let sidebar = windowState.isSidebarVisible ? windowState.sidebarWidth : 0
             let push = max(shown - sidebar * progress, 0)
             ZStack {
-                // As in Arc, the window buttons go with the sidebar over the first half of the pull
-                // and come back with the library over the second; at rest they belong to whichever
-                // is showing.
-                TrafficLights(visible: lightsVisible || progress > 0, alpha: abs(1 - 2 * progress))
+                // Keep traffic lights solid across the swipe like Arc, never blinking out mid-pull.
+                TrafficLights(visible: lightsVisible || progress > 0, alpha: 1)
                     .frame(width: 0, height: 0)
                 LibraryPanel(width: width, shown: shown)
                 content
                     .environment(\.libraryProgress, progress)
                     .offset(x: onRight ? -push : push)
+                    .shadow(color: .black.opacity(0.22 * progress), radius: 18 * progress, x: onRight ? 6 * progress : -6 * progress)
                 // While the library is out, a click on the page beside it brings the page back.
                 // Only beside it: an overlay on the moved browser stays at the browser's old
                 // frame (offset moves drawing, not layout) and swallowed every click in the library.
@@ -146,12 +145,15 @@ extension EnvironmentValues {
 /// The sidebar giving way to the library: fading and drifting toward it, gone once it is out.
 struct LibraryFade: ViewModifier {
     @Environment(\.libraryProgress) private var progress
+    @Environment(\.nookSettings) private var nookSettings
 
     func body(content: Content) -> some View {
-        // Gone by half way. Opacity only: a blur or scale here flattens the AppKit views inside
-        // (the space pager tracking the very swipe) into a picture, and the swipe breaks.
+        // Gone by half way. Opacity + offset only: blur or scale flattens the AppKit space
+        // pager inside and breaks the active swipe.
         let out = min(progress * 2, 1)
+        let drift = (nookSettings.sidebarPosition == .right ? 1 : -1) * 18 * out
         content
+            .offset(x: drift)
             .opacity(1 - out)
             // Under the library from the first point of the pull, so it never takes its clicks.
             .allowsHitTesting(progress == 0)
@@ -172,6 +174,7 @@ struct LibraryPanel: View {
 
     var body: some View {
         let onRight = nookSettings.sidebarPosition == .right
+        let progress = width > 0 ? min(shown / width, 1) : 0
         if shown > 0 {
             SidebarMenu()
                 .environmentObject(browserManager)
@@ -180,10 +183,9 @@ struct LibraryPanel: View {
                 .frame(maxHeight: .infinity)
                 .padding(.top, NookDesign.Spacing.sidebarTop)
                 .spaceThemeAppearance(theme)
-                // Trails the browser in, so it reads as underneath, fading in as it comes. No blur or
-                // scale: those flatten the AppKit views inside into a picture (see LibraryFade).
-                .offset(x: (onRight ? 1 : -1) * (width - shown) * 0.3)
-                .opacity(min(1, shown / max(width * 0.5, 1)))
+                // Sits underneath as the browser slides aside, fading in with subtle depth.
+                .scaleEffect(0.98 + 0.02 * progress, anchor: onRight ? .trailing : .leading)
+                .opacity(min(1, shown / max(width * 0.35, 1)))
                 .frame(maxWidth: .infinity, alignment: onRight ? .trailing : .leading)
                 .transition(.identity)
         }

@@ -199,7 +199,7 @@ public enum NookDesign {
         public static let flight = Animation.easeIn(duration: 0.6)       // a download flying from the page to its button
         public static let spring = Animation.snappy(duration: 0.3)      // palette, dialog, toast, drag reorder, gesture-tracked motion
         public static let pageSettle = Animation.spring(response: 0.25, dampingFraction: 1)  // the space pager's settle, so the dots land with the pages
-        public static let librarySpring = Spring(response: 0.25, dampingRatio: 1)   // library open, close and release, the pager's spring
+        public static let librarySpring = Spring(response: 0.30, dampingRatio: 0.88)   // library open, close and release
         public static let libraryRubberBand: CGFloat = 0.55              // resistance past fully open
         public static let libraryVelocityWindow: TimeInterval = 0.1      // swipe samples older than this are dropped from the velocity
         public static let swipeAxisLock: CGFloat = 10                    // points of travel before a swipe commits to an axis
