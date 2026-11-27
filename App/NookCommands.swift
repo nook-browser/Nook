@@ -360,9 +360,66 @@ struct NookCommands: Commands {
                         .modifier(spaceShortcut(index))
                     }
                 }
+
+                Divider()
+
+                Button("Space Settings...") {
+                    browserManager.showSpaceSettings()
+                }
+                .modifier(dynamicShortcut(.customizeSpaceGradient))
+                .disabled(windowRegistry.activeWindow?.spaceID == nil)
             }
 
-            CommandMenu("Privacy") {
+            CommandMenu("Tabs") {
+                Button("New Tab") {
+                    windowRegistry.activeWindow?.commandPalette?.open()
+                }
+
+                Button(browserManager.pinToggleIsPin == false ? "Unpin Tab" : "Pin Tab") {
+                    browserManager.togglePinCurrentTab()
+                }
+                .disabled(browserManager.pinToggleIsPin == nil)
+
+                Divider()
+
+                Button("Collapse All Folders") {
+                    if let spaceID = windowRegistry.activeWindow?.spaceID {
+                        browserManager.tabs.setAllFolders(open: false, space: spaceID)
+                    }
+                }
+                .disabled(windowRegistry.activeWindow?.spaceID == nil)
+
+                Button("Expand All Folders") {
+                    if let spaceID = windowRegistry.activeWindow?.spaceID {
+                        browserManager.tabs.setAllFolders(open: true, space: spaceID)
+                    }
+                }
+                .disabled(windowRegistry.activeWindow?.spaceID == nil)
+
+                if tabOrganizerManager.isAvailable {
+                    Divider()
+
+                    Button("Organize Tabs") {
+                        if let spaceID = windowRegistry.activeWindow?.spaceID {
+                            Task {
+                                await tabOrganizerManager.organizeTabs(in: spaceID, using: browserManager.tabs)
+                            }
+                        }
+                    }
+                    .disabled(
+                        tabOrganizerManager.isOrganizing
+                            || windowRegistry.activeWindow?.spaceID == nil
+                    )
+                }
+            }
+
+            CommandMenu("Archive") {
+                Button("Reopen Closed Tab") {
+                    if let window = windowRegistry.activeWindow { browserManager.tabs.reopenLastClosed(in: window) }
+                }
+
+                Divider()
+
                 Menu("Clear Cookies") {
                     Button("Clear Cookies for Current Site") {
                         browserManager.clearCurrentPageCookies()
@@ -473,25 +530,17 @@ struct NookCommands: Commands {
                     browserManager.tabs.activeWindowSession?.load(URL(string: "https://chromewebstore.google.com")!)
                 }
 
+                Button("Boost This Site...") {
+                    browserManager.boostCurrentSite()
+                }
+                .disabled(browserManager.tabs.activeWindowSession == nil)
+
                 #if DEBUG
                 Divider()
                 Button("Open Popup Console") {
                     browserManager.extensionManager?.showPopupConsole()
                 }
                 #endif
-            }
-
-            CommandMenu("Appearance") {
-                Button("Space Settings...") {
-                    browserManager.showSpaceSettings()
-                }
-                .modifier(dynamicShortcut(.customizeSpaceGradient))
-                .disabled(windowRegistry.activeWindow?.spaceID == nil)
-
-                Button("Boost This Site...") {
-                    browserManager.boostCurrentSite()
-                }
-                .disabled(browserManager.tabs.activeWindowSession == nil)
             }
         }
     }

@@ -22,6 +22,7 @@ struct SpacesListItem: View {
     let isFaded: Bool
     /// Draw a plain dot whatever the icon; the Agent space keeps its mark.
     let forceDot: Bool
+    let onHoverChange: (Bool) -> Void
 
     @State private var showThemePicker = false
     @State private var showsIconPicker = false
@@ -37,7 +38,8 @@ struct SpacesListItem: View {
         selection: Double? = nil,
         isFaded: Bool,
         buttonSize: CGFloat = NookDesign.Spacing.xxl,
-        forceDot: Bool = false
+        forceDot: Bool = false,
+        onHoverChange: @escaping (Bool) -> Void = { _ in }
     ) {
         self.forceDot = forceDot
         self.space = space
@@ -45,6 +47,7 @@ struct SpacesListItem: View {
         self.selection = selection ?? (isActive ? 1 : 0)
         self.isFaded = isFaded
         self.buttonSize = buttonSize
+        self.onHoverChange = onHoverChange
     }
 
     var body: some View {
@@ -62,6 +65,7 @@ struct SpacesListItem: View {
         .layoutPriority(isActive ? 1 : 0)
         .opacity(isFaded ? 0.3 : 1.0)
         .accessibilityLabel(space.name)
+        .onHoverTracking { onHoverChange($0) }
         .popover(isPresented: $showThemePicker, arrowEdge: .top) {
             SpaceThemeEditor(space: space)
                 .environment(tabs)

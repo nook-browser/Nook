@@ -20,6 +20,7 @@ struct SidebarBottomBar: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(CommandPalette.self) private var commandPalette
     @Binding var isMenuButtonHovered: Bool
+    @State private var showCreateMenu = false
     let onMenuTap: () -> Void
     let onNewSpaceTap: () -> Void
     let onMenuHover: (Bool) -> Void
@@ -106,14 +107,31 @@ struct SidebarBottomBar: View {
         }
     }
     
-    /// Arc's create menu: space and folder, then page tools, then panes and tabs.
+    /// Arc's create menu: `+` rotates to `×` and opens a popover above the button.
     private var newSpaceButton: some View {
-        Menu {
-            Button("New Space", systemImage: "plus.square.on.square") {
+        Button {
+            showCreateMenu.toggle()
+        } label: {
+            Image(systemName: "plus")
+                .rotationEffect(.degrees(showCreateMenu ? 45 : 0))
+                .animation(NookDesign.Motion.spring, value: showCreateMenu)
+        }
+        .accessibilityLabel(showCreateMenu ? "Close Menu" : "Actions")
+        .nookSidebarIconButtons()
+        .popover(isPresented: $showCreateMenu, arrowEdge: .top) {
+            createMenuPopover
+        }
+    }
+
+    private var createMenuPopover: some View {
+        VStack(alignment: .leading, spacing: NookDesign.Spacing.xxs) {
+            CreateMenuRow("New Space", systemImage: "plus.square.on.square") {
+                showCreateMenu = false
                 onNewSpaceTap()
             }
 
-            Button("New Folder", systemImage: "folder.badge.plus") {
+            CreateMenuRow("New Folder", systemImage: "folder.badge.plus") {
+                showCreateMenu = false
                 if let spaceID = windowState.spaceID {
                     tabs.createFolderForRename(in: .tabs(spaceID: spaceID), after: nil)
                 }
@@ -122,49 +140,130 @@ struct SidebarBottomBar: View {
             Menu {
                 ForEach(LiveFolderMenuItem.all, id: \.title) { entry in
                     Button(entry.title, systemImage: entry.symbol) {
+                        showCreateMenu = false
                         if let spaceID = windowState.spaceID {
                             tabs.createLiveFolder(entry.source, in: spaceID)
                         }
                     }
                 }
                 Button("New Feed Folder…", systemImage: "dot.radiowaves.up.forward") {
+                    showCreateMenu = false
                     if let spaceID = windowState.spaceID {
                         browserManager.presentFeedFolderPrompt(in: spaceID)
                     }
                 }
             } label: {
-                Label("New Live Folder", systemImage: "folder.badge.gearshape")
+                CreateMenuRowLabel("New Live Folder", systemImage: "folder.badge.gearshape", trailingChevron: true)
             }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
 
             Divider()
+                .padding(.vertical, NookDesign.Spacing.xs)
+                .padding(.horizontal, NookDesign.Spacing.sm)
 
-            Button("New Boost", systemImage: "wand.and.stars") {
+            CreateMenuRow("New Boost", systemImage: "wand.and.stars", disabled: !selectedPageIsWeb) {
+                showCreateMenu = false
                 browserManager.openBoostPanel(in: windowState)
             }
-            .disabled(!selectedPageIsWeb)
 
             Divider()
+                .padding(.vertical, NookDesign.Spacing.xs)
+                .padding(.horizontal, NookDesign.Spacing.sm)
 
-            Button("New Split", systemImage: "rectangle.split.2x1") {
+            CreateMenuRow(
+                "New Split",
+                systemImage: "rectangle.split.2x1",
+                disabled: windowState.selectedItemID == nil || windowState.split != nil
+            ) {
+                showCreateMenu = false
                 if let itemID = tabs.open(url: TabsController.homeURL, in: windowState, placement: .background) {
                     browserManager.splitManager.enterSplit(with: itemID, in: windowState)
                 }
             }
-            .disabled(windowState.selectedItemID == nil || windowState.split != nil)
 
-            Button("New Tab", systemImage: "plus.square") {
+            CreateMenuRow("New Tab", systemImage: "plus.square", shortcut: "⌘T") {
+                showCreateMenu = false
                 commandPalette.open()
             }
-        } label: {
-            Label("Actions", systemImage: "plus")
         }
-        .menuStyle(.button)
-        .nookSidebarIconButtons()
+        .padding(NookDesign.Spacing.sm)
+        .frame(width: 220)
     }
 
     private var selectedPageIsWeb: Bool {
         guard let url = tabs.selectedSession(in: windowState)?.url else { return false }
         return url.scheme == "http" || url.scheme == "https"
+    }
+}
+
+/// One row inside the bottom-bar create popover.
+private struct CreateMenuRow: View {
+    let title: String
+    let systemImage: String
+    var shortcut: String? = nil
+    var disabled: Bool = false
+    let action: () -> Void
+
+    init(_ title: String, systemImage: String, shortcut: String? = nil, disabled: Bool = false, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.shortcut = shortcut
+        self.disabled = disabled
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            CreateMenuRowLabel(title, systemImage: systemImage, shortcut: shortcut)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.4 : 1)
+    }
+}
+
+private struct CreateMenuRowLabel: View {
+    let title: String
+    let systemImage: String
+    var shortcut: String? = nil
+    var trailingChevron: Bool = false
+    @State private var isHovering = false
+
+    init(_ title: String, systemImage: String, shortcut: String? = nil, trailingChevron: Bool = false) {
+        self.title = title
+        self.systemImage = systemImage
+        self.shortcut = shortcut
+        self.trailingChevron = trailingChevron
+    }
+
+    var body: some View {
+        HStack(spacing: NookDesign.Spacing.md) {
+            Image(systemName: systemImage)
+                .font(.system(size: NookDesign.Size.rowGlyph, weight: .medium))
+                .frame(width: NookDesign.Size.favicon)
+            Text(title)
+                .font(NookDesign.Font.label)
+            Spacer(minLength: 0)
+            if let shortcut {
+                Text(shortcut)
+                    .font(NookDesign.Font.secondary)
+                    .foregroundStyle(.tertiary)
+            } else if trailingChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: NookDesign.Size.rowGlyph - 2, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .foregroundStyle(.primary)
+        .padding(.horizontal, NookDesign.Spacing.rowPadding)
+        .frame(height: NookDesign.Tab.height)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isHovering ? NookDesign.Surface.fill : .clear, in: NookDesign.Radius.shape(NookDesign.Radius.md))
+        .contentShape(NookDesign.Radius.shape(NookDesign.Radius.md))
+        .onHoverTracking { hovering in
+            withAnimation(NookDesign.Motion.hover(hovering)) { isHovering = hovering }
+        }
     }
 }
 

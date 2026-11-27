@@ -15,6 +15,7 @@ import NookWeb
 public struct SpacesList: View {
     @Environment(TabsController.self) private var tabs
     @Environment(BrowserWindowState.self) private var windowState
+    @State private var hoveredIndex: Int?
 
     private var visibleSpaces: [SpaceRecord] {
         tabs.switchableSpaces(for: windowState)
@@ -33,14 +34,17 @@ public struct SpacesList: View {
             let compact = SpaceSwitcher.isCompact(itemSize: size)
             let overflows = size * CGFloat(count) > width
             let row = HStack(alignment: .center, spacing: gap) {
-                ForEach(visibleSpaces, id: \.id) { space in
+                ForEach(Array(visibleSpaces.enumerated()), id: \.element.id) { index, space in
                     SpacesListItem(
                         space: space,
                         isActive: windowState.spaceID == space.id,
                         selection: selection(of: space.id),
                         isFaded: false,
                         buttonSize: size,
-                        forceDot: compact
+                        forceDot: compact,
+                        onHoverChange: { hovering in
+                            hoveredIndex = hovering ? index : (hoveredIndex == index ? nil : hoveredIndex)
+                        }
                     )
                     .environment(windowState)
                     .transition(.asymmetric(
@@ -55,9 +59,21 @@ public struct SpacesList: View {
             } else {
                 row
                     .frame(width: width, height: geometry.size.height, alignment: .center)
-                    .clipped()
             }
         }
+        .overlay(alignment: .top) {
+            if let hoveredIndex, visibleSpaces.indices.contains(hoveredIndex) {
+                SpaceHoverPill(
+                    space: visibleSpaces[hoveredIndex],
+                    shortcutNumber: hoveredIndex < 9 ? hoveredIndex + 1 : nil
+                )
+                .fixedSize()
+                .offset(y: -(NookDesign.Size.iconButton + NookDesign.Spacing.sm))
+                .allowsHitTesting(false)
+                .transition(.opacity.combined(with: .offset(y: 4)))
+            }
+        }
+        .animation(NookDesign.Motion.quick, value: hoveredIndex)
         .animation(NookDesign.Motion.standard, value: visibleSpaces.count)
     }
 
@@ -68,5 +84,52 @@ public struct SpacesList: View {
         if swipe.from == swipe.to { return id == swipe.from ? 1 : 0 }
         if id == swipe.from { return 1 - swipe.progress }
         return id == swipe.to ? swipe.progress : 0
+    }
+}
+
+/// Arc-style floating pill shown above a hovered space icon in the bottom bar.
+private struct SpaceHoverPill: View {
+    let space: SpaceRecord
+    let shortcutNumber: Int?
+
+    var body: some View {
+        HStack(spacing: NookDesign.Spacing.sm) {
+            Text(space.name)
+                .font(NookDesign.Font.label)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+
+            if let profile = space.profileName, !profile.isEmpty {
+                HStack(spacing: NookDesign.Spacing.xs) {
+                    Image(systemName: "face.smiling")
+                        .font(NookDesign.Font.captionStrong)
+                    Text(profile)
+                        .font(NookDesign.Font.captionStrong)
+                }
+                .foregroundStyle(.black)
+                .padding(.horizontal, NookDesign.Spacing.sm)
+                .padding(.vertical, NookDesign.Spacing.xxs)
+                .background(Color.white.opacity(0.85), in: Capsule())
+            }
+
+            if let shortcutNumber {
+                HStack(spacing: NookDesign.Spacing.xxs) {
+                    keycap("⌃")
+                    keycap("\(shortcutNumber)")
+                }
+            }
+        }
+        .padding(.horizontal, NookDesign.Spacing.md)
+        .frame(height: NookDesign.Size.iconButton)
+        .background(Color.black.opacity(0.88), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: NookDesign.Size.hairlineWidth))
+    }
+
+    private func keycap(_ text: String) -> some View {
+        Text(text)
+            .font(NookDesign.Font.captionStrong)
+            .foregroundStyle(.black)
+            .frame(width: NookDesign.Size.rowButton, height: NookDesign.Size.rowButton)
+            .background(Color.white.opacity(0.85), in: NookDesign.Radius.shape(NookDesign.Radius.xs))
     }
 }

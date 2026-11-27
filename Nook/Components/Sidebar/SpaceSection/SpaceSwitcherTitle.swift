@@ -95,11 +95,15 @@ struct SpaceSwitcherTitle: View {
         }
     }
 
-    /// The space icon, a chevron on hover when there are pinned tabs to fold.
+    /// Chevron right when collapsed, chevron down on hover when expanded, otherwise the space icon.
     @ViewBuilder
     private func leadingIcon(_ space: SpaceRecord) -> some View {
-        if isHovering, hasPinned(space) {
-            Image(systemName: tabs.isPinnedCollapsed(space: space.id) ? "chevron.right" : "chevron.down")
+        if hasPinned(space), tabs.isPinnedCollapsed(space: space.id) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: NookDesign.Size.rowGlyph, weight: .semibold))
+                .foregroundStyle(.secondary)
+        } else if isHovering, hasPinned(space) {
+            Image(systemName: "chevron.down")
                 .font(.system(size: NookDesign.Size.rowGlyph, weight: .semibold))
                 .foregroundStyle(.secondary)
         } else if space.isAgent {
@@ -115,7 +119,7 @@ struct SpaceSwitcherTitle: View {
 
     private func title(_ space: SpaceRecord) -> some View {
         let title = Text(space.name)
-            .foregroundStyle(.primary)
+            .foregroundStyle(.secondary)
             .font(NookDesign.Font.label)
             .lineLimit(1)
             .fixedSize()

@@ -210,20 +210,20 @@ struct URLBarView: View {
                     beginEditing(session?.url.absoluteString ?? "")
                 })
 
-                // Copy link button (shown on hover like Arc)
-                if !isEditing, (isHovering || showCheckmark), let session {
+                // Copy link button (always accessible when tab is selected)
+                if !isEditing, let session {
                     Button("Copy Link", systemImage: showCheckmark ? "checkmark" : "link") {
                         copyURLToClipboard(session.url.absoluteString)
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(NookIconButtonStyle(size: NookDesign.Size.iconButton, radius: NookDesign.Radius.sm))
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(isHovering ? Color.primary : Color.secondary)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     .contentTransition(.symbolEffect(.replace))
                 }
 
-                // Extension library button (shown on hover to keep the URL bar clean at rest)
-                if !isEditing, isHovering, let session, session.url.absoluteString != "about:blank", let extensionManager = browserManager.extensionManager {
+                // Extension library button (contains site settings, zoom, etc.)
+                if !isEditing, let session, session.url.absoluteString != "about:blank", let extensionManager = browserManager.extensionManager {
                     let pinnedIDs = browserManager.nookSettings?.pinnedExtensionIDs ?? []
                     let pinnedExtensions = extensionManager.installedExtensions.filter { pinnedIDs.contains($0.id) }
 

@@ -46,15 +46,15 @@ public struct TabFolderView: View {
             }
         }) {
             HStack(spacing: NookDesign.Spacing.md) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: NookDesign.Size.rowGlyph - 1, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(isOpen ? 90 : 0))
-                    .animation(NookDesign.Motion.standard, value: isOpen)
-
-                Image(systemName: liveSymbol ?? (isOpen ? "folder.fill" : "folder"))
-                    .font(.system(size: NookDesign.Size.spaceIcon, weight: .medium))
-                    .foregroundStyle(tabs.space(spaceID)?.accentColor ?? .secondary)
+                if let liveSymbol {
+                    Image(systemName: liveSymbol)
+                        .font(.system(size: NookDesign.Size.spaceIcon, weight: .medium))
+                        .foregroundStyle(tabs.space(spaceID)?.accentColor ?? .secondary)
+                        .frame(width: NookDesign.Size.favicon, height: NookDesign.Size.favicon)
+                } else {
+                    ArcFolderIcon(isOpen: isOpen)
+                        .frame(width: NookDesign.Size.essentialsFavicon, height: NookDesign.Size.essentialsFavicon)
+                }
 
                 if isRenaming {
                     TextField("", text: $draftName)
@@ -84,12 +84,6 @@ public struct TabFolderView: View {
                         .font(NookDesign.Font.caption)
                         .foregroundStyle(.secondary)
                         .help(liveStatusHelp(status))
-                }
-
-                if !isHovering {
-                    Text("\(tabs.children(of: .folder(itemID: item.id)).count)")
-                        .font(NookDesign.Font.caption)
-                        .foregroundStyle(.tertiary)
                 }
 
                 if isHovering && !isRenaming {
@@ -158,6 +152,7 @@ public struct TabFolderView: View {
     }
 
     private func cancelRename() {
+        draftName = ""
         renameState.itemID = nil
         nameFieldFocused = false
     }
@@ -169,5 +164,62 @@ public struct TabFolderView: View {
             tabs.rename(item.id, newName)
         }
         cancelRename()
+    }
+}
+
+/// Arc-style two-tone outlined folder icon whose front flap tilts open when expanded.
+private struct ArcFolderIcon: View {
+    let isOpen: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let stroke = Color.primary.opacity(0.88)
+        let tabFill = Color.primary.opacity(0.35)
+        let interiorFill = colorScheme == .dark ? Color.black.opacity(0.65) : Color.white.opacity(0.75)
+
+        ZStack(alignment: .bottom) {
+            FolderBackShape()
+                .fill(tabFill)
+            FolderBackShape()
+                .stroke(stroke, lineWidth: 1.45)
+
+            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                .fill(interiorFill)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .stroke(stroke, lineWidth: 1.45)
+                )
+                .frame(height: isOpen ? 10.5 : 11.5)
+                .rotation3DEffect(
+                    .degrees(isOpen ? 28 : 0),
+                    axis: (x: 1, y: 0, z: 0),
+                    anchor: .bottom,
+                    perspective: 0.6
+                )
+                .offset(x: isOpen ? 0.8 : 0, y: 0)
+        }
+        .frame(width: 18, height: 15)
+        .animation(NookDesign.Motion.spring, value: isOpen)
+    }
+}
+
+private struct FolderBackShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var p = Path()
+        p.move(to: CGPoint(x: 0, y: 2.5))
+        p.addQuadCurve(to: CGPoint(x: 2.2, y: 0.5), control: CGPoint(x: 0, y: 0.5))
+        p.addLine(to: CGPoint(x: w * 0.38, y: 0.5))
+        p.addQuadCurve(to: CGPoint(x: w * 0.48, y: 1.8), control: CGPoint(x: w * 0.44, y: 0.5))
+        p.addLine(to: CGPoint(x: w * 0.52, y: 2.5))
+        p.addLine(to: CGPoint(x: w - 2, y: 2.5))
+        p.addQuadCurve(to: CGPoint(x: w, y: 4.5), control: CGPoint(x: w, y: 2.5))
+        p.addLine(to: CGPoint(x: w, y: h - 2))
+        p.addQuadCurve(to: CGPoint(x: w - 2, y: h), control: CGPoint(x: w, y: h))
+        p.addLine(to: CGPoint(x: 2, y: h))
+        p.addQuadCurve(to: CGPoint(x: 0, y: h - 2), control: CGPoint(x: 0, y: h))
+        p.closeSubpath()
+        return p
     }
 }

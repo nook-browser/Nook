@@ -21,7 +21,7 @@ struct PinnedGrid: View {
     @Environment(BrowserWindowState.self) private var windowState
     @Environment(WindowRegistry.self) private var windowRegistry
     @ObservedObject private var dragSession = NookDragSessionManager.shared
-    private let maxColumns = 4
+    private let maxColumns = 3
 
     init(width: CGFloat, spaceID: UUID? = nil) {
         self.width = width

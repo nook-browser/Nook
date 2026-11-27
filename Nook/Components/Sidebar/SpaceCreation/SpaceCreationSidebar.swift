@@ -190,9 +190,10 @@ struct SpaceCreationSidebar: View {
 
     private func create() {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let defaultName = "Space \(tabs.orderedSpaces.filter { !$0.isAgent }.count + 1)"
         let theme = self.theme
         guard let spaceID = tabs.createSpace(
-            name: trimmed.isEmpty ? "New Space" : trimmed,
+            name: trimmed.isEmpty ? defaultName : trimmed,
             icon: icon,
             accentHex: SpaceTheme.accentColor(theme.points[0]).hex,
             after: tabs.orderedSpaces.last { !$0.isAgent }?.id,
